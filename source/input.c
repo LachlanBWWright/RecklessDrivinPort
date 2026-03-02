@@ -12,7 +12,7 @@
 #include "preferences.h"
 #include <HID_Utilities_CFM.h>
 
-#define kCreator 'Råç2'
+#define kCreator 'RÔøΩÔøΩ2'
 #define kMinSwitchDelay		15		//Minimum Delay between siwtching reverse gears in frames.
 
 ISpElementReference *gVirtualElements;
@@ -152,10 +152,10 @@ void InitInput()
 		ISpNeed** needs;
 		int needCount;
 		
-		(Handle)needs=GetResource('ISpN',128);
+		needs=(ISpNeed**)GetResource('ISpN',128);
 		HLock((Handle)needs);
 		needCount=GetHandleSize((Handle)needs)/sizeof(ISpNeed);
-		(Ptr)gVirtualElements=NewPtr(sizeof(ISpElementReference)*needCount);
+		gVirtualElements=(ISpElementReference*)NewPtr(sizeof(ISpElementReference)*needCount);
 		DoError(ISpElement_NewVirtualFromNeeds(needCount, *needs, gVirtualElements, 0));
 		DoError(ISpInit(needCount,*needs,gVirtualElements,kCreator,'????',0,128,0));
 		//DoError(ISpDevices_ActivateClass(kISpDeviceClass_SpeechRecognition));

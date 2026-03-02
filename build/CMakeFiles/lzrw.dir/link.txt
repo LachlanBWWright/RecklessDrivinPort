@@ -1,0 +1,2 @@
+/usr/bin/ar qc liblzrw.a CMakeFiles/lzrw.dir/port/lzrw/lzrw.c.o CMakeFiles/lzrw.dir/port/lzrw/lzrwHandleInterface.c.o
+/usr/bin/ranlib liblzrw.a

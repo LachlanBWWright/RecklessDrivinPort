@@ -315,7 +315,7 @@ void KillObject(tObject *theObj)
 	theObj->control=kObjectNoInput;
 }
 
-inline void ChangeObjs(tObject* obj1,tObject* obj2)
+static inline void ChangeObjs(tObject* obj1,tObject* obj2)
 {
 	((tObject*)obj1->prev)->next=obj2;
 	((tObject*)obj2->next)->prev=obj1;
@@ -394,7 +394,7 @@ void FireWeapon(tObject *shooter,int weaponID)
 	}
 }
 
-inline void MoveObject(tObject *theObj)
+static inline void MoveObject(tObject *theObj)
 {
 	if(*(double*)(&theObj->velo))
 	{
@@ -444,7 +444,7 @@ inline void MoveObject(tObject *theObj)
 	}
 }
 
-inline void AnimateObject(tObject *theObj)
+static inline void AnimateObject(tObject *theObj)
 {
 	tObjectTypePtr objType=theObj->type;
 	if(!(*objType).frameDuration)

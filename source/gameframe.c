@@ -38,7 +38,7 @@ void ResumeFrameCount()
 	gStartMS+=GetMSTime()-gPauseMS;
 }
 
-inline Boolean CheckFrameTime()
+static inline Boolean CheckFrameTime()
 {
 	unsigned long optFrameCount;
 	UInt64 curMS;
@@ -55,7 +55,7 @@ inline Boolean CheckFrameTime()
 	return false;
 }
 
-inline CheckTimeSkip()
+static inline void CheckTimeSkip()
 {
 	unsigned long optFrameCount;
 	UInt64 curMS;

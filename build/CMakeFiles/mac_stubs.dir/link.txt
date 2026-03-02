@@ -1,0 +1,2 @@
+/usr/bin/ar qc libmac_stubs.a CMakeFiles/mac_stubs.dir/port/mac_stubs.c.o
+/usr/bin/ranlib libmac_stubs.a

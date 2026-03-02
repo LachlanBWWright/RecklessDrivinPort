@@ -87,7 +87,7 @@ int LoadLevel()
 			return false;
 		}
 
-	(Ptr)gFirstObj=NewPtrClear(sizeof(tObject));
+	gFirstObj=(tObject*)NewPtrClear(sizeof(tObject));
 	gFirstObj->next=gFirstObj;
 	gFirstObj->prev=gFirstObj;
 	
@@ -98,14 +98,14 @@ int LoadLevel()
 	}
 
 	LoadPack(kPackLevel1+gLevelID);
-	(Ptr)gLevelData=GetSortedPackEntry(kPackLevel1+gLevelID,1,nil);
-	(Ptr)gMarks=GetSortedPackEntry(kPackLevel1+gLevelID,2,&gMarkSize);
+	gLevelData=(tLevelData*)GetSortedPackEntry(kPackLevel1+gLevelID,1,nil);
+	gMarks=(tMarkSeg*)GetSortedPackEntry(kPackLevel1+gLevelID,2,&gMarkSize);
 	gMarkSize/=sizeof(tMarkSeg);
-	(Ptr)gRoadInfo=GetSortedPackEntry(kPackRoad,gLevelData->roadInfo,nil);
-	(Ptr)gTrackUp=(Ptr)gLevelData+sizeof(tLevelData);
-	(Ptr)gTrackDown=(Ptr)gTrackUp+sizeof(UInt32)+gTrackUp->num*sizeof(tTrackInfoSeg);
-	(Ptr)gRoadLenght=LoadObjs((Ptr)gTrackDown+sizeof(UInt32)+gTrackDown->num*sizeof(tTrackInfoSeg));
-	(Ptr)gRoadData=(Ptr)gRoadLenght+sizeof(UInt32);
+	gRoadInfo=(tRoadInfo*)GetSortedPackEntry(kPackRoad,gLevelData->roadInfo,nil);
+	gTrackUp=(tTrackInfo*)((Ptr)gLevelData+sizeof(tLevelData));
+	gTrackDown=(tTrackInfo*)((Ptr)gTrackUp+sizeof(UInt32)+gTrackUp->num*sizeof(tTrackInfoSeg));
+	gRoadLenght=(UInt32*)LoadObjs((Ptr)gTrackDown+sizeof(UInt32)+gTrackDown->num*sizeof(tTrackInfoSeg));
+	gRoadData=(tRoad)((Ptr)gRoadLenght+sizeof(UInt32));
 	
 	for(i=0;i<9;i++)
 		if((*gLevelData).objGrps[i].resID)

@@ -1,6 +1,9 @@
 #include "initexit.h"
 #include "screen.h"
+#include <string.h>
 
+#ifdef __ppc__
+/* PowerPC-specific stack frame and assembly code */
 typedef struct
 {
     unsigned long   fSaveSP,fSaveCR,fSaveLR,fResv0,fResv1,fSaveRTOC;
@@ -45,6 +48,16 @@ inline void GetCallerName(Str255 callerName)
 	else
 		BlockMoveData("\p<Anonymous Routine>",callerName,20);
 }
+#else
+/* On non-PPC platforms, caller name lookup is not available */
+static inline void GetCallerName(Str255 callerName)
+{
+    /* Pascal string format: first byte is length */
+    const char *name = "<Unknown Caller>";
+    callerName[0] = (char)strlen(name);
+    memcpy(callerName + 1, name, callerName[0]);
+}
+#endif /* __ppc__ */
 
 void HandleError(int id)
 {

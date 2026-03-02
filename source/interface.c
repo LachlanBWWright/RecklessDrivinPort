@@ -116,8 +116,8 @@ void DrawScreen(int button,GWorldPtr src)
 			DrawString(gPrefs.name);
 		}
 		else{
-			Move(-StringWidth("\p¥¥¥ This Copy is not Registered! ¥¥¥"),0);
-			DrawString("\p¥¥¥ This Copy is not Registered! ¥¥¥");
+			Move(-StringWidth("\pï¿½ï¿½ï¿½ This Copy is not Registered! ï¿½ï¿½ï¿½"),0);
+			DrawString("\pï¿½ï¿½ï¿½ This Copy is not Registered! ï¿½ï¿½ï¿½");
 		}		
 		MoveTo(10,15);
 		if(gLevelResFile)
@@ -195,7 +195,7 @@ void InitInterface()
 		DrawPicture((PicHandle)pic,&gwSize);
 		DisposeHandle(pic);	
 		SetGWorld(oldGW,oldGD);
-		(Handle)gButtonList=GetResource('Recs',1000);
+		gButtonList=(Rect**)GetResource('Recs',1000);
 		gButtonRgn=NewRgn();
 		gInterfaceInited=true;
 	}

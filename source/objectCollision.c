@@ -75,7 +75,7 @@ t2DPoint SectPoint(t2DPoint *l1p1,t2DPoint *l1p2,t2DPoint *l2p1,t2DPoint *l2p2)
 	return P2D(x,y);		
 }
 
-inline float sqr(float x)
+static inline float sqr(float x)
 {
 	return x*x;
 }

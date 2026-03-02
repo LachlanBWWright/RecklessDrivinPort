@@ -160,7 +160,7 @@ float CalcPower(tObject *theObj,float velo)
 	return power;
 }
 
-inline float SlideFriction(float slide)
+static inline float SlideFriction(float slide)
 {
 	if(slide>kMinSlide)
 	{

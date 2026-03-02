@@ -116,10 +116,10 @@ void DrawRoadZoomed(float xDrawStart,float yDrawStart,float zoom)
 	int screenY;
 	int rowBytesSkip=gRowBytes-gXSize;
 	Ptr drawPos=gBaseAddr;	
-	Ptr backgrTex=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).backgroundTex);
-	Ptr roadTex=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).foregroundTex);
-	Ptr leftBorder=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).roadLeftBorder);
-	Ptr rightBorder=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).roadRightBorder);
+	Ptr backgrTex=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).backgroundTex,nil);
+	Ptr roadTex=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).foregroundTex,nil);
+	Ptr leftBorder=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).roadLeftBorder,nil);
+	Ptr rightBorder=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).roadRightBorder,nil);
 	if(gPrefs.lineSkip)
 		rowBytesSkip+=gRowBytes;
 	for(screenY=0;screenY<gYSize;screenY+=(gPrefs.lineSkip?2:1))
@@ -150,20 +150,20 @@ void DrawMarksZoomed(float xDrawStart,float yDrawStart,float zoom)
 	int l=0,r=gMarkSize,i;
 	int yClipWorld=(gYSize-(gFinishDelay?0:kInvLines))*zoom;
 	int yClip=(gYSize-(gFinishDelay?0:kInvLines));
-	Ptr trackTex=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).marks);
+	Ptr trackTex=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).marks,nil);
 	while(r-1>l)
-		if(gMarks[(l+r)/2].y>yDrawStart)
+		if(gMarks[(l+r)/2].p1.y>yDrawStart)
 			l=(l+r)/2;
 		else
 			r=(l+r)/2;
-	for(i=l;i>0&&gMarks[i].y>yDrawStart-yClipWorld;i++)
+	for(i=l;i>0&&gMarks[i].p1.y>yDrawStart-yClipWorld;i++)
 	{
-		int x=(gMarks[i].x-xDrawStart)*invZoom-2;
-		int y=(yDrawStart-gMarks[i].y)*invZoom;
+		int x=(gMarks[i].p1.x-xDrawStart)*invZoom-2;
+		int y=(yDrawStart-gMarks[i].p1.y)*invZoom;
 		if((y>0)&&(y<yClip))
 			if((x>0)&&(x<gXSize-4))
 			{	
-				int v=(-gMarks[i].y&0x001f)<<2;
+				int v=(-(int)gMarks[i].p1.y&0x001f)<<2;
 				*(long*)(gBaseAddr+y*gRowBytes+x)=*(long*)(trackTex+v);
 			}
 	}
@@ -174,15 +174,15 @@ void DrawTracksZoomed(float xDrawStart,float yDrawStart,float zoom)
 	float invZoom=1/zoom;
 	int i;
 	int yClip=gYSize-(gFinishDelay?0:kInvLines);
-	Ptr trackTex=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).tracks);
+	Ptr trackTex=GetUnsortedPackEntry(kPackTxtR,(*gRoadInfo).tracks,nil);
 	for(i=0;i<gTrackCount;i++)
 	{
-		int x=(gTracks[i].x-xDrawStart)*invZoom-2;
-		int y=(yDrawStart-gTracks[i].y)*invZoom;
+		int x=(gTracks[i].p1.x-xDrawStart)*invZoom-2;
+		int y=(yDrawStart-gTracks[i].p1.y)*invZoom;
 		if((y>0)&&(y<yClip))
 			if((x>0)&&(x<gXSize-4))
 			{	
-				int v=(-gTracks[i].y&0x001f)<<2;
+				int v=(-(int)gTracks[i].p1.y&0x001f)<<2;
 				*(long*)(gBaseAddr+y*gRowBytes+x)=*(long*)(trackTex+v);
 			}
 	}

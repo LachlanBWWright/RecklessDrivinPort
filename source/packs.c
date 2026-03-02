@@ -28,16 +28,17 @@ UInt32 CryptData(UInt32 *data,UInt32 len)
    	}
 	if(len)
 	{
-		*((UInt8*)data)^=gKey>>24;
-		check+=(*((UInt8*)data)++)<<24;
+		UInt8 *byteData = (UInt8*)data;
+		*byteData^=gKey>>24;
+		check+=(*byteData++)<<24;
 		if(len>1)
 		{
-			*((UInt8*)data)^=(gKey>>16)&0xff;
-			check+=(*((UInt8*)data)++)<<16;
+			*byteData^=(gKey>>16)&0xff;
+			check+=(*byteData++)<<16;
 			if(len>2)
 			{
-				*((UInt8*)data)^=(gKey>>8)&0xff;
-				check+=(*((UInt8*)data)++)<<8;
+				*byteData^=(gKey>>8)&0xff;
+				check+=(*byteData++)<<8;
 			}
 		}
 	}

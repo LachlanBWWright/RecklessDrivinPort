@@ -288,7 +288,7 @@ noDraw:
 	*data=spritePos+4;
 }
 
-inline void DrawZoomedCharLine(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
+static inline void DrawZoomedCharLine(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
 {
 	if(gPrefs.hiColor)
 		DrawZoomedCharLine16(data,x,y,zoom);
@@ -296,7 +296,7 @@ inline void DrawZoomedCharLine(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
 		DrawZoomedCharLine8(data,x,y,zoom);	
 }
 
-inline void DrawCharLine(UInt8 **data,SInt32 x,SInt32 y)
+static inline void DrawCharLine(UInt8 **data,SInt32 x,SInt32 y)
 {
 	if(gPrefs.hiColor)
 		DrawCharLine16(data,x,y);

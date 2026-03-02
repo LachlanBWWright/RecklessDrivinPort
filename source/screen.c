@@ -172,7 +172,7 @@ GWorldPtr GetScreenGW()
 }
 
 
-inline RGBColor FadeColor(RGBColor pRGBColor,float fade)
+static inline RGBColor FadeColor(RGBColor pRGBColor,float fade)
 {
      RGBColor tRGBColor;
 

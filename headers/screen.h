@@ -32,12 +32,12 @@ Point GetScreenPos(Point *);
 GWorldPtr GetScreenGW();
 void FadeScreen(int);
 
-inline UInt16 BlendRGB16(UInt16 a,UInt16 b)
+static inline UInt16 BlendRGB16(UInt16 a,UInt16 b)
 {
 	return ((a&0x001e)>>1)+((b&0x001e)>>1)+((a&0x03c0)>>1)+((b&0x03c0)>>1)+((a&0x7800)>>1)+((b&0x7800)>>1);
 } 
 
-inline UInt16 ShadeRGB16(int shade,UInt16 a)
+static inline UInt16 ShadeRGB16(int shade,UInt16 a)
 {
 	return ((a&0x001e)*shade/kLightValues)+((a&0x03c0)*shade/kLightValues&0x03c0)+((a&0x7800)*shade/kLightValues&0x7800);
 } 

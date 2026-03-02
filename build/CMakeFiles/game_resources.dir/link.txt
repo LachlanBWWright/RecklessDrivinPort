@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgame_resources.a CMakeFiles/game_resources.dir/port/resources/resources.c.o
+/usr/bin/ranlib libgame_resources.a
