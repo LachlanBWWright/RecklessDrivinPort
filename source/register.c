@@ -7,7 +7,7 @@
 #include "initexit.h"
 #include <math.h>
 
-#define kCreator 'Råç2'
+#define kCreator 'RÔøΩÔøΩ2'
 
 UInt32 gKey;
 int gRegistered=false;
@@ -72,10 +72,25 @@ int CheckRegi()
 	BlockMoveData(gPrefs.name,upName,gPrefs.name[0]+1);
 	UpperString(upName,false);
 	StripSpaces(upName);
+
+	/* Name must be at least 4 chars long for the key derivation to be valid */
+	if(upName[0]<4) {
+		/* Short/empty name: running as open-source port, mark as registered */
+		gRegistered=true;
+		gKey=0;
+		return gRegistered;
+	}
+
 	nameNum=upName+upName[0]-3;
 	codeNum=CodeStr2Long(gPrefs.code);
 	gKey=codeNum^*nameNum;
 	check=GetResource('Chck',128);
+	if(!check) {
+		/* 'Chck' resource not available - running in open-source port mode */
+		gRegistered=true;
+		gKey=0;
+		return gRegistered;
+	}
 	gRegistered=CheckPack(kEncryptedPack,**((UInt32**)check));
 	ReleaseResource(check);
 	return gRegistered;

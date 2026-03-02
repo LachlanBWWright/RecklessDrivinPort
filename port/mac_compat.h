@@ -818,7 +818,7 @@ OSErr  AEGetNthPtr(const AEDescList *theAEDescList, long index, DescType desired
 OSErr  AEDisposeDesc(AEDesc *theAEDesc);
 
 /* Misc System calls */
-OSErr  Gestalt(OSType selector, long *response);
+OSErr  Gestalt(OSType selector, SInt32 *response);
 void   ExitToShell(void);
 void   DebugStr(const char *debuggerMsg);
 Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *mouseRgn);

@@ -18,19 +18,34 @@
 /* Memory Manager                                                            */
 /*---------------------------------------------------------------------------*/
 
+/*
+ * Handle implementation: prefix each data block with its size so that
+ * GetHandleSize() returns the exact requested size (not malloc's usable size).
+ *
+ * Memory layout: [ Size prefix ] [ data ... ]
+ *                               ^
+ *                           *handle points here
+ */
+#define HSIZE_PREFIX sizeof(Size)
+
 Handle NewHandle(Size s)
 {
-    Ptr  *h = (Ptr *)malloc(sizeof(Ptr));
-    if (!h) return NULL;
-    *h = (Ptr)malloc(s ? s : 1);
-    if (!*h) { free(h); return NULL; }
+    char *block;
+    Ptr  *h;
+    if (s < 0) s = 0;
+    block = (char *)malloc(HSIZE_PREFIX + (s ? (size_t)s : 1));
+    if (!block) return NULL;
+    *(Size*)block = s;
+    h = (Ptr *)malloc(sizeof(Ptr));
+    if (!h) { free(block); return NULL; }
+    *h = block + HSIZE_PREFIX;
     return (Handle)h;
 }
 
 Handle NewHandleClear(Size s)
 {
     Handle h = NewHandle(s);
-    if (h && s) memset(*h, 0, s);
+    if (h && *h && s) memset(*h, 0, (size_t)s);
     return h;
 }
 
@@ -38,27 +53,26 @@ Handle NewHandleSys(Size s) { return NewHandle(s); }
 
 Size GetHandleSize(Handle h)
 {
-    /* We store the size just before the allocation */
     if (!h || !*h) return 0;
-    /* Use malloc_usable_size if available, else return a large estimate */
-#ifdef __linux__
-    extern size_t malloc_usable_size(void *ptr);
-    return (Size)malloc_usable_size(*h);
-#else
-    return 0;
-#endif
+    return *(Size*)(*h - HSIZE_PREFIX);
 }
 
-void SetHandleSize(Handle h, Size s)
+void SetHandleSize(Handle h, Size newSize)
 {
-    if (!h) return;
-    *h = (Ptr)realloc(*h, s ? s : 1);
+    char *block, *newBlock;
+    if (!h || !*h) return;
+    block    = *h - HSIZE_PREFIX;
+    newBlock = (char *)realloc(block, HSIZE_PREFIX + (newSize ? (size_t)newSize : 1));
+    if (!newBlock) return;
+    *(Size*)newBlock = newSize;
+    *h = newBlock + HSIZE_PREFIX;
 }
 
 void DisposeHandle(Handle h)
 {
     if (!h) return;
-    if (*h) free(*h);
+    if (*h) free(*h - HSIZE_PREFIX);
+    *h = NULL;
     free(h);
 }
 
@@ -874,10 +888,10 @@ OSErr AEDisposeDesc(AEDesc *theAEDesc) {
 /* System calls                                                              */
 /*---------------------------------------------------------------------------*/
 
-OSErr Gestalt(OSType selector, long *response) {
+OSErr Gestalt(OSType selector, SInt32 *response) {
     if (!response) return -50;
     if (selector == 'sysv') { *response = 0x00001050; return 0; } /* fake OS X 10.5 */
-    if (selector == 'pclk') { *response = 1000000000; return 0; } /* 1GHz */
+    if (selector == 'pclk') { *response = (SInt32)1000000000; return 0; } /* 1GHz */
     *response = 0;
     return 0;
 }
@@ -954,7 +968,12 @@ OSErr SndChannelStatus(SndChannelPtr chan, short theLength, SCStatusPtr theStatu
 }
 
 NumVersion SndSoundManagerVersion(void) {
-    NumVersion v = { 0, 0, 0, 4 }; /* Fake version 4 */
+    /* Return version 3.2 final (0x03200000) - must be > 0x03100000 to pass ReqCheck() */
+    NumVersion v;
+    v.majorRev    = 3;
+    v.minorAndBugRev = 0x20; /* minor=2, bug=0 */
+    v.stage       = 0x80;   /* final release */
+    v.nonRelRev   = 0;
     return v;
 }
 

@@ -53,7 +53,7 @@ UInt32 U32Version(NumVersion v)
 int ReqCheck()
 {
 	int hit;
-	long resp;
+	SInt32 resp;
 	AlertStdAlertParamRec alertParam={
 		false,false,nil,
 		"\pExit",
