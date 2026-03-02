@@ -55,7 +55,7 @@ static inline Boolean CheckFrameTime()
 	return false;
 }
 
-static inline void CheckTimeSkip()
+static inline void CheckTimeSkip(void)
 {
 	unsigned long optFrameCount;
 	UInt64 curMS;

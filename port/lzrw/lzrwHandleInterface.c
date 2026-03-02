@@ -55,8 +55,7 @@ void LZRWDecodeHandle(Handle *handle)
     const uint8_t *compressed_data = data + 4;
 
     /* We need to know the compressed data length. Use GetHandleSize. */
-    extern Size GetHandleSize(Handle h);
-    Size handle_size = GetHandleSize(handle);
+    Size handle_size = GetHandleSize(*handle);
     if (handle_size <= 4) {
         free(wrk_mem);
         return;
