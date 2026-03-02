@@ -8,11 +8,23 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment to GitHub Pages
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
+  # ============================================================
+  # Linux native build (SDL2)
+  # ============================================================
   build-linux:
-    name: Build on Linux
+    name: Build on Linux (SDL2)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -21,11 +33,11 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y cmake gcc
+          sudo apt-get install -y cmake gcc libsdl2-dev
 
-      - name: Configure CMake
+      - name: Configure CMake (SDL2 backend)
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
 
       - name: Build
         run: |
@@ -35,9 +47,93 @@ jobs:
         run: |
           test -f build/reckless_drivin && echo "Build succeeded: $(file build/reckless_drivin)"
 
-      - name: Upload build artifact
+      - name: Upload Linux build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: reckless-drivin-linux
+          name: reckless-drivin-linux-sdl2
           path: build/reckless_drivin
           if-no-files-found: error
+
+  # ============================================================
+  # WebAssembly build using Emscripten
+  # ============================================================
+  build-wasm:
+    name: Build WebAssembly (Emscripten)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.55
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Verify Emscripten
+        run: emcc --version
+
+      - name: Configure CMake for WASM
+        run: |
+          emcmake cmake -B build_wasm \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPORT_SDL2=ON
+
+      - name: Build WASM
+        run: |
+          cmake --build build_wasm --parallel
+
+      - name: List WASM outputs
+        run: ls -lh build_wasm/
+
+      - name: Prepare GitHub Pages content
+        run: |
+          mkdir -p gh-pages
+          # Copy WASM build outputs
+          cp build_wasm/reckless_drivin.js  gh-pages/ 2>/dev/null || true
+          cp build_wasm/reckless_drivin.wasm gh-pages/ 2>/dev/null || true
+          cp build_wasm/reckless_drivin.data gh-pages/ 2>/dev/null || true
+          # The shell.html becomes index.html
+          # (Emscripten may have generated it from the --shell-file, but check)
+          if [ -f build_wasm/reckless_drivin.html ]; then
+            cp build_wasm/reckless_drivin.html gh-pages/index.html
+          else
+            cp port/wasm/shell.html gh-pages/index.html
+          fi
+          echo "Pages content:"
+          ls -lh gh-pages/
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reckless-drivin-wasm
+          path: gh-pages/
+          if-no-files-found: error
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: gh-pages/
+
+  # ============================================================
+  # Deploy to GitHub Pages (only on push to master/main)
+  # ============================================================
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

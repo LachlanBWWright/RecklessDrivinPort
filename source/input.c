@@ -423,6 +423,9 @@ void Input(tInputData **data)
 
 UInt64 GetMSTime()
 {
+#ifdef PORT_SDL2
+	return (UInt64)SDL_GetTicks64();
+#else
 	if(gInputISp)
 	{
 		AbsoluteTime t=ISpUptime();
@@ -437,6 +440,7 @@ UInt64 GetMSTime()
 		UInt64 tMS=n/1000;
 		return tMS;
 	}
+#endif
 }
 
 void FlushInput()

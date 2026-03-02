@@ -154,100 +154,231 @@ Handle Get1Resource(ResType theType, short theID) {
 }
 
 /*---------------------------------------------------------------------------*/
-/* File Manager                                                              */
+/* File Manager - POSIX-backed implementation                                */
 /*---------------------------------------------------------------------------*/
 
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+
+/* Map Mac FSRef numbers to POSIX file descriptors (simple array) */
+#define MAX_OPEN_FILES 32
+static int s_file_fds[MAX_OPEN_FILES];  /* POSIX file descriptors, or -1 if closed */
+static int s_files_initialized = 0;
+
+static void init_file_table(void) {
+    if (!s_files_initialized) {
+        int i;
+        for (i = 0; i < MAX_OPEN_FILES; i++) s_file_fds[i] = -1;
+        s_files_initialized = 1;
+    }
+}
+
+static short alloc_refnum(int fd) {
+    int i;
+    init_file_table();
+    for (i = 1; i < MAX_OPEN_FILES; i++) {
+        if (s_file_fds[i] == -1) {
+            s_file_fds[i] = fd;
+            return (short)i;
+        }
+    }
+    return -1; /* no slots */
+}
+
+/* Get platform-specific preferences directory */
+static const char *get_prefs_dir(void) {
+#ifdef __EMSCRIPTEN__
+    /* Emscripten: use IDBFS-mounted /prefs */
+    return "/prefs";
+#else
+    /* Linux/macOS: use $HOME/.reckless_drivin */
+    static char dir[512] = {0};
+    if (!dir[0]) {
+        const char *home = getenv("HOME");
+        if (!home) home = "/tmp";
+        snprintf(dir, sizeof(dir), "%s/.reckless_drivin", home);
+    }
+    return dir;
+#endif
+}
+
+static void ensure_prefs_dir(void) {
+    const char *d = get_prefs_dir();
+    struct stat st;
+    if (stat(d, &st) != 0) {
+        mkdir(d, 0755);
+    }
+}
+
 OSErr FSMakeFSSpec(short vRefNum, long dirID, const char *cName, FSSpec *spec) {
-    if (!spec) return -50; /* paramErr */
+    if (!spec) return -50;
     spec->vRefNum = vRefNum;
     spec->parID   = dirID;
-    if (cName) strncpy(spec->name, cName, 255);
-    else spec->name[0] = 0;
+    if (cName) {
+        strncpy(spec->name, cName, 255);
+        spec->name[255] = '\0';
+    } else {
+        spec->name[0] = 0;
+    }
     return 0;
 }
 
+/* Build POSIX path from FSSpec; puts result in buf (must be at least 512 bytes) */
+static void fsspec_to_path(const FSSpec *spec, char *buf, size_t bufsz) {
+    const char *dir = get_prefs_dir();
+    const char *name = spec->name;
+    /* Skip leading Pascal string length byte if present (heuristic) */
+    if (name[0] > 0 && name[0] < 32 &&
+        (unsigned char)name[0] == strlen(name+1)) {
+        name++; /* Pascal string: first byte is length */
+    }
+    snprintf(buf, bufsz, "%s/%s", dir, name);
+}
+
 short FSpOpenResFile(const FSSpec *spec, char permission) {
-    printf("TODO: FSpOpenResFile(%s)\n", spec ? spec->name : "null");
+    /* Resource files are handled by resources.c, not this path */
     return -1;
 }
 
 OSErr FSpOpenDF(const FSSpec *spec, char permission, short *refNum) {
-    printf("TODO: FSpOpenDF(%s)\n", spec ? spec->name : "null");
-    if (refNum) *refNum = -1;
-    return -43; /* fnfErr */
+    char path[512];
+    int posix_flags, fd;
+    if (!spec || !refNum) return -50;
+    fsspec_to_path(spec, path, sizeof(path));
+    posix_flags = (permission == 1/*fsRdPerm*/) ? O_RDONLY
+                : (permission == 2/*fsWrPerm*/) ? O_WRONLY|O_CREAT
+                :                                  O_RDWR|O_CREAT;
+    fd = open(path, posix_flags, 0644);
+    if (fd < 0) {
+        *refNum = -1;
+        return -43; /* fnfErr */
+    }
+    *refNum = alloc_refnum(fd);
+    if (*refNum < 0) { close(fd); return -108; }
+    return 0;
 }
 
 OSErr FSpOpenRF(const FSSpec *spec, char permission, short *refNum) {
-    printf("TODO: FSpOpenRF\n");
     if (refNum) *refNum = -1;
     return -43;
 }
 
 OSErr FSOpen(const char *cName, short vRefNum, short *refNum) {
-    printf("TODO: FSOpen(%s)\n", cName ? cName : "null");
-    if (refNum) *refNum = -1;
-    return -43;
+    int fd;
+    if (!cName || !refNum) return -50;
+    fd = open(cName, O_RDWR|O_CREAT, 0644);
+    if (fd < 0) { *refNum = -1; return -43; }
+    *refNum = alloc_refnum(fd);
+    if (*refNum < 0) { close(fd); return -108; }
+    return 0;
 }
 
 short OpenResFile(const char *cName) {
-    printf("TODO: OpenResFile(%s)\n", cName ? cName : "null");
-    return -1;
+    return -1; /* resource files handled separately */
 }
 
 OSErr FSpCreate(const FSSpec *spec, OSType creator, OSType fileType, short scriptTag) {
-    printf("TODO: FSpCreate(%s)\n", spec ? spec->name : "null");
-    return 0;
+    char path[512];
+    int fd;
+    if (!spec) return -50;
+    ensure_prefs_dir();
+    fsspec_to_path(spec, path, sizeof(path));
+    fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    if (fd >= 0) close(fd);
+    return (fd >= 0) ? 0 : -43;
 }
 
 OSErr FSpDelete(const FSSpec *spec) {
-    printf("TODO: FSpDelete(%s)\n", spec ? spec->name : "null");
-    return 0;
+    char path[512];
+    if (!spec) return -50;
+    fsspec_to_path(spec, path, sizeof(path));
+    return (remove(path) == 0) ? 0 : -43;
 }
 
 OSErr FindFolder(short vRefNum, OSType folderType, Boolean createFolder,
                   short *foundVRefNum, long *foundDirID) {
-    printf("TODO: FindFolder\n");
     if (foundVRefNum) *foundVRefNum = 0;
     if (foundDirID)   *foundDirID   = 0;
+    if (createFolder) ensure_prefs_dir();
     return 0;
 }
 
 OSErr FSRead(short refNum, long *count, Ptr buffPtr) {
-    printf("TODO: FSRead\n");
-    if (count) *count = 0;
-    return -36; /* ioErr */
+    int fd;
+    ssize_t n;
+    if (!count || !buffPtr || refNum < 0 || refNum >= MAX_OPEN_FILES) return -50;
+    fd = s_file_fds[refNum];
+    if (fd < 0) return -38; /* fnOpnErr */
+    n = read(fd, buffPtr, (size_t)*count);
+    if (n < 0) { *count = 0; return -36; }
+    *count = (long)n;
+    return (n == 0) ? -39 /*eofErr*/ : 0;
 }
 
 OSErr FSWrite(short refNum, long *count, Ptr buffPtr) {
-    printf("TODO: FSWrite\n");
-    return -36;
+    int fd;
+    ssize_t n;
+    if (!count || !buffPtr || refNum < 0 || refNum >= MAX_OPEN_FILES) return -50;
+    fd = s_file_fds[refNum];
+    if (fd < 0) return -38;
+    n = write(fd, buffPtr, (size_t)*count);
+    if (n < 0) return -36;
+    *count = (long)n;
+    return 0;
 }
 
 OSErr FSClose(short refNum) {
-    printf("TODO: FSClose\n");
+    int fd;
+    if (refNum < 0 || refNum >= MAX_OPEN_FILES) return -50;
+    fd = s_file_fds[refNum];
+    if (fd < 0) return -38;
+    close(fd);
+    s_file_fds[refNum] = -1;
     return 0;
 }
 
 OSErr GetEOF(short refNum, long *logEOF) {
-    printf("TODO: GetEOF\n");
-    if (logEOF) *logEOF = 0;
+    int fd;
+    struct stat st;
+    if (!logEOF || refNum < 0 || refNum >= MAX_OPEN_FILES) return -50;
+    fd = s_file_fds[refNum];
+    if (fd < 0) return -38;
+    if (fstat(fd, &st) != 0) return -36;
+    *logEOF = (long)st.st_size;
     return 0;
 }
 
 OSErr SetEOF(short refNum, long logEOF) {
-    printf("TODO: SetEOF\n");
+    int fd;
+    if (refNum < 0 || refNum >= MAX_OPEN_FILES) return -50;
+    fd = s_file_fds[refNum];
+    if (fd < 0) return -38;
+    return (ftruncate(fd, (off_t)logEOF) == 0) ? 0 : -36;
+}
+
+OSErr GetFPos(short refNum, long *curPos) {
+    int fd;
+    off_t pos;
+    if (!curPos || refNum < 0 || refNum >= MAX_OPEN_FILES) return -50;
+    fd = s_file_fds[refNum];
+    if (fd < 0) return -38;
+    pos = lseek(fd, 0, SEEK_CUR);
+    if (pos < 0) return -36;
+    *curPos = (long)pos;
     return 0;
 }
 
-OSErr GetFPos(short refNum, long *filePos) {
-    printf("TODO: GetFPos\n");
-    if (filePos) *filePos = 0;
-    return 0;
-}
-
-OSErr SetFPos(short refNum, short posMode, long filePos) {
-    printf("TODO: SetFPos\n");
-    return 0;
+OSErr SetFPos(short refNum, short posMode, long posOff) {
+    int fd, whence;
+    if (refNum < 0 || refNum >= MAX_OPEN_FILES) return -50;
+    fd = s_file_fds[refNum];
+    if (fd < 0) return -38;
+    whence = (posMode == 1/*fsFromStart*/) ? SEEK_SET
+           : (posMode == 3/*fsFromLEOF*/)  ? SEEK_END
+           :                                  SEEK_CUR; /* fsFromMark */
+    return (lseek(fd, (off_t)posOff, whence) >= 0) ? 0 : -36;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -258,6 +389,7 @@ void GetDateTime(unsigned long *secs) {
     if (secs) *secs = (unsigned long)time(NULL);
 }
 
+#ifndef PORT_SDL2
 void Microseconds(UnsignedWide *microTickCount) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -274,13 +406,15 @@ UInt32 TickCount(void) {
     /* 1 tick = 1/60 second */
     return (UInt32)((ts.tv_sec * 1000000000ULL + ts.tv_nsec) / 16666666ULL);
 }
+#endif /* !PORT_SDL2 */
 
-/* GetMSTime is implemented in source/input.c using platform time APIs */
+/* GetMSTime is implemented in source/input.c or sdl_platform.c */
 
 /*---------------------------------------------------------------------------*/
 /* Time functions (Mach/HW timer stubs)                                      */
 /*---------------------------------------------------------------------------*/
 
+#ifndef PORT_SDL2
 AbsoluteTime UpTime(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -295,6 +429,7 @@ Nanoseconds AbsoluteToNanoseconds(AbsoluteTime a) {
     /* AbsoluteTime and Nanoseconds are both UnsignedWide = {lo, hi} */
     return a;
 }
+#endif /* !PORT_SDL2 */
 
 /*---------------------------------------------------------------------------*/
 /* QuickDraw 2D                                                              */
@@ -310,49 +445,111 @@ void OffsetRect(Rect *r, short dh, short dv) {
     r->left += dh; r->right += dh; r->top += dv; r->bottom += dv;
 }
 
-static GWorldPtr gScreenGWorld = NULL;
+static GWorldPtr gCurrentGWorld = NULL;
 
 void GetGWorld(GWorldPtr *port, GDHandle *gdh) {
-    if (port) *port = gScreenGWorld;
+    if (port) *port = gCurrentGWorld;
     if (gdh)  *gdh  = NULL;
 }
 
 void SetGWorld(GWorldPtr port, GDHandle gdh) {
-    gScreenGWorld = port;
+    gCurrentGWorld = port;
 }
+
+/*
+ * GWorld implementation:
+ * We use a simple struct that holds a pixel buffer and PixMap.
+ * The PixMap is embedded so GetGWorldPixMap works correctly.
+ */
+typedef struct {
+    PixMap  pixmap;     /* Must be first member */
+    UInt8  *pixels;     /* Allocated pixel data */
+    int     owned;      /* Whether we own 'pixels' */
+} GWorldImpl;
 
 OSErr NewGWorld(GWorldPtr *offscreenGWorld, short pixelDepth, const Rect *boundsRect,
                  CTabHandle cTable, GDHandle aGDevice, UInt32 flags) {
-    printf("TODO: NewGWorld\n");
-    if (offscreenGWorld) {
-        *offscreenGWorld = (GWorldPtr)calloc(1, sizeof(GWorld));
-    }
+    GWorldImpl *gw;
+    int w, h, bpp;
+    if (!offscreenGWorld || !boundsRect) return -50;
+
+    gw = (GWorldImpl *)calloc(1, sizeof(GWorldImpl));
+    if (!gw) return -108;
+
+    w = boundsRect->right  - boundsRect->left;
+    h = boundsRect->bottom - boundsRect->top;
+    bpp = (pixelDepth == 16) ? 2 : (pixelDepth == 32) ? 4 : 1;
+
+    gw->pixels = (UInt8 *)calloc(1, (size_t)(w * h * bpp) + 16);
+    if (!gw->pixels) { free(gw); return -108; }
+    gw->owned = 1;
+
+    /* Set up PixMap */
+    gw->pixmap.baseAddr  = (Ptr)gw->pixels;
+    gw->pixmap.rowBytes  = (short)(w * bpp) | 0x8000; /* set high bit = PixMap */
+    gw->pixmap.bounds    = *boundsRect;
+    gw->pixmap.pixelSize = pixelDepth ? pixelDepth : 8;
+    gw->pixmap.cmpCount  = (pixelDepth == 16 || pixelDepth == 32) ? 3 : 1;
+    gw->pixmap.cmpSize   = (pixelDepth == 16) ? 5 : (pixelDepth == 32) ? 8 : 8;
+    gw->pixmap.pmTable   = (Handle)cTable;
+
+    *offscreenGWorld = (GWorldPtr)gw;
     return 0;
 }
 
 void DisposeGWorld(GWorldPtr offscreenGWorld) {
-    if (offscreenGWorld) free(offscreenGWorld);
+    if (offscreenGWorld) {
+        GWorldImpl *gw = (GWorldImpl *)offscreenGWorld;
+        if (gw->owned && gw->pixels) free(gw->pixels);
+        free(gw);
+    }
 }
 
 PixMapHandle GetGWorldPixMap(GWorldPtr offscreenGWorld) {
-    printf("TODO: GetGWorldPixMap\n");
-    return NULL;
+    if (!offscreenGWorld) return NULL;
+    /* The PixMap is the first member of GWorldImpl, so the ptr IS the PixMapPtr */
+    static PixMap *s_pm_ptr;
+    s_pm_ptr = &((GWorldImpl *)offscreenGWorld)->pixmap;
+    return (PixMapHandle)&s_pm_ptr;
 }
 
 Ptr GetPixBaseAddr(PixMapHandle pm) {
-    printf("TODO: GetPixBaseAddr\n");
-    return NULL;
+    if (!pm || !*pm) return NULL;
+    return (*pm)->baseAddr;
 }
 
 Boolean LockPixels(PixMapHandle pm) { return 1; }
+/* UnlockPixels is defined as static inline in mac_compat.h */
 
 CTabHandle GetCTable(short ctID) {
-    printf("TODO: GetCTable(%d)\n", ctID);
-    return NULL;
+    /* Try to load from resources (game has 'clut' or 'Cl16' resources) */
+    Handle h = Pomme_GetResource('clut', ctID);
+    if (!h) {
+        /* Create a simple grayscale color table as fallback */
+        Size sz = sizeof(ColorTable) + sizeof(ColorSpec) * 255;
+        CTabHandle ct = (CTabHandle)NewHandle(sz);
+        if (!ct) return NULL;
+        {
+            int i;
+            ColorTable *tbl = *ct;
+            tbl->ctSeed  = 0;
+            tbl->ctFlags = 0;
+            tbl->ctSize  = 255;
+            for (i = 0; i < 256; i++) {
+                tbl->ctTable[i].value = (short)i;
+                tbl->ctTable[i].rgb.red   = (UInt16)((i * 257) & 0xFFFF);
+                tbl->ctTable[i].rgb.green = (UInt16)((i * 257) & 0xFFFF);
+                tbl->ctTable[i].rgb.blue  = (UInt16)((i * 257) & 0xFFFF);
+            }
+        }
+        return ct;
+    }
+    /* The resource data IS the ColorTable struct; return it as a handle */
+    return (CTabHandle)h;
 }
 
 void DisposeCTable(CTabHandle ctab) {
-    printf("TODO: DisposeCTable\n");
+    if (ctab) DisposeHandle((Handle)ctab);
 }
 
 PicHandle GetPicture(short id) {
@@ -399,7 +596,9 @@ Boolean PtInRect(Point pt, const Rect *r) {
             pt.v >= r->top  && pt.v < r->bottom) ? 1 : 0;
 }
 
+#ifndef PORT_SDL2
 Boolean StillDown(void) { return 0; }
+#endif
 
 void BeginUpdate(WindowPtr w) { }
 void EndUpdate(WindowPtr w)   { }
@@ -683,15 +882,18 @@ OSErr Gestalt(OSType selector, long *response) {
     return 0;
 }
 
+#ifndef PORT_SDL2
 void ExitToShell(void) {
     printf("[ExitToShell]\n");
     exit(0);
 }
+#endif
 
 void DebugStr(const char *debuggerMsg) {
     printf("[DebugStr] %s\n", debuggerMsg ? debuggerMsg : "");
 }
 
+#ifndef PORT_SDL2
 Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *mouseRgn) {
     if (theEvent) {
         memset(theEvent, 0, sizeof(EventRecord));
@@ -701,6 +903,7 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
 }
 
 void FlushEvents(short eventMask, short stopMask) { }
+#endif /* !PORT_SDL2 */
 
 OSErr AEProcessAppleEvent(const EventRecord *theEventRecord) { return 0; }
 
@@ -712,11 +915,13 @@ Boolean DialogSelect(const EventRecord *theEvent, DialogPtr *theDialog, short *i
     return 0;
 }
 
+#ifndef PORT_SDL2
 Boolean Button(void) { return 0; }
 
 void GetKeys(KeyMap theKeys) {
     if (theKeys) memset(theKeys, 0, sizeof(UInt32) * 4);
 }
+#endif /* !PORT_SDL2 */
 
 void TEFromScrap(void) { }
 
