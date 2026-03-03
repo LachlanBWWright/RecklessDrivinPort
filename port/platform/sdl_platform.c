@@ -60,6 +60,22 @@ static SDL_Surface  *s_rgb_surface = NULL; /* 32-bit surface for upload to textu
  */
 static UInt8 *s_back_buffer = NULL;
 
+/* Declared in gameinitexit.c - true while the game level is active */
+extern int gGameOn;
+
+/* Helper: (re)allocate the back-buffer with the given bytes-per-pixel.
+ * Updates gBaseAddr and gRowBytes.  Safe to call if already the right size. */
+static void sdl_set_depth(int bpp)
+{
+    size_t needed = (size_t)gXSize * gYSize * bpp;
+    if (s_back_buffer) free(s_back_buffer);
+    s_back_buffer = (UInt8 *)malloc(needed);
+    if (!s_back_buffer) { fprintf(stderr, "sdl_set_depth: malloc failed\n"); exit(1); }
+    memset(s_back_buffer, 0, needed);
+    gBaseAddr  = (Ptr)s_back_buffer;
+    gRowBytes  = (short)(gXSize * bpp);
+}
+
 /*
  * Screen GWorldImpl: a GWorldImpl struct that wraps the SDL surface pixels.
  * This allows CopyBits/GetPortBitMapForCopyBits to work with the SDL screen
@@ -266,8 +282,7 @@ void SDL_Platform_SetPalette(int index, int count, UInt16 *rgbValues) {
     }
 }
 
-void InitScreen(int hiColor) {
-    int bytesPerPixel = hiColor ? 2 : 1;
+void InitScreen(int unused) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         exit(1);
@@ -338,37 +353,36 @@ void InitScreen(int hiColor) {
         exit(1);
     }
 
-    /* Allocate a dedicated back-buffer that won't be moved by the SDL renderer.
-     * For hi-color (16-bit) mode we need 2 bytes per pixel. */
-    if (s_back_buffer) free(s_back_buffer);
-    s_back_buffer = (UInt8 *)malloc((size_t)gXSize * gYSize * bytesPerPixel);
-    if (!s_back_buffer) {
-        fprintf(stderr, "Failed to allocate back buffer\n");
-        exit(1);
-    }
-    memset(s_back_buffer, 0, (size_t)gXSize * gYSize * bytesPerPixel);
-
-    gBaseAddr = (Ptr)s_back_buffer;
-    gRowBytes = gXSize * bytesPerPixel;  /* stride: 1 byte/px (8-bit) or 2 bytes/px (hiColor) */
+    /* Allocate the initial 8-bit back-buffer.
+     * The buffer may be reallocated to 16-bit in ScreenMode(kScreenRunning)
+     * when hiColor gameplay starts, and back to 8-bit on kScreenSuspended. */
+    sdl_set_depth(1);
 
     gScreenMode = kScreenSuspended;
-    printf("[SDL] InitScreen: %dx%d, rowBytes=%d, hiColor=%d\n",
-           gXSize, gYSize, gRowBytes, hiColor);
+    printf("[SDL] InitScreen: %dx%d, rowBytes=%d\n", gXSize, gYSize, gRowBytes);
 }
 
 void ScreenMode(int mode) {
     gScreenMode = mode;
     switch (mode) {
         case kScreenRunning:
-            /* Keep gBaseAddr pointing at our dedicated back buffer */
-            if (s_back_buffer) {
-                gBaseAddr = (Ptr)s_back_buffer;
-                /* gRowBytes was set correctly in InitScreen; do not reset it here */
+            /* Switch to 16-bit back-buffer for hiColor gameplay; stay 8-bit for menus */
+            if (gGameOn && gPrefs.hiColor) {
+                if (gRowBytes != gXSize * 2)
+                    sdl_set_depth(2);
+            } else {
+                if (gRowBytes != gXSize)
+                    sdl_set_depth(1);
             }
             /* Load the game's 8-bit colour lookup table (same as screen.c) */
             if (!s_palette_set) {
                 SetScreenClut(8);
             }
+            break;
+        case kScreenSuspended:
+            /* Always switch back to 8-bit for menu/interface */
+            if (gRowBytes != gXSize)
+                sdl_set_depth(1);
             break;
         case kScreenStopped:
             /* Clean up SDL resources */
@@ -449,6 +463,8 @@ void Blit2Screen(void) {
                 int x;
                 for (x = 0; x < gXSize; x++) {
                     UInt16 p = src[x];
+                    /* Mac stored XRGB1555 big-endian; byte-swap to get correct LE value */
+                    p = (UInt16)((p >> 8) | (p << 8));
                     /* XRGB1555: bits 14-10=R, 9-5=G, 4-0=B */
                     Uint8 r = (Uint8)(((p >> 10) & 0x1F) << 3);
                     Uint8 g = (Uint8)(((p >>  5) & 0x1F) << 3);

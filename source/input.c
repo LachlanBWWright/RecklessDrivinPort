@@ -456,9 +456,9 @@ UInt64 GetMSTime()
 #ifdef PORT_SDL2
 	/* SDL_GetTicks64 not available in Emscripten SDL2 port; use SDL_GetTicks */
 #if defined(__EMSCRIPTEN__)
-	return (UInt64)SDL_GetTicks();
+	return (UInt64)SDL_GetTicks() * 1000ULL;
 #else
-	return (UInt64)SDL_GetTicks64();
+	return (UInt64)SDL_GetTicks64() * 1000ULL;
 #endif
 #else
 	if(gInputISp)

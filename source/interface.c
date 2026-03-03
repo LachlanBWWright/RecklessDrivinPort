@@ -213,11 +213,11 @@ void InitInterface()
 	}
 	InputMode(kInputSuspended);
 	FadeScreen(1);
+	gGameOn=false;
 	ScreenMode(kScreenRunning);
 	ScreenUpdate(nil);
 	FadeScreen(0);
 	SaveFlushEvents();
-	gGameOn=false;
 }
 
 void UpdateButtonLocation()

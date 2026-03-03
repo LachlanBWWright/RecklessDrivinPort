@@ -106,7 +106,7 @@ void Init()
 	CheckRegi();
 	if(!gRegistered)
 		Register(false);
-	InitScreen(gPrefs.hiColor);
+	InitScreen(0);
 	ShowPicScreen(1003);
 	LoadPack(kPackSnds);
 	LoadPack(kPackObTy);
