@@ -64,16 +64,19 @@ static UInt8 *s_back_buffer = NULL;
 extern int gGameOn;
 
 /* Helper: (re)allocate the back-buffer with the given bytes-per-pixel.
- * Updates gBaseAddr and gRowBytes.  Safe to call if already the right size. */
+ * No-ops if the buffer is already at the correct size. */
 static void sdl_set_depth(int bpp)
 {
     size_t needed = (size_t)gXSize * gYSize * bpp;
+    short  wanted_rowbytes = (short)(gXSize * bpp);
+    if (s_back_buffer && gRowBytes == wanted_rowbytes)
+        return;  /* already the right depth */
     if (s_back_buffer) free(s_back_buffer);
     s_back_buffer = (UInt8 *)malloc(needed);
     if (!s_back_buffer) { fprintf(stderr, "sdl_set_depth: malloc failed\n"); exit(1); }
     memset(s_back_buffer, 0, needed);
     gBaseAddr  = (Ptr)s_back_buffer;
-    gRowBytes  = (short)(gXSize * bpp);
+    gRowBytes  = wanted_rowbytes;
 }
 
 /*
@@ -462,9 +465,8 @@ void Blit2Screen(void) {
                 const UInt16 *src = (const UInt16 *)(s_back_buffer + y * gRowBytes);
                 int x;
                 for (x = 0; x < gXSize; x++) {
-                    UInt16 p = src[x];
-                    /* Mac stored XRGB1555 big-endian; byte-swap to get correct LE value */
-                    p = (UInt16)((p >> 8) | (p << 8));
+                    /* Mac stored XRGB1555 big-endian; swap to native LE before extracting RGB */
+                    UInt16 p = be16_swap(src[x]);
                     /* XRGB1555: bits 14-10=R, 9-5=G, 4-0=B */
                     Uint8 r = (Uint8)(((p >> 10) & 0x1F) << 3);
                     Uint8 g = (Uint8)(((p >>  5) & 0x1F) << 3);
