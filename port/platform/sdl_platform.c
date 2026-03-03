@@ -440,7 +440,18 @@ void Blit2Screen(void) {
     SDL_RenderCopy(s_renderer, s_texture, NULL, NULL);
     SDL_RenderPresent(s_renderer);
 
-
+    /* Save screenshots when RECKLESS_SCREENSHOT_DIR env var is set */
+    {
+        static int s_shot_count = 0;
+        static int s_shot_done = 0;
+        const char *dir = SDL_getenv("RECKLESS_SCREENSHOT_DIR");
+        if (dir && !s_shot_done && s_rgb_surface) {
+            char path[512];
+            snprintf(path, sizeof(path), "%s/native_%03d.bmp", dir, s_shot_count++);
+            SDL_SaveBMP(s_rgb_surface, path);
+            if (s_shot_count >= 5) s_shot_done = 1;
+        }
+    }
 }
 
 /* SetScreenClut - set palette from color table resource */
@@ -460,6 +471,34 @@ void SetScreenClut(int id) {
     s_palette_set = 1;
     if (s_surface) {
         SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
+    }
+
+    /* Invalidate the rgb15 → palette8 lookup cache in mac_stubs.c */
+    extern void rgb15_cache_invalidate(void);
+    rgb15_cache_invalidate();
+
+    /* Load the translucence table for the new palette.
+     * The 'Trtb' resource is a 256×256 byte lookup table:
+     *   trTab[(fgColor << 8) | bgColor] = blended palette index
+     * Sprites dereference gTranslucenceTab directly so it must be non-NULL. */
+    {
+        extern Handle gTranslucenceTab;
+        if (gTranslucenceTab) {
+            ReleaseResource(gTranslucenceTab);
+            gTranslucenceTab = NULL;
+        }
+        gTranslucenceTab = GetResource('Trtb', (short)id);
+        if (!gTranslucenceTab || !*gTranslucenceTab) {
+            /* Fallback: build an identity table (no blending) */
+            if (!gTranslucenceTab) gTranslucenceTab = NewHandle(65536);
+            if (gTranslucenceTab && *gTranslucenceTab) {
+                UInt8 *tbl = (UInt8 *)*gTranslucenceTab;
+                int fg, bg;
+                for (fg = 0; fg < 256; fg++)
+                    for (bg = 0; bg < 256; bg++)
+                        tbl[(fg << 8) | bg] = (UInt8)fg;
+            }
+        }
     }
 
     /* Build lightning table (same as original code) */
