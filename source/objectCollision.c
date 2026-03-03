@@ -111,56 +111,65 @@ void MakeDebris(tObject *theObj,int damagePos,float damage,float maxDamage)
 	float xSize=(*objType).width*kScale,ySize=(*objType).length*kScale;
 	if(damagePos!=kMotor&&RanProb(kDebrisProbility*damage/maxDamage))
 	{
-		tObject *debrisObj;
+		tObject *debrisObj=nil;
 		switch(damagePos){
 			case kFrontBumper:
 				debrisObj=NewObject(theObj,1014);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir)*ySize,cos(theObj->dir)*ySize));
 				debrisObj->dir=theObj->dir;
 				break;	
 			case kBackBumper:
 				debrisObj=NewObject(theObj,1014);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(-sin(theObj->dir)*ySize,-cos(theObj->dir)*ySize));
 				debrisObj->dir=theObj->dir+PI;
 				break;	
 			case kFrontLeftTire:
 				debrisObj=NewObject(theObj,1012);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir)*ySize,cos(theObj->dir)*ySize));
 				debrisObj->pos=VEC2D_Sum(debrisObj->pos,P2D(-cos(theObj->dir)*xSize,-sin(theObj->dir)*xSize));
 				debrisObj->dir=RanFl(0,2*PI);
 				break;	
 			case kFrontRightTire:
 				debrisObj=NewObject(theObj,1012);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir)*ySize,cos(theObj->dir)*ySize));
 				debrisObj->pos=VEC2D_Sum(debrisObj->pos,P2D(cos(theObj->dir)*xSize,sin(theObj->dir)*xSize));
 				debrisObj->dir=RanFl(0,2*PI);
 				break;	
 			case kBackLeftTire:
 				debrisObj=NewObject(theObj,1012);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(-sin(theObj->dir)*(*objType).length*kScale,-cos(theObj->dir)*(*objType).length*kScale));;
 				debrisObj->pos=VEC2D_Sum(debrisObj->pos,P2D(-cos(theObj->dir)*(*objType).width*kScale,-sin(theObj->dir)*(*objType).width*kScale));;
 				debrisObj->dir=RanFl(0,2*PI);
 				break;	
 			case kBackRightTire:
 				debrisObj=NewObject(theObj,1012);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(-sin(theObj->dir)*(*objType).length*kScale,-cos(theObj->dir)*(*objType).length*kScale));;
 				debrisObj->pos=VEC2D_Sum(debrisObj->pos,P2D(cos(theObj->dir)*(*objType).width*kScale,sin(theObj->dir)*(*objType).width*kScale));;
 				debrisObj->dir=RanFl(0,2*PI);
 				break;	
 			case kLeftDoor:
 				debrisObj=NewObject(theObj,1015);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(-cos(theObj->dir)*(*objType).width*kScale,-sin(theObj->dir)*(*objType).width*kScale));;
 				debrisObj->dir=theObj->dir;
 				debrisObj->rotVelo=-2*PI;
 				break;	
 			case kRightDoor:
 				debrisObj=NewObject(theObj,1016);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(cos(theObj->dir)*(*objType).width*kScale,sin(theObj->dir)*(*objType).width*kScale));;
 				debrisObj->dir=theObj->dir;
 				debrisObj->rotVelo=2*PI;
 				break;					
 		}
-		debrisObj->velo=VEC2D_Sum(theObj->velo,P2D(sin(debrisObj->dir)*10,cos(debrisObj->dir)*10));
+		if(debrisObj)
+			debrisObj->velo=VEC2D_Sum(theObj->velo,P2D(sin(debrisObj->dir)*10,cos(debrisObj->dir)*10));
 	}
 }
 
@@ -323,6 +332,8 @@ void DoBounceElastic(tObject *obj1,tObject *obj2,t2DPoint diff)
 void BounceObjects(tObject *obj1,tObject *obj2)
 {
 	t2DPoint diff;
+	int sepIter=0;
+	const int kMaxSeparationIterations=200;
 	float boom=(VEC2D_Value(VEC2D_Difference(obj1->velo,obj2->velo))-kMinDamageVelo)*0.05;
 	boom=boom<0?0:boom;
 	if(boom)
@@ -336,8 +347,9 @@ void BounceObjects(tObject *obj1,tObject *obj2)
 			diff.y=1;		
 		obj2->pos=VEC2D_Sum(obj1->pos,VEC2D_Scale(diff,-kSeperatio));
 		obj1->pos=VEC2D_Sum(obj2->pos,VEC2D_Scale(diff,kSeperatio*kSeperatio));
+		sepIter++;
 	}
-	while(TestCollision(obj1,obj2,INFINITY));
+	while(TestCollision(obj1,obj2,INFINITY)&&sepIter<kMaxSeparationIterations);
 	diff=VEC2D_Norm(diff);
 	DoBounce(obj1,obj2,diff);    
 }

@@ -385,7 +385,7 @@ void SimplePlaySound(int id)
 		if(!gBuggySoundManager){
 			cmd.cmd=rateMultiplierCmd;
 			cmd.param2=0x00010000;
-			DoError(SndDoImmediate(gEngineChannel,&cmd));
+			DoError(SndDoImmediate(chan,&cmd));
 		}
 		cmd.cmd=callBackCmd;
 		cmd.param1=0;

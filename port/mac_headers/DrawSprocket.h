@@ -59,43 +59,36 @@ enum {
 };
 
 /* Stub functions */
-static inline OSErr DSpStartup(void) { printf("TODO: DSpStartup\n"); return 0; }
-static inline OSErr DSpShutdown(void) { printf("TODO: DSpShutdown\n"); return 0; }
+static inline OSErr DSpStartup(void) { return 0; }
+static inline OSErr DSpShutdown(void) { return 0; }
 static inline OSErr DSpFindBestContext(DSpContextAttributes *inDesiredAttributes,
                                         DSpContextReference *outContext) {
-    printf("TODO: DSpFindBestContext\n");
     if (outContext) *outContext = NULL;
     return 0;
 }
 static inline OSErr DSpContext_Reserve(DSpContextReference inContext,
                                         DSpContextAttributes *inDesiredAttributes) {
-    printf("TODO: DSpContext_Reserve\n");
     return 0;
 }
 static inline OSErr DSpContext_SetState(DSpContextReference inContext, UInt32 inState) {
-    printf("TODO: DSpContext_SetState\n");
     return 0;
 }
 static inline OSErr DSpContext_GetBackBuffer(DSpContextReference inContext,
                                               UInt32 inBufferKind,
                                               GWorldPtr *outBackBuffer) {
-    printf("TODO: DSpContext_GetBackBuffer\n");
     if (outBackBuffer) *outBackBuffer = NULL;
     return 0;
 }
 static inline OSErr DSpContext_SwapBuffers(DSpContextReference inContext,
                                             void *inBusyProc,
                                             void *inUserData) {
-    printf("TODO: DSpContext_SwapBuffers\n");
     return 0;
 }
 static inline OSErr DSpContext_Release(DSpContextReference inContext) {
-    printf("TODO: DSpContext_Release\n");
     return 0;
 }
 static inline OSErr DSpContext_GetAttributes(DSpContextReference inContext,
                                               DSpContextAttributes *outAttributes) {
-    printf("TODO: DSpContext_GetAttributes\n");
     return 0;
 }
 static inline OSErr DSpProcessEvent(EventRecord *inEvent, Boolean *outEventWasProcessed) {
@@ -104,7 +97,6 @@ static inline OSErr DSpProcessEvent(EventRecord *inEvent, Boolean *outEventWasPr
 }
 static inline OSErr DSpContext_GetFrontBuffer(DSpContextReference inContext,
                                                GWorldPtr *outFrontBuffer) {
-    printf("TODO: DSpContext_GetFrontBuffer\n");
     if (outFrontBuffer) *outFrontBuffer = NULL;
     return 0;
 }
@@ -125,7 +117,6 @@ static inline OSErr DSpContext_FadeGamma(DSpContextReference inContext,
     return 0;
 }
 static inline OSErr DSpContext_FadeGammaIn(DSpContextReference inContext, void *inFade) {
-    printf("TODO: DSpContext_FadeGammaIn\n");
     return 0;
 }
 

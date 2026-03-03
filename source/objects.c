@@ -49,8 +49,9 @@ void Explosion(t2DPoint pos,t2DPoint velo,int offs,float mass,int sound)
 					expObj=NewObject(gFirstObj,195);
 				else{
 					expObj=NewObject(gFirstObj,1020);
-					expObj->jumpVelo=15;
+					if(expObj) expObj->jumpVelo=15;
 				}				
+			if(!expObj) continue;
 			expObj->frameDuration=RanFl(0,0.25);
 			expObj->frame=0;
 			expObj->pos.x=pos.x+RanFl(0,l);

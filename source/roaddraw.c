@@ -169,7 +169,7 @@ Ptr DrawBorderZoomed(Ptr drawPos,int xDrawStart,int x1,int x2,int y,Ptr data,flo
 	UInt32 u=0;
 	if(x2<0) return drawPos;
 	if(x1<0){
-		u=-x1<<8;
+		u=(UInt32)(-x1*256.0f*zoom);
 		x1=0;
 	}
 	if(x2>gXSize)x2=gXSize;

@@ -807,7 +807,6 @@ void FlushMessageBuffer(void) {
 }
 
 void AddFloatToMessageBuffer(StringPtr label, float value) {
-    /* TODO: render debug text with SDL2_ttf */
     (void)label; (void)value;
 }
 

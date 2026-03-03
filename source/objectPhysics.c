@@ -358,6 +358,7 @@ int CheckObjectMotion(tObject *theObj)
 void MakeSmoke(tObject *theObj)
 {
 	tObject *smokeObj=NewObject(theObj,195);
+	if(!smokeObj) return;
 	tObjectTypePtr objType=theObj->type;
 	smokeObj->pos=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir)*(*objType).length*kScale,cos(theObj->dir)*(*objType).length*kScale));
 	smokeObj->pos=VEC2D_Sum(smokeObj->pos,P2D(RanFl(-10,10),RanFl(-10,10)));
@@ -368,6 +369,7 @@ void BurnObj(tObject *theObj)
 	tObject *expObj;			
 	float l=(*theObj->type).length*kScale;
 	expObj=NewObject(theObj,1001);
+	if(!expObj) return;
 	expObj->frameDuration=RanFl(0,4);
 	expObj->frame=0;
 	expObj->pos.x=theObj->pos.x+RanFl(0,l);

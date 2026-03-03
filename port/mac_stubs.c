@@ -2,9 +2,6 @@
  * mac_stubs.c - Stub implementations of Mac OS 9 API functions
  *
  * These are minimal implementations to allow the game to compile.
- * Full implementations will be added incrementally as the port progresses.
- *
- * TODO items are marked with printf("TODO: FunctionName") statements.
  */
 
 #include "mac_compat.h"
