@@ -1029,18 +1029,60 @@ static int pict_find_pixdata(const UInt8 *pict, int picSize,
             }
 
             /* --- Pixel data opcodes --------------------------------------- */
+            /*
+             * PackBitsRect (0x0098) / PackBitsRgn (0x0099):
+             *   PixMap WITHOUT baseAddr (46 bytes): rowBytes(2)+bounds(8)+...
+             *   pixelSize is at offset 28 within this record.
+             *   ColorTable follows the PixMap: ctSeed(4)+ctFlags(2)+ctSize(2)
+             *     + (ctSize+1) entries × 8 bytes each.
+             *   srcRect(8)+dstRect(8)+mode(2) follow ColorTable.
+             *   PackBitsRgn (0x0099) has a RgnData clip after the rects.
+             */
             case 0x0098:    /* PackBitsRect */
-            case 0x0099:    /* PackBitsRgn  */
-            case 0x009A:    /* DirectBitsRect */
-            case 0x009B: {  /* DirectBitsRgn  */
-                if (pos + 48 > picSize) return -1;
-                int pixelSize = (int)((pict[pos+38] << 8) | pict[pos+39]);
+            case 0x0099: {  /* PackBitsRgn  */
+                if (pos + 46 > picSize) return -1;
+                int pixelSize = (int)((pict[pos+28] << 8) | pict[pos+29]);
                 int bpp = (pixelSize == 16) ? 2 : 1;
                 int rowbytes = picW * bpp;
-                pos += 48;  /* skip PixMap record */
+                pos += 46;  /* skip 46-byte PixMap (no baseAddr) */
+                /* ColorTable: ctSeed(4) + ctFlags(2) + ctSize(2) + entries */
+                if (pos + 8 > picSize) return -1;
+                {
+                    int ctSize = (int)((pict[pos+6] << 8) | pict[pos+7]);
+                    int ctBytes = 8 + (ctSize + 1) * 8;
+                    if (pos + ctBytes > picSize) return -1;
+                    pos += ctBytes;
+                }
                 if (pos + 18 > picSize) return -1;
                 pos += 18;  /* srcRect(8) + dstRect(8) + mode(2) */
-                if (op == 0x009B || op == 0x0099) {
+                if (op == 0x0099) {
+                    if (pos + 2 > picSize) return -1;
+                    int rsz = (int)((pict[pos] << 8) | pict[pos+1]);
+                    pos += rsz;
+                }
+                *out_bpp      = bpp;
+                *out_rowbytes = rowbytes;
+                return pos;
+            }
+
+            case 0x009A:    /* DirectBitsRect */
+            case 0x009B: {  /* DirectBitsRgn  */
+                /*
+                 * Mac PixMap record layout (50 bytes total):
+                 *   baseAddr(4) + rowBytes(2) + bounds(8) + pmVersion(2) +
+                 *   packType(2) + packSize(4) + hRes(4) + vRes(4) +
+                 *   pixelType(2) + pixelSize(2) + cmpCount(2) + cmpSize(2) +
+                 *   planeBytes(4) + pmTable(4) + pmReserved(4) = 50 bytes
+                 * pixelSize is at offset 32 within the PixMap record.
+                 */
+                if (pos + 50 > picSize) return -1;
+                int pixelSize = (int)((pict[pos+32] << 8) | pict[pos+33]);
+                int bpp = (pixelSize == 16) ? 2 : 1;
+                int rowbytes = picW * bpp;
+                pos += 50;  /* skip PixMap record */
+                if (pos + 18 > picSize) return -1;
+                pos += 18;  /* srcRect(8) + dstRect(8) + mode(2) */
+                if (op == 0x009B) {
                     if (pos + 2 > picSize) return -1;
                     int rsz = (int)((pict[pos] << 8) | pict[pos+1]);
                     pos += rsz;
