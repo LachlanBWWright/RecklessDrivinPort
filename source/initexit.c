@@ -103,9 +103,7 @@ void Init()
 	//DoError(RegisterAppearanceClient());
 	Randomize();
 	LoadPrefs();
-	CheckRegi();
-	if(!gRegistered)
-		Register(false);
+	gRegistered=true;  /* open-source port: always registered */
 	InitScreen(0);
 	ShowPicScreen(1003);
 	LoadPack(kPackSnds);

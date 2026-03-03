@@ -134,16 +134,15 @@ void UseResFile(short refNum) {
 short CurResFile(void) { return gCurrentResFile; }
 
 void CloseResFile(short refNum) {
-    printf("TODO: CloseResFile(%d)\n", refNum);
+    (void)refNum; /* no-op: resources are kept open for the lifetime of the process */
 }
 
 short Count1Resources(ResType t) {
-    printf("TODO: Count1Resources\n");
+    (void)t;
     return 0;
 }
 
 short Count1Types(void) {
-    printf("TODO: Count1Types\n");
     return 0;
 }
 
@@ -152,12 +151,12 @@ Handle GetResource(ResType theType, short theID) {
 }
 
 Handle Get1IndResource(ResType theType, short index) {
-    printf("TODO: Get1IndResource\n");
+    (void)theType; (void)index;
     return NULL;
 }
 
 void GetResInfo(Handle res, short *theID, ResType *theType, char *name256) {
-    printf("TODO: GetResInfo\n");
+    (void)res;
     if (theID) *theID = 0;
     if (theType) *theType = 0;
     if (name256) name256[0] = 0;
@@ -167,14 +166,14 @@ void ReleaseResource(Handle res) {
     if (res) DisposeHandle(res);
 }
 
-void RemoveResource(Handle res)  { printf("TODO: RemoveResource\n"); }
-void AddResource(Handle data, ResType type, short id, const char *name) { printf("TODO: AddResource\n"); }
-void ChangedResource(Handle res) { printf("TODO: ChangedResource\n"); }
-void WriteResource(Handle res)   { printf("TODO: WriteResource\n"); }
-void DetachResource(Handle res)  { printf("TODO: DetachResource\n"); }
+void RemoveResource(Handle res)  { (void)res; }
+void AddResource(Handle data, ResType type, short id, const char *name) { (void)data; (void)type; (void)id; (void)name; }
+void ChangedResource(Handle res) { (void)res; }
+void WriteResource(Handle res)   { (void)res; }
+void DetachResource(Handle res)  { (void)res; }
 long GetResourceSizeOnDisk(Handle res) { return GetHandleSize(res); }
 long SizeResource(Handle res)          { return GetHandleSize(res); }
-void SetResLoad(Boolean load)          { /* no-op */ }
+void SetResLoad(Boolean load)          { extern int g_res_load; g_res_load = load ? 1 : 0; }
 Handle Get1Resource(ResType theType, short theID) {
     return Pomme_GetResource(theType, theID);
 }
@@ -635,18 +634,18 @@ void DisposeCTable(CTabHandle ctab) {
 }
 
 PicHandle GetPicture(short id) {
-    printf("TODO: GetPicture(%d)\n", id);
+    (void)id;
     return NULL;
 }
 
 PicHandle OpenCPicture(const OpenCPicParams *newHeader) {
-    printf("TODO: OpenCPicture\n");
+    (void)newHeader;
     PicHandle h = (PicHandle)NewHandle(sizeof(Picture));
     if (h) memset(*h, 0, sizeof(Picture));
     return h;
 }
 
-void ClosePicture(void) { printf("TODO: ClosePicture\n"); }
+void ClosePicture(void) { }
 
 /* Helper: get pixel buffer and rowbytes from a GWorldPtr */
 static UInt8 *gw_pixels(GWorldPtr gw) {
@@ -1460,7 +1459,7 @@ void ShowCursor(void)  { }
 
 
 void DragWindow(WindowPtr w, Point startPt, const Rect *boundsRect) {
-    printf("TODO: DragWindow\n");
+    (void)w; (void)startPt; (void)boundsRect;
 }
 
 short FindWindow(Point pt, WindowPtr *which) {
@@ -1468,16 +1467,16 @@ short FindWindow(Point pt, WindowPtr *which) {
     return 0;
 }
 
-void HideWindow(WindowPtr w)   { printf("TODO: HideWindow\n"); }
-void ShowWindow(WindowPtr w)   { printf("TODO: ShowWindow\n"); }
-void SelectWindow(WindowPtr w) { printf("TODO: SelectWindow\n"); }
+void HideWindow(WindowPtr w)   { (void)w; }
+void ShowWindow(WindowPtr w)   { (void)w; }
+void SelectWindow(WindowPtr w) { (void)w; }
 
 /*---------------------------------------------------------------------------*/
 /* Dialog Manager                                                            */
 /*---------------------------------------------------------------------------*/
 
 DialogPtr GetNewDialog(short id, void *wStorage, WindowPtr behind) {
-    printf("TODO: GetNewDialog(%d)\n", id);
+    (void)id; (void)wStorage; (void)behind;
     return (DialogPtr)calloc(1, sizeof(OpaqueDialogPtr));
 }
 
@@ -1486,7 +1485,7 @@ void DisposeDialog(DialogPtr dialog) {
 }
 
 void ModalDialog(void *filterProc, short *itemHit) {
-    printf("TODO: ModalDialog\n");
+    (void)filterProc;
     if (itemHit) *itemHit = 1;
 }
 
@@ -1552,7 +1551,6 @@ short StopAlert(short alertID, void *filterProc) {
 /*---------------------------------------------------------------------------*/
 
 OSErr RegisterAppearanceClient(void) {
-    printf("TODO: RegisterAppearanceClient\n");
     return 0;
 }
 
@@ -1658,7 +1656,7 @@ void TEFromScrap(void) { }
 
 OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
                      SndCallBackProcPtr userRoutine) {
-    printf("TODO: SndNewChannel\n");
+    (void)synth; (void)init;
     if (!chan) return -50;
     *chan = (SndChannelPtr)calloc(1, sizeof(SndChannel));
     if (!*chan) return -108;
@@ -1667,7 +1665,7 @@ OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
 }
 
 OSErr SndDisposeChannel(SndChannelPtr chan, Boolean quietNow) {
-    printf("TODO: SndDisposeChannel\n");
+    (void)quietNow;
     if (chan) free(chan);
     return 0;
 }

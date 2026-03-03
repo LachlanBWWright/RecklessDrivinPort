@@ -241,12 +241,31 @@ static const SDL_Scancode s_mac_to_sdl[128] = {
     /* 0x7F */ SDL_SCANCODE_UNKNOWN,
 };
 
+/* Reverse lookup: SDL_Scancode → Mac ADB scan code (or 0xFF if not mapped) */
+static uint8_t s_sdl_to_mac[SDL_NUM_SCANCODES];
+static int s_sdl_to_mac_built = 0;
+
+static void build_sdl_to_mac(void) {
+    int i;
+    if (s_sdl_to_mac_built) return;
+    memset(s_sdl_to_mac, 0xFF, sizeof(s_sdl_to_mac));
+    for (i = 0; i < 128; i++) {
+        SDL_Scancode sc = s_mac_to_sdl[i];
+        if (sc != SDL_SCANCODE_UNKNOWN && s_sdl_to_mac[sc] == 0xFF)
+            s_sdl_to_mac[sc] = (uint8_t)i;
+    }
+    s_sdl_to_mac_built = 1;
+}
+
 /* ============================================================
  * GetKeys - Mac keyboard state using SDL2 keyboard state
  * ============================================================ */
 void GetKeys(KeyMap theKeys) {
     unsigned char *km = (unsigned char *)theKeys;
     memset(km, 0, 16);
+
+    /* Pump events so the keyboard state reflects keys pressed since last call */
+    SDL_PumpEvents();
 
     int numKeys = 0;
     const Uint8 *sdl_keys = SDL_GetKeyboardState(&numKeys);
@@ -646,15 +665,26 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
                 return 1;
 
             case SDL_KEYDOWN:
-                theEvent->what = keyDown;
-                theEvent->message = (ev.key.keysym.sym & charCodeMask);
-                theEvent->when = SDL_GetTicks();
+                build_sdl_to_mac();
+                {
+                    uint8_t mac_vk = s_sdl_to_mac[ev.key.keysym.scancode];
+                    theEvent->what = keyDown;
+                    /* Mac EventRecord.message: bits 15-8 = virtual key code, bits 7-0 = char code */
+                    theEvent->message = (ev.key.keysym.sym & charCodeMask)
+                                      | ((mac_vk != 0xFF) ? ((UInt32)mac_vk << 8) : 0);
+                    theEvent->when = SDL_GetTicks();
+                }
                 return 1;
 
             case SDL_KEYUP:
-                theEvent->what = keyUp;
-                theEvent->message = (ev.key.keysym.sym & charCodeMask);
-                theEvent->when = SDL_GetTicks();
+                build_sdl_to_mac();
+                {
+                    uint8_t mac_vk = s_sdl_to_mac[ev.key.keysym.scancode];
+                    theEvent->what = keyUp;
+                    theEvent->message = (ev.key.keysym.sym & charCodeMask)
+                                      | ((mac_vk != 0xFF) ? ((UInt32)mac_vk << 8) : 0);
+                    theEvent->when = SDL_GetTicks();
+                }
                 return 1;
 
             case SDL_MOUSEBUTTONDOWN:

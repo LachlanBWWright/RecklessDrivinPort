@@ -50,6 +50,9 @@ static uint32_t le32(uint32_t v) {
 static FILE       *gResourceFile  = NULL;
 static long        gResourceStart = 0;
 
+/* SetResLoad flag: when false, suppress "not found" stderr messages */
+int g_res_load = 1;
+
 void Pomme_InitResources(void)
 {
     if (gResourceFile) return;
@@ -107,6 +110,7 @@ Handle Pomme_GetResource(ResType theType, short theID)
         fseek(gResourceFile, (long)resLen, SEEK_CUR);
     }
 
+    if (!g_res_load) return NULL;    /* suppress "not found" warning during probe */
     fprintf(stderr, "Pomme_GetResource: not found: type='%s' id=%d\n",
             typeBuf, theID);
     return NULL;
