@@ -507,18 +507,35 @@ void Blit2Screen(void) {
     SDL_RenderCopy(s_renderer, s_texture, NULL, NULL);
     SDL_RenderPresent(s_renderer);
 
-    /* Save screenshots when RECKLESS_SCREENSHOT_DIR env var is set */
+    /* Process quit events during gameplay (WaitNextEvent is not called in game loop) */
     {
-        static int s_shot_count = 0;
-        static int s_shot_done = 0;
-        const char *dir = SDL_getenv("RECKLESS_SCREENSHOT_DIR");
-        if (dir && !s_shot_done && s_rgb_surface) {
-            char path[512];
-            snprintf(path, sizeof(path), "%s/native_%03d.bmp", dir, s_shot_count++);
-            SDL_SaveBMP(s_rgb_surface, path);
-            if (s_shot_count >= 5) s_shot_done = 1;
+        SDL_Event ev;
+        extern int gExit;
+        while (SDL_PollEvent(&ev)) {
+            if (ev.type == SDL_QUIT) { gExit = 1; }
         }
     }
+
+    /* Save screenshots when RECKLESS_SCREENSHOT_DIR env var is set.
+     * Skip initial frames (menu + level load) to capture actual gameplay. */
+#define SCREENSHOT_WARMUP_FRAMES 200
+    {
+        static int s_shot_count = 0;
+        static int s_shot_skip  = 0;
+        static int s_shot_done  = 0;
+        const char *dir = SDL_getenv("RECKLESS_SCREENSHOT_DIR");
+        if (dir && !s_shot_done && s_rgb_surface) {
+            if (s_shot_skip < SCREENSHOT_WARMUP_FRAMES) {
+                s_shot_skip++;
+            } else {
+                char path[512];
+                snprintf(path, sizeof(path), "%s/native_%03d.bmp", dir, s_shot_count++);
+                SDL_SaveBMP(s_rgb_surface, path);
+                if (s_shot_count >= 5) s_shot_done = 1;
+            }
+        }
+    }
+#undef SCREENSHOT_WARMUP_FRAMES
 }
 
 /* SetScreenClut - set palette from color table resource */
