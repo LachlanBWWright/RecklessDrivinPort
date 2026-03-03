@@ -83,7 +83,6 @@ add_library(mac_stubs STATIC
 # Game source files
 # ============================================================
 set(GAME_SOURCES
-    source/appleevents.c
     source/error.c
     source/gameendseq.c
     source/gameframe.c
@@ -114,6 +113,13 @@ set(GAME_SOURCES
     source/sprites.c
     source/textfx.c
 )
+
+# appleevents.c uses Mac-only Apple Events API; only include it when not using
+# the SDL2 port (i.e. native Mac build).  The SDL2 port provides InitAE() stub
+# in mac_stubs.c.
+if(NOT PORT_SDL2)
+    list(APPEND GAME_SOURCES source/appleevents.c)
+endif()
 
 # ============================================================
 # SDL2 backend - replaces source/screen.c and Mac-specific
@@ -163,9 +169,9 @@ endif()
 # Emscripten / WASM specific settings
 # ============================================================
 if(EMSCRIPTEN)
-    # WASM build settings
+    # WASM build settings - output as reckless_drivin.html (shell template)
     set(WASM_OUTPUT_NAME "reckless_drivin")
-    set(CMAKE_EXECUTABLE_SUFFIX ".js")
+    set(CMAKE_EXECUTABLE_SUFFIX ".html")
 
     # Pre-load resources.dat into the virtual filesystem
     set(EMSCRIPTEN_PRELOAD_FILES

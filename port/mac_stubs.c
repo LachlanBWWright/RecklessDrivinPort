@@ -1438,3 +1438,12 @@ Component FindNextComponent(Component aComponent, ComponentDescription *looking)
     printf("TODO: FindNextComponent\n");
     return NULL;
 }
+
+
+/* AppleEvents stubs - not needed outside Mac */
+void InitAE(void) { /* no-op: Apple Events not available on SDL2/WASM */ }
+
+/* Input stubs - Mac ISP not available on SDL2/WASM */
+void InitInput(void)     { /* SDL2 keyboard via GetKeys()/IsPressed() */ }
+void ConfigureInput(void){ }
+void ConfigureHID(void)  { }

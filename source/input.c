@@ -1,8 +1,12 @@
+#ifndef PORT_SDL2
 #define CALL_IN_SPOCKETS_BUT_NOT_IN_CARBON 1
 #include <InputSprocket.h>
 #include <DriverServices.h>
-#include <math.h>
 #include <iShockXForceAPI.h>
+#include <HID_Utilities_CFM.h>
+#define kCreator 0x52000002u  /* Mac creator code */
+#endif /* !PORT_SDL2 */
+#include <math.h>
 #include "error.h"
 #include "input.h"
 #include "interface.h"
@@ -10,13 +14,13 @@
 #include "screen.h"
 #include "gameframe.h"
 #include "preferences.h"
-#include <HID_Utilities_CFM.h>
 
-#define kCreator 'R��2'
 #define kMinSwitchDelay		15		//Minimum Delay between siwtching reverse gears in frames.
 
+#ifndef PORT_SDL2
 ISpElementReference *gVirtualElements;
 ISpElementListReference gEventElements;
+#endif
 tInputData gInputData;
 int gFire,gMissile;
 int gInputISp=false;
@@ -24,15 +28,18 @@ int gInputHID=false;
 int gForceFeedback=false;
 unsigned long gSwitchDelayStart;
 int gLastScan[kNumElements];
+#ifndef PORT_SDL2
 iS2F_DeviceRef_t giShockList[iS2F_MAX_ISHOCK2_NUM];
 pRecElement *gElements;
 pRecDevice gController;
 int gNumHIDElements=0;
 extern int gOSX;
+#endif
 
 int gFFBBlock=0;
 void FFBJolt(float lMag,float rMag,float duration)
 {
+#ifndef PORT_SDL2
 	if(gForceFeedback)
 	{
 		iS2F_JoltCmd_t joltCmd;
@@ -42,10 +49,14 @@ void FFBJolt(float lMag,float rMag,float duration)
 		iS2F_SimpleJolt(giShockList[0],&joltCmd);
 		gFFBBlock=gFrameCount+duration*kCalcFPS;
 	}
+#else
+	(void)lMag; (void)rMag; (void)duration;
+#endif
 }
 
 void FFBDirect(float lMag,float rMag)
 {
+#ifndef PORT_SDL2
 	if(gForceFeedback&&gFrameCount>gFFBBlock)
 	{
 		iS2F_MotorCmd_t directCmd;
@@ -53,10 +64,14 @@ void FFBDirect(float lMag,float rMag)
 		directCmd.rightMotorMagnitude=rMag*10;
 		iS2F_SimpleDirectControl(giShockList[0],&directCmd);
 	}
+#else
+	(void)lMag; (void)rMag;
+#endif
 }
 
 void FFBStop()
 {
+#ifndef PORT_SDL2
 	if(gForceFeedback)
 	{
 		iS2F_MotorCmd_t directCmd;
@@ -64,10 +79,12 @@ void FFBStop()
 		directCmd.rightMotorMagnitude=0;
 		iS2F_SimpleDirectControl(giShockList[0],&directCmd);
 	}
+#endif
 }
 
 void InputMode(int mode)
 {
+#ifndef PORT_SDL2
 	if(gInputISp)
 	{
 		switch(mode){
@@ -82,6 +99,7 @@ void InputMode(int mode)
 		}
 	}
 	else
+#endif
 	{
 		int i;
 		for(i=0;i<kNumElements;i++)
@@ -89,6 +107,7 @@ void InputMode(int mode)
 	}
 	if(mode==kInputStopped)
 	{
+#ifndef PORT_SDL2
 		if(gForceFeedback)
 		{
 			FFBStop();
@@ -99,11 +118,13 @@ void InputMode(int mode)
 			HIDReleaseDeviceList();
 			TearDownHIDCFM();
 		}
+#endif
 	}
 	if(mode==kInputSuspended&&gForceFeedback)
 		FFBStop();
 }
 
+#ifndef PORT_SDL2
 #define kHIDPage_GenericDesktop 0x1
 #define kHIDUsage_GD_Mouse 0x2
 #define kHIDUsage_GD_Keyboard 0x6
@@ -183,6 +204,7 @@ void InitInput()
 	}
 
 }
+#endif /* !PORT_SDL2 */
 
 
 float ThrottleReset(float throttle)
@@ -212,6 +234,7 @@ short IsPressed(unsigned short k )
 
 int GetElement(int element)
 {
+#ifndef PORT_SDL2
 	if(gInputISp)
 	{
 		UInt32 tempInput;
@@ -219,23 +242,28 @@ int GetElement(int element)
 		return tempInput;
 	}
 	else
+#endif
 		if(IsPressed(gPrefs.keyCodes[element]))
 			return true;
+#ifndef PORT_SDL2
 	if(gInputHID&&element<=kMissile)
 		if(gPrefs.hidElements[element]<gNumHIDElements)
 			if(gElements[gPrefs.hidElements[element]]->type==2)
 				if(HIDGetElementValue(gController,gElements[gPrefs.hidElements[element]]))
 					return true;
+#endif
 	return false;
 }
 
 int GetElementHIDOnly(int element)
 {
+#ifndef PORT_SDL2
 	if(gInputHID&&element<=kMissile)
 		if(gPrefs.hidElements[element]<gNumHIDElements)
 			if(gElements[gPrefs.hidElements[element]]->type==2)
 				if(HIDGetElementValue(gController,gElements[gPrefs.hidElements[element]]))
 					return true;
+#endif
 	return false;
 }
 
@@ -252,6 +280,7 @@ int ContinuePress()
 
 int GetEvent(int *element,int *data)
 {
+#ifndef PORT_SDL2
 	if(gInputISp)
 	{
 		Boolean wasEvent;
@@ -265,6 +294,7 @@ int GetEvent(int *element,int *data)
 		else return false;
 	}
 	else
+#endif
 	{
 		int i;
 		for(i=0;i<kNumElements;i++)
@@ -424,7 +454,12 @@ void Input(tInputData **data)
 UInt64 GetMSTime()
 {
 #ifdef PORT_SDL2
+	/* SDL_GetTicks64 not available in Emscripten SDL2 port; use SDL_GetTicks */
+#if defined(__EMSCRIPTEN__)
+	return (UInt64)SDL_GetTicks();
+#else
 	return (UInt64)SDL_GetTicks64();
+#endif
 #else
 	if(gInputISp)
 	{
@@ -445,10 +480,13 @@ UInt64 GetMSTime()
 
 void FlushInput()
 {
+#ifndef PORT_SDL2
 	if(gInputISp)
 		DoError(ISpElementList_Flush(gEventElements));
+#endif
 }
 
+#ifndef PORT_SDL2
 void GetKeyPress(int element,DialogPtr keyDlg,UInt8 *elements)
 {
 	int i,pressed=false;
@@ -590,3 +628,4 @@ void ConfigureInput()
 		DisposeDialog(keyDlg);
 	}
 }
+#endif /* !PORT_SDL2 */

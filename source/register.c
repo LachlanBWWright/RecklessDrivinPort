@@ -7,7 +7,8 @@
 #include "initexit.h"
 #include <math.h>
 
-#define kCreator 'R��2'
+/* Mac creator code 'R??2' - used in Mac-only code paths */
+#define kCreator 0x52000002u
 
 UInt32 gKey;
 int gRegistered=false;
