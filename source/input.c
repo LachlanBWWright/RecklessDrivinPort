@@ -6,6 +6,9 @@
 #include <HID_Utilities_CFM.h>
 #define kCreator 0x52000002u  /* Mac creator code */
 #endif /* !PORT_SDL2 */
+#ifdef PORT_SDL2
+#include <SDL2/SDL.h>
+#endif
 #include <math.h>
 #include "error.h"
 #include "input.h"
@@ -245,6 +248,23 @@ int GetElement(int element)
 #endif
 		if(IsPressed(gPrefs.keyCodes[element]))
 			return true;
+#ifdef PORT_SDL2
+	/* Hardcoded SDL2 fallback: arrow keys and WASD always drive,
+	 * independent of the keyCodes stored in preferences.
+	 * (The original 'Pref' resource defaults to numpad keys, not arrows.) */
+	{
+		const Uint8 *sdl_keys = SDL_GetKeyboardState(NULL);
+		switch(element)
+		{
+			case kForward:  if(sdl_keys[SDL_SCANCODE_UP]    || sdl_keys[SDL_SCANCODE_W]) return true; break;
+			case kBackward: if(sdl_keys[SDL_SCANCODE_DOWN]  || sdl_keys[SDL_SCANCODE_S]) return true; break;
+			case kLeft:     if(sdl_keys[SDL_SCANCODE_LEFT]  || sdl_keys[SDL_SCANCODE_A]) return true; break;
+			case kRight:    if(sdl_keys[SDL_SCANCODE_RIGHT] || sdl_keys[SDL_SCANCODE_D]) return true; break;
+			case kAbort:    if(sdl_keys[SDL_SCANCODE_ESCAPE]) return true; break;
+			default: break;
+		}
+	}
+#endif
 #ifndef PORT_SDL2
 	if(gInputHID&&element<=kMissile)
 		if(gPrefs.hidElements[element]<gNumHIDElements)

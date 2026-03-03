@@ -120,7 +120,21 @@ void FirstRun()
 		/* Clamp volume to a reasonable range */
 		if(gPrefs.volume > 256) gPrefs.volume = 100;
 	}
-	ReleaseResource(prefDefault);	
+	ReleaseResource(prefDefault);
+#ifdef PORT_SDL2
+	/* The original Pref resource maps driving to the numeric keypad.
+	 * Override with standard arrow-key + modifier bindings for the SDL2 port. */
+	gPrefs.keyCodes[kForward]   = 0x7E; /* Up arrow */
+	gPrefs.keyCodes[kBackward]  = 0x7D; /* Down arrow */
+	gPrefs.keyCodes[kLeft]      = 0x7B; /* Left arrow */
+	gPrefs.keyCodes[kRight]     = 0x7C; /* Right arrow */
+	gPrefs.keyCodes[kKickdown]  = 0x38; /* Left Shift */
+	gPrefs.keyCodes[kBrake]     = 0x31; /* Space */
+	gPrefs.keyCodes[kFire]      = 0x06; /* Z */
+	gPrefs.keyCodes[kMissile]   = 0x07; /* X */
+	gPrefs.keyCodes[kAbort]     = 0x35; /* Escape */
+	gPrefs.keyCodes[kPause]     = 0x0F; /* R */
+#endif
 }
 
 void LoadPrefs()
