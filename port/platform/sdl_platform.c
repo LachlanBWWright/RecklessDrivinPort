@@ -83,6 +83,10 @@ char gMessageBuffer[1024];
 char *gMessagePos;
 int gMessageCount;
 
+/* Forward declaration of audio callback processor (defined after sound manager) */
+static void sdl_audio_process_callbacks(void);
+static void sdl_audio_open(void);
+
 /* ============================================================
  * Mac ADB scan code → SDL_Scancode lookup table
  * Maps Mac ADB keyboard scan codes (0-127) to SDL2 scancodes.
@@ -263,10 +267,13 @@ void SDL_Platform_SetPalette(int index, int count, UInt16 *rgbValues) {
 }
 
 void InitScreen(int dummy) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         exit(1);
     }
+
+    /* Initialize audio subsystem */
+    sdl_audio_open();
 
     gXSize = 640;
     gYSize = 480;
@@ -432,6 +439,8 @@ void Blit2Screen(void) {
     SDL_RenderClear(s_renderer);
     SDL_RenderCopy(s_renderer, s_texture, NULL, NULL);
     SDL_RenderPresent(s_renderer);
+
+
 }
 
 /* SetScreenClut - set palette from color table resource */
@@ -533,6 +542,9 @@ static int s_mouse_down = 0;
 extern int gExit; /* declared in interface.h or gameframe.h */
 
 Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *mouseRgn) {
+    /* Process pending sound callbacks first (must be on main thread) */
+    sdl_audio_process_callbacks();
+
     SDL_Event ev;
     if (!theEvent) return 0;
     memset(theEvent, 0, sizeof(EventRecord));
@@ -657,6 +669,427 @@ void AddFloatToMessageBuffer(StringPtr label, float value) {
 }
 
 /* ============================================================
+ * SDL2 Sound Manager - Software mixer implementing Mac Sound Manager API
+ * Supports: SndNewChannel, SndDisposeChannel, SndDoImmediate, SndDoCommand
+ * Commands: bufferCmd, volumeCmd, flushCmd, quietCmd, rateMultiplierCmd,
+ *           callBackCmd, rateCmd, getRateCmd
+ * ============================================================ */
+
+/*
+ * Mac SoundHeader layout (stdSH, encode=0x00, 8-bit mono PCM):
+ *   offset 0:  uint32 samplePtr    (0 = data inline at sampleArea)
+ *   offset 4:  uint32 length       (number of samples)
+ *   offset 8:  uint32 sampleRate   (16.16 fixed-point Hz)
+ *   offset 12: uint32 loopStart
+ *   offset 16: uint32 loopEnd
+ *   offset 20: uint8  encode       (0=stdSH, 0xFF=extSH, 0xFE=cmpSH)
+ *   offset 21: uint8  baseFrequency
+ *   offset 22: uint8  sampleArea[] (PCM data: 8-bit unsigned offset by 128)
+ *
+ * Mac SoundHeader layout (extSH, encode=0xFF, 16-bit stereo PCM):
+ *   offsets 0-21: same as above (length = numFrames)
+ *   offset 22: uint32 numFrames
+ *   offset 26: 10 bytes (extended 80-bit float sampleRate - we skip this)
+ *   offset 36: uint32 markerChunk
+ *   offset 40: uint32 instrumentChunks
+ *   offset 44: uint32 AESRecording
+ *   offset 48: uint16 sampleSize (bits per sample)
+ *   offset 50: uint16 futureUse1
+ *   offset 52: uint32 futureUse2
+ *   offset 56: uint32 futureUse3
+ *   offset 60: uint32 futureUse4
+ *   offset 64: uint8  sampleArea[]
+ */
+
+/* SDL_AudioSpec for mixer */
+#define SND_SAMPLE_RATE   22050
+#define SND_CHANNELS      1
+#define SND_BUFFER_SIZE   1024
+#define MAX_SND_CHANNELS  16    /* max simultaneous Sound Manager channels */
+
+typedef struct SndVoice {
+    /* Playback position */
+    const uint8_t *samples;   /* 8-bit unsigned PCM data from Mac SoundHeader (or NULL) */
+    uint32_t      num_samples;
+    double        pos;        /* current read position (fractional) */
+    double        rate;       /* samples per output sample (= src_rate/dst_rate * multiplier) */
+    double        rate_mul;   /* rateMultiplierCmd value (1.0 = normal) */
+    uint32_t      src_rate;   /* sample rate from SoundHeader */
+
+    /* Volume/pan: 0-255 range, left/right separate */
+    float vol_l, vol_r;
+
+    /* Looping */
+    uint32_t loop_start, loop_end;
+
+    /* Callback on completion */
+    SndCallBackProcPtr callback;
+    SndChannelPtr      chan;
+    int                callback_pending;  /* 1 = fire callBackCmd at end */
+    int                callback_param1;
+
+    /* Active flag */
+    int active;
+} SndVoice;
+
+/* One mixer voice per SndChannel */
+static SndVoice  s_voices[MAX_SND_CHANNELS];
+static int       s_voice_count = 0;     /* number allocated */
+static SDL_mutex *s_audio_mutex = NULL;
+static int       s_audio_open   = 0;
+
+/* -------- Helper: get voice index for a channel -------- */
+static int voice_for_chan(SndChannelPtr chan) {
+    if (!chan) return -1;
+    int idx = (int)(intptr_t)chan->nextChan;  /* we store index in nextChan */
+    if (idx < 0 || idx >= MAX_SND_CHANNELS) return -1;
+    return idx;
+}
+
+/* -------- SDL audio callback -------- */
+static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
+    (void)userdata;
+    int n = len;  /* len is bytes; we use int16 samples */
+    int16_t *out = (int16_t *)stream;
+    int n_samples = n / 2;  /* stereo int16 = 4 bytes per frame; mono = 2 bytes */
+    /* Actually our SDL audio is mono int16 */
+    memset(out, 0, (size_t)n);
+
+    if (!s_audio_mutex) return;
+    SDL_LockMutex(s_audio_mutex);
+
+    for (int vi = 0; vi < s_voice_count; vi++) {
+        SndVoice *v = &s_voices[vi];
+        if (!v->active || !v->samples || v->num_samples == 0) continue;
+
+        for (int i = 0; i < n_samples; i++) {
+            uint32_t idx = (uint32_t)v->pos;
+            if (idx >= v->num_samples) {
+                /* End of sample - check loop */
+                if (v->loop_end > v->loop_start && v->loop_end <= v->num_samples) {
+                    v->pos = v->loop_start;
+                    idx = v->loop_start;
+                } else {
+                    v->active = 0;
+                    if (v->callback_pending) {
+                        /* Schedule callback to be called outside audio thread */
+                        v->callback_pending = 2;  /* 2 = needs firing */
+                    }
+                    break;
+                }
+            }
+            /* 8-bit unsigned PCM (range 0-255) to signed int16: convert to signed by
+             * treating as uint8 (which is what Mac samples are), mapping 0-255 -> -128..127 */
+            int sample = (int)((uint8_t)v->samples[idx] - 128) * 256;
+            /* Apply volume */
+            sample = (int)(sample * v->vol_l);
+            /* Clamp and mix */
+            {
+                int32_t sum = (int32_t)out[i] + (int32_t)sample;
+                out[i] = (int16_t)(sum > 32767 ? 32767 : sum < -32768 ? -32768 : sum);
+            }
+            v->pos += v->rate;
+        }
+    }
+
+    SDL_UnlockMutex(s_audio_mutex);
+}
+
+/* -------- Open SDL audio device -------- */
+static void sdl_audio_open(void) {
+    if (s_audio_open) return;
+    s_audio_mutex = SDL_CreateMutex();
+
+    SDL_AudioSpec want, got;
+    SDL_memset(&want, 0, sizeof(want));
+    want.freq     = SND_SAMPLE_RATE;
+    want.format   = AUDIO_S16SYS;
+    want.channels = 1;      /* mono mixing */
+    want.samples  = SND_BUFFER_SIZE;
+    want.callback = sdl_audio_callback;
+    want.userdata = NULL;
+
+    if (SDL_OpenAudio(&want, &got) < 0) {
+        fprintf(stderr, "[SDL] SDL_OpenAudio failed: %s\n", SDL_GetError());
+        return;
+    }
+    s_audio_open = 1;
+    SDL_PauseAudio(0);  /* start playback */
+    printf("[SDL] Audio opened: %d Hz, format=%d, ch=%d\n",
+           got.freq, got.format, got.channels);
+}
+
+/* ============================================================
+ * Mac Sound Manager API implementation for SDL2 port
+ * ============================================================ */
+
+OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
+                    SndCallBackProcPtr userRoutine) {
+    if (!chan) return -50;
+
+    /* Open audio device on first channel */
+    if (!s_audio_open) {
+        /* Add SDL_INIT_AUDIO if not already initialized */
+        SDL_InitSubSystem(SDL_INIT_AUDIO);
+        sdl_audio_open();
+    }
+
+    if (s_voice_count >= MAX_SND_CHANNELS) {
+        fprintf(stderr, "[SDL] SndNewChannel: too many channels\n");
+        return -108;
+    }
+
+    *chan = (SndChannelPtr)calloc(1, sizeof(SndChannel));
+    if (!*chan) return -108;
+
+    int vi = s_voice_count++;
+    SndVoice *v = &s_voices[vi];
+    memset(v, 0, sizeof(*v));
+    v->vol_l    = 1.0f;
+    v->vol_r    = 1.0f;
+    v->rate_mul = 1.0;
+    v->rate     = 1.0;
+    v->active   = 0;
+    v->callback = userRoutine;
+    v->chan     = *chan;
+
+    /* Store voice index in nextChan (we're not using it for actual linking) */
+    (*chan)->nextChan = (struct SndChannel *)(intptr_t)vi;
+    (*chan)->callBack  = userRoutine;
+    (*chan)->userInfo  = 0;
+
+    return 0;
+}
+
+OSErr SndDisposeChannel(SndChannelPtr chan, Boolean quietNow) {
+    if (!chan) return 0;
+    int vi = voice_for_chan(chan);
+    if (vi >= 0 && s_audio_mutex) {
+        SDL_LockMutex(s_audio_mutex);
+        s_voices[vi].active   = 0;
+        s_voices[vi].samples  = NULL;
+        SDL_UnlockMutex(s_audio_mutex);
+    }
+    free(chan);
+    return 0;
+}
+
+/* -------- Parse Mac SoundHeader and start playback -------- */
+static void voice_play_buffer(SndVoice *v, const uint8_t *snd_hdr) {
+    if (!snd_hdr) return;
+
+    /* Read SoundHeader fields (big-endian) */
+    uint32_t length    = ((uint32_t)snd_hdr[4]<<24)|((uint32_t)snd_hdr[5]<<16)|
+                         ((uint32_t)snd_hdr[6]<<8 )|snd_hdr[7];
+    uint32_t rate_fx   = ((uint32_t)snd_hdr[8]<<24)|((uint32_t)snd_hdr[9]<<16)|
+                         ((uint32_t)snd_hdr[10]<<8)|snd_hdr[11];
+    uint32_t loop_start= ((uint32_t)snd_hdr[12]<<24)|((uint32_t)snd_hdr[13]<<16)|
+                         ((uint32_t)snd_hdr[14]<<8 )|snd_hdr[15];
+    uint32_t loop_end  = ((uint32_t)snd_hdr[16]<<24)|((uint32_t)snd_hdr[17]<<16)|
+                         ((uint32_t)snd_hdr[18]<<8 )|snd_hdr[19];
+    uint8_t  encode    = snd_hdr[20];
+
+    double src_rate = (double)rate_fx / 65536.0;
+    if (src_rate < 100.0) src_rate = 22050.0;  /* sanity check */
+
+    v->src_rate   = (uint32_t)src_rate;
+    v->rate       = src_rate / (double)SND_SAMPLE_RATE * v->rate_mul;
+    v->loop_start = loop_start;
+    v->loop_end   = loop_end;
+    v->pos        = 0.0;
+
+    if (encode == 0x00) {
+        /* stdSH: 8-bit mono samples at offset 22 */
+        v->samples     = (const uint8_t *)(snd_hdr + 22);
+        v->num_samples = length;
+        v->active      = 1;
+    } else if (encode == 0xFF) {
+        /* extSH: 16-bit at offset 64 - not common in this game, skip for now */
+        v->active = 0;
+    } else {
+        /* cmpSH or other - not supported */
+        v->active = 0;
+    }
+}
+
+OSErr SndDoImmediate(SndChannelPtr chan, const SndCommand *cmd) {
+    if (!chan || !cmd) return 0;
+    int vi = voice_for_chan(chan);
+    if (vi < 0) return 0;
+    SndVoice *v = &s_voices[vi];
+
+    if (s_audio_mutex) SDL_LockMutex(s_audio_mutex);
+
+    switch (cmd->cmd & 0x7FFF) {  /* strip high bit (data-offset flag) */
+        case 3: /* quietCmd */
+            v->active = 0;
+            break;
+        case 4: /* flushCmd */
+            v->active = 0;
+            v->callback_pending = 0;
+            break;
+        case 46: /* volumeCmd */
+            /* param2: hi 16 bits = left, lo 16 bits = right (range 0-0x0100 = 0.0-1.0) */
+            {
+                uint16_t vl = (uint16_t)((cmd->param2 >> 16) & 0xFFFF);
+                uint16_t vr = (uint16_t)( cmd->param2        & 0xFFFF);
+                /* Mono mix: average L+R; 0x0100 = full volume */
+                v->vol_l = (float)vl / 256.0f;
+                v->vol_r = (float)vr / 256.0f;
+                /* For mono output use average */
+                if (v->vol_l == 0 && v->vol_r > 0) v->vol_l = v->vol_r;
+                if (v->vol_r == 0 && v->vol_l > 0) v->vol_r = v->vol_l;
+            }
+            break;
+        case 82: /* rateCmd */
+            if (cmd->param2 > 0) {
+                v->rate_mul = (double)cmd->param2 / 65536.0;
+                v->rate = (double)v->src_rate / (double)SND_SAMPLE_RATE * v->rate_mul;
+            }
+            break;
+        case 85: /* getRateCmd */
+            /* param2 is pointer to UInt32 to receive the rate */
+            if (cmd->param2) {
+                uint32_t *dest = (uint32_t *)(intptr_t)cmd->param2;
+                *dest = (uint32_t)(v->src_rate * 65536.0);
+            }
+            break;
+        case 86: /* rateMultiplierCmd */
+            if (cmd->param2 > 0) {
+                v->rate_mul = (double)cmd->param2 / 65536.0;
+                if (v->src_rate > 0)
+                    v->rate = (double)v->src_rate / (double)SND_SAMPLE_RATE * v->rate_mul;
+            }
+            break;
+        case 81: /* bufferCmd - immediate version plays right away */
+            if (cmd->param2) {
+                voice_play_buffer(v, (const uint8_t *)(intptr_t)cmd->param2);
+            }
+            break;
+        default:
+            break;
+    }
+
+    if (s_audio_mutex) SDL_UnlockMutex(s_audio_mutex);
+    return 0;
+}
+
+OSErr SndDoCommand(SndChannelPtr chan, const SndCommand *cmd, Boolean noWait) {
+    if (!chan || !cmd) return 0;
+    int vi = voice_for_chan(chan);
+    if (vi < 0) return 0;
+    SndVoice *v = &s_voices[vi];
+
+    if (s_audio_mutex) SDL_LockMutex(s_audio_mutex);
+
+    switch (cmd->cmd & 0x7FFF) {
+        case 81: /* bufferCmd */
+            if (cmd->param2) {
+                voice_play_buffer(v, (const uint8_t *)(intptr_t)cmd->param2);
+            }
+            break;
+        case 13: /* callBackCmd */
+            /* Schedule callback when current sound finishes */
+            v->callback_pending = 1;
+            v->callback_param1  = cmd->param1;
+            break;
+        default:
+            /* Delegate to SndDoImmediate for other commands */
+            if (s_audio_mutex) SDL_UnlockMutex(s_audio_mutex);
+            return SndDoImmediate(chan, cmd);
+    }
+
+    if (s_audio_mutex) SDL_UnlockMutex(s_audio_mutex);
+    return 0;
+}
+
+OSErr SndChannelStatus(SndChannelPtr chan, short theLength, SCStatusPtr theStatus) {
+    if (theStatus) memset(theStatus, 0, theLength);
+    if (!chan) return 0;
+    int vi = voice_for_chan(chan);
+    if (vi >= 0 && theStatus && theLength >= 4) {
+        /* scChannelBusy = 0x0001 */
+        if (s_voices[vi].active)
+            ((uint8_t *)theStatus)[3] |= 0x01;
+    }
+    return 0;
+}
+
+/* -------- Process pending callbacks (called from main thread) -------- */
+static void sdl_audio_process_callbacks(void) {
+    if (!s_audio_mutex) return;
+    SDL_LockMutex(s_audio_mutex);
+    for (int vi = 0; vi < s_voice_count; vi++) {
+        SndVoice *v = &s_voices[vi];
+        if (v->callback_pending == 2 && v->callback && v->chan) {
+            SndCallBackProcPtr cb = v->callback;
+            SndChannelPtr chan = v->chan;
+            SndCommand cmd;
+            cmd.cmd    = 13; /* callBackCmd */
+            cmd.param1 = v->callback_param1;
+            cmd.param2 = 0;
+            v->callback_pending = 0;
+            SDL_UnlockMutex(s_audio_mutex);
+            cb(chan, &cmd);
+            SDL_LockMutex(s_audio_mutex);
+        }
+    }
+    SDL_UnlockMutex(s_audio_mutex);
+}
+
+NumVersion SndSoundManagerVersion(void) {
+    /* Return version 3.6 - "HQ mode" threshold is 0x03600000 */
+    NumVersion v;
+    v.majorRev       = 3;
+    v.minorAndBugRev = 0x60;
+    v.stage          = 0x80; /* final */
+    v.nonRelRev      = 0;
+    return v;
+}
+
+OSErr GetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr) {
+    (void)ci;
+    if (selector == 'srat' && infoPtr) {
+        /* siSampleRate: return 22050 Hz as 16.16 fixed point */
+        *(uint32_t *)infoPtr = (uint32_t)(22050.0 * 65536.0);
+    } else if (selector == 'srav' && infoPtr) {
+        /* siSampleRateAvailable: return a SoundInfoList with our supported rate.
+         * The game iterates rates.infoHandle entries looking for its desired rate,
+         * then calls DisposeHandle(rates.infoHandle). We must allocate a real Handle. */
+        SoundInfoList *sil = (SoundInfoList *)infoPtr;
+        /* Allocate a handle with one UnsignedFixed (22050 Hz) */
+        Handle h = NewHandle(sizeof(UnsignedFixed));
+        if (h && *h) {
+            UnsignedFixed rate22k = (UnsignedFixed)(22050.0 * 65536.0);
+            memcpy(*h, &rate22k, sizeof(rate22k));
+            sil->count = 1;
+            sil->infoHandle = h;
+        } else {
+            sil->count = 0;
+            sil->infoHandle = NewHandle(0); /* empty but valid handle */
+        }
+    }
+    return 0;
+}
+
+OSErr SetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr) {
+    (void)ci; (void)selector; (void)infoPtr;
+    return 0;
+}
+
+/* Component (FindNextComponent) - return non-NULL so SetGameVolume proceeds */
+Component FindNextComponent(Component aComponent, ComponentDescription *looking) {
+    (void)aComponent; (void)looking;
+    /* Return a fake non-NULL component so the game enters the sound rate setup */
+    return (Component)(intptr_t)1;
+}
+
+/* ============================================================
+ * End SDL2 Sound Manager
+ * ============================================================ */
+
+
+/* ============================================================
  * WASM / Emscripten main loop support
  * ============================================================ */
 #ifdef __EMSCRIPTEN__
@@ -674,6 +1107,8 @@ static void emscripten_main_loop(void) {
     if (!s_initialized) return;
     extern int gGameOn;
     extern int gExit;
+    /* Process pending sound callbacks */
+    sdl_audio_process_callbacks();
     if (gExit) {
         emscripten_cancel_main_loop();
         Exit();
@@ -681,8 +1116,14 @@ static void emscripten_main_loop(void) {
     }
     if (gGameOn)
         GameFrame();
-    else
+    else {
         Eventloop();
+        /* In WASM, the canvas must be refreshed every animation frame.
+         * Eventloop() only calls Blit2Screen() when responding to an event
+         * (mouse move, window update, etc.), so we force a blit here to
+         * ensure the canvas always shows the latest rendered frame. */
+        Blit2Screen();
+    }
 }
 
 /* WASM entry point - called from JS after page loads */
@@ -694,6 +1135,7 @@ int main(int argc, char *argv[]) {
     emscripten_set_main_loop(emscripten_main_loop, 0, 1);
     return 0;
 }
+
 
 #endif /* __EMSCRIPTEN__ */
 

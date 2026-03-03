@@ -1121,7 +1121,7 @@ void FrameRect(const Rect *r) {
 void MoveTo(short h, short v)                       { }
 void LineTo(short h, short v)                       { }
 void Line(short dh, short dv)                       { }
-void DrawString(const char *s)                      { printf("TODO: DrawString(%s)\n", s ? s : ""); }
+void DrawString(const char *s)                      { (void)s; /* text rendering not implemented */ }
 void TextFont(short font)                           { }
 void TextSize(short size)                           { }
 void TextMode(short mode)                           { }
@@ -1191,9 +1191,10 @@ void GetRegionBounds(RgnHandle rgn, Rect *bounds) {
 /* Window Manager                                                            */
 /*---------------------------------------------------------------------------*/
 
-void InitCursor(void)  { printf("TODO: InitCursor\n"); }
-void HideCursor(void)  { printf("TODO: HideCursor\n"); }
-void ShowCursor(void)  { printf("TODO: ShowCursor\n"); }
+void InitCursor(void)  { }   /* no-op: SDL2 cursor managed via SDL_ShowCursor */
+void HideCursor(void)  { }
+void ShowCursor(void)  { }
+
 
 void DragWindow(WindowPtr w, Point startPt, const Rect *boundsRect) {
     printf("TODO: DragWindow\n");
@@ -1389,6 +1390,9 @@ void TEFromScrap(void) { }
 /* Sound Manager                                                             */
 /*---------------------------------------------------------------------------*/
 
+#ifndef PORT_SDL2
+/* SDL2 port provides its own sound manager in sdl_platform.c */
+
 OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
                      SndCallBackProcPtr userRoutine) {
     printf("TODO: SndNewChannel\n");
@@ -1414,30 +1418,29 @@ OSErr SndChannelStatus(SndChannelPtr chan, short theLength, SCStatusPtr theStatu
 }
 
 NumVersion SndSoundManagerVersion(void) {
-    /* Return version 3.2 final (0x03200000) - must be > 0x03100000 to pass ReqCheck() */
+    /* Return version 3.6 - > 0x03600000 enables HQ mode */
     NumVersion v;
     v.majorRev    = 3;
-    v.minorAndBugRev = 0x20; /* minor=2, bug=0 */
+    v.minorAndBugRev = 0x60;
     v.stage       = 0x80;   /* final release */
     v.nonRelRev   = 0;
     return v;
 }
 
 OSErr GetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr) {
-    printf("TODO: GetSoundOutputInfo\n");
     if (selector == 'srat' && infoPtr) *(long*)infoPtr = 0x56220000; /* rate22050hz */
     return 0;
 }
 
 OSErr SetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr) {
-    printf("TODO: SetSoundOutputInfo\n");
     return 0;
 }
 
 Component FindNextComponent(Component aComponent, ComponentDescription *looking) {
-    printf("TODO: FindNextComponent\n");
-    return NULL;
+    return (Component)(intptr_t)1;
 }
+
+#endif /* !PORT_SDL2 */
 
 
 /* AppleEvents stubs - not needed outside Mac */

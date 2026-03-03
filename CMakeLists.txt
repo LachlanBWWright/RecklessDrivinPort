@@ -79,6 +79,12 @@ add_library(mac_stubs STATIC
     port/mac_stubs.c
 )
 
+# Propagate PORT_SDL2 to the mac_stubs library so it can guard
+# duplicate implementations (e.g. SndNewChannel is in sdl_platform.c
+# for SDL2 builds).
+if(PORT_SDL2)
+    target_compile_definitions(mac_stubs PRIVATE PORT_SDL2)
+endif()
 # ============================================================
 # Game source files
 # ============================================================
