@@ -198,6 +198,16 @@ void InitInterface()
 		DisposeHandle(pic);	
 		SetGWorld(oldGW,oldGD);
 		gButtonList=(Rect**)GetResource('Recs',1000);
+		/* The Recs resource contains big-endian Mac Rect structs.
+		 * On little-endian platforms we must byte-swap all fields. */
+		if(gButtonList && *gButtonList) {
+			int nRects=(int)(GetHandleSize((Handle)gButtonList)/sizeof(Rect));
+			int ri;
+			HLock((Handle)gButtonList);
+			for(ri=0;ri<nRects;ri++)
+				SwapRect((*gButtonList)+ri);
+			HUnlock((Handle)gButtonList);
+		}
 		gButtonRgn=NewRgn();
 		gInterfaceInited=true;
 	}

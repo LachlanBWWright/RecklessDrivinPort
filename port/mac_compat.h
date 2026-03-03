@@ -94,8 +94,35 @@ typedef Point *PointPtr;
 typedef Rect  *RectPtr;
 
 /*---------------------------------------------------------------------------*/
-/* FSSpec                                                                    */
+/* Big-endian byte-swap helpers for Mac resource data                        */
+/*                                                                           */
+/* All multi-byte values stored in Mac resource binary data are big-endian.  */
+/* On little-endian hosts (x86/x86_64) we must byte-swap them before use.   */
 /*---------------------------------------------------------------------------*/
+
+static inline uint16_t be16_swap(uint16_t v) {
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return (uint16_t)(((v & 0xFF00u) >> 8) | ((v & 0x00FFu) << 8));
+#else
+    return v;
+#endif
+}
+static inline uint32_t be32_swap(uint32_t v) {
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return ((v & 0xFF000000u) >> 24) | ((v & 0x00FF0000u) >> 8) |
+           ((v & 0x0000FF00u) <<  8) | ((v & 0x000000FFu) << 24);
+#else
+    return v;
+#endif
+}
+/* Swap a Mac Rect (fields are big-endian SInt16 in resource data) */
+static inline void SwapRect(Rect *r) {
+    r->top    = (SInt16)be16_swap((uint16_t)r->top);
+    r->left   = (SInt16)be16_swap((uint16_t)r->left);
+    r->bottom = (SInt16)be16_swap((uint16_t)r->bottom);
+    r->right  = (SInt16)be16_swap((uint16_t)r->right);
+}
+
 
 typedef struct FSSpec {
     short  vRefNum;

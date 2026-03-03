@@ -14,6 +14,10 @@
 #include <time.h>
 #include <ctype.h>
 
+/* Forward declarations for QuickDraw helpers used by DrawPicture */
+static UInt8 *current_port_pixels(void);
+static short  current_port_rowbytes(void);
+
 /*---------------------------------------------------------------------------*/
 /* Memory Manager                                                            */
 /*---------------------------------------------------------------------------*/
@@ -541,11 +545,69 @@ Boolean LockPixels(PixMapHandle pm) { return 1; }
 /* UnlockPixels is defined as static inline in mac_compat.h */
 
 CTabHandle GetCTable(short ctID) {
-    /* Try to load from resources (game has 'clut' or 'Cl16' resources) */
-    Handle h = Pomme_GetResource('clut', ctID);
-    if (!h) {
-        /* Create a simple grayscale color table as fallback */
-        Size sz = sizeof(ColorTable) + sizeof(ColorSpec) * 255;
+    /*
+     * The game stores its colour table as a 'Cl16' resource: 256 big-endian
+     * 16-bit values in xRRRRR GGGGG BBBBB (1-5-5-5) format.
+     * Build a standard ColorTable from it.
+     */
+    Handle raw = Pomme_GetResource('Cl16', ctID);
+    if (raw) {
+        Size rawSz = GetHandleSize(raw);
+        int nColors = (int)(rawSz / 2);  /* 2 bytes per 15-bit entry */
+        if (nColors > 256) nColors = 256;
+        {
+            Size ctSz = (Size)(offsetof(ColorTable, ctTable) + sizeof(ColorSpec) * nColors);
+            CTabHandle ct = (CTabHandle)NewHandle(ctSz);
+            if (ct) {
+                int i;
+                ColorTable *tbl = *ct;
+                tbl->ctSeed  = (SInt32)ctID;
+                tbl->ctFlags = 0;
+                tbl->ctSize  = (short)(nColors - 1);
+                for (i = 0; i < nColors; i++) {
+                    /* Big-endian 16-bit: bit15=unused, bits14-10=R, bits9-5=G, bits4-0=B */
+                    const uint8_t *b = (const uint8_t *)(*raw) + i * 2;
+                    uint16_t v = (uint16_t)(((uint16_t)b[0] << 8) | b[1]);
+                    uint8_t r5 = (uint8_t)((v >> 10) & 0x1F);
+                    uint8_t g5 = (uint8_t)((v >>  5) & 0x1F);
+                    uint8_t b5 = (uint8_t)( v        & 0x1F);
+                    /* Scale 5-bit → 8-bit → 16-bit (so >> 8 gives correct 8-bit) */
+                    uint8_t r8 = (uint8_t)((r5 * 255u + 15u) / 31u);
+                    uint8_t g8 = (uint8_t)((g5 * 255u + 15u) / 31u);
+                    uint8_t b8 = (uint8_t)((b5 * 255u + 15u) / 31u);
+                    tbl->ctTable[i].value     = (short)i;
+                    tbl->ctTable[i].rgb.red   = (UInt16)(r8 * 257u);
+                    tbl->ctTable[i].rgb.green = (UInt16)(g8 * 257u);
+                    tbl->ctTable[i].rgb.blue  = (UInt16)(b8 * 257u);
+                }
+            }
+            DisposeHandle(raw);
+            return ct;
+        }
+    }
+
+    /* Try legacy 'clut' resource (big-endian Mac ColorTable struct) */
+    {
+        Handle h = Pomme_GetResource('clut', ctID);
+        if (h) {
+            int i;
+            ColorTable *tbl = *(CTabHandle)h;
+            tbl->ctSeed  = (SInt32)be32_swap((uint32_t)tbl->ctSeed);
+            tbl->ctFlags = (SInt16)be16_swap((uint16_t)tbl->ctFlags);
+            tbl->ctSize  = (SInt16)be16_swap((uint16_t)tbl->ctSize);
+            for (i = 0; i <= (int)tbl->ctSize && i < 256; i++) {
+                tbl->ctTable[i].value     = (SInt16)be16_swap((uint16_t)tbl->ctTable[i].value);
+                tbl->ctTable[i].rgb.red   = be16_swap(tbl->ctTable[i].rgb.red);
+                tbl->ctTable[i].rgb.green = be16_swap(tbl->ctTable[i].rgb.green);
+                tbl->ctTable[i].rgb.blue  = be16_swap(tbl->ctTable[i].rgb.blue);
+            }
+            return (CTabHandle)h;
+        }
+    }
+
+    /* Last resort: grayscale color table */
+    {
+        Size sz = (Size)(offsetof(ColorTable, ctTable) + sizeof(ColorSpec) * 256);
         CTabHandle ct = (CTabHandle)NewHandle(sz);
         if (!ct) return NULL;
         {
@@ -555,16 +617,14 @@ CTabHandle GetCTable(short ctID) {
             tbl->ctFlags = 0;
             tbl->ctSize  = 255;
             for (i = 0; i < 256; i++) {
-                tbl->ctTable[i].value = (short)i;
-                tbl->ctTable[i].rgb.red   = (UInt16)((i * 257) & 0xFFFF);
-                tbl->ctTable[i].rgb.green = (UInt16)((i * 257) & 0xFFFF);
-                tbl->ctTable[i].rgb.blue  = (UInt16)((i * 257) & 0xFFFF);
+                tbl->ctTable[i].value     = (short)i;
+                tbl->ctTable[i].rgb.red   = (UInt16)(i * 257u);
+                tbl->ctTable[i].rgb.green = (UInt16)(i * 257u);
+                tbl->ctTable[i].rgb.blue  = (UInt16)(i * 257u);
             }
         }
         return ct;
     }
-    /* The resource data IS the ColorTable struct; return it as a handle */
-    return (CTabHandle)h;
 }
 
 void DisposeCTable(CTabHandle ctab) {
@@ -725,12 +785,157 @@ OSErr HandToHand(Handle *theHndl) {
 
 OSErr MemError(void) { return 0; }
 
+/*
+ * unpack_bits - Decode one PackBits-compressed row into dst[width] bytes.
+ * Returns number of compressed bytes consumed.
+ */
+static int unpack_bits(const UInt8 *src, UInt8 *dst, int width) {
+    const UInt8 *s = src;
+    UInt8 *d = dst;
+    UInt8 *end = dst + width;
+    while (d < end) {
+        int flagbyte = (int)(SInt8)*s++;
+        if (flagbyte >= 0) {
+            /* (flagbyte+1) literal bytes */
+            int n = flagbyte + 1;
+            while (n-- > 0 && d < end) *d++ = *s++;
+        } else if (flagbyte != -128) {
+            /* Repeat next byte (-flagbyte+1) times */
+            int n = -flagbyte + 1;
+            UInt8 b = *s++;
+            while (n-- > 0 && d < end) *d++ = b;
+        }
+        /* flagbyte == -128: NOP */
+    }
+    return (int)(s - src);
+}
+
+/*
+ * DrawPicture - decode a Mac PICT (PPic resource) into the current GWorld.
+ *
+ * The game's PPic resources are LZRW-compressed Mac PICT v2 images:
+ *   Bytes 0-9:   size(2) + bounding rect(8) [big-endian]
+ *   Bytes 10-39: version opcodes + HeaderOp
+ *   Bytes 40+:   LongComment, Clip region, PackBitsRgn with 0-row placeholder
+ *   Byte 150:    start of actual PackBits pixel rows (for 640x480 images)
+ *                each row: byteCount(2 if width>250 else 1) + compressed bytes
+ *
+ * Pixel values are 8-bit palette indices matching the current screen CLUT.
+ */
 void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
-    printf("TODO: DrawPicture\n");
+    const UInt8 *pict;
+    int picW, picH, pixDataOff, row;
+    int16_t picTop, picLeft, picBottom, picRight;
+    UInt8 *portPix;
+    int portRb;
+    UInt8 *rowBuf;
+    extern short gXSize, gYSize;
+
+    if (!myPicture || !*myPicture) {
+        fprintf(stderr, "DrawPicture: null picture\n");
+        return;
+    }
+
+    pict = (const UInt8 *)(*myPicture);
+
+    /* Parse PICT bounds rect (big-endian SInt16: top, left, bottom, right) */
+    picTop    = (int16_t)(((uint16_t)pict[2] << 8) | pict[3]);
+    picLeft   = (int16_t)(((uint16_t)pict[4] << 8) | pict[5]);
+    picBottom = (int16_t)(((uint16_t)pict[6] << 8) | pict[7]);
+    picRight  = (int16_t)(((uint16_t)pict[8] << 8) | pict[9]);
+    picW = picRight  - picLeft;
+    picH = picBottom - picTop;
+
+    if (picW <= 0 || picH <= 0 || picW > 4096 || picH > 4096) {
+        fprintf(stderr, "DrawPicture: bad picture size %dx%d\n", picW, picH);
+        return;
+    }
+
+    /*
+     * Auto-detect pixel data start: scan for a valid set of PackBits rows.
+     * Try offset 106 first (PPic 1005), then 150 (PPic 1000-1004,1007-1008),
+     * then scan in steps of 2.
+     */
+    {
+        Size picSize = GetHandleSize((Handle)myPicture);
+        static const int CANDIDATES[] = { 150, 106, 80, 82, 84, 86, 88, 90,
+                                           92, 94, 96, 98, 100, 102, 104,
+                                           108, 110, 112, 114, 116, 118, 120,
+                                           122, 124, 126, 128, 130, 132, 134,
+                                           136, 138, 140, 142, 144, 146, 148,
+                                           152, 154, 156, 158, 160, -1 };
+        int ci, best = -1;
+        int bcBytes = (picW > 250) ? 2 : 1;
+        for (ci = 0; CANDIDATES[ci] >= 0 && best < 0; ci++) {
+            int off = CANDIDATES[ci];
+            int ok = 1;
+            int consumed = 0;
+            for (int r = 0; r < picH && ok; r++) {
+                if (off + bcBytes > (int)picSize) { ok=0; break; }
+                int bc = (bcBytes==2) ?
+                    (int)(((uint16_t)pict[off]<<8)|pict[off+1]) :
+                    (int)pict[off];
+                if (bc < 0 || bc > picW*2+200) { ok=0; break; }
+                consumed += bcBytes + bc;
+                off += bcBytes + bc;
+            }
+            if (ok && consumed > picW * picH / 2) best = CANDIDATES[ci];
+        }
+        if (best < 0) {
+            fprintf(stderr, "DrawPicture: could not find pixel data in PICT %dx%d\n", picW, picH);
+            return;
+        }
+        pixDataOff = best;
+    }
+
+    portPix = current_port_pixels();
+    portRb  = current_port_rowbytes();
+    if (!portPix || !portRb) return;
+
+    /* Destination rectangle: use dstRect if provided, else PICT bounds */
+    int dstTop  = dstRect ? dstRect->top  : picTop;
+    int dstLeft = dstRect ? dstRect->left : picLeft;
+
+    rowBuf = (UInt8 *)malloc((size_t)picW);
+    if (!rowBuf) return;
+
+    {
+        const UInt8 *src = pict + pixDataOff;
+        int bcBytes = (picW > 250) ? 2 : 1;
+        for (row = 0; row < picH; row++) {
+            int dstY = dstTop + row;
+            int bc;
+
+            /* Read byteCount */
+            if (bcBytes == 2)
+                bc = (int)(((uint16_t)src[0] << 8) | src[1]);
+            else
+                bc = (int)src[0];
+            src += bcBytes;
+
+            /* Decode PackBits into rowBuf */
+            memset(rowBuf, 0, (size_t)picW);
+            if (bc > 0) unpack_bits(src, rowBuf, picW);
+            src += bc;
+
+            /* Write row to destination port (bounds check) */
+            if (dstY >= 0 && dstY < gYSize) {
+                UInt8 *dst = portPix + dstY * portRb + dstLeft;
+                int w = picW;
+                if (dstLeft < 0) {
+                    dst -= dstLeft;
+                    w   += dstLeft;
+                }
+                if (dstLeft + w > gXSize) w = gXSize - dstLeft;
+                if (w > 0) memcpy(dst, rowBuf, (size_t)w);
+            }
+        }
+    }
+
+    free(rowBuf);
 }
 
 void KillPicture(PicHandle myPicture) {
-    printf("TODO: KillPicture\n");
 }
 
 /* QuickDraw current port pixel access helpers */
@@ -759,9 +964,10 @@ static void fill_rect_color(const Rect *r, UInt8 color) {
     rb  = current_port_rowbytes();
     if (!pix || !rb) return;
     x1 = r->left; y1 = r->top; x2 = r->right; y2 = r->bottom;
-    /* Clamp */
-    if (x1 < 0) x1 = 0;
-    if (y1 < 0) y1 = 0;
+    /* Clamp to pixel buffer bounds */
+    if (x1 < 0) x1 = 0; if (y1 < 0) y1 = 0;
+    if (x2 > gXSize) x2 = gXSize; if (y2 > gYSize) y2 = gYSize;
+    if (x1 >= x2 || y1 >= y2) return;
     for (y = y1; y < y2; y++) {
         UInt8 *row = pix + y * rb + x1;
         for (x = x1; x < x2; x++) *row++ = color;
@@ -797,13 +1003,25 @@ void InvertRect(const Rect *r) {
 }
 
 static void draw_hline(UInt8 *pix, int rb, int x1, int x2, int y, UInt8 color) {
-    UInt8 *row = pix + y * rb + x1;
+    UInt8 *row;
     int x;
+    extern short gXSize, gYSize;
+    /* Bounds check */
+    if (y < 0 || y >= gYSize) return;
+    if (x1 < 0) x1 = 0;
+    if (x2 > gXSize) x2 = gXSize;
+    if (x1 >= x2) return;
+    row = pix + y * rb + x1;
     for (x = x1; x < x2; x++) *row++ = color;
 }
 
 static void draw_vline(UInt8 *pix, int rb, int x, int y1, int y2, UInt8 color) {
     int y;
+    extern short gXSize, gYSize;
+    /* Bounds check */
+    if (x < 0 || x >= gXSize) return;
+    if (y1 < 0) y1 = 0;
+    if (y2 > gYSize) y2 = gYSize;
     for (y = y1; y < y2; y++) pix[y * rb + x] = color;
 }
 

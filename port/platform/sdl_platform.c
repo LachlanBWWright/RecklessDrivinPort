@@ -78,6 +78,7 @@ int gScreenMode = kScreenSuspended;
 
 /* Forward declarations from screen.c for functions we call */
 void SetScreenClut(int id);
+void Blit2Screen(void);
 char gMessageBuffer[1024];
 char *gMessagePos;
 int gMessageCount;
@@ -354,6 +355,10 @@ void ScreenMode(int mode) {
                 gBaseAddr = (Ptr)s_back_buffer;
                 gRowBytes = gXSize;
             }
+            /* Load the game's 8-bit colour lookup table (same as screen.c) */
+            if (!s_palette_set) {
+                SetScreenClut(8);
+            }
             break;
         case kScreenStopped:
             /* Clean up SDL resources */
@@ -388,8 +393,8 @@ GWorldPtr GetScreenGW(void) {
 }
 
 void FadeScreen(int out) {
-    /* TODO: implement fade using SDL2 render alpha */
-    (void)out;
+    /* On fade-in (out=0): present whatever is in the back buffer */
+    if (!out) Blit2Screen();
 }
 
 /*

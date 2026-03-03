@@ -113,6 +113,12 @@ void FirstRun()
 		long copySize = GetHandleSize(prefDefault);
 		if (copySize > (long)sizeof(tPrefs)) copySize = (long)sizeof(tPrefs);
 		BlockMoveData(*prefDefault,&gPrefs,copySize);
+		/* The Pref resource contains big-endian Mac values.
+		 * Byte-swap the multi-byte fields on little-endian platforms. */
+		gPrefs.version = (UInt16)be16_swap((uint16_t)gPrefs.version);
+		gPrefs.volume  = (UInt16)be16_swap((uint16_t)gPrefs.volume);
+		/* Clamp volume to a reasonable range */
+		if(gPrefs.volume > 256) gPrefs.volume = 100;
 	}
 	ReleaseResource(prefDefault);	
 }
