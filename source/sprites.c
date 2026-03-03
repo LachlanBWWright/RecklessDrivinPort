@@ -191,6 +191,7 @@ void DrawSpriteRotatedClippedTranslucent16(tSpriteHeader16 *sprite,int dudx,int 
 {
 	int vMask=sprite->ySize-1<<8;
 	int vShift=8-sprite->log2xSize;
+	int xMask=sprite->xSize-1;
 	UInt16 mask=sprite->data[0];
 	for(;y<y2;y++)
 	{
@@ -208,7 +209,7 @@ void DrawSpriteRotatedClippedTranslucent16(tSpriteHeader16 *sprite,int dudx,int 
 		dst+=x;
 		while(dst<endDst)				
 		{		
-			UInt16 color=sprite->data[(u>>8)+((v&vMask)>>vShift)];
+			UInt16 color=sprite->data[((u>>8)&xMask)+((v&vMask)>>vShift)];
 			if(color!=mask)
 				*dst=BlendRGB16(color,*dst);
 			u+=dudx;
@@ -253,6 +254,7 @@ void DrawSpriteRotatedClipped16(tSpriteHeader16 *sprite,int dudx,int dvdx,int y,
 {
 	int vMask=sprite->ySize-1<<8;
 	int vShift=8-sprite->log2xSize;
+	int xMask=sprite->xSize-1;
 	UInt16 mask=sprite->data[0];
 	for(;y<y2;y++)	
 	{
@@ -270,7 +272,7 @@ void DrawSpriteRotatedClipped16(tSpriteHeader16 *sprite,int dudx,int dvdx,int y,
 		dst+=x;
 		while(dst<endDst)				
 		{		
-			UInt16 color=sprite->data[(u>>8)+((v&vMask)>>vShift)];
+			UInt16 color=sprite->data[((u>>8)&xMask)+((v&vMask)>>vShift)];
 			if(color!=mask)
 				*dst=color;
 			u+=dudx;
@@ -308,6 +310,7 @@ void DrawSpriteRotatedTranslucent16(tSpriteHeader16 *sprite,int dudx,int dvdx,in
 {
 	int vMask=sprite->ySize-1<<8;
 	int vShift=8-sprite->log2xSize;
+	int xMask=sprite->xSize-1;
 	UInt16 mask=sprite->data[0];
 	for(;y<y2;y++)
 	{
@@ -317,7 +320,7 @@ void DrawSpriteRotatedTranslucent16(tSpriteHeader16 *sprite,int dudx,int dvdx,in
 		int v=		gSlope[y].v;
 		while(dst<endDst)				
 		{		
-			UInt16 color=sprite->data[(u>>8)+((v&vMask)>>vShift)];
+			UInt16 color=sprite->data[((u>>8)&xMask)+((v&vMask)>>vShift)];
 			if(color!=mask)
 				*dst=BlendRGB16(color,*dst);
 			u+=dudx;
@@ -354,6 +357,7 @@ void DrawSpriteRotated16(tSpriteHeader16 *sprite,int dudx,int dvdx,int y,int y2)
 {
 	int vMask=sprite->ySize-1<<8;
 	int vShift=8-sprite->log2xSize;
+	int xMask=sprite->xSize-1;
 	UInt16 mask=sprite->data[0];
 	for(;y<y2;y++)		//no clip, no translucence
 	{
@@ -363,7 +367,7 @@ void DrawSpriteRotated16(tSpriteHeader16 *sprite,int dudx,int dvdx,int y,int y2)
 		int v=		gSlope[y].v;
 		while(dst<endDst)				
 		{		
-			UInt16 color=sprite->data[(u>>8)+((v&vMask)>>vShift)];
+			UInt16 color=sprite->data[((u>>8)&xMask)+((v&vMask)>>vShift)];
 			if(color!=mask)
 				*dst=color;
 			u+=dudx;
