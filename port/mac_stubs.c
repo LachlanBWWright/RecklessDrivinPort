@@ -18,6 +18,9 @@
 static UInt8 *current_port_pixels(void);
 static short  current_port_rowbytes(void);
 
+/* QuickDraw state: suppress drawing while OpenRgn() / CloseRgn() is active */
+static int gQDOpenRgn = 0;
+
 /*---------------------------------------------------------------------------*/
 /* Memory Manager                                                            */
 /*---------------------------------------------------------------------------*/
@@ -726,8 +729,8 @@ void GetPortBounds(GWorldPtr port, Rect *bounds) {
 /*---------------------------------------------------------------------------*/
 
 void SetEmptyRgn(RgnHandle rgn) { }
-void OpenRgn(void) { }
-void CloseRgn(RgnHandle dstRgn) { }
+void OpenRgn(void)              { gQDOpenRgn++; }
+void CloseRgn(RgnHandle dstRgn) { if (gQDOpenRgn > 0) gQDOpenRgn--; }
 void DiffRgn(RgnHandle srcRgnA, RgnHandle srcRgnB, RgnHandle dstRgn) { }
 
 Boolean PtInRect(Point pt, const Rect *r) {
@@ -1034,7 +1037,7 @@ static void fill_rect_color(const Rect *r, UInt8 color) {
     int x, y, x1, y1, x2, y2, rb;
     UInt8 *pix;
     extern short gXSize, gYSize;
-    if (!r) return;
+    if (!r || gQDOpenRgn) return;
     pix = current_port_pixels();
     rb  = current_port_rowbytes();
     if (!pix || !rb) return;
@@ -1102,9 +1105,12 @@ static void draw_vline(UInt8 *pix, int rb, int x, int y1, int y2, UInt8 color) {
 
 void FrameRect(const Rect *r) {
     int x1, y1, x2, y2;
-    UInt8 *pix = current_port_pixels();
-    int rb = current_port_rowbytes();
-    if (!r || !pix || !rb) return;
+    UInt8 *pix;
+    int rb;
+    if (!r || gQDOpenRgn) return;
+    pix = current_port_pixels();
+    rb = current_port_rowbytes();
+    if (!pix || !rb) return;
     x1 = r->left; y1 = r->top; x2 = r->right - 1; y2 = r->bottom - 1;
     if (x1 < 0) x1 = 0; if (y1 < 0) y1 = 0;
     draw_hline(pix, rb, x1, x2+1, y1, gQDForeColor);
