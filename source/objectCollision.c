@@ -433,6 +433,7 @@ void HandleCollision(tObject *posObj)
 	tObject	*theObj=gFirstVisObj;
 	while(theObj!=gLastVisObj)
 	{
+		tObject *nextObj=(tObject*)theObj->next;
 		if(theObj!=posObj&&theObj!=posObj->shooter&&posObj!=theObj->shooter)
 		{
 			float xdist=theObj->pos.x-posObj->pos.x;
@@ -440,8 +441,12 @@ void HandleCollision(tObject *posObj)
 			float sqdist=xdist*xdist+ydist*ydist;
 			if(sqdist<kMaxCollDist*kMaxCollDist)
 				if(TestCollision(posObj,theObj,sqdist))
-				{						
-					if((*theObj->type).flags&kObjectBounce)
+				{
+					/* Cache type flags before any KillObject calls that may free theObj */
+					UInt16 theObjFlags  = theObj->type->flags;
+					UInt16 theObjFlags2 = theObj->type->flags2;
+					t2DPoint theObjPos  = theObj->pos;
+					if(theObjFlags&kObjectBounce)
 					{
 						if((*posObj->type).flags2&kObjectMissile){
 							posObj->jumpHeight=0;
@@ -453,9 +458,9 @@ void HandleCollision(tObject *posObj)
 					if(VEC2D_Value(posObj->velo)>kMinJumpVelo)
 					{
 						int jumpScore=0;
-						if(theObj->type->flags2&kObjectRamp)
+						if(theObjFlags2&kObjectRamp)
 							{posObj->jumpVelo=VEC2D_Value(posObj->velo);jumpScore=theObj->type->score;}
-						if(theObj->type->flags2&kObjectBump)
+						if(theObjFlags2&kObjectBump)
 							{posObj->jumpVelo=VEC2D_Value(posObj->velo)*0.45;jumpScore=theObj->type->score;}
 						if(posObj==gPlayerObj&&jumpScore)
 						{
@@ -463,33 +468,33 @@ void HandleCollision(tObject *posObj)
 							Str31 str;
 							gPlayerScore+=jumpScore;
 							NumToString(jumpScore,str);
-							fx.x=theObj->pos.x;
-							fx.y=theObj->pos.y;
+							fx.x=theObjPos.x;
+							fx.y=theObjPos.y;
 							fx.effectFlags=kEffectExplode+kEffectTiny+kEffectAbsPos;
 							MakeFXStringFromNumStr(str,fx.text);
 							NewTextEffect(&fx);
 						}
 					}
-					if(theObj->type->flags&kObjectKillsCars)
+					if(theObjFlags&kObjectKillsCars)
 						KillObject(posObj);
-					if(theObj->type->flags&kObjectKilledByCars)
+					if(theObjFlags&kObjectKilledByCars)
 						KillObject(theObj);
-					if((*theObj->type).flags2&kObjectOil)
+					if(theObjFlags2&kObjectOil)
 						posObj->rotVelo=(fabs(posObj->rotVelo)>0.2?1:0)*(posObj->rotVelo>0?1:-1)*PI*0.05*VEC2D_Value(posObj->velo);
 					if(posObj==gPlayerObj)
 					{
-						if((*theObj->type).flags&kObjectBonusFlag)
+						if(theObjFlags&kObjectBonusFlag)
 							BonusObject(theObj);
 					}
 					else if(theObj==gSpikeObj)
 						if(posObj->type->flags2&kObjectDamageble)
 						{
-							DamageObj(posObj,VEC2D_Value(gPlayerObj->velo)*kLowFrameDuration*9,VEC2D_Norm(VEC2D_Difference(theObj->pos,posObj->pos)));
+							DamageObj(posObj,VEC2D_Value(gPlayerObj->velo)*kLowFrameDuration*9,VEC2D_Norm(VEC2D_Difference(theObjPos,posObj->pos)));
 							PlaySound(posObj->pos,gPlayerObj->velo,1,VEC2D_Value(gPlayerObj->velo)/70,143);
 						}
 				}
 		}
-		theObj=(tObject*)theObj->next;
+		theObj=nextObj;
 	}
 }
 

@@ -158,3 +158,26 @@ int NumPackEntries(int num)
 	tPackHeader *pack = (tPackHeader*)*gPacks[num];
 	return PACK_ID(pack);
 }
+
+/* Get pack entry by 1-based position in the header array.
+ * Position 1 = first entry, position n = last entry.
+ * Unlike GetSortedPackEntry this does not assume sequential IDs,
+ * so it can iterate every entry in a pack regardless of ID gaps. */
+Ptr GetPackEntryByPos(int packNum, int pos, int *size)
+{
+	tPackHeader *pack;
+	int n;
+	UInt32 offs;
+	if (!gPacks[packNum]) return 0;
+	pack = (tPackHeader*)*gPacks[packNum];
+	n = PACK_ID(pack);
+	if (pos < 1 || pos > n) return 0;
+	offs = PACK_OFFS(&pack[pos]);
+	if (size) {
+		if (pos == n)
+			*size = (int)GetHandleSize(gPacks[packNum]) - (int)offs;
+		else
+			*size = (int)PACK_OFFS(&pack[pos+1]) - (int)offs;
+	}
+	return (Ptr)pack + offs;
+}

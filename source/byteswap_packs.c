@@ -157,9 +157,13 @@ void PortByteSwapPackRoad(void) {
 
 void PortByteSwapPackObTy(void) {
     int i, n = pack_count(kPackObTy);
-    int startId = 128;
-    for (i = 0; i < n; i++) {
-        tObjectType *t = (tObjectType *)GetUnsortedPackEntry(kPackObTy, startId + i, NULL);
+    /* Iterate ALL entries by position so high-ID types (debris, explosions,
+     * e.g. 195, 1001, 1012, 1014-1016, 1020, 2000) are also byte-swapped.
+     * The previous ID-based loop (startId=128, IDs 128..128+n-1) would miss
+     * any entry whose ID exceeds 128+n-1, leaving big-endian float fields
+     * (mass, width, length, etc.) corrupted on little-endian platforms. */
+    for (i = 1; i <= n; i++) {
+        tObjectType *t = (tObjectType *)GetPackEntryByPos(kPackObTy, i, NULL);
         if (t) swap_object_type(t);
     }
 }

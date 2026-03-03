@@ -206,6 +206,11 @@ tObject *NewObject(tObject *prev,SInt16 typeRes)
 	((tObject*)(prev->next))->prev=theObj;
 	prev->next=theObj;
 	theObj->type=(tObjectTypePtr)GetUnsortedPackEntry(kPackObTy,typeRes,0);
+	if(!theObj->type)
+	{
+		RemoveObject(theObj);
+		return nil;
+	}
 	if((*theObj->type).flags&kObjectRandomFrameFlag)
 		theObj->frame=(*theObj->type).frame+RanInt(0,(*theObj->type).numFrames);
 	else
@@ -303,6 +308,11 @@ void KillObject(tObject *theObj)
 		return;
 	}
 	theObj->type=(tObjectTypePtr)GetUnsortedPackEntry(kPackObTy,(*objType).deathObj+(sinkEnable?gRoadInfo->deathOffs:0),0);
+	if(!theObj->type)
+	{
+		RemoveObject(theObj);
+		return;
+	}
 	theObj->layer=(*theObj->type).flags2>>5&3;
 	objType=theObj->type;		
 	if((*objType).flags&kObjectRandomFrameFlag)

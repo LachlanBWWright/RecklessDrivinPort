@@ -341,7 +341,7 @@ void PlaySound(t2DPoint pos,t2DPoint velo,float freq,float vol,int id)
 		else{
 			cmd.cmd=rateMultiplierCmd;
 			cmd.param2=0x00010000*freq;
-			DoError(SndDoImmediate(gEngineChannel,&cmd));
+			DoError(SndDoImmediate(chan,&cmd));
 		}
 		cmd.cmd=callBackCmd;
 		cmd.param1=0;
