@@ -786,28 +786,51 @@ OSErr HandToHand(Handle *theHndl) {
 OSErr MemError(void) { return 0; }
 
 /*
- * unpack_bits - Decode one PackBits-compressed row into dst[width] bytes.
- * Returns number of compressed bytes consumed.
+ * unpack_bits - Decode one 8-bit PackBits row (dstCap bytes of output).
+ * Stops when input srcLen is exhausted OR dstCap bytes written.
  */
-static int unpack_bits(const UInt8 *src, UInt8 *dst, int width) {
-    const UInt8 *s = src;
-    UInt8 *d = dst;
-    UInt8 *end = dst + width;
-    while (d < end) {
+static int unpack_bits(const UInt8 *src, int srcLen, UInt8 *dst, int dstCap) {
+    const UInt8 *s = src, *srcEnd = src + srcLen;
+    UInt8 *d = dst, *end = dst + dstCap;
+    while (d < end && s < srcEnd) {
         int flagbyte = (int)(SInt8)*s++;
         if (flagbyte >= 0) {
-            /* (flagbyte+1) literal bytes */
             int n = flagbyte + 1;
-            while (n-- > 0 && d < end) *d++ = *s++;
+            while (n-- > 0 && d < end && s < srcEnd) *d++ = *s++;
         } else if (flagbyte != -128) {
-            /* Repeat next byte (-flagbyte+1) times */
             int n = -flagbyte + 1;
+            if (s >= srcEnd) break;
             UInt8 b = *s++;
             while (n-- > 0 && d < end) *d++ = b;
         }
-        /* flagbyte == -128: NOP */
     }
-    return (int)(s - src);
+    return (int)(d - dst);
+}
+
+/*
+ * unpack_bits16 - Decode one 16-bit PackBits row (Mac PICT packType=3).
+ * Tokens operate on 2-byte units.  Writes dstCap bytes of output.
+ */
+static int unpack_bits16(const UInt8 *src, int srcLen, UInt8 *dst, int dstCap) {
+    const UInt8 *s = src, *srcEnd = src + srcLen;
+    UInt8 *d = dst, *end = dst + dstCap;
+    while (d + 1 < end && s < srcEnd) {
+        int flagbyte = (int)(SInt8)*s++;
+        if (flagbyte >= 0) {
+            /* (flagbyte+1) literal 2-byte values */
+            int n = flagbyte + 1;
+            while (n-- > 0 && d + 1 < end && s + 1 < srcEnd) {
+                *d++ = *s++; *d++ = *s++;
+            }
+        } else if (flagbyte != -128) {
+            /* (-flagbyte+1) copies of next 2-byte value */
+            int n = -flagbyte + 1;
+            if (s + 1 >= srcEnd) break;
+            UInt8 b0 = *s++, b1 = *s++;
+            while (n-- > 0 && d + 1 < end) { *d++ = b0; *d++ = b1; }
+        }
+    }
+    return (int)(d - dst);
 }
 
 /*
@@ -952,7 +975,12 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
 
             /* Decode PackBits row into rowBuf (rowBytes of output) */
             memset(rowBuf, 0, (size_t)rowBytes);
-            if (bc > 0) unpack_bits(src, rowBuf, rowBytes);
+            if (bc > 0) {
+                if (picBpp == 2)
+                    unpack_bits16(src, bc, rowBuf, rowBytes);
+                else
+                    unpack_bits(src, bc, rowBuf, rowBytes);
+            }
             src += bc;
 
             if (dstY < 0 || dstY >= gYSize) continue;
