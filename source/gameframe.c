@@ -293,6 +293,20 @@ void PlayerHandling()
 
 void GameFrame()
 {
+#ifdef PORT_SDL2
+	/* Throttle game-logic to real-time so gFrameCount cannot race arbitrarily
+	 * far ahead of optFrameCount.  Without this guard a vsync-less renderer can
+	 * increment gFrameCount thousands of times per second, forcing CheckTimeSkip
+	 * to busy-wait for hours before the clock catches up. */
+	{
+		UInt64 curMS=GetMSTime()-gStartMS;
+		unsigned long targetCount=(unsigned long)(curMS*kCalcFPMS);
+		if(gFrameCount>targetCount+1){
+			SDL_Delay(1);
+			return;
+		}
+	}
+#endif
 	MoveObjects();
 	PlayerHandling();
 	gFrameCount++;

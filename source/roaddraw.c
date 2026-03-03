@@ -240,11 +240,11 @@ void DrawRoadZoomed(float xDrawStart,float yDrawStart,float zoom)
 		roadData[1]=((floorPerc*(*floorRoad)[1]+(1-floorPerc)*(*ceilRoad)[1])-xDrawStart)*invZoom;
 		roadData[2]=((floorPerc*(*floorRoad)[2]+(1-floorPerc)*(*ceilRoad)[2])-xDrawStart)*invZoom;
 		roadData[3]=((floorPerc*(*floorRoad)[3]+(1-floorPerc)*(*ceilRoad)[3])-xDrawStart)*invZoom;
-		drawPos=DrawBorderLineZoomed(drawPos,xDrawStart,0x80000000,roadData[0],worldY,backgrTex,leftBorder,rightBorder,zoom);
+		drawPos=DrawBorderLineZoomed(drawPos,xDrawStart,0x80000000,roadData[0],worldY,backgrTex,leftBorder,leftBorder,zoom);
 		drawPos=DrawLineZoomed(drawPos,xDrawStart,roadData[0],roadData[1],worldY,gXFrontDriftPos,gYFrontDriftPos,roadTex,zoom);
 		drawPos=DrawBorderLineZoomed(drawPos,xDrawStart,roadData[1],roadData[2],worldY,backgrTex,leftBorder,rightBorder,zoom);
 		drawPos=DrawLineZoomed(drawPos,xDrawStart,roadData[2],roadData[3],worldY,gXFrontDriftPos,gYFrontDriftPos,roadTex,zoom);
-		drawPos=DrawBorderLineZoomed(drawPos,xDrawStart,roadData[3],0x7fffffff,worldY,backgrTex,leftBorder,rightBorder,zoom);		
+		drawPos=DrawBorderLineZoomed(drawPos,xDrawStart,roadData[3],0x7fffffff,worldY,backgrTex,rightBorder,rightBorder,zoom);		
 		drawPos+=rowBytesSkip;
 	}
 	/* Sanity check disabled for port: floating-point differences may cause off-by-one pixel counts */
@@ -344,11 +344,11 @@ void DrawRoadZoomed16(float xDrawStart,float yDrawStart,float zoom)
 		roadData[1]=((floorPerc*(*floorRoad)[1]+(1-floorPerc)*(*ceilRoad)[1])-xDrawStart)*invZoom;
 		roadData[2]=((floorPerc*(*floorRoad)[2]+(1-floorPerc)*(*ceilRoad)[2])-xDrawStart)*invZoom;
 		roadData[3]=((floorPerc*(*floorRoad)[3]+(1-floorPerc)*(*ceilRoad)[3])-xDrawStart)*invZoom;
-		drawPos=DrawBorderLineZoomed16(drawPos,xDrawStart,0x80000000,roadData[0],worldY,backgrTex,leftBorder,rightBorder,zoom);
+		drawPos=DrawBorderLineZoomed16(drawPos,xDrawStart,0x80000000,roadData[0],worldY,backgrTex,leftBorder,leftBorder,zoom);
 		drawPos=DrawLineZoomed16(drawPos,xDrawStart,roadData[0],roadData[1],worldY,gXFrontDriftPos,gYFrontDriftPos,roadTex,zoom);
 		drawPos=DrawBorderLineZoomed16(drawPos,xDrawStart,roadData[1],roadData[2],worldY,backgrTex,leftBorder,rightBorder,zoom);
 		drawPos=DrawLineZoomed16(drawPos,xDrawStart,roadData[2],roadData[3],worldY,gXFrontDriftPos,gYFrontDriftPos,roadTex,zoom);
-		drawPos=DrawBorderLineZoomed16(drawPos,xDrawStart,roadData[3],0x7fffffff,worldY,backgrTex,leftBorder,rightBorder,zoom);		
+		drawPos=DrawBorderLineZoomed16(drawPos,xDrawStart,roadData[3],0x7fffffff,worldY,backgrTex,rightBorder,rightBorder,zoom);		
 		drawPos+=rowBytesSkip;
 	}
 	/* Sanity check disabled for port: floating-point differences may cause off-by-one pixel counts */
