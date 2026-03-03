@@ -95,11 +95,20 @@ void LZRWDecodeHandle(Handle *handle)
     }
 
     /*
-     * Replace handle contents with the decompressed data.
-     * Use SetHandleSize + memcpy to work correctly with our size-prefixed
-     * Handle implementation (avoids calling free() on the data pointer directly).
+     * Replace handle with the decompressed data by creating a new Handle.
+     * Using DisposeHandle + NewHandle instead of SetHandleSize avoids potential
+     * issues with the realloc moving memory while other pointers to it exist.
      */
-    SetHandleSize(*handle, (Size)uncompressed_size);
-    memcpy(**handle, dst_buf, (size_t)dst_len);
-    free(dst_buf);
+    {
+        Handle newH = NewHandle((Size)dst_len);
+        if (!newH) {
+            fprintf(stderr, "LZRWDecodeHandle: out of memory for result handle\n");
+            free(dst_buf);
+            return;
+        }
+        memcpy(*newH, dst_buf, (size_t)dst_len);
+        free(dst_buf);
+        DisposeHandle(*handle);
+        *handle = newH;
+    }
 }

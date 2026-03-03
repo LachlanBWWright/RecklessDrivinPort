@@ -50,8 +50,29 @@ int    gScreenBlitSpecial = 0;
 static SDL_Window   *s_window   = NULL;
 static SDL_Renderer *s_renderer = NULL;
 static SDL_Texture  *s_texture  = NULL;
-static SDL_Surface  *s_surface  = NULL;  /* 8-bit indexed surface used as back-buffer */
+static SDL_Surface  *s_surface  = NULL;  /* 8-bit paletted surface (blit source) */
 static SDL_Surface  *s_rgb_surface = NULL; /* 32-bit surface for upload to texture */
+
+/*
+ * Dedicated back-buffer for gBaseAddr. We keep this separate from the SDL
+ * surface pixels because SDL may invalidate/relocate surface->pixels after
+ * the hardware renderer is initialized (especially on OpenGL backends).
+ */
+static UInt8 *s_back_buffer = NULL;
+
+/*
+ * Screen GWorldImpl: a GWorldImpl struct that wraps the SDL surface pixels.
+ * This allows CopyBits/GetPortBitMapForCopyBits to work with the SDL screen
+ * without requiring special-case SDL_Surface handling in mac_stubs.c.
+ */
+typedef struct {
+    PixMap  pixmap;
+    UInt8  *pixels;
+    int     owned;
+} GWorldImpl;  /* must match definition in mac_stubs.c */
+
+static GWorldImpl s_screen_gworld;
+static int        s_screen_gworld_valid = 0;
 
 int gScreenMode = kScreenSuspended;
 
@@ -308,11 +329,17 @@ void InitScreen(int dummy) {
         exit(1);
     }
 
-    /* Point game's back buffer at SDL surface pixels */
-    SDL_LockSurface(s_surface);
-    gBaseAddr = (Ptr)s_surface->pixels;
-    gRowBytes = s_surface->pitch;
-    SDL_UnlockSurface(s_surface);
+    /* Allocate a dedicated back-buffer that won't be moved by the SDL renderer */
+    if (s_back_buffer) free(s_back_buffer);
+    s_back_buffer = (UInt8 *)malloc((size_t)gXSize * gYSize);
+    if (!s_back_buffer) {
+        fprintf(stderr, "Failed to allocate back buffer\n");
+        exit(1);
+    }
+    memset(s_back_buffer, 0, (size_t)gXSize * gYSize);
+
+    gBaseAddr = (Ptr)s_back_buffer;
+    gRowBytes = gXSize;  /* stride = width for our packed back buffer */
 
     gScreenMode = kScreenSuspended;
     printf("[SDL] InitScreen: %dx%d, rowBytes=%d\n", gXSize, gYSize, gRowBytes);
@@ -322,10 +349,11 @@ void ScreenMode(int mode) {
     gScreenMode = mode;
     switch (mode) {
         case kScreenRunning:
-            SDL_LockSurface(s_surface);
-            gBaseAddr = (Ptr)s_surface->pixels;
-            gRowBytes = s_surface->pitch;
-            SDL_UnlockSurface(s_surface);
+            /* Keep gBaseAddr pointing at our dedicated back buffer */
+            if (s_back_buffer) {
+                gBaseAddr = (Ptr)s_back_buffer;
+                gRowBytes = gXSize;
+            }
             break;
         case kScreenStopped:
             /* Clean up SDL resources */
@@ -334,6 +362,7 @@ void ScreenMode(int mode) {
             if (s_surface)    { SDL_FreeSurface(s_surface);      s_surface = NULL; }
             if (s_renderer)   { SDL_DestroyRenderer(s_renderer); s_renderer = NULL; }
             if (s_window)     { SDL_DestroyWindow(s_window);     s_window = NULL; }
+            if (s_back_buffer){ free(s_back_buffer);             s_back_buffer = NULL; }
             SDL_Quit();
             break;
         default:
@@ -341,9 +370,21 @@ void ScreenMode(int mode) {
     }
 }
 
-/* GWorldPtr stub - return a handle to our surface */
+/* GWorldPtr stub - return a GWorldImpl wrapping our SDL surface */
 GWorldPtr GetScreenGW(void) {
-    return (GWorldPtr)s_surface;
+    if (!s_surface) return NULL;
+    /* Keep the screen GWorldImpl in sync with the SDL surface */
+    s_screen_gworld.pixels = (UInt8 *)gBaseAddr;
+    s_screen_gworld.owned  = 0;
+    s_screen_gworld.pixmap.baseAddr  = gBaseAddr;
+    s_screen_gworld.pixmap.rowBytes  = (short)gRowBytes | (short)0x8000;
+    s_screen_gworld.pixmap.bounds.left   = 0;
+    s_screen_gworld.pixmap.bounds.top    = 0;
+    s_screen_gworld.pixmap.bounds.right  = (short)gXSize;
+    s_screen_gworld.pixmap.bounds.bottom = (short)gYSize;
+    s_screen_gworld.pixmap.pixelSize = 8;
+    s_screen_gworld_valid = 1;
+    return (GWorldPtr)&s_screen_gworld;
 }
 
 void FadeScreen(int out) {
@@ -353,11 +394,12 @@ void FadeScreen(int out) {
 
 /*
  * Blit2Screen - present the game's back buffer (gBaseAddr) to the SDL window.
- * The back buffer is an 8-bit indexed surface; convert to 32-bit RGB and
- * upload to the streaming texture, then render.
+ * The back buffer is a separate 8-bit indexed allocation; we copy it into the
+ * paletted SDL surface, blit that to a 32-bit surface, upload to texture, render.
  */
 void Blit2Screen(void) {
-    if (!s_surface || !s_renderer || !s_texture || !s_rgb_surface)
+    int y;
+    if (!s_surface || !s_renderer || !s_texture || !s_rgb_surface || !s_back_buffer)
         return;
 
     /* Make sure the palette is current on the surface */
@@ -365,8 +407,15 @@ void Blit2Screen(void) {
         SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
     }
 
-    /* Point surface pixels at gBaseAddr in case it moved */
-    /* (they should be the same, but be safe) */
+    /* Copy our back buffer into the SDL paletted surface */
+    if (SDL_LockSurface(s_surface) == 0) {
+        for (y = 0; y < gYSize; y++) {
+            UInt8 *dst = (UInt8 *)s_surface->pixels + y * s_surface->pitch;
+            const UInt8 *src = s_back_buffer + y * gXSize;
+            memcpy(dst, src, (size_t)gXSize);
+        }
+        SDL_UnlockSurface(s_surface);
+    }
 
     /* Convert 8-bit indexed → 32-bit ARGB */
     SDL_BlitSurface(s_surface, NULL, s_rgb_surface, NULL);

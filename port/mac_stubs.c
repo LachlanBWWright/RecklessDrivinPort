@@ -22,20 +22,25 @@
  * Handle implementation: prefix each data block with its size so that
  * GetHandleSize() returns the exact requested size (not malloc's usable size).
  *
- * Memory layout: [ Size prefix ] [ data ... ]
- *                               ^
+ * Memory layout: [ uint32_t size (4 bytes) ] [ data ... ]
+ *                                             ^
  *                           *handle points here
+ *
+ * We use a fixed 4-byte prefix (matching Mac OS Classic 32-bit memory model)
+ * rather than sizeof(Size) which would be 8 on 64-bit platforms.
  */
-#define HSIZE_PREFIX sizeof(Size)
+#define HSIZE_PREFIX 4
 
 Handle NewHandle(Size s)
 {
     char *block;
     Ptr  *h;
+    uint32_t sz;
     if (s < 0) s = 0;
-    block = (char *)malloc(HSIZE_PREFIX + (s ? (size_t)s : 1));
+    sz = (uint32_t)s;
+    block = (char *)malloc(HSIZE_PREFIX + (sz ? (size_t)sz : 1));
     if (!block) return NULL;
-    *(Size*)block = s;
+    *(uint32_t*)block = sz;
     h = (Ptr *)malloc(sizeof(Ptr));
     if (!h) { free(block); return NULL; }
     *h = block + HSIZE_PREFIX;
@@ -54,7 +59,7 @@ Handle NewHandleSys(Size s) { return NewHandle(s); }
 Size GetHandleSize(Handle h)
 {
     if (!h || !*h) return 0;
-    return *(Size*)(*h - HSIZE_PREFIX);
+    return (Size)*(uint32_t*)(*h - HSIZE_PREFIX);
 }
 
 void SetHandleSize(Handle h, Size newSize)
@@ -64,7 +69,7 @@ void SetHandleSize(Handle h, Size newSize)
     block    = *h - HSIZE_PREFIX;
     newBlock = (char *)realloc(block, HSIZE_PREFIX + (newSize ? (size_t)newSize : 1));
     if (!newBlock) return;
-    *(Size*)newBlock = newSize;
+    *(uint32_t*)newBlock = (uint32_t)newSize;
     *h = newBlock + HSIZE_PREFIX;
 }
 
@@ -580,19 +585,80 @@ PicHandle OpenCPicture(const OpenCPicParams *newHeader) {
 
 void ClosePicture(void) { printf("TODO: ClosePicture\n"); }
 
+/* Helper: get pixel buffer and rowbytes from a GWorldPtr */
+static UInt8 *gw_pixels(GWorldPtr gw) {
+    extern Ptr gBaseAddr;
+    if (!gw) return (UInt8 *)gBaseAddr;
+    return ((GWorldImpl *)gw)->pixels;
+}
+
+static short gw_rowbytes(GWorldPtr gw) {
+    extern short gRowBytes;
+    if (!gw) return gRowBytes;
+    return (short)(((GWorldImpl *)gw)->pixmap.rowBytes & 0x3FFF);
+}
+
 void CopyBits(const BitMap *srcBits, const BitMap *dstBits,
                const Rect *srcRect, const Rect *dstRect,
                short mode, void *maskRgn) {
-    printf("TODO: CopyBits\n");
+    /* Simple 8-bit/pixel copy between Mac BitMaps (no scaling, no mode effects) */
+    int srcX, srcY, dstX, dstY, w, h;
+    int srcRB, dstRB;
+    const UInt8 *src;
+    UInt8 *dst;
+    int y;
+
+    if (!srcBits || !dstBits || !srcRect || !dstRect) return;
+
+    srcRB = srcBits->rowBytes & 0x3FFF;
+    dstRB = dstBits->rowBytes & 0x3FFF;
+    src = (const UInt8 *)srcBits->baseAddr;
+    dst = (UInt8 *)dstBits->baseAddr;
+    if (!src || !dst || !srcRB || !dstRB) return;
+
+    srcX = srcRect->left; srcY = srcRect->top;
+    dstX = dstRect->left; dstY = dstRect->top;
+    w = srcRect->right - srcRect->left;
+    h = srcRect->bottom - srcRect->top;
+    if (w <= 0 || h <= 0) return;
+
+    for (y = 0; y < h; y++) {
+        const UInt8 *srow = src + (srcY + y) * srcRB + srcX;
+        UInt8 *drow = dst + (dstY + y) * dstRB + dstX;
+        memcpy(drow, srow, (size_t)w);
+    }
 }
 
 const BitMap *GetPortBitMapForCopyBits(GWorldPtr port) {
-    printf("TODO: GetPortBitMapForCopyBits\n");
-    return NULL;
+    /* Return a static BitMap pointing at the GWorld (or screen) pixel buffer */
+    static BitMap bm;
+    extern Ptr gBaseAddr;
+    extern short gRowBytes;
+    extern short gXSize, gYSize;
+    if (!port) {
+        bm.baseAddr = gBaseAddr;
+        bm.rowBytes = gRowBytes;
+        bm.bounds.left = 0; bm.bounds.top = 0;
+        bm.bounds.right = gXSize; bm.bounds.bottom = gYSize;
+    } else {
+        GWorldImpl *gw = (GWorldImpl *)port;
+        bm.baseAddr = (Ptr)gw->pixels;
+        bm.rowBytes = (short)(gw->pixmap.rowBytes & 0x3FFF);
+        bm.bounds = gw->pixmap.bounds;
+    }
+    return &bm;
 }
 
 void GetPortBounds(GWorldPtr port, Rect *bounds) {
-    if (bounds) { bounds->left = 0; bounds->top = 0; bounds->right = 640; bounds->bottom = 480; }
+    extern short gXSize, gYSize;
+    if (!bounds) return;
+    if (port) {
+        GWorldImpl *gw = (GWorldImpl *)port;
+        *bounds = gw->pixmap.bounds;
+    } else {
+        bounds->left = 0; bounds->top = 0;
+        bounds->right = gXSize; bounds->bottom = gYSize;
+    }
 }
 
 /*---------------------------------------------------------------------------*/
@@ -667,11 +733,92 @@ void KillPicture(PicHandle myPicture) {
     printf("TODO: KillPicture\n");
 }
 
-void FillRect(const Rect *r, const Pattern *pat)   { printf("TODO: FillRect\n"); }
-void EraseRect(const Rect *r)                       { printf("TODO: EraseRect\n"); }
-void PaintRect(const Rect *r)                       { printf("TODO: PaintRect\n"); }
-void InvertRect(const Rect *r)                      { printf("TODO: InvertRect\n"); }
-void FrameRect(const Rect *r)                       { printf("TODO: FrameRect\n"); }
+/* QuickDraw current port pixel access helpers */
+static UInt8 *current_port_pixels(void) {
+    extern Ptr gBaseAddr;
+    if (gCurrentGWorld) return gw_pixels(gCurrentGWorld);
+    return (UInt8 *)gBaseAddr;
+}
+
+static short current_port_rowbytes(void) {
+    extern short gRowBytes;
+    if (gCurrentGWorld) return gw_rowbytes(gCurrentGWorld);
+    return gRowBytes;
+}
+
+/* Current QuickDraw pen color (index into 8-bit palette) */
+static UInt8 gQDForeColor = 0;   /* black = 0 */
+static UInt8 gQDBackColor = 255; /* white = 255 */
+
+static void fill_rect_color(const Rect *r, UInt8 color) {
+    int x, y, x1, y1, x2, y2, rb;
+    UInt8 *pix;
+    extern short gXSize, gYSize;
+    if (!r) return;
+    pix = current_port_pixels();
+    rb  = current_port_rowbytes();
+    if (!pix || !rb) return;
+    x1 = r->left; y1 = r->top; x2 = r->right; y2 = r->bottom;
+    /* Clamp */
+    if (x1 < 0) x1 = 0;
+    if (y1 < 0) y1 = 0;
+    for (y = y1; y < y2; y++) {
+        UInt8 *row = pix + y * rb + x1;
+        for (x = x1; x < x2; x++) *row++ = color;
+    }
+}
+
+void FillRect(const Rect *r, const Pattern *pat) {
+    /* Use foreground color (pattern not implemented) */
+    fill_rect_color(r, gQDForeColor);
+}
+
+void EraseRect(const Rect *r) {
+    fill_rect_color(r, gQDBackColor);
+}
+
+void PaintRect(const Rect *r) {
+    fill_rect_color(r, gQDForeColor);
+}
+
+void InvertRect(const Rect *r) {
+    int x, y, x1, y1, x2, y2, rb;
+    UInt8 *pix;
+    if (!r) return;
+    pix = current_port_pixels();
+    rb  = current_port_rowbytes();
+    if (!pix || !rb) return;
+    x1 = r->left; y1 = r->top; x2 = r->right; y2 = r->bottom;
+    if (x1 < 0) x1 = 0; if (y1 < 0) y1 = 0;
+    for (y = y1; y < y2; y++) {
+        UInt8 *row = pix + y * rb + x1;
+        for (x = x1; x < x2; x++) *row++ ^= 0xFF;
+    }
+}
+
+static void draw_hline(UInt8 *pix, int rb, int x1, int x2, int y, UInt8 color) {
+    UInt8 *row = pix + y * rb + x1;
+    int x;
+    for (x = x1; x < x2; x++) *row++ = color;
+}
+
+static void draw_vline(UInt8 *pix, int rb, int x, int y1, int y2, UInt8 color) {
+    int y;
+    for (y = y1; y < y2; y++) pix[y * rb + x] = color;
+}
+
+void FrameRect(const Rect *r) {
+    int x1, y1, x2, y2;
+    UInt8 *pix = current_port_pixels();
+    int rb = current_port_rowbytes();
+    if (!r || !pix || !rb) return;
+    x1 = r->left; y1 = r->top; x2 = r->right - 1; y2 = r->bottom - 1;
+    if (x1 < 0) x1 = 0; if (y1 < 0) y1 = 0;
+    draw_hline(pix, rb, x1, x2+1, y1, gQDForeColor);
+    draw_hline(pix, rb, x1, x2+1, y2, gQDForeColor);
+    draw_vline(pix, rb, x1, y1, y2+1, gQDForeColor);
+    draw_vline(pix, rb, x2, y1, y2+1, gQDForeColor);
+}
 void MoveTo(short h, short v)                       { }
 void LineTo(short h, short v)                       { }
 void Line(short dh, short dv)                       { }

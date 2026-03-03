@@ -116,8 +116,8 @@ void DrawScreen(int button,GWorldPtr src)
 			DrawString(gPrefs.name);
 		}
 		else{
-			Move(-StringWidth("\p��� This Copy is not Registered! ���"),0);
-			DrawString("\p��� This Copy is not Registered! ���");
+			Move(-StringWidth("\p\xA0\xA0\xA0 This Copy is not Registered! \xA0\xA0\xA0"),0);
+			DrawString("\p\xA0\xA0\xA0 This Copy is not Registered! \xA0\xA0\xA0");
 		}		
 		MoveTo(10,15);
 		if(gLevelResFile)
@@ -128,6 +128,8 @@ void DrawScreen(int button,GWorldPtr src)
 		ForeColor(blackColor);
 	}		
 	SetGWorld(oldGW,oldGD);
+	/* Flush to display after drawing to screen GWorld */
+	Blit2Screen();
 }
 
 void ScreenUpdate(WindowPtr win)

@@ -109,9 +109,11 @@ void FirstRun()
 		gPrefs.keyCodes[kPause]     = 0x0F; /* R */
 		return;
 	}
-	BlockMoveData(*prefDefault,&gPrefs,
-		GetHandleSize(prefDefault)<(long)sizeof(tPrefs)
-		? GetHandleSize(prefDefault) : (long)sizeof(tPrefs));
+	{
+		long copySize = GetHandleSize(prefDefault);
+		if (copySize > (long)sizeof(tPrefs)) copySize = (long)sizeof(tPrefs);
+		BlockMoveData(*prefDefault,&gPrefs,copySize);
+	}
 	ReleaseResource(prefDefault);	
 }
 
