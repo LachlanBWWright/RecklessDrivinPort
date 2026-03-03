@@ -48,7 +48,7 @@ static inline Boolean CheckFrameTime()
 	if(gFrameCount>optFrameCount)
 	{
 		//AddFloatToMessageBuffer("\pFPS: ",(float)1000000/((curMS-gLastGraphFrameMS[0])/kGraphFrameCount));
-		BlockMoveData(gLastGraphFrameMS+1,gLastGraphFrameMS,sizeof(UInt64)*(kGraphFrameCount)-1);
+		BlockMoveData(gLastGraphFrameMS+1,gLastGraphFrameMS,sizeof(UInt64)*(kGraphFrameCount-1));
 		gLastGraphFrameMS[kGraphFrameCount-1]=curMS;
 		return true;
 	}

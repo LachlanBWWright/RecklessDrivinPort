@@ -78,7 +78,7 @@ void HandleError(int id)
 	idStr[0]+=3;
 	GetCallerName(help);	
 	BlockMoveData(help+2,idStr+idStr[0]+1,help[0]-1);
-	idStr[0]+=help[0]-1;	
+	idStr[0]+=help[0]-1;
 #if __option(scheduling)
 	ShowCursor();
 	ScreenMode(kScreenSuspended);
@@ -90,6 +90,20 @@ void HandleError(int id)
 	if(err)ExitToShell();
 #else
 	DebugStr(idStr);
+	/* Port debug: print C backtrace so we can identify the error source */
+	{
+		void *bt[32]; int n;
+		extern int backtrace(void**,int);
+		extern char **backtrace_symbols(void*const*,int);
+		n = backtrace(bt, 32);
+		char **syms = backtrace_symbols(bt, n);
+		if (syms) {
+			int i;
+			fprintf(stderr, "[HandleError] error=%d, backtrace:\n", id);
+			for (i = 0; i < n; i++) fprintf(stderr, "  %s\n", syms[i]);
+			free(syms);
+		}
+	}
 #endif
 	Exit();
 }

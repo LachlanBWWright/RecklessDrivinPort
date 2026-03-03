@@ -266,7 +266,8 @@ void SDL_Platform_SetPalette(int index, int count, UInt16 *rgbValues) {
     }
 }
 
-void InitScreen(int dummy) {
+void InitScreen(int hiColor) {
+    int bytesPerPixel = hiColor ? 2 : 1;
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         exit(1);
@@ -337,20 +338,22 @@ void InitScreen(int dummy) {
         exit(1);
     }
 
-    /* Allocate a dedicated back-buffer that won't be moved by the SDL renderer */
+    /* Allocate a dedicated back-buffer that won't be moved by the SDL renderer.
+     * For hi-color (16-bit) mode we need 2 bytes per pixel. */
     if (s_back_buffer) free(s_back_buffer);
-    s_back_buffer = (UInt8 *)malloc((size_t)gXSize * gYSize);
+    s_back_buffer = (UInt8 *)malloc((size_t)gXSize * gYSize * bytesPerPixel);
     if (!s_back_buffer) {
         fprintf(stderr, "Failed to allocate back buffer\n");
         exit(1);
     }
-    memset(s_back_buffer, 0, (size_t)gXSize * gYSize);
+    memset(s_back_buffer, 0, (size_t)gXSize * gYSize * bytesPerPixel);
 
     gBaseAddr = (Ptr)s_back_buffer;
-    gRowBytes = gXSize;  /* stride = width for our packed back buffer */
+    gRowBytes = gXSize * bytesPerPixel;  /* stride: 1 byte/px (8-bit) or 2 bytes/px (hiColor) */
 
     gScreenMode = kScreenSuspended;
-    printf("[SDL] InitScreen: %dx%d, rowBytes=%d\n", gXSize, gYSize, gRowBytes);
+    printf("[SDL] InitScreen: %dx%d, rowBytes=%d, hiColor=%d\n",
+           gXSize, gYSize, gRowBytes, hiColor);
 }
 
 void ScreenMode(int mode) {
@@ -360,7 +363,7 @@ void ScreenMode(int mode) {
             /* Keep gBaseAddr pointing at our dedicated back buffer */
             if (s_back_buffer) {
                 gBaseAddr = (Ptr)s_back_buffer;
-                gRowBytes = gXSize;
+                /* gRowBytes was set correctly in InitScreen; do not reset it here */
             }
             /* Load the game's 8-bit colour lookup table (same as screen.c) */
             if (!s_palette_set) {
@@ -406,31 +409,58 @@ void FadeScreen(int out) {
 
 /*
  * Blit2Screen - present the game's back buffer (gBaseAddr) to the SDL window.
- * The back buffer is a separate 8-bit indexed allocation; we copy it into the
- * paletted SDL surface, blit that to a 32-bit surface, upload to texture, render.
+ * The back buffer is either:
+ *  - 8-bit indexed (gRowBytes == gXSize):  copy into paletted surface, blit to 32-bit
+ *  - 16-bit XRGB1555 (gRowBytes == gXSize*2):  convert XRGB1555 pixels → ARGB8888
  */
 void Blit2Screen(void) {
     int y;
-    if (!s_surface || !s_renderer || !s_texture || !s_rgb_surface || !s_back_buffer)
+    if (!s_renderer || !s_texture || !s_rgb_surface || !s_back_buffer)
         return;
 
-    /* Make sure the palette is current on the surface */
-    if (s_palette_set) {
-        SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
-    }
+    if (gRowBytes == gXSize) {
+        /* ---- 8-bit indexed path ---- */
+        if (!s_surface) return;
 
-    /* Copy our back buffer into the SDL paletted surface */
-    if (SDL_LockSurface(s_surface) == 0) {
-        for (y = 0; y < gYSize; y++) {
-            UInt8 *dst = (UInt8 *)s_surface->pixels + y * s_surface->pitch;
-            const UInt8 *src = s_back_buffer + y * gXSize;
-            memcpy(dst, src, (size_t)gXSize);
+        /* Make sure the palette is current on the surface */
+        if (s_palette_set) {
+            SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
         }
-        SDL_UnlockSurface(s_surface);
-    }
 
-    /* Convert 8-bit indexed → 32-bit ARGB */
-    SDL_BlitSurface(s_surface, NULL, s_rgb_surface, NULL);
+        /* Copy our back buffer into the SDL paletted surface */
+        if (SDL_LockSurface(s_surface) == 0) {
+            for (y = 0; y < gYSize; y++) {
+                UInt8 *dst = (UInt8 *)s_surface->pixels + y * s_surface->pitch;
+                const UInt8 *src = s_back_buffer + y * gXSize;
+                memcpy(dst, src, (size_t)gXSize);
+            }
+            SDL_UnlockSurface(s_surface);
+        }
+
+        /* Convert 8-bit indexed → 32-bit ARGB */
+        SDL_BlitSurface(s_surface, NULL, s_rgb_surface, NULL);
+    } else {
+        /* ---- 16-bit XRGB1555 hi-color path ---- */
+        if (SDL_LockSurface(s_rgb_surface) == 0) {
+            for (y = 0; y < gYSize; y++) {
+                Uint32 *dst = (Uint32 *)((UInt8 *)s_rgb_surface->pixels
+                                         + y * s_rgb_surface->pitch);
+                const UInt16 *src = (const UInt16 *)(s_back_buffer + y * gRowBytes);
+                int x;
+                for (x = 0; x < gXSize; x++) {
+                    UInt16 p = src[x];
+                    /* XRGB1555: bits 14-10=R, 9-5=G, 4-0=B */
+                    Uint8 r = (Uint8)(((p >> 10) & 0x1F) << 3);
+                    Uint8 g = (Uint8)(((p >>  5) & 0x1F) << 3);
+                    Uint8 b = (Uint8)(( p        & 0x1F) << 3);
+                    /* ARGB8888 */
+                    dst[x] = (Uint32)(0xFF000000u | ((Uint32)r << 16)
+                                      | ((Uint32)g << 8) | b);
+                }
+            }
+            SDL_UnlockSurface(s_rgb_surface);
+        }
+    }
 
     /* Upload to texture */
     SDL_UpdateTexture(s_texture, NULL, s_rgb_surface->pixels, s_rgb_surface->pitch);

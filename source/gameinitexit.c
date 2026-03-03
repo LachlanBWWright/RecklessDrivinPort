@@ -16,6 +16,7 @@
 #include "register.h"
 #include "preferences.h"
 #include "gamesounds.h"
+#include "byteswap_packs.h"
 
 tRoad gRoadData;	
 UInt32 *gRoadLenght;
@@ -98,6 +99,7 @@ int LoadLevel()
 	}
 
 	LoadPack(kPackLevel1+gLevelID);
+	PortByteSwapLevelPack(kPackLevel1+gLevelID);
 	gLevelData=(tLevelData*)GetSortedPackEntry(kPackLevel1+gLevelID,1,nil);
 	gMarks=(tMarkSeg*)GetSortedPackEntry(kPackLevel1+gLevelID,2,&gMarkSize);
 	gMarkSize/=sizeof(tMarkSeg);

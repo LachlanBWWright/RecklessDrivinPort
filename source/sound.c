@@ -7,6 +7,16 @@
 #include "preferences.h"
 #include "packs.h"
 #include "random.h"
+/* tSound struct fields are stored in Mac big-endian byte order in the pack
+ * data.  On little-endian platforms we must byte-swap them before use.
+ * TSOUND_U32 wraps be32_swap (from mac_compat.h, force-included at compile
+ * time) so the original game code's intent remains clear. */
+#define TSOUND_U32(x) be32_swap(x)
+/* SndCommand.param2 holds a Ptr on Mac (32-bit).  On 64-bit Linux we store
+ * the full pointer via intptr_t.  The original (SInt32) cast truncates the
+ * pointer; SOUND_PTR2PARAM casts safely to the long-wide param2 field. */
+#define SOUND_PTR2PARAM(base, off) \
+    ((intptr_t)((UInt8 *)(base) + TSOUND_U32(off)))
 
 #define kNumChannels	3	//number of sound channels
 #define kNumHQChannels	6	//number of sound channels in high quality mode
@@ -172,7 +182,7 @@ void SetCarSound(float engine,float skidL,float skidR,float velo)
 			tSound *sound=(tSound*)GetSortedPackEntry(kPackSnds,132,nil);
 			gEngineChannel->userInfo=0;
 			cmd.cmd=bufferCmd;
-			cmd.param2=(SInt32)sound+sound->offsets[RanInt(0,sound->numSamples)];
+			cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
 			DoError(SndDoCommand(gEngineChannel,&cmd,false));
 			cmd.cmd=callBackCmd;
 			cmd.param1=1;
@@ -205,7 +215,7 @@ void SetCarSound(float engine,float skidL,float skidR,float velo)
 			tSound *sound=(tSound*)GetSortedPackEntry(kPackSnds,(*gRoadInfo).skidSound,nil);
 			gSkidChannel->userInfo=0;
 			cmd.cmd=bufferCmd;
-			cmd.param2=(SInt32)sound+sound->offsets[RanInt(0,sound->numSamples)];
+			cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
 			DoError(SndDoCommand(gSkidChannel,&cmd,false));
 			cmd.cmd=callBackCmd;
 			cmd.param1=1;
@@ -253,7 +263,7 @@ void StartCarChannels()
 			tSound *sound=(tSound*)GetSortedPackEntry(kPackSnds,132,nil);
 			cmd.cmd=bufferCmd;
 			cmd.param1=0;
-			cmd.param2=(SInt32)sound+sound->offsets[RanInt(0,sound->numSamples)];
+			cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
 			DoError(SndDoCommand(gEngineChannel,&cmd,false));
 			cmd.cmd=callBackCmd;
 			cmd.param1=1;
@@ -262,7 +272,7 @@ void StartCarChannels()
 			sound=(tSound*)GetSortedPackEntry(kPackSnds,(*gRoadInfo).skidSound,nil);
 			cmd.cmd=bufferCmd;
 			cmd.param1=0;
-			cmd.param2=(SInt32)sound+sound->offsets[RanInt(0,sound->numSamples)];
+			cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
 			DoError(SndDoCommand(gSkidChannel,&cmd,false));	
 			cmd.cmd=callBackCmd;
 			cmd.param1=1;
@@ -287,15 +297,15 @@ void PlaySound(t2DPoint pos,t2DPoint velo,float freq,float vol,int id)
 				priority=gChannels[i]->userInfo;
 				chan=gChannels[i];
 			}
-		if(sound->flags&kSoundPriorityHigher)
+		if(TSOUND_U32(sound->flags)&kSoundPriorityHigher)
 		{
-			if(priority>=sound->priority)
+			if(priority>=TSOUND_U32(sound->priority))
 				return;
-		}else if(priority>sound->priority)
+		}else if(priority>TSOUND_U32(sound->priority))
 			return;		
 		dist=1-VEC2D_Value(VEC2D_Difference(pos,gCameraObj->pos))*(1/kMaxListenDist);
 		if(dist<=0) return;	
-		chan->userInfo=sound->priority;
+		chan->userInfo=TSOUND_U32(sound->priority);
 		pan=(pos.x-gCameraObj->pos.x)*(1/kMaxPanDist);
 		if(fabs(pan)>1)
 			if(pan>0)pan=1;
@@ -314,7 +324,7 @@ void PlaySound(t2DPoint pos,t2DPoint velo,float freq,float vol,int id)
 		cmd.cmd=quietCmd;
 		DoError(SndDoImmediate(chan,&cmd));
 		cmd.cmd=bufferCmd;
-		cmd.param2=(SInt32)sound+sound->offsets[RanInt(0,sound->numSamples)];
+		cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
 		DoError(SndDoImmediate(chan,&cmd));
 		cmd.cmd=volumeCmd;
 		cmd.param2=((int)(0x0100*vol*dist*(1-pan))&0xffff)|((int)(0x0100*vol*dist*(1+pan))<<16);
@@ -322,7 +332,7 @@ void PlaySound(t2DPoint pos,t2DPoint velo,float freq,float vol,int id)
 		if(gBuggySoundManager){
 			UInt32 rate;
 			cmd.cmd=getRateCmd;
-			cmd.param2=(SInt32)&rate;
+			cmd.param2=(intptr_t)&rate;
 			DoError(SndDoImmediate(chan,&cmd));
 			cmd.cmd=rateCmd;
 			cmd.param2=rate*freq;
@@ -354,11 +364,11 @@ void SimplePlaySound(int id)
 				priority=gChannels[i]->userInfo;
 				chan=gChannels[i];
 			}
-		if(sound->flags&kSoundPriorityHigher)
+		if(TSOUND_U32(sound->flags)&kSoundPriorityHigher)
 		{
-			if(priority>=sound->priority)
+			if(priority>=TSOUND_U32(sound->priority))
 				return;
-		}else if(priority>sound->priority)
+		}else if(priority>TSOUND_U32(sound->priority))
 			return;		
 		cmd.param1=0;
 		cmd.param2=0;
@@ -367,7 +377,7 @@ void SimplePlaySound(int id)
 		cmd.cmd=quietCmd;
 		DoError(SndDoImmediate(chan,&cmd));
 		cmd.cmd=bufferCmd;
-		cmd.param2=(SInt32)sound+sound->offsets[RanInt(0,sound->numSamples)];
+		cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
 		DoError(SndDoImmediate(chan,&cmd));
 		cmd.cmd=volumeCmd;
 		cmd.param2=((int)(0x0100*gVolume)&0xffff)|((int)(0x0100*gVolume)<<16);

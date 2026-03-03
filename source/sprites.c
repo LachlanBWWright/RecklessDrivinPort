@@ -6,6 +6,7 @@
 #include "packs.h"
 #include "preferences.h"
 #include "random.h"
+#include "byteswap_packs.h"
 
 #define kNumSprites			300
 #define kNumSpecialSprites	100
@@ -893,9 +894,10 @@ void LoadSprites()
 	{
 		int size;
 		Ptr data=GetUnsortedPackEntry(spritePack,i,&size);
-		if(data)
+		if(data) {
 			DoError(PtrToHand(data,&gSprites[i-128],size));
-		else
+			PortByteSwapSpriteHandle(gSprites[i-128]);
+		} else
 			gSprites[i-128]=nil;
 	}
 	for(i=kNumSprites;i<kNumSprites+kNumSpecialSprites;i++)

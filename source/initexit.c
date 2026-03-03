@@ -16,6 +16,7 @@
 #include "random.h"
 #include "packs.h"
 #include "register.h"
+#include "byteswap_packs.h"
 
 #if __option(profile)
 #include <profiler.h>
@@ -105,12 +106,15 @@ void Init()
 	CheckRegi();
 	if(!gRegistered)
 		Register(false);
-	InitScreen(0);
+	InitScreen(gPrefs.hiColor);
 	ShowPicScreen(1003);
 	LoadPack(kPackSnds);
 	LoadPack(kPackObTy);
+	PortByteSwapPackObTy();
 	LoadPack(kPackOgrp);
+	PortByteSwapPackOgrp();
 	LoadPack(kPackRoad);
+	PortByteSwapPackRoad();
 	if(gPrefs.hiColor)
 	{
 		LoadPack(kPacksR16);

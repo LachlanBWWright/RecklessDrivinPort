@@ -118,6 +118,7 @@ set(GAME_SOURCES
     source/sound.c
     source/sprites.c
     source/textfx.c
+    source/byteswap_packs.c
 )
 
 # appleevents.c uses Mac-only Apple Events API; only include it when not using
