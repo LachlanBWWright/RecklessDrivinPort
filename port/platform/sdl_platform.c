@@ -243,7 +243,7 @@ void GetKeys(KeyMap theKeys) {
  * ============================================================ */
 
 /* The game's internal color palette (8-bit indexed colors) */
-static SDL_Color s_palette[256];
+SDL_Color s_palette[256];
 static int s_palette_set = 0;
 
 /* Set palette colors for 8-bit mode */

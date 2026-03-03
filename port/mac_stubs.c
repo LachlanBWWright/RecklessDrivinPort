@@ -811,20 +811,46 @@ static int unpack_bits(const UInt8 *src, UInt8 *dst, int width) {
 }
 
 /*
+ * rgb15_to_palette8 - Convert a 15-bit xRRRRRGGGGGBBBBB pixel to the nearest
+ * 8-bit palette index using the supplied palette (SDL_Color array of 256).
+ */
+#ifdef PORT_SDL2
+#include <SDL2/SDL.h>
+extern SDL_Color s_palette[256];
+static UInt8 rgb15_to_palette8(uint16_t px15, const SDL_Color *pal) {
+    int r = ((px15 >> 10) & 0x1F) * 255 / 31;
+    int g = ((px15 >>  5) & 0x1F) * 255 / 31;
+    int b = ( px15        & 0x1F) * 255 / 31;
+    int best = 0, bestDist = 0x7FFFFFFF, i;
+    for (i = 0; i < 256; i++) {
+        int dr = r - pal[i].r, dg = g - pal[i].g, db = b - pal[i].b;
+        int dist = dr*dr + dg*dg + db*db;
+        if (dist < bestDist) { bestDist = dist; best = i; }
+    }
+    return (UInt8)best;
+}
+#endif
+
+/*
  * DrawPicture - decode a Mac PICT (PPic resource) into the current GWorld.
  *
- * The game's PPic resources are LZRW-compressed Mac PICT v2 images:
- *   Bytes 0-9:   size(2) + bounding rect(8) [big-endian]
- *   Bytes 10-39: version opcodes + HeaderOp
- *   Bytes 40+:   LongComment, Clip region, PackBitsRgn with 0-row placeholder
- *   Byte 150:    start of actual PackBits pixel rows (for 640x480 images)
- *                each row: byteCount(2 if width>250 else 1) + compressed bytes
+ * The game's PPic resources are LZRW-compressed Mac PICT v2 images.
+ * Resources.dat was built from the hi-colour version of the game; all PPic
+ * images are 16-bit (15-bit packed x5R5G5B) stored using PackBits compression
+ * with a 2-byte byteCount prefix per row.
  *
- * Pixel values are 8-bit palette indices matching the current screen CLUT.
+ * Header layout (for 640x480 images):
+ *   Bytes 0-9:   PICT size(2) + bounding rect(8) [big-endian]
+ *   Bytes 10-39: version opcodes + HeaderOp
+ *   Bytes 40-149: LongComment + Clip region + PackBitsRgn placeholder
+ *   Byte 150:   start of packed pixel rows: byteCount(2) + PackBits data
+ *
+ * Decoded row width is picW*2 bytes (2 bytes per pixel, 15-bit RGB).
+ * We convert 16-bit → 8-bit palette index when writing to the 8-bit port.
  */
 void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
     const UInt8 *pict;
-    int picW, picH, pixDataOff, row;
+    int picW, picH, pixDataOff, picBpp, row;
     int16_t picTop, picLeft, picBottom, picRight;
     UInt8 *portPix;
     int portRb;
@@ -852,40 +878,50 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
     }
 
     /*
-     * Auto-detect pixel data start: scan for a valid set of PackBits rows.
-     * Try offset 106 first (PPic 1005), then 150 (PPic 1000-1004,1007-1008),
-     * then scan in steps of 2.
+     * Auto-detect pixel row width.  The PPic resources in resources.dat were
+     * exported from the hi-colour build, so all images use 16-bit pixels
+     * (rowBytes = picW * 2).  We first try the 16-bit row width; if that
+     * overshoots, we fall back to 8-bit (picW).
      */
     {
         Size picSize = GetHandleSize((Handle)myPicture);
-        static const int CANDIDATES[] = { 150, 106, 80, 82, 84, 86, 88, 90,
-                                           92, 94, 96, 98, 100, 102, 104,
-                                           108, 110, 112, 114, 116, 118, 120,
-                                           122, 124, 126, 128, 130, 132, 134,
-                                           136, 138, 140, 142, 144, 146, 148,
-                                           152, 154, 156, 158, 160, -1 };
-        int ci, best = -1;
-        int bcBytes = (picW > 250) ? 2 : 1;
-        for (ci = 0; CANDIDATES[ci] >= 0 && best < 0; ci++) {
-            int off = CANDIDATES[ci];
-            int ok = 1;
-            int consumed = 0;
-            for (int r = 0; r < picH && ok; r++) {
-                if (off + bcBytes > (int)picSize) { ok=0; break; }
-                int bc = (bcBytes==2) ?
-                    (int)(((uint16_t)pict[off]<<8)|pict[off+1]) :
-                    (int)pict[off];
-                if (bc < 0 || bc > picW*2+200) { ok=0; break; }
-                consumed += bcBytes + bc;
-                off += bcBytes + bc;
+        /* Try pixel-data start at offset 150 (all 640x480 PPic) or 106 (PPic 1005) */
+        static const int OFFSETS[] = { 150, 106, 80, 82, 84, 86, 88, 90, 92,
+                                        94, 96, 98, 100, 102, 104, 108, 110,
+                                       112, 114, 116, 118, 120, 122, 124, 126,
+                                       128, 130, 132, 134, 136, 138, 140, 142,
+                                       144, 146, 148, 152, 154, 156, 158, 160, -1 };
+        /* Try each (startOffset, rowBytes) combination: 16-bit first */
+        int depths[] = { 2, 1 };   /* bytes per pixel to try */
+        int di, ci, found = 0;
+        for (di = 0; di < 2 && !found; di++) {
+            int bpp = depths[di];
+            int rowBytes = picW * bpp;
+            int bcBytes  = (rowBytes > 250) ? 2 : 1;
+            for (ci = 0; OFFSETS[ci] >= 0 && !found; ci++) {
+                int off = OFFSETS[ci];
+                int ok = 1;
+                int consumed = 0;
+                for (int r = 0; r < picH && ok; r++) {
+                    if (off + bcBytes > (int)picSize) { ok=0; break; }
+                    int bc = (bcBytes==2) ?
+                        (int)(((uint16_t)pict[off]<<8)|pict[off+1]) :
+                        (int)pict[off];
+                    if (bc <= 0 || bc > rowBytes + rowBytes/2 + 200) { ok=0; break; }
+                    consumed += bcBytes + bc;
+                    off      += bcBytes + bc;
+                }
+                if (ok && consumed > rowBytes * picH / 4) {
+                    pixDataOff = OFFSETS[ci];
+                    picBpp     = bpp;
+                    found = 1;
+                }
             }
-            if (ok && consumed > picW * picH / 2) best = CANDIDATES[ci];
         }
-        if (best < 0) {
-            fprintf(stderr, "DrawPicture: could not find pixel data in PICT %dx%d\n", picW, picH);
+        if (!found) {
+            fprintf(stderr, "DrawPicture: no pixel data found in PICT %dx%d\n", picW, picH);
             return;
         }
-        pixDataOff = best;
     }
 
     portPix = current_port_pixels();
@@ -893,46 +929,57 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
     if (!portPix || !portRb) return;
 
     /* Destination rectangle: use dstRect if provided, else PICT bounds */
+    {
     int dstTop  = dstRect ? dstRect->top  : picTop;
     int dstLeft = dstRect ? dstRect->left : picLeft;
+    int rowBytes = picW * picBpp;
+    int bcBytes  = (rowBytes > 250) ? 2 : 1;
 
-    rowBuf = (UInt8 *)malloc((size_t)picW);
+    rowBuf = (UInt8 *)malloc((size_t)rowBytes);
     if (!rowBuf) return;
 
     {
         const UInt8 *src = pict + pixDataOff;
-        int bcBytes = (picW > 250) ? 2 : 1;
         for (row = 0; row < picH; row++) {
             int dstY = dstTop + row;
             int bc;
 
             /* Read byteCount */
-            if (bcBytes == 2)
-                bc = (int)(((uint16_t)src[0] << 8) | src[1]);
-            else
-                bc = (int)src[0];
+            bc = (bcBytes == 2) ?
+                 (int)(((uint16_t)src[0] << 8) | src[1]) :
+                 (int)src[0];
             src += bcBytes;
 
-            /* Decode PackBits into rowBuf */
-            memset(rowBuf, 0, (size_t)picW);
-            if (bc > 0) unpack_bits(src, rowBuf, picW);
+            /* Decode PackBits row into rowBuf (rowBytes of output) */
+            memset(rowBuf, 0, (size_t)rowBytes);
+            if (bc > 0) unpack_bits(src, rowBuf, rowBytes);
             src += bc;
 
-            /* Write row to destination port (bounds check) */
-            if (dstY >= 0 && dstY < gYSize) {
+            if (dstY < 0 || dstY >= gYSize) continue;
+
+            if (picBpp == 1) {
+                /* 8-bit indexed: copy palette indices directly */
                 UInt8 *dst = portPix + dstY * portRb + dstLeft;
                 int w = picW;
-                if (dstLeft < 0) {
-                    dst -= dstLeft;
-                    w   += dstLeft;
-                }
                 if (dstLeft + w > gXSize) w = gXSize - dstLeft;
-                if (w > 0) memcpy(dst, rowBuf, (size_t)w);
+                if (w > 0 && dstLeft < gXSize) memcpy(dst, rowBuf, (size_t)w);
+            } else {
+                /* 16-bit x5R5G5B → 8-bit palette index via nearest-colour match */
+#ifdef PORT_SDL2
+                UInt8 *dst = portPix + dstY * portRb + dstLeft;
+                int x;
+                for (x = 0; x < picW && (dstLeft + x) < gXSize; x++) {
+                    uint16_t px = (uint16_t)(((uint16_t)rowBuf[x*2] << 8)
+                                            | rowBuf[x*2+1]);
+                    dst[x] = rgb15_to_palette8(px, s_palette);
+                }
+#endif
             }
         }
     }
 
     free(rowBuf);
+    } /* close dstTop/dstLeft block */
 }
 
 void KillPicture(PicHandle myPicture) {
