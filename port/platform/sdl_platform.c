@@ -507,6 +507,10 @@ void Blit2Screen(void) {
     SDL_RenderCopy(s_renderer, s_texture, NULL, NULL);
     SDL_RenderPresent(s_renderer);
 
+    /* Process pending sound callbacks (engine loop, etc.) during gameplay.
+     * WaitNextEvent() is not called in the game loop, so we do it here. */
+    sdl_audio_process_callbacks();
+
     /* Process quit events during gameplay (WaitNextEvent is not called in game loop) */
     {
         SDL_Event ev;
@@ -752,7 +756,12 @@ void FlushEvents(short eventMask, short stopMask) {
 }
 
 Boolean Button(void) {
-    return (Boolean)s_mouse_down;
+    /* Query current mouse button state directly so Button() returns the
+     * actual hardware state, not the stale event-driven s_mouse_down flag.
+     * This prevents WaitForPress() from exiting immediately because the
+     * left button was held down during the previous click. */
+    SDL_PumpEvents();
+    return (Boolean)(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON_LMASK);
 }
 
 Boolean StillDown(void) {
@@ -868,7 +877,7 @@ typedef struct SndVoice {
 
 /* One mixer voice per SndChannel */
 static SndVoice  s_voices[MAX_SND_CHANNELS];
-static int       s_voice_count = 0;     /* number allocated */
+static int       s_voice_count = 0;     /* high-water mark of allocated slots */
 static SDL_mutex *s_audio_mutex = NULL;
 static int       s_audio_open   = 0;
 
@@ -963,20 +972,31 @@ OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
 
     /* Open audio device on first channel */
     if (!s_audio_open) {
-        /* Add SDL_INIT_AUDIO if not already initialized */
         SDL_InitSubSystem(SDL_INIT_AUDIO);
         sdl_audio_open();
     }
 
-    if (s_voice_count >= MAX_SND_CHANNELS) {
-        fprintf(stderr, "[SDL] SndNewChannel: too many channels\n");
-        return -108;
+    /* Find a free slot: scan for a previously disposed voice (chan==NULL)
+     * before allocating a new slot.  This allows InitChannels() to be
+     * called multiple times without exhausting the fixed-size voice array. */
+    int vi = -1;
+    {
+        int slot_idx;
+        for (slot_idx = 0; slot_idx < s_voice_count; slot_idx++) {
+            if (s_voices[slot_idx].chan == NULL) { vi = slot_idx; break; }
+        }
+    }
+    if (vi < 0) {
+        if (s_voice_count >= MAX_SND_CHANNELS) {
+            fprintf(stderr, "[SDL] SndNewChannel: too many channels\n");
+            return -108;
+        }
+        vi = s_voice_count++;
     }
 
     *chan = (SndChannelPtr)calloc(1, sizeof(SndChannel));
     if (!*chan) return -108;
 
-    int vi = s_voice_count++;
     SndVoice *v = &s_voices[vi];
     memset(v, 0, sizeof(*v));
     v->vol_l    = 1.0f;
@@ -1002,6 +1022,7 @@ OSErr SndDisposeChannel(SndChannelPtr chan, Boolean quietNow) {
         SDL_LockMutex(s_audio_mutex);
         s_voices[vi].active   = 0;
         s_voices[vi].samples  = NULL;
+        s_voices[vi].chan     = NULL;  /* mark slot as reusable */
         SDL_UnlockMutex(s_audio_mutex);
     }
     free(chan);

@@ -9,6 +9,9 @@
 #include "gameinitexit.h"
 #include "packs.h"
 #include "random.h"
+#ifdef PORT_SDL2
+#include <SDL2/SDL.h>
+#endif
 
 #define kCalcFPMS			(kCalcFPS/(float)1000000)
 #define kGraphFrameCount 	12
@@ -59,9 +62,23 @@ static inline void CheckTimeSkip(void)
 {
 	unsigned long optFrameCount;
 	UInt64 curMS;
+#ifdef PORT_SDL2
+	/* 2 ms threshold below which we skip the SDL_Delay to avoid adding
+	 * unnecessary latency on the last busy-wait iteration */
+#define kMinSleepThreshUS ((UInt64)2000)
+#endif
 	do{
 		curMS=GetMSTime()-gStartMS;
 		optFrameCount=curMS*kCalcFPMS;
+#ifdef PORT_SDL2
+		/* Yield to the OS so the window stays responsive during the wait */
+		if(gFrameCount>optFrameCount) {
+			UInt64 nextFrameUS=(UInt64)(gFrameCount/kCalcFPMS);
+			UInt64 remainUS=(curMS<nextFrameUS)?nextFrameUS-curMS:0;
+			if(remainUS>kMinSleepThreshUS) SDL_Delay(1);
+		}
+#undef kMinSleepThreshUS
+#endif
 	}while(gFrameCount>optFrameCount);
 }
 
