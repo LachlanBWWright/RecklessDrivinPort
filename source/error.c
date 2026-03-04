@@ -90,6 +90,7 @@ void HandleError(int id)
 	if(err)ExitToShell();
 #else
 	DebugStr(idStr);
+#if !defined(__EMSCRIPTEN__)
 	/* Port debug: print C backtrace so we can identify the error source */
 	{
 		void *bt[32]; int n;
@@ -104,6 +105,7 @@ void HandleError(int id)
 			free(syms);
 		}
 	}
+#endif
 #endif
 	Exit();
 }
