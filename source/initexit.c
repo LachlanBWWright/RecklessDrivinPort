@@ -57,7 +57,7 @@ int ReqCheck()
 	SInt32 resp;
 	AlertStdAlertParamRec alertParam={
 		false,false,nil,
-		"\pExit",
+		"\x04Exit",
 		nil,
 		nil,
 		kAlertStdAlertOKButton,
@@ -71,8 +71,8 @@ int ReqCheck()
 	if(U32Version(SndSoundManagerVersion())<=0x03100000)
 	{
 		StandardAlert(kAlertStopAlert,
-		"\pYour Sound Manager version is too old.",
-		"\p",
+		"\x25Your Sound Manager version is too old.",
+		"\x00",
 		&alertParam,
 		&hit);
 		return false;
@@ -82,8 +82,8 @@ int ReqCheck()
 	if(gOSX&resp<0x00001002)
 	{
 		StandardAlert(kAlertStopAlert,
-		"\pTo run Reckless Drivin' under Mac OS X you need at least Mac OS X 10.0.2.",
-		"\pUse The Software Update Panel under Sytem preferences to update your system.",
+		"\x3fTo run Reckless Drivin' under Mac OS X you need at least Mac OS X 10.0.2.",
+		"\x4bUse The Software Update Panel under Sytem preferences to update your system.",
 		&alertParam,
 		&hit);
 		return false;
@@ -136,7 +136,7 @@ void Init()
 		FSSpec spec;
 		OSErr err;
 		
-		err=FSMakeFSSpec(0,0,"\pProfiler Dump",&spec);
+		err=FSMakeFSSpec(0,0,"\x0dProfiler Dump",&spec);
 		DoError(err==fnfErr?noErr:err);
 		err=FSpDelete(&spec);
 		DoError(err==fnfErr?noErr:err);
@@ -149,7 +149,7 @@ void Init()
 void Exit()
 {
 	#if __option(profile)
-	DoError(ProfilerDump("\pProfiler Dump"));
+	DoError(ProfilerDump("\x0dProfiler Dump"));
 	#endif
 	if(gInitSuccessful)
 	{

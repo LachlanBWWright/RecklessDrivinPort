@@ -50,7 +50,7 @@ static inline Boolean CheckFrameTime()
 	optFrameCount=curMS*kCalcFPMS;
 	if(gFrameCount>optFrameCount)
 	{
-		//AddFloatToMessageBuffer("\pFPS: ",(float)1000000/((curMS-gLastGraphFrameMS[0])/kGraphFrameCount));
+		//AddFloatToMessageBuffer("\x05FPS: ",(float)1000000/((curMS-gLastGraphFrameMS[0])/kGraphFrameCount));
 		BlockMoveData(gLastGraphFrameMS+1,gLastGraphFrameMS,sizeof(UInt64)*(kGraphFrameCount-1));
 		gLastGraphFrameMS[kGraphFrameCount-1]=curMS;
 		return true;
@@ -202,7 +202,7 @@ void PlayerHandling()
 					SimplePlaySound(144);
 				if((int)gGameTime==(int)gLevelData->time)
 				{
-					tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\pTIMEhUPee"};
+					tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x09TIMEhUPee"};
 					NewTextEffect(&fx);
 					SimplePlaySound(149);
 				}
@@ -219,7 +219,7 @@ void PlayerHandling()
 		gDisplayScore=gPlayerScore;
 	if(gPlayerScore>(gExtraLives+1)*kExtraLiveScore)
 	{
-		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\pEXTRAhLIFEee"};
+		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0cEXTRAhLIFEee"};
 		NewTextEffect(&fx);
 		gExtraLives++;
 		gPlayerLives++;
@@ -230,7 +230,7 @@ void PlayerHandling()
 	if(gPlayerObj->pos.y>gLevelData->levelEnd)
 		if(!gPlayerDeathDelay)
 		{
-			tTextEffect fx={320,240,kEffectExplode,0,"\pLEVELhCOMPLETED"};
+			tTextEffect fx={320,240,kEffectExplode,0,"\x0fLEVELhCOMPLETED"};
 			NewTextEffect(&fx);
 			if(!gFinishDelay)
 				gFinishDelay=0.001;
@@ -287,9 +287,9 @@ void PlayerHandling()
 	} 
 	//invincibility
 	gPlayerObj->damage=0;
-	/*AddFloatToMessageBuffer("\pVelo: ",VEC2D_Value(gCameraObj->velo)*3.6);	
-	AddFloatToMessageBuffer("\pSlide: ",gCameraObj->slide);
-	AddFloatToMessageBuffer("\pBrake: ",gCameraObj->input.brake);0*/
+	/*AddFloatToMessageBuffer("\x06Velo: ",VEC2D_Value(gCameraObj->velo)*3.6);
+	AddFloatToMessageBuffer("\x07Slide: ",gCameraObj->slide);
+	AddFloatToMessageBuffer("\x07Brake: ",gCameraObj->input.brake);0*/
 }
 
 void GameFrame()

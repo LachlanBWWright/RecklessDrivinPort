@@ -33,7 +33,7 @@ short GetPrefsFile(FSSpec *spec)
 	long dirID;
 	short vRef;
 	DoError(FindFolder(kOnSystemDisk,kPreferencesFolderType,kCreateFolder,&vRef,&dirID));
-	err=FSMakeFSSpec(vRef,dirID,"\pReckless Drivin' Prefs",spec);
+	err=FSMakeFSSpec(vRef,dirID,"\x16Reckless Drivin' Prefs",spec);
 	if(err==fnfErr)
 	{
 		DoError(FSpCreate(spec,'????','pref',smSystemScript));

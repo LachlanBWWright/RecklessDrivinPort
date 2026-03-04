@@ -451,7 +451,7 @@ void TakeScreenshot()
 	PicHandle screenPic;
 	SetRect(&rec,0,0,gXSize,gYSize);
 	screenPic=MakeGWPicture(&rec);
-	AddResource((Handle)screenPic,'PICT',Count1Resources('PICT')+1000,"\p");
+	AddResource((Handle)screenPic,'PICT',Count1Resources('PICT')+1000,"\x00");
 	ReleaseResource((Handle)screenPic);
 }
 

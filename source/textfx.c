@@ -6,11 +6,17 @@
 #include "packs.h"
 #include "preferences.h"
 
+#include <stdint.h>
+
 #define kMaxFX	10
 #define kEndShapeToken		0				// the end of shape maker
 #define kLineStartToken		1				// the line start marker
 #define kDrawPixelsToken	2				// the draw run marker
 #define kSkipPixelsToken	3				// the skip pixels marker
+
+/* Endian-safe token accessors (data is big-endian Mac format) */
+#define TOKEN_TYPE(p)  ((p)[0])
+#define TOKEN_DATA(p)  (((SInt32)(p)[1] << 16) | ((SInt32)(p)[2] << 8) | (p)[3])
 #define kCharSize 32
 #define kExplAccel 10.0
 #define kEffectAccel 150.0
@@ -45,19 +51,19 @@ void DrawZoomedCharLine8(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
 	UInt8 *spritePos=*data;
 	UInt8 *lineBase=gBaseAddr+y*gRowBytes;
 	int stop=0;
-	if((y<0)||(y>=gYSize-kInvLines)) goto noDrawZoomed;	
-	if(((x>>16)+(zoom>>11)<0)||((x>>16)>=gXSize)) goto noDrawZoomed;	
+	if((y<0)||(y>=gYSize-kInvLines)) goto noDrawZoomed;
+	if(((x>>16)+(zoom>>11)<0)||((x>>16)>=gXSize)) goto noDrawZoomed;
 	if(((x>>16)<0)||((x>>16)+(zoom>>11)>=gXSize)) goto noDrawZoomed;
 	while(!stop)
 	{
-		SInt32 tokenData=(*((unsigned long *)spritePos))&0x00ffffff;
-		switch (*spritePos)
+		SInt32 tokenData=TOKEN_DATA(spritePos);
+		switch (TOKEN_TYPE(spritePos))
 		{
 			case kDrawPixelsToken:
 				{
 					int i=0;
 					UInt8 *src=spritePos+4;
-					spritePos+=4+tokenData+(tokenData&3?(4-tokenData&3):0);
+					spritePos+=4+tokenData+(tokenData&3?(4-(tokenData&3)):0);
 					while(tokenData>i)
 					{
 						UInt8 *dst=lineBase+(x>>16);
@@ -79,15 +85,15 @@ void DrawZoomedCharLine8(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
 				stop=true;
 				break;
 		}
-	}	
+	}
 noDrawZoomed:
 	while(!stop)
 	{
-		SInt32 tokenData=(*((unsigned long *)spritePos))&0x00ffffff;
-		switch (*spritePos)
+		SInt32 tokenData=TOKEN_DATA(spritePos);
+		switch (TOKEN_TYPE(spritePos))
 		{
 			case kDrawPixelsToken:
-				spritePos+=4+tokenData+(tokenData&3?(4-tokenData&3):0);
+				spritePos+=4+tokenData+(tokenData&3?(4-(tokenData&3)):0);
 				break;
 			case kSkipPixelsToken:
 				spritePos+=4;
@@ -110,28 +116,28 @@ void DrawCharLine8(UInt8 **data,SInt32 x,SInt32 y)
 	UInt8 *spritePos=*data;
 	UInt8 *dst=gBaseAddr+x+y*gRowBytes;
 	int stop=0;
-	if((y<0)||(y>=gYSize-kInvLines)) goto noDraw;	
-	if((x+kCharSize<0)||(x>=gXSize)) goto noDraw;	
+	if((y<0)||(y>=gYSize-kInvLines)) goto noDraw;
+	if((x+kCharSize<0)||(x>=gXSize)) goto noDraw;
 	if((x<0)||(x+kCharSize>=gXSize)) goto noDraw;
 	do
 	{
-		SInt32 tokenData=(*((unsigned long *)spritePos))&0x00ffffff;
-		switch (*spritePos)
+		SInt32 tokenData=TOKEN_DATA(spritePos);
+		switch (TOKEN_TYPE(spritePos))
 		{
 			case kDrawPixelsToken:
 				{
 					int i=0;
 					UInt8 *src=spritePos+4;
-					spritePos+=4+tokenData+(tokenData&3?(4-tokenData&3):0);
-					while(tokenData-(int)sizeof(long)>=i)
+					spritePos+=4+tokenData+(tokenData&3?(4-(tokenData&3)):0);
+					while(tokenData-(int)sizeof(uint32_t)>=i)
 					{
-						*((long*)(dst+i))=*((long*)(src+i));
-						i+=sizeof(long);
+						*((uint32_t*)(dst+i))=*((uint32_t*)(src+i));
+						i+=sizeof(uint32_t);
 					}
-					if(tokenData-(int)sizeof(short)>=i)
+					if(tokenData-(int)sizeof(uint16_t)>=i)
 					{
-						*((short*)(dst+i))=*((short*)(src+i));
-						i+=sizeof(short);
+						*((uint16_t*)(dst+i))=*((uint16_t*)(src+i));
+						i+=sizeof(uint16_t);
 					}
 					if(tokenData-(int)sizeof(char)>=i)
 						*((char*)(dst+i))=*((char*)(src+i));
@@ -155,11 +161,11 @@ void DrawCharLine8(UInt8 **data,SInt32 x,SInt32 y)
 noDraw:
 	do
 	{
-		SInt32 tokenData=(*((unsigned long *)spritePos))&0x00ffffff;
-		switch (*spritePos)
+		SInt32 tokenData=TOKEN_DATA(spritePos);
+		switch (TOKEN_TYPE(spritePos))
 		{
 			case kDrawPixelsToken:
-				spritePos+=4+tokenData+(tokenData&3?(4-tokenData&3):0);
+				spritePos+=4+tokenData+(tokenData&3?(4-(tokenData&3)):0);
 				break;
 			case kSkipPixelsToken:
 				spritePos+=4;
@@ -182,23 +188,23 @@ void DrawZoomedCharLine16(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
 	UInt8 *spritePos=*data;
 	UInt8 *lineBase=gBaseAddr+y*gRowBytes;
 	int stop=0;
-	if((y<0)||(y>=gYSize-kInvLines)) goto noDrawZoomed;	
-	if(((x>>16)+(zoom>>11)<0)||((x>>16)>=gXSize)) goto noDrawZoomed;	
+	if((y<0)||(y>=gYSize-kInvLines)) goto noDrawZoomed;
+	if(((x>>16)+(zoom>>11)<0)||((x>>16)>=gXSize)) goto noDrawZoomed;
 	if(((x>>16)<0)||((x>>16)+(zoom>>11)>=gXSize)) goto noDrawZoomed;
 	while(!stop)
 	{
-		SInt32 tokenData=(*((unsigned long *)spritePos))&0x00ffffff;
-		switch (*spritePos)
+		SInt32 tokenData=TOKEN_DATA(spritePos);
+		switch (TOKEN_TYPE(spritePos))
 		{
 			case kDrawPixelsToken:
 				{
 					int i=0;
-					UInt16 *src=spritePos+4;
+					UInt16 *src=(UInt16*)(spritePos+4);
 					int tokenSize=tokenData*2;
-					spritePos+=4+tokenSize+(tokenSize&3?(4-tokenSize&3):0);
+					spritePos+=4+tokenSize+(tokenSize&3?(4-(tokenSize&3)):0);
 					while(tokenData>i)
 					{
-						UInt16 *dst=lineBase+((x>>15)&0xfffe);
+						UInt16 *dst=(UInt16*)(lineBase+((x>>15)&0xfffe));
 						*dst=*(src+i);
 						i++;
 						x+=zoom;
@@ -217,16 +223,16 @@ void DrawZoomedCharLine16(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
 				stop=true;
 				break;
 		}
-	}	
+	}
 noDrawZoomed:
 	while(!stop)
 	{
-		SInt32 tokenData=(*((unsigned long *)spritePos))&0x00ffffff;
-		switch (*spritePos)
+		SInt32 tokenData=TOKEN_DATA(spritePos);
+		switch (TOKEN_TYPE(spritePos))
 		{
 			case kDrawPixelsToken:{
 				int tokenSize=tokenData*2;
-				spritePos+=4+tokenSize+(tokenSize&3?(4-tokenSize&3):0);
+				spritePos+=4+tokenSize+(tokenSize&3?(4-(tokenSize&3)):0);
 				}break;
 			case kSkipPixelsToken:
 				spritePos+=4;
@@ -246,25 +252,25 @@ noDrawZoomed:
 void DrawCharLine16(UInt8 **data,SInt32 x,SInt32 y)
 {
 	UInt8 *spritePos=*data;
-	UInt16 *dst=gBaseAddr+2*x+y*gRowBytes;
+	UInt16 *dst=(UInt16*)(gBaseAddr+2*x+y*gRowBytes);
 	int stop=0;
-	if((y<0)||(y>=gYSize-kInvLines)) goto noDraw;	
-	if((x+kCharSize<0)||(x>=gXSize)) goto noDraw;	
+	if((y<0)||(y>=gYSize-kInvLines)) goto noDraw;
+	if((x+kCharSize<0)||(x>=gXSize)) goto noDraw;
 	if((x<0)||(x+kCharSize>=gXSize)) goto noDraw;
 	do
 	{
-		SInt32 tokenData=(*((unsigned long *)spritePos))&0x00ffffff;
-		switch (*spritePos)
+		SInt32 tokenData=TOKEN_DATA(spritePos);
+		switch (TOKEN_TYPE(spritePos))
 		{
 			case kDrawPixelsToken:
 				{
 					int i=0;
-					UInt16 *src=spritePos+4;
+					UInt16 *src=(UInt16*)(spritePos+4);
 					int tokenSize=tokenData*2;
-					spritePos+=4+tokenSize+(tokenSize&3?(4-tokenSize&3):0);
+					spritePos+=4+tokenSize+(tokenSize&3?(4-(tokenSize&3)):0);
 					while(tokenData-2>=i)
 					{
-						*((long*)(dst+i))=*((long*)(src+i));
+						*((uint32_t*)(dst+i))=*((uint32_t*)(src+i));
 						i+=2;
 					}
 					if(tokenData-(int)sizeof(char)>=i)
@@ -289,12 +295,12 @@ void DrawCharLine16(UInt8 **data,SInt32 x,SInt32 y)
 noDraw:
 	do
 	{
-		SInt32 tokenData=(*((unsigned long *)spritePos))&0x00ffffff;
-		switch (*spritePos)
+		SInt32 tokenData=TOKEN_DATA(spritePos);
+		switch (TOKEN_TYPE(spritePos))
 		{
 			case kDrawPixelsToken:{
 				int tokenSize=tokenData*2;
-				spritePos+=4+tokenSize+(tokenSize&3?(4-tokenSize&3):0);
+				spritePos+=4+tokenSize+(tokenSize&3?(4-(tokenSize&3)):0);
 				}break;
 			case kSkipPixelsToken:
 				spritePos+=4;
@@ -317,7 +323,7 @@ static inline void DrawZoomedCharLine(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom
 	if(gPrefs.hiColor)
 		DrawZoomedCharLine16(data,x,y,zoom);
 	else
-		DrawZoomedCharLine8(data,x,y,zoom);	
+		DrawZoomedCharLine8(data,x,y,zoom);
 }
 
 static inline void DrawCharLine(UInt8 **data,SInt32 x,SInt32 y)
@@ -325,7 +331,7 @@ static inline void DrawCharLine(UInt8 **data,SInt32 x,SInt32 y)
 	if(gPrefs.hiColor)
 		DrawCharLine16(data,x,y);
 	else
-		DrawCharLine8(data,x,y);	
+		DrawCharLine8(data,x,y);
 }
 
 
@@ -365,7 +371,7 @@ void DrawTextFX(int xDrawStart,int yDrawStart)
 					DrawZoomedCharLine(&theCH,(SInt32)(x*65536.0),y,(SInt32)(exploZoom*65536.0));
 				else
 					DrawCharLine(&theCH,(SInt32)(x),(SInt32)(y));
-				y+=exploZoom;				
+				y+=exploZoom;
 			}
 			baseX+=exploZoom*kCharSize;
 		}
@@ -413,9 +419,9 @@ void DrawTextFXZoomed(float xDrawStart,float yDrawStart,float zoom)
 				continue;
 			}
 			theCH+=8;
-			if((unsigned char)*theCH > 3){
+			if(TOKEN_TYPE((UInt8*)theCH) > 3){
 				printf("LOG: DrawTextFX bad token %d at ch=%d('%c') entryID=%d theCH=%p\n",
-				       (unsigned char)*theCH, ch, gTextFX[i].text[ch], entryID, (void*)theCH);
+				       TOKEN_TYPE((UInt8*)theCH), ch, gTextFX[i].text[ch], entryID, (void*)theCH);
 				fflush(stdout);
 				continue;
 			}
@@ -451,7 +457,7 @@ void SimpleDrawText(Str255 text,int xPos,int yPos)
 		{
 			DrawZoomedCharLine(&theCH,xPos<<16,y,1<<15);
 			DrawZoomedCharLine(&theCH,xPos<<16,y,1<<15);
-			y++;				
+			y++;
 		}
 		xPos+=kCharSize/2;
 	}
@@ -459,5 +465,5 @@ void SimpleDrawText(Str255 text,int xPos,int yPos)
 
 void ClearTextFX()
 {
-	gFXCount=0;	
+	gFXCount=0;
 }

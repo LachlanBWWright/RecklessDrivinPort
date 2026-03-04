@@ -364,68 +364,76 @@ void BonusObject(tObject *theObj)
 			switch(RanInt(0,8))
 			{
 				case 0:
+        printf("Addon: Lock triggered\n");
 					if(!(gPlayerAddOns&kAddOnLock))
 					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\pADDONShLOCKEDf"};
+						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\x0eADDONShLOCKEDf"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnLock;
 						ok=true;
 					}
 					break;	
 				case 1:
+        printf("Addon: Mines triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\pMINESee"};
+						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x07MINESee"};
 						NewTextEffect(&fx);
 						gNumMines+=5;
 						ok=true;
 					}
 					break;	
 				case 2:
+        printf("Addon: Missiles triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\pMISSILESe"};
+						tTextEffect fx={320,240,kEffectExplode,0,"\x09MISSILESe"};
 						NewTextEffect(&fx);
 						gNumMissiles+=5;
 						ok=true;
 					}
 					break;	
 				case 3:
+        printf("Addon: Spikes triggered\n");
 					if(!(gPlayerAddOns&kAddOnSpikes))
 					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\pSPIKESe"};
+						tTextEffect fx={320,240,kEffectExplode,0,"\x07SPIKESe"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnSpikes;
 						ok=true;
 					}
 					break;
 				case 4:
+        printf("Addon: Police jammer triggered\n");
 					if(!(gPlayerAddOns&kAddOnCop))
 					{
-						tTextEffect fx={320,240,kEffectSinLines,0,"\pPOLICEhJAMMER"};
+						tTextEffect fx={320,240,kEffectSinLines,0,"\x0dPOLICEhJAMMER"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnCop;
 						ok=true;
 					}
 					break;	
 				case 5:
+        printf("Addon: Turbo engine triggered\n");
 					if(!(gPlayerAddOns&kAddOnTurbo))
 					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\pTURBOhENGINEeee"};
+						tTextEffect fx={320,240,kEffectExplode,0,"\x0fTURBOhENGINEeee"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnTurbo;
 						ok=true;
 					}
 					break;	
 				case 6:
+        printf("Addon: Score award triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\p][[[hAWARDEDf"};
+						tTextEffect fx={320,240,kEffectExplode,0,"\x0d][[[hAWARDEDf"};
 						NewTextEffect(&fx);
 						gPlayerScore+=2000;
 						ok=true;
 					}
 					break;
 				case 7:
+        printf("Addon: Extra life triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\pEXTRAhLIFEee"};
+						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0cEXTRAhLIFEee"};
 						NewTextEffect(&fx);
 						gPlayerLives++;
 						SimplePlaySound(154);

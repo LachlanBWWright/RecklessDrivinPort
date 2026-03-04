@@ -270,7 +270,7 @@ void KillObject(tObject *theObj)
 	{
 		if(!gFinishDelay&&!(gPlayerDeathDelay!=0)&&gPlayerLives)
 		{
-			tTextEffect fx={320,240,kEffectExplode,0,"\pOUCHeee"};
+			tTextEffect fx={320,240,kEffectExplode,0,"\x07OUCHeee"};
 			NewTextEffect(&fx);
 			gPlayerLives--;
 			FFBJolt(1.0,1.0,1.0);

@@ -545,7 +545,7 @@ void GetHIDPress(int element,DialogPtr keyDlg,UInt8 *elements)
 			{
 				if(HIDGetElementValue(gController,gElements[i]))
 				{
-					Str255 text="\pButton XXX";
+					Str255 text="\x0aButton XXX";
 					GetDialogItem(keyDlg,element+4,&type,&item,&box);
 					elements[element]=i;
 					text[10]='0'+(elements[element]%10);
@@ -573,7 +573,7 @@ void ConfigureHID()
 		DoError(SetDialogCancelItem(keyDlg,3));
 		for(i=0;i<8;i++)
 		{
-			Str255 text="\pButton XXX";
+			Str255 text="\x0aButton XXX";
 			GetDialogItem(keyDlg,i+4,&type,&item,&box);
 			elements[i]=gPrefs.hidElements[i];
 			text[10]='0'+(elements[i]%10);
@@ -604,8 +604,8 @@ void ConfigureHID()
 		0,
 		kWindowDefaultPosition};
 		DoError(StandardAlert(kAlertStopAlert,
-			"\pCouldn't find a compatible Gamepad.",
-			"\pPlug in your Gamepad and re-launch Reckless Drivin'.",
+			"\x23Couldn't find a compatible Gamepad.",
+			"\x31Plug in your Gamepad and re-launch Reckless Drivin'.",
 			&alertParam,
 			&hit));
 	}

@@ -3,7 +3,7 @@
  *
  *  Created by ggs on Mon Nov 26 2001.
  
-    Copyright:	Copyright © 2001 Apple Computer, Inc., All Rights Reserved
+    Copyright:	Copyright ï¿½ 2001 Apple Computer, Inc., All Rights Reserved
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -12,7 +12,7 @@
 			please do not use, install, modify or redistribute this Apple software.
 
 			In consideration of your agreement to abide by the following terms, and subject
-			to these terms, Apple grants you a personal, non-exclusive license, under AppleÕs
+			to these terms, Apple grants you a personal, non-exclusive license, under Appleï¿½s
 			copyrights in this original Apple software (the "Apple Software"), to use,
 			reproduce, modify and redistribute the Apple Software, with or without
 			modifications, in source and/or binary forms; provided that if you redistribute
@@ -117,21 +117,21 @@ OSStatus SetupHIDCFM (void)
 	refMainBundle = CFBundleGetMainBundle(); 
 	if (!refMainBundle)
 	{
-        DebugStr ("\pCould open main bundle");
+        DebugStr ("\x16Could open main bundle");
 		return paramErr;
 	}
 	// create a URL to the app bundle
 	refMainBundleURL = CFBundleCopyBundleURL (refMainBundle); 
 	if (!refMainBundleURL)
 	{
-        DebugStr ("\pCould not copy main bundle URL");
+        DebugStr ("\x1eCould not copy main bundle URL");
 		return paramErr;
 	}
 	// create a URL that points to the app's directory
 /*	refPathBundleURL = CFURLCreateCopyDeletingLastPathComponent (NULL, refMainBundleURL); 
 	if (!refPathBundleURL)
 	{
-        DebugStr ("\pCould not create new parent URL deleting last path component");
+        DebugStr ("\x39Could not create new parent URL deleting last path component");
 		if (refMainBundleURL != NULL) 
 			CFRelease (refMainBundleURL);
 		return paramErr;
@@ -146,19 +146,19 @@ OSStatus SetupHIDCFM (void)
 	// did we actaully get a bundle URL
 	if (!gBundleURL)
 	{
-        DebugStr ("\pCould create HID bundle URL");
+        DebugStr ("\x19Could create HID bundle URL");
 		return paramErr;
     }
 	// get the actual bundle for the HID library
 	gBundle = CFBundleCreate (NULL, gBundleURL);
 	if (!gBundle)
 	{
-        DebugStr ("\pCould not create HID MachO library bundle");
+        DebugStr ("\x25Could not create HID MachO library bundle");
 		return paramErr;
 	}
     if (!CFBundleLoadExecutable (gBundle)) // If the code was successfully loaded, look for our function.
 	{
-    	DebugStr ("\pCould not load MachO executable");
+    	DebugStr ("\x1cCould not load MachO executable");
     	return paramErr;
 	}
 	// Now that the code is loaded, search for the function we want by name.
