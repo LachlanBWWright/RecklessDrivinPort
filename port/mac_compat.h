@@ -33,6 +33,7 @@
 #define MoveTo      Mac_MoveTo
 #define ShowCursor  Mac_ShowCursor
 #define SetCursor   Mac_SetCursor
+#define PlaySound   Mac_PlaySound
 #define BeginUpdate Mac_BeginUpdate
 #define EndUpdate   Mac_EndUpdate
 #define HideWindow  Mac_HideWindow
