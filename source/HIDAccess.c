@@ -117,14 +117,14 @@ OSStatus SetupHIDCFM (void)
 	refMainBundle = CFBundleGetMainBundle(); 
 	if (!refMainBundle)
 	{
-        DebugStr ("\x16Could open main bundle");
+        DebugStr ("\x16" "Could open main bundle");
 		return paramErr;
 	}
 	// create a URL to the app bundle
 	refMainBundleURL = CFBundleCopyBundleURL (refMainBundle); 
 	if (!refMainBundleURL)
 	{
-        DebugStr ("\x1eCould not copy main bundle URL");
+        DebugStr ("\x1e" "Could not copy main bundle URL");
 		return paramErr;
 	}
 	// create a URL that points to the app's directory

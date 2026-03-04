@@ -261,8 +261,8 @@ void Register(int fullscreen)
 	}
 	else{
 		DoError(StandardAlert(kAlertNoteAlert,
-		"\x26You have already registered this game.",
-		"\x15Thank you once again!",
+		"\x26" "You have already registered this game.",
+		"\x15" "Thank you once again!",
 		&alertParam,
 		&alertHit));
 	}

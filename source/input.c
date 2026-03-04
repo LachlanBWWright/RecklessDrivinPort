@@ -545,7 +545,7 @@ void GetHIDPress(int element,DialogPtr keyDlg,UInt8 *elements)
 			{
 				if(HIDGetElementValue(gController,gElements[i]))
 				{
-					Str255 text="\x0aButton XXX";
+					Str255 text="\x0a" "Button XXX";
 					GetDialogItem(keyDlg,element+4,&type,&item,&box);
 					elements[element]=i;
 					text[10]='0'+(elements[element]%10);
@@ -573,7 +573,7 @@ void ConfigureHID()
 		DoError(SetDialogCancelItem(keyDlg,3));
 		for(i=0;i<8;i++)
 		{
-			Str255 text="\x0aButton XXX";
+			Str255 text="\x0a" "Button XXX";
 			GetDialogItem(keyDlg,i+4,&type,&item,&box);
 			elements[i]=gPrefs.hidElements[i];
 			text[10]='0'+(elements[i]%10);
