@@ -236,12 +236,17 @@ jobs:
 
   # ============================================================
   # Create GitHub Release on push to main/master
+  # ------------------------------------------------------------
+  # The release job is currently disabled to prevent automated
+  # GitHub releases from being created during CI.
+  # To re-enable, restore the original `if` condition below.
   # ============================================================
   release:
     name: Create GitHub Release
     needs: [build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    # disabled by default
+    if: false
     permissions:
       contents: write
 
