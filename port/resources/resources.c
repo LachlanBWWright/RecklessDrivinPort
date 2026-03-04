@@ -121,16 +121,7 @@ void Pomme_InitResources(void)
         gResourceFile = fopen(RESOURCES_DAT_FALLBACK, "rb");
 #endif
     if (!gResourceFile) {
-        char cwd[4096];
-#ifdef _WIN32
-        _getcwd(cwd, sizeof(cwd));
-#else
-        getcwd(cwd, sizeof(cwd));
-#endif
         fprintf(stderr, "Fatal: could not open resources.dat\n");
-        fprintf(stderr, "  CWD: %s\n", cwd);
-        fprintf(stderr, "  Tried CWD path: %s\n", RESOURCES_DAT_PATH);
-        fprintf(stderr, "  Tried next to executable (open_resources_beside_exe)\n");
     }
 }
 
