@@ -20,6 +20,10 @@
 
 void ObjectPhysics(tObject *);
 
+#ifdef _MSC_VER
+#pragma function(abs)
+#endif
+
 int abs(int x)
 {
 	return x>=0?x:-x;
