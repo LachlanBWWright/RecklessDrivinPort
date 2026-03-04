@@ -526,16 +526,27 @@ void MoveObjects()
 	while(theObj!=gFirstObj)
 	{
 		tObject *next=(tObject*)theObj->next;
+		printf("LOG: MO-obj %p type=%p flags=0x%x flags2=0x%x isPlayer=%d\n",
+		       (void*)theObj, (void*)theObj->type,
+		       (unsigned)(*theObj->type).flags, (unsigned)(*theObj->type).flags2,
+		       (theObj==gPlayerObj)?1:0); fflush(stdout);
 		if((theObj==gPlayerObj)||!(gFrameCount%kLowCalcRatio)){
-			if(gFrameCount%(2*kLowCalcRatio))
-				ObjectControl(theObj,input);		
+			if(gFrameCount%(2*kLowCalcRatio)){
+				printf("LOG: MO-OC\n"); fflush(stdout);
+				ObjectControl(theObj,input);
+			}
+			printf("LOG: MO-OP\n"); fflush(stdout);
 			ObjectPhysics(theObj);
 			if(next->prev==theObj){
-				MoveObject(theObj);		
+				printf("LOG: MO-MO\n"); fflush(stdout);
+				MoveObject(theObj);
+				printf("LOG: MO-AO\n"); fflush(stdout);
 				AnimateObject(theObj);
 			}
 		}else{
-			MoveObject(theObj);		
+			printf("LOG: MO-MO2\n"); fflush(stdout);
+			MoveObject(theObj);
+			printf("LOG: MO-AO2\n"); fflush(stdout);
 			AnimateObject(theObj);
 		}
 		theObj=next;

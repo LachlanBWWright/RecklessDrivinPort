@@ -217,15 +217,22 @@ void StartGame(int lcheat)
 	{
 		const Uint8 *keys = SDL_GetKeyboardState(NULL);
 		int i;
-		for(i=0;i<=9;i++)
-			if(keys[SDL_SCANCODE_0+i])
+		for(i=1;i<=9;i++)
+			if(keys[SDL_SCANCODE_1+i-1])
 			{
-				gLevelID=(i==0)?9:i-1;
+				gLevelID=i-1;
 				if(gLevelID>=NumLevels())gLevelID=0;
 				lcheat=1;
 				printf("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
 				break;
 			}
+		if(!lcheat&&keys[SDL_SCANCODE_0])
+		{
+			gLevelID=9;
+			if(gLevelID>=NumLevels())gLevelID=0;
+			lcheat=1;
+			printf("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
+		}
 	}
 #else
 	if(lcheat)
