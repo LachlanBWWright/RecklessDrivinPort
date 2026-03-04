@@ -443,8 +443,10 @@ void BonusObject(tObject *theObj)
 int HandleCollision(tObject *posObj)
 {
 	tObject	*theObj=gFirstVisObj;
+	int hcIter=0;
 	while(theObj!=gLastVisObj)
 	{
+		if(++hcIter>10000){printf("LOG: HandleCollision infinite loop! posObj=%p theObj=%p gFirstVisObj=%p gLastVisObj=%p\n",(void*)posObj,(void*)theObj,(void*)gFirstVisObj,(void*)gLastVisObj);break;}
 		tObject *nextObj=(tObject*)theObj->next;
 		if(theObj!=posObj&&theObj!=posObj->shooter&&posObj!=theObj->shooter)
 		{

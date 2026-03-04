@@ -398,18 +398,21 @@ void ObjectPhysics(tObject *theObj)
 			ControlHeliObject(theObj);
 		if(theObj->type->flags2&kObjectMissile){
 			if(theObj->jumpHeight==0&&theObj->jumpVelo==0)
-				KillObject(theObj);}
+				{KillObject(theObj);return;}}
 		else if(fabs(theObj->pos.y-gCameraObj->pos.y)<kVisDist)
 		{
+			tObjectTypePtr savedType=theObj->type;
 			if(theObj->type->flags&kObjectBackCollFlag||theObj->type->flags2&kObjectSink&&(*gRoadInfo).deathOffs){
 				if(CalcBackCollision(theObj->pos)==2)
-					KillObject(theObj);}
+					{KillObject(theObj);return;}}
 			else if(theObj->type->flags2&kObjectFrontCollFlag){
 				if(CalcBackCollision(theObj->pos)==0)
-					KillObject(theObj);}
+					{KillObject(theObj);return;}}
 			if(theObj->type->flags&kObjectBounce)
 				if(HandleCollision(theObj))
 					return; /* theObj was killed; do not access it further */
+			if(theObj->type!=savedType)
+				return; /* type changed by collision; stop processing stale flags */
 			if(theObj->type->flags&kObjectCop)
 				if(!(gPlayerAddOns&kAddOnCop)&&!gFinishDelay&&!gPlayerDeathDelay)
 				{
@@ -420,7 +423,7 @@ void ObjectPhysics(tObject *theObj)
 					else if(theObj->control==kObjectDriveDown)
 					{
 						if(gPlayerObj->pos.y>theObj->pos.y+kStartChaseDist*kScale)
-							ObjectStartChase(theObj,kStartChaseDist*kScale,kStartChaseSpeed);			
+							ObjectStartChase(theObj,kStartChaseDist*kScale,kStartChaseSpeed);
 					}
 					else if(theObj->control==kObjectCopControl)
 						if(theObj->type->weaponObj)
@@ -439,7 +442,7 @@ void ObjectPhysics(tObject *theObj)
 					if(RanProb((theObj->damage-theObj->type->maxDamage)/(float)theObj->type->maxDamage*0.25))
 						Explosion(theObj->pos,theObj->velo,0,250,0);
 					if(theObj->damage>theObj->type->maxDamage*2)
-						KillObject(theObj);
+						{KillObject(theObj);return;}
 				}
 			}
 		}

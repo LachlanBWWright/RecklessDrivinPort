@@ -75,6 +75,9 @@ void DrawZoomedCharLine8(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
 			case kEndShapeToken:
 				stop=true;
 				break;
+			default:
+				stop=true;
+				break;
 		}
 	}	
 noDrawZoomed:
@@ -91,6 +94,9 @@ noDrawZoomed:
 				break;
 			case kLineStartToken:
 			case kEndShapeToken:
+				stop=true;
+				break;
+			default:
 				stop=true;
 				break;
 		}
@@ -140,6 +146,9 @@ void DrawCharLine8(UInt8 **data,SInt32 x,SInt32 y)
 			case kEndShapeToken:
 				stop=true;
 				break;
+			default:
+				stop=true;
+				break;
 		}
 	}
 	while (!stop);
@@ -157,6 +166,9 @@ noDraw:
 				break;
 			case kLineStartToken:
 			case kEndShapeToken:
+				stop=true;
+				break;
+			default:
 				stop=true;
 				break;
 		}
@@ -201,6 +213,9 @@ void DrawZoomedCharLine16(UInt8 **data,SInt32 x,SInt32 y,UInt32 zoom)
 			case kEndShapeToken:
 				stop=true;
 				break;
+			default:
+				stop=true;
+				break;
 		}
 	}	
 noDrawZoomed:
@@ -218,6 +233,9 @@ noDrawZoomed:
 				break;
 			case kLineStartToken:
 			case kEndShapeToken:
+				stop=true;
+				break;
+			default:
 				stop=true;
 				break;
 		}
@@ -262,6 +280,9 @@ void DrawCharLine16(UInt8 **data,SInt32 x,SInt32 y)
 			case kEndShapeToken:
 				stop=true;
 				break;
+			default:
+				stop=true;
+				break;
 		}
 	}
 	while (!stop);
@@ -280,6 +301,9 @@ noDraw:
 				break;
 			case kLineStartToken:
 			case kEndShapeToken:
+				stop=true;
+				break;
+			default:
 				stop=true;
 				break;
 		}
@@ -381,7 +405,20 @@ void DrawTextFXZoomed(float xDrawStart,float yDrawStart,float zoom)
 			baseX+=0.5*dt*dt*kEffectAccel;
 		for(ch=1;ch<=gTextFX[i].text[0];ch++)
 		{
-			Ptr theCH=GetSortedPackEntry(gPrefs.hiColor?kPackcR16:kPackcRLE,gTextFX[i].text[ch]-'A'+128,nil)+8;
+			int entryID=gTextFX[i].text[ch]-'A'+128;
+			Ptr theCH=GetSortedPackEntry(gPrefs.hiColor?kPackcR16:kPackcRLE,entryID,nil);
+			if(!theCH){
+				printf("LOG: DrawTextFX NULL entry pack=%d id=%d ch='%c'(%d)\n",
+				       gPrefs.hiColor?kPackcR16:kPackcRLE,entryID,gTextFX[i].text[ch],gTextFX[i].text[ch]);
+				continue;
+			}
+			theCH+=8;
+			if((unsigned char)*theCH > 3){
+				printf("LOG: DrawTextFX bad token %d at ch=%d('%c') entryID=%d theCH=%p\n",
+				       (unsigned char)*theCH, ch, gTextFX[i].text[ch], entryID, (void*)theCH);
+				fflush(stdout);
+				continue;
+			}
 			float y=baseY;
 			for(line=0;line<kCharSize;line++)
 			{
@@ -390,7 +427,7 @@ void DrawTextFXZoomed(float xDrawStart,float yDrawStart,float zoom)
 					DrawZoomedCharLine(&theCH,(SInt32)(x*65536.0),y,(SInt32)(exploZoom*65536.0));
 				else
 					DrawCharLine(&theCH,(SInt32)(x),(SInt32)(y));
-				y+=exploZoom;				
+				y+=exploZoom;
 			}
 			baseX+=exploZoom*kCharSize;
 		}

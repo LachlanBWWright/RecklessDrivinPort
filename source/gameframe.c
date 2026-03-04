@@ -313,11 +313,14 @@ void GameFrame()
 		}
 	}
 #endif
+	printf("LOG: GF-A MoveObjects\n"); fflush(stdout);
 	MoveObjects();
+	printf("LOG: GF-B PlayerHandling\n"); fflush(stdout);
 	PlayerHandling();
 	gFrameCount++;
 	if(CheckFrameTime())
 	{
+		printf("LOG: GF-C RenderFrame\n"); fflush(stdout);
 		RenderFrame();
 		gGraphFrameCount++;
 		CheckTimeSkip();

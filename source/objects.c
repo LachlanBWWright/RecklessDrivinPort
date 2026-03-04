@@ -311,14 +311,29 @@ void KillObject(tObject *theObj)
 		RemoveObject(theObj);
 		return;
 	}
-	theObj->type=(tObjectTypePtr)GetUnsortedPackEntry(kPackObTy,(*objType).deathObj+(sinkEnable?gRoadInfo->deathOffs:0),0);
+	{
+		int deathID=(*objType).deathObj+(sinkEnable?gRoadInfo->deathOffs:0);
+		printf("LOG: KillObject deathObj transform id=%d\n", deathID);
+		theObj->type=(tObjectTypePtr)GetUnsortedPackEntry(kPackObTy,deathID,0);
+	}
 	if(!theObj->type)
 	{
+		printf("LOG: KillObject deathObj type NULL, removing\n");
 		RemoveObject(theObj);
 		return;
 	}
 	theObj->layer=(*theObj->type).flags2>>5&3;
-	objType=theObj->type;		
+	objType=theObj->type;
+	printf("LOG: KillObject deathObj success flags=0x%x flags2=0x%x frame=%d numFrames=%d frameDur=%f deathObj2=%d\n",
+	       (unsigned)(*objType).flags, (unsigned)(*objType).flags2,
+	       (int)(*objType).frame, (int)(*objType).numFrames, (*objType).frameDuration,
+	       (int)(*objType).deathObj);
+	{
+		unsigned char *raw=(unsigned char*)objType;
+		printf("LOG: KillObject raw bytes (first 40): ");
+		for(int b=0;b<40;b++) printf("%02x ",raw[b]);
+		printf("\n");
+	}
 	if((*objType).flags&kObjectRandomFrameFlag)
 		theObj->frame=(*objType).frame+RanInt(0,(*theObj->type).numFrames);
 	else
@@ -343,8 +358,8 @@ void GetVisObjs()
 {
 	tObject	*theObj=(tObject*)gFirstObj->next;
 	int minVis=gCameraObj->pos.y-kVisDist;
-	int maxVis=gCameraObj->pos.y+kVisDist;	
-	while(theObj->pos.y<minVis)
+	int maxVis=gCameraObj->pos.y+kVisDist;
+	while(theObj->pos.y<minVis&&theObj!=gFirstObj)
 		theObj=(tObject*)theObj->next;
 	gFirstVisObj=theObj;
 	while(theObj->pos.y<maxVis&&theObj!=gFirstObj)
@@ -525,5 +540,7 @@ void MoveObjects()
 		}
 		theObj=next;
 	}
+	printf("LOG: MO-sort\n"); fflush(stdout);
 	SortObjects();
+	printf("LOG: MO-done\n"); fflush(stdout);
 }

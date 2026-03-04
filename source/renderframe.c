@@ -719,10 +719,15 @@ void RenderFrame()
 		DrawMarksZoomed(xDrawStart,yDrawStart,zoom);
 		DrawTracksZoomed(xDrawStart,yDrawStart,zoom);
 	}
-	DrawParticleFXZoomed(xDrawStart,yDrawStart,zoom,0);	
+	DrawParticleFXZoomed(xDrawStart,yDrawStart,zoom,0);
+	printf("LOG: RF-sprites\n"); fflush(stdout);
 	DrawSpritesZoomed(xDrawStart,yDrawStart,zoom);
-	DrawParticleFXZoomed(xDrawStart,yDrawStart,zoom,1);	
+	printf("LOG: RF-pfx\n"); fflush(stdout);
+	DrawParticleFXZoomed(xDrawStart,yDrawStart,zoom,1);
+	printf("LOG: RF-text\n"); fflush(stdout);
 	DrawTextFXZoomed(xDrawStart,yDrawStart,zoom);
+	printf("LOG: RF-textdone\n"); fflush(stdout);
+	printf("LOG: RF-panel\n"); fflush(stdout);
 	if(DrawPanel())
 		if(preSpecBlit!=gScreenBlitSpecial)
 			RenderFrame();
