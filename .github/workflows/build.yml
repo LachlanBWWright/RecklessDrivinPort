@@ -107,6 +107,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_INSTALLATION_ROOT }}/installed
+          key: vcpkg-x64-windows-static-sdl2-${{ runner.os }}
+
       - name: Install SDL2 via vcpkg (static)
         run: |
           vcpkg install sdl2:x64-windows-static

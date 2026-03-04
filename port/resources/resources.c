@@ -20,7 +20,8 @@
 #include <stdint.h>
 
 #ifdef _WIN32
-#include <direct.h>  /* _pgmptr */
+#include <windows.h>
+#include <direct.h>
 #elif defined(__linux__)
 #include <unistd.h>
 #include <limits.h>
@@ -41,9 +42,9 @@ static FILE *open_resources_beside_exe(void)
     dir[0] = '\0';
 
 #ifdef _WIN32
-    /* Use _pgmptr which is set by the CRT to the exe path */
-    if (!_pgmptr || strlen(_pgmptr) >= sizeof(dir)) return NULL;
-    strcpy(dir, _pgmptr);
+    /* Use GetModuleFileName - more reliable than _pgmptr with static CRT */
+    DWORD len = GetModuleFileNameA(NULL, dir, (DWORD)sizeof(dir));
+    if (len == 0 || len >= sizeof(dir)) return NULL;
 #elif defined(__linux__)
     ssize_t len = readlink("/proc/self/exe", dir, sizeof(dir) - 1);
     if (len <= 0) return NULL;
@@ -112,6 +113,8 @@ void Pomme_InitResources(void)
 #endif
     if (!gResourceFile) {
         fprintf(stderr, "Fatal: could not open resources.dat\n");
+        fprintf(stderr, "  Tried CWD path: %s\n", RESOURCES_DAT_PATH);
+        fprintf(stderr, "  Also tried next to executable.\n");
     }
 }
 
