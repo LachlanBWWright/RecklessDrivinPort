@@ -178,6 +178,13 @@ void LoadPrefs()
 	}
 	if(gOSX)
 		gPrefs.lineSkip=false;
+#ifdef PORT_SDL2
+	/* 16-bit (hi-color) road rendering is broken in the SDL2 port.
+	 * Force 8-bit mode regardless of saved prefs so the road never
+	 * glitches on the right side of the screen. */
+	gPrefs.hiColor = 0;
+	printf("LOG: prefs loaded – hiColor forced to 0 (8-bit road mode)\n");
+#endif
 }
 
 void WritePrefs(int reset)

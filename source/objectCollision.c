@@ -491,6 +491,8 @@ int HandleCollision(tObject *posObj)
 						}
 					}
 					if(theObjFlags&kObjectKillsCars){
+						printf("LOG: HandleCollision – posObj killed by kObjectKillsCars (posObj=%p)\n",
+						       (void*)posObj);
 						KillObject(posObj);
 						return 1; /* posObj may be freed; caller must not use posObj */
 					}

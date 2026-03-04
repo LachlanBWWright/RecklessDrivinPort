@@ -209,9 +209,11 @@ endif()
 add_executable(reckless_drivin ${GAME_SOURCES})
 
 target_link_libraries(reckless_drivin
+    -Wl,--start-group
     mac_stubs
     game_resources
     lzrw
+    -Wl,--end-group
     m   # libm for math functions
 )
 

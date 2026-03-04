@@ -195,6 +195,7 @@ void GetLevelNumber()
 
 void StartGame(int lcheat)
 {
+	printf("LOG: StartGame called (lcheat=%d)\n", lcheat);
 	DisposeInterface();
 	gPlayerLives=3;
 	gExtraLives=0;

@@ -454,6 +454,30 @@ void Blit2Screen(void) {
     if (!s_renderer || !s_texture || !s_rgb_surface || !s_back_buffer)
         return;
 
+    /* 144 fps cap: drop frames that arrive too soon after the previous one.
+     * The game logic already runs at 60 fps (kCalcFPS=60) so this guard is a
+     * safety net in case the render loop ever runs faster than intended. */
+#define BLIT2SCREEN_MIN_MS (1000 / 144)   /* ~6 ms */
+    {
+        static Uint32 s_last_blit_ms = 0;
+        Uint32 now_ms = SDL_GetTicks();
+        if (s_last_blit_ms && (now_ms - s_last_blit_ms) < BLIT2SCREEN_MIN_MS) {
+            /* Too soon – skip this present to stay within 144 fps */
+            return;
+        }
+        s_last_blit_ms = now_ms;
+    }
+#undef BLIT2SCREEN_MIN_MS
+
+    /* Log first render frame */
+    {
+        static int s_first_blit = 1;
+        if (s_first_blit) {
+            printf("LOG: first Blit2Screen – gRowBytes=%d gXSize=%d gYSize=%d\n",
+                   gRowBytes, gXSize, gYSize);
+            s_first_blit = 0;
+        }
+    }
     if (gRowBytes == gXSize) {
         /* ---- 8-bit indexed path ---- */
         if (!s_surface) return;
@@ -1070,12 +1094,19 @@ static void voice_play_buffer(SndVoice *v, const uint8_t *snd_hdr) {
         v->active      = 1;
     } else if (encode == 0xFF) {
         /* extSH: sample data begins at offset 64.
-         * sampleSize (big-endian uint16) at bytes 44-45 gives bits per sample. */
-        uint16_t sample_size = ((uint16_t)snd_hdr[44] << 8) | snd_hdr[45];
+         * numFrames (big-endian uint32) at bytes 22-25 is the frame count.
+         * sampleSize (big-endian uint16) at bytes 48-49 gives bits per sample.
+         * Note: offset 4 is numChannels (not a usable frame count), and
+         * offset 44 is AESRecording (not sampleSize) — do not read from there. */
+        uint32_t num_frames  = ((uint32_t)snd_hdr[22]<<24)|((uint32_t)snd_hdr[23]<<16)|
+                               ((uint32_t)snd_hdr[24]<<8 )|snd_hdr[25];
+        uint16_t sample_size = ((uint16_t)snd_hdr[48] << 8) | snd_hdr[49];
         v->samples     = (const uint8_t *)(snd_hdr + 64);
-        v->num_samples = length; /* numFrames, same field as stdSH length */
+        v->num_samples = num_frames;
         v->is16bit     = (sample_size == 16) ? 1 : 0;
         v->active      = 1;
+        printf("LOG: extSH sound: numFrames=%u sampleSize=%u is16bit=%d rate=%.1fHz\n",
+               num_frames, sample_size, v->is16bit, src_rate);
     } else {
         /* cmpSH or other - not supported */
         v->is16bit = 0;

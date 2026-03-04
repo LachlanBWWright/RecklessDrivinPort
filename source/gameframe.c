@@ -104,6 +104,7 @@ void CopClear()
 void ResurrectPlayer()
 {
 	int i;
+	printf("LOG: ResurrectPlayer called (lives=%d)\n", gPlayerLives);
 	for(i=0;(i<gTrackUp->num)&&(gTrackUp->track[i].y<gPlayerObj->pos.y);i++);
 	gPlayerObj=NewObject(gFirstObj,gRoadInfo->water?kNormalPlayerBoatID:gPlayerCarID);
 	gPlayerObj->pos.x=gTrackUp->track[i-1].x;
@@ -294,6 +295,11 @@ void PlayerHandling()
 void GameFrame()
 {
 #ifdef PORT_SDL2
+	/* Log every 180 frames (~3 seconds) so user can see the game is running */
+	if (gFrameCount % 180 == 0) {
+		printf("LOG: GameFrame count=%lu graphFrames=%lu\n",
+		       gFrameCount, gGraphFrameCount);
+	}
 	/* Throttle game-logic to real-time so gFrameCount cannot race arbitrarily
 	 * far ahead of optFrameCount.  Without this guard a vsync-less renderer can
 	 * increment gFrameCount thousands of times per second, forcing CheckTimeSkip

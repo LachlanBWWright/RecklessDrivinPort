@@ -263,6 +263,9 @@ void KillObject(tObject *theObj)
 {
 	tObjectTypePtr objType=theObj->type;
 	int sinkEnable=CalcBackCollision(theObj->pos)==2&&(*objType).flags2&kObjectSink;
+	printf("LOG: KillObject obj=%p isPlayer=%d deathObj=%d frame=%d\n",
+	       (void*)theObj, (theObj==gPlayerObj)?1:0,
+	       (int)(*objType).deathObj, (int)theObj->frame);
 	if(theObj==gPlayerObj)
 	{
 		if(!gFinishDelay&&!(gPlayerDeathDelay!=0)&&gPlayerLives)
