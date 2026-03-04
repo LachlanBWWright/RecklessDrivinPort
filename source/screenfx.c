@@ -251,6 +251,7 @@ void GameOverAnim()
 		DrawSprite(kGameOverSprite,xPos,yPos,dir,size);
 		if(t>kFadeStart)
 			FadeScreen(256-(t-kFadeStart)/(kAnimDuration-kFadeStart)*256+256);
+		Blit2Screen();
 	}while(t<kAnimDuration);
 	gBaseAddr=oldBaseAddr;
 	gRowBytes=oldRowBytes;
