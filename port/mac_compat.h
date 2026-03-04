@@ -892,4 +892,16 @@ Nanoseconds  AbsoluteToNanoseconds(AbsoluteTime a);
 
 #endif /* MAC_COMPAT_APPLE_NATIVE */
 
+/* -----------------------------------------------------------------------
+ * LOG_DEBUG – diagnostic printf guarded by the DEBUG preprocessor symbol.
+ * Define DEBUG at compile time (e.g. -DDEBUG) to enable all LOG: output.
+ * In release builds these expand to nothing so no output is produced.
+ * ----------------------------------------------------------------------- */
+#ifdef DEBUG
+#  include <stdio.h>
+#  define LOG_DEBUG(...) printf(__VA_ARGS__)
+#else
+#  define LOG_DEBUG(...) ((void)0)
+#endif
+
 #endif /* MAC_COMPAT_H */

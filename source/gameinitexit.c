@@ -198,7 +198,7 @@ void GetLevelNumber()
 
 void StartGame(int lcheat)
 {
-	printf("LOG: StartGame called (lcheat=%d)\n", lcheat);
+	LOG_DEBUG("LOG: StartGame called (lcheat=%d)\n", lcheat);
 	DisposeInterface();
 	gPlayerLives=3;
 	gExtraLives=0;
@@ -223,7 +223,7 @@ void StartGame(int lcheat)
 				gLevelID=i-1;
 				if(gLevelID>=NumLevels())gLevelID=0;
 				lcheat=1;
-				printf("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
+				LOG_DEBUG("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
 				break;
 			}
 		if(!lcheat&&keys[SDL_SCANCODE_0])
@@ -231,7 +231,7 @@ void StartGame(int lcheat)
 			gLevelID=9;
 			if(gLevelID>=NumLevels())gLevelID=0;
 			lcheat=1;
-			printf("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
+			LOG_DEBUG("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
 		}
 	}
 #else

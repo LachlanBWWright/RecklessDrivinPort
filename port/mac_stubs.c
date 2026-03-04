@@ -1532,14 +1532,14 @@ OSErr StandardAlert(AlertType alertType, const char *error, const char *explanat
     if (alertType == 0)      typeStr = "STOP";
     else if (alertType == 1) typeStr = "NOTE";
     else if (alertType == 2) typeStr = "CAUTION";
-    printf("[%s] %s\n       %s\n", typeStr,
+    LOG_DEBUG("[%s] %s\n       %s\n", typeStr,
            error ? error : "", explanation ? explanation : "");
     if (itemHit) *itemHit = 1;
     return 0;
 }
 
 short StopAlert(short alertID, void *filterProc) {
-    printf("[StopAlert %d]\n", alertID);
+    LOG_DEBUG("[StopAlert %d]\n", alertID);
     return 1;
 }
 
@@ -1603,13 +1603,13 @@ OSErr Gestalt(OSType selector, SInt32 *response) {
 
 #ifndef PORT_SDL2
 void ExitToShell(void) {
-    printf("[ExitToShell]\n");
+    LOG_DEBUG("[ExitToShell]\n");
     exit(0);
 }
 #endif
 
 void DebugStr(const char *debuggerMsg) {
-    printf("[DebugStr] %s\n", debuggerMsg ? debuggerMsg : "");
+    LOG_DEBUG("[DebugStr] %s\n", debuggerMsg ? debuggerMsg : "");
 }
 
 #ifndef PORT_SDL2

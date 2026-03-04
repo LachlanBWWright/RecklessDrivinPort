@@ -4,14 +4,13 @@ on:
   push:
     branches: [ "**" ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 permissions:
-  contents: read
+  contents: write    # needed to create releases
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment to GitHub Pages
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -35,23 +34,91 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y cmake gcc libsdl2-dev
 
-      - name: Configure CMake (SDL2 backend)
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
+      - name: Configure CMake (SDL2 backend, Release)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
 
       - name: Build
-        run: |
-          cmake --build build --parallel
+        run: cmake --build build --parallel
 
       - name: Check binary exists
-        run: |
-          test -f build/reckless_drivin && echo "Build succeeded: $(file build/reckless_drivin)"
+        run: test -f build/reckless_drivin && echo "Build succeeded: $(file build/reckless_drivin)"
 
-      - name: Upload Linux build artifact
+      - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: reckless-drivin-linux-sdl2
+          name: reckless-drivin-linux
           path: build/reckless_drivin
+          if-no-files-found: error
+
+  # ============================================================
+  # macOS native build (SDL2 via Homebrew)
+  # ============================================================
+  build-macos:
+    name: Build on macOS (SDL2)
+    runs-on: macos-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SDL2
+        run: brew install sdl2
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Check binary exists
+        run: test -f build/reckless_drivin && echo "Build succeeded"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reckless-drivin-macos
+          path: build/reckless_drivin
+          if-no-files-found: error
+
+  # ============================================================
+  # Windows native build (SDL2 via vcpkg)
+  # ============================================================
+  build-windows:
+    name: Build on Windows (SDL2)
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SDL2 via vcpkg
+        run: |
+          vcpkg install sdl2:x64-windows
+          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Configure CMake
+        run: |
+          cmake -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DPORT_SDL2=ON `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Check binary exists
+        run: Test-Path build\Release\reckless_drivin.exe
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reckless-drivin-windows
+          path: build/Release/reckless_drivin.exe
           if-no-files-found: error
 
   # ============================================================
@@ -83,25 +150,28 @@ jobs:
             -DPORT_SDL2=ON
 
       - name: Build WASM
-        run: |
-          cmake --build build_wasm --parallel
+        run: cmake --build build_wasm --parallel
 
       - name: List WASM outputs
         run: ls -lh build_wasm/
 
-      - name: Prepare GitHub Pages content
+      - name: Prepare GitHub Pages content (Angular + WASM)
         run: |
           mkdir -p gh-pages
-          # Copy WASM build outputs
-          cp build_wasm/reckless_drivin.js  gh-pages/ 2>/dev/null || true
+          # Copy WASM game files
+          cp build_wasm/reckless_drivin.js   gh-pages/ 2>/dev/null || true
           cp build_wasm/reckless_drivin.wasm gh-pages/ 2>/dev/null || true
           cp build_wasm/reckless_drivin.data gh-pages/ 2>/dev/null || true
-          # The shell.html becomes index.html
-          # (Emscripten may have generated it from the --shell-file, but check)
-          if [ -f build_wasm/reckless_drivin.html ]; then
-            cp build_wasm/reckless_drivin.html gh-pages/index.html
+          # Copy Angular site (pre-built static files from port/angular-site/)
+          if [ -d port/angular-site/dist ]; then
+            cp -r port/angular-site/dist/. gh-pages/
           else
-            cp port/wasm/shell.html gh-pages/index.html
+            # Fallback: use shell.html as index
+            if [ -f build_wasm/reckless_drivin.html ]; then
+              cp build_wasm/reckless_drivin.html gh-pages/index.html
+            else
+              cp port/wasm/shell.html gh-pages/index.html
+            fi
           fi
           echo "Pages content:"
           ls -lh gh-pages/
@@ -119,7 +189,7 @@ jobs:
           path: gh-pages/
 
   # ============================================================
-  # Deploy to GitHub Pages (only on push to master/main)
+  # Deploy to GitHub Pages (push to main/master only)
   # ============================================================
   deploy-pages:
     name: Deploy to GitHub Pages
@@ -137,3 +207,60 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # ============================================================
+  # Create GitHub Release on push to main/master
+  # ============================================================
+  release:
+    name: Create GitHub Release
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: reckless-drivin-linux
+          path: release/linux
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: reckless-drivin-macos
+          path: release/macos
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: reckless-drivin-windows
+          path: release/windows
+
+      - name: Prepare release assets
+        run: |
+          chmod +x release/linux/reckless_drivin
+          chmod +x release/macos/reckless_drivin
+          cd release/linux  && zip -9 ../reckless-drivin-linux.zip reckless_drivin
+          cd release/macos  && zip -9 ../reckless-drivin-macos.zip reckless_drivin
+          cd release/windows && zip -9 ../reckless-drivin-windows.zip reckless_drivin.exe
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Reckless Drivin' – Latest Build"
+          body: |
+            Automated build from `${{ github.ref_name }}` @ `${{ github.sha }}`.
+
+            Download the binary for your platform and run it alongside the game's
+            `resources.dat` file (place it in the same directory).
+          prerelease: false
+          files: |
+            release/reckless-drivin-linux.zip
+            release/reckless-drivin-macos.zip
+            release/reckless-drivin-windows.zip

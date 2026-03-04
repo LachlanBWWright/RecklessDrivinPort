@@ -8,6 +8,12 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Build options
 # ============================================================
 option(PORT_SDL2 "Build with SDL2 backend (replaces Mac screen/input/time APIs)" ON)
+option(ENABLE_DEBUG_LOG "Enable LOG: diagnostic output (sets -DDEBUG)" OFF)
+
+if(ENABLE_DEBUG_LOG)
+    add_compile_definitions(DEBUG)
+    message(STATUS "Debug logging enabled (ENABLE_DEBUG_LOG=ON)")
+endif()
 
 # ============================================================
 # Compiler warnings - informational only during porting

@@ -381,7 +381,7 @@ void InitScreen(int unused) {
     sdl_set_depth(1);
 
     gScreenMode = kScreenSuspended;
-    printf("[SDL] InitScreen: %dx%d, rowBytes=%d\n", gXSize, gYSize, gRowBytes);
+    LOG_DEBUG("[SDL] InitScreen: %dx%d, rowBytes=%d\n", gXSize, gYSize, gRowBytes);
 }
 
 void ScreenMode(int mode) {
@@ -473,7 +473,7 @@ void Blit2Screen(void) {
     {
         static int s_first_blit = 1;
         if (s_first_blit) {
-            printf("LOG: first Blit2Screen – gRowBytes=%d gXSize=%d gYSize=%d\n",
+            LOG_DEBUG("LOG: first Blit2Screen – gRowBytes=%d gXSize=%d gYSize=%d\n",
                    gRowBytes, gXSize, gYSize);
             s_first_blit = 0;
         }
@@ -991,7 +991,7 @@ static void sdl_audio_open(void) {
     }
     s_audio_open = 1;
     SDL_PauseAudio(0);  /* start playback */
-    printf("[SDL] Audio opened: %d Hz, format=%d, ch=%d\n",
+    LOG_DEBUG("[SDL] Audio opened: %d Hz, format=%d, ch=%d\n",
            got.freq, got.format, got.channels);
 }
 
@@ -1105,7 +1105,7 @@ static void voice_play_buffer(SndVoice *v, const uint8_t *snd_hdr) {
         v->num_samples = num_frames;
         v->is16bit     = (sample_size == 16) ? 1 : 0;
         v->active      = 1;
-        printf("LOG: extSH sound: numFrames=%u sampleSize=%u is16bit=%d rate=%.1fHz\n",
+        LOG_DEBUG("LOG: extSH sound: numFrames=%u sampleSize=%u is16bit=%d rate=%.1fHz\n",
                num_frames, sample_size, v->is16bit, src_rate);
     } else {
         /* cmpSH or other - not supported */

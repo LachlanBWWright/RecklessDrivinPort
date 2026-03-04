@@ -364,7 +364,7 @@ void BonusObject(tObject *theObj)
 			switch(RanInt(0,8))
 			{
 				case 0:
-        printf("Addon: Lock triggered\n");
+        LOG_DEBUG("Addon: Lock triggered\n");
 					if(!(gPlayerAddOns&kAddOnLock))
 					{
 						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\x0eADDONShLOCKEDf"};
@@ -374,7 +374,7 @@ void BonusObject(tObject *theObj)
 					}
 					break;	
 				case 1:
-        printf("Addon: Mines triggered\n");
+        LOG_DEBUG("Addon: Mines triggered\n");
 					{
 						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x07MINESee"};
 						NewTextEffect(&fx);
@@ -383,7 +383,7 @@ void BonusObject(tObject *theObj)
 					}
 					break;	
 				case 2:
-        printf("Addon: Missiles triggered\n");
+        LOG_DEBUG("Addon: Missiles triggered\n");
 					{
 						tTextEffect fx={320,240,kEffectExplode,0,"\x09MISSILESe"};
 						NewTextEffect(&fx);
@@ -392,7 +392,7 @@ void BonusObject(tObject *theObj)
 					}
 					break;	
 				case 3:
-        printf("Addon: Spikes triggered\n");
+        LOG_DEBUG("Addon: Spikes triggered\n");
 					if(!(gPlayerAddOns&kAddOnSpikes))
 					{
 						tTextEffect fx={320,240,kEffectExplode,0,"\x07SPIKESe"};
@@ -402,7 +402,7 @@ void BonusObject(tObject *theObj)
 					}
 					break;
 				case 4:
-        printf("Addon: Police jammer triggered\n");
+        LOG_DEBUG("Addon: Police jammer triggered\n");
 					if(!(gPlayerAddOns&kAddOnCop))
 					{
 						tTextEffect fx={320,240,kEffectSinLines,0,"\x0dPOLICEhJAMMER"};
@@ -412,7 +412,7 @@ void BonusObject(tObject *theObj)
 					}
 					break;	
 				case 5:
-        printf("Addon: Turbo engine triggered\n");
+        LOG_DEBUG("Addon: Turbo engine triggered\n");
 					if(!(gPlayerAddOns&kAddOnTurbo))
 					{
 						tTextEffect fx={320,240,kEffectExplode,0,"\x0fTURBOhENGINEeee"};
@@ -422,7 +422,7 @@ void BonusObject(tObject *theObj)
 					}
 					break;	
 				case 6:
-        printf("Addon: Score award triggered\n");
+        LOG_DEBUG("Addon: Score award triggered\n");
 					{
 						tTextEffect fx={320,240,kEffectExplode,0,"\x0d][[[hAWARDEDf"};
 						NewTextEffect(&fx);
@@ -431,7 +431,7 @@ void BonusObject(tObject *theObj)
 					}
 					break;
 				case 7:
-        printf("Addon: Extra life triggered\n");
+        LOG_DEBUG("Addon: Extra life triggered\n");
 					{
 						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0cEXTRAhLIFEee"};
 						NewTextEffect(&fx);
@@ -454,7 +454,7 @@ int HandleCollision(tObject *posObj)
 	int hcIter=0;
 	while(theObj!=gLastVisObj)
 	{
-		if(++hcIter>10000){printf("LOG: HandleCollision infinite loop! posObj=%p theObj=%p gFirstVisObj=%p gLastVisObj=%p\n",(void*)posObj,(void*)theObj,(void*)gFirstVisObj,(void*)gLastVisObj);break;}
+		if(++hcIter>10000){LOG_DEBUG("LOG: HandleCollision infinite loop! posObj=%p theObj=%p gFirstVisObj=%p gLastVisObj=%p\n",(void*)posObj,(void*)theObj,(void*)gFirstVisObj,(void*)gLastVisObj);break;}
 		tObject *nextObj=(tObject*)theObj->next;
 		if(theObj!=posObj&&theObj!=posObj->shooter&&posObj!=theObj->shooter)
 		{
@@ -501,7 +501,7 @@ int HandleCollision(tObject *posObj)
 						}
 					}
 					if(theObjFlags&kObjectKillsCars){
-						printf("LOG: HandleCollision – posObj killed by kObjectKillsCars (posObj=%p)\n",
+						LOG_DEBUG("LOG: HandleCollision – posObj killed by kObjectKillsCars (posObj=%p)\n",
 						       (void*)posObj);
 						KillObject(posObj);
 						return 1; /* posObj may be freed; caller must not use posObj */

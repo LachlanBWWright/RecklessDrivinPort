@@ -414,13 +414,13 @@ void DrawTextFXZoomed(float xDrawStart,float yDrawStart,float zoom)
 			int entryID=gTextFX[i].text[ch]-'A'+128;
 			Ptr theCH=GetSortedPackEntry(gPrefs.hiColor?kPackcR16:kPackcRLE,entryID,nil);
 			if(!theCH){
-				printf("LOG: DrawTextFX NULL entry pack=%d id=%d ch='%c'(%d)\n",
+				LOG_DEBUG("LOG: DrawTextFX NULL entry pack=%d id=%d ch='%c'(%d)\n",
 				       gPrefs.hiColor?kPackcR16:kPackcRLE,entryID,gTextFX[i].text[ch],gTextFX[i].text[ch]);
 				continue;
 			}
 			theCH+=8;
 			if(TOKEN_TYPE((UInt8*)theCH) > 3){
-				printf("LOG: DrawTextFX bad token %d at ch=%d('%c') entryID=%d theCH=%p\n",
+				LOG_DEBUG("LOG: DrawTextFX bad token %d at ch=%d('%c') entryID=%d theCH=%p\n",
 				       TOKEN_TYPE((UInt8*)theCH), ch, gTextFX[i].text[ch], entryID, (void*)theCH);
 				fflush(stdout);
 				continue;

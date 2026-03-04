@@ -381,7 +381,7 @@ void DrawSprite(int id, float cx, float cy, float dir, float zoom)
 {
 	int idx = id - 128;
 	if (idx < 0 || idx >= kNumSprites + kNumSpecialSprites || !gSprites[idx]) {
-		printf("LOG: DrawSprite id=%d (idx=%d) – NULL or out-of-range sprite handle, skipping\n",
+		LOG_DEBUG("LOG: DrawSprite id=%d (idx=%d) – NULL or out-of-range sprite handle, skipping\n",
 		       id, idx);
 		return;
 	}
@@ -425,7 +425,7 @@ void DrawSpriteTranslucent(int id, float cx, float cy, float dir, float zoom)
 {
 	int idx = id - 128;
 	if (idx < 0 || idx >= kNumSprites + kNumSpecialSprites || !gSprites[idx]) {
-		printf("LOG: DrawSpriteTranslucent id=%d – NULL or out-of-range sprite, skipping\n", id);
+		LOG_DEBUG("LOG: DrawSpriteTranslucent id=%d – NULL or out-of-range sprite, skipping\n", id);
 		return;
 	}
 	tSpriteHeader *sprite=(tSpriteHeader*)*(gSprites[id-128]);
