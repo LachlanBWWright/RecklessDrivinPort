@@ -20,8 +20,7 @@
 #include <stdint.h>
 
 #ifdef _WIN32
-/* Only declare what we need to avoid Win32 name clashes with Mac stubs */
-__declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(void *hModule, char *lpFilename, unsigned long nSize);
+#include <direct.h>  /* _pgmptr */
 #elif defined(__linux__)
 #include <unistd.h>
 #include <limits.h>
@@ -42,8 +41,9 @@ static FILE *open_resources_beside_exe(void)
     dir[0] = '\0';
 
 #ifdef _WIN32
-    unsigned long len = GetModuleFileNameA(NULL, dir, sizeof(dir));
-    if (len == 0 || len >= sizeof(dir)) return NULL;
+    /* Use _pgmptr which is set by the CRT to the exe path */
+    if (!_pgmptr || strlen(_pgmptr) >= sizeof(dir)) return NULL;
+    strcpy(dir, _pgmptr);
 #elif defined(__linux__)
     ssize_t len = readlink("/proc/self/exe", dir, sizeof(dir) - 1);
     if (len <= 0) return NULL;
