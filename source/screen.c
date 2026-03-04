@@ -83,7 +83,7 @@ void FlushMessageBuffer()
 	gMessageCount=0;
 }
 
-void InitScreen()
+void InitScreen(int unused)
 {
 	DSpContextAttributes inDesiredAttributes;
 	SInt32 cpuSpeed;

@@ -21,7 +21,7 @@ extern Handle gTranslucenceTab,g16BitClut;
 extern UInt8 gLightningTab[kLightValues][256];
 extern int gScreenBlitSpecial;
 
-void InitScreen();
+void InitScreen(int);
 void SetScreenClut(int);
 void ScreenMode(int);
 void Blit2Screen();

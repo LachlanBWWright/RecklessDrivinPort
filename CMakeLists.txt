@@ -31,6 +31,7 @@ else()
         -Wno-unused-variable
         -Wno-unused-function
         -Wno-deprecated-declarations
+        -Wno-deprecated-non-prototype
         -Wno-format
     )
 endif()
@@ -214,14 +215,26 @@ endif()
 # ============================================================
 add_executable(reckless_drivin ${GAME_SOURCES})
 
-target_link_libraries(reckless_drivin
-    -Wl,--start-group
-    mac_stubs
-    game_resources
-    lzrw
-    -Wl,--end-group
-    m   # libm for math functions
-)
+if(NOT EMSCRIPTEN AND NOT APPLE AND NOT MSVC)
+    # GNU ld needs --start-group to resolve circular deps between static libs
+    target_link_libraries(reckless_drivin
+        -Wl,--start-group
+        mac_stubs
+        game_resources
+        lzrw
+        -Wl,--end-group
+        m
+    )
+else()
+    target_link_libraries(reckless_drivin
+        mac_stubs
+        game_resources
+        lzrw
+    )
+    if(NOT EMSCRIPTEN AND NOT MSVC)
+        target_link_libraries(reckless_drivin m)
+    endif()
+endif()
 
 # Link SDL2
 if(PORT_SDL2 AND NOT EMSCRIPTEN)
