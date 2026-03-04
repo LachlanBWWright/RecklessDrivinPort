@@ -24,7 +24,7 @@
 #define kMotorRunTime		0.3		//time in seconds for motor to reach maximum acceleration.
 #define kTrackIntensity		0.075	//Intensity of rubber Tracks left by cars.
 
-void HandleCollision(tObject *);
+int HandleCollision(tObject *);
 
 t2DPoint CalcWheelForce(float dir,float wheelPower,float fRoadFriction,float mass,float velo,t2DPoint vVelo,tObject *theObj,float *slide)
 {
@@ -408,7 +408,8 @@ void ObjectPhysics(tObject *theObj)
 				if(CalcBackCollision(theObj->pos)==0)
 					KillObject(theObj);}
 			if(theObj->type->flags&kObjectBounce)
-				HandleCollision(theObj);
+				if(HandleCollision(theObj))
+					return; /* theObj was killed; do not access it further */
 			if(theObj->type->flags&kObjectCop)
 				if(!(gPlayerAddOns&kAddOnCop)&&!gFinishDelay&&!gPlayerDeathDelay)
 				{

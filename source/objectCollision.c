@@ -440,7 +440,7 @@ void BonusObject(tObject *theObj)
 	KillObject(theObj);
 }
 
-void HandleCollision(tObject *posObj)
+int HandleCollision(tObject *posObj)
 {
 	tObject	*theObj=gFirstVisObj;
 	while(theObj!=gLastVisObj)
@@ -492,7 +492,7 @@ void HandleCollision(tObject *posObj)
 					}
 					if(theObjFlags&kObjectKillsCars){
 						KillObject(posObj);
-						return; /* posObj may be freed; stop iterating */
+						return 1; /* posObj may be freed; caller must not use posObj */
 					}
 					if(!theObjKilled&&(theObjFlags&kObjectKilledByCars)){
 						KillObject(theObj);
@@ -515,6 +515,7 @@ void HandleCollision(tObject *posObj)
 		}
 		theObj=nextObj;
 	}
+	return 0;
 }
 
 void ShotHitObject(tObject *theObj,t2DPoint *srcPoint,t2DPoint *shotPoint,t2DPoint *impactPoint)

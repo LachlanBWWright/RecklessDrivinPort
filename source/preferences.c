@@ -127,6 +127,10 @@ void FirstRun()
 	 * The Pref resources also have sound disabled by default; enable it here. */
 	gPrefs.sound       = 1;
 	gPrefs.engineSound = 1;
+	/* 16-bit textures/sprites are stored big-endian in the pack and are not
+	 * byte-swapped on little-endian platforms; force 8-bit mode to avoid
+	 * visual corruption (wrong-colour/striped road and sprite glitches). */
+	gPrefs.hiColor     = 0;
 	gPrefs.keyCodes[kForward]   = 0x7E; /* Up arrow */
 	gPrefs.keyCodes[kBackward]  = 0x7D; /* Down arrow */
 	gPrefs.keyCodes[kLeft]      = 0x7B; /* Left arrow */

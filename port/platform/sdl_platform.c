@@ -872,6 +872,9 @@ typedef struct SndVoice {
 
     /* Active flag */
     int active;
+
+    /* extSH 16-bit flag: samples contains big-endian int16 pairs */
+    int is16bit;
 } SndVoice;
 
 /* One mixer voice per SndChannel */
@@ -920,9 +923,16 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
                     break;
                 }
             }
-            /* 8-bit unsigned PCM (range 0-255) to signed int16: convert to signed by
-             * treating as uint8 (which is what Mac samples are), mapping 0-255 -> -128..127 */
-            int sample = (int)((uint8_t)v->samples[idx] - 128) * 256;
+            /* Convert sample to int16 for mixing */
+            int sample;
+            if (v->is16bit) {
+                /* extSH 16-bit big-endian signed PCM: swap bytes to get native int16 */
+                uint32_t byte_index = idx * 2;
+                sample = (int)(int16_t)(((uint16_t)v->samples[byte_index] << 8) | v->samples[byte_index + 1]);
+            } else {
+                /* stdSH / extSH 8-bit unsigned PCM: map 0-255 -> -32768..32512 */
+                sample = (int)((uint8_t)v->samples[idx] - 128) * 256;
+            }
             /* Apply volume */
             sample = (int)(sample * v->vol_l);
             /* Clamp and mix */
@@ -1056,13 +1066,20 @@ static void voice_play_buffer(SndVoice *v, const uint8_t *snd_hdr) {
         /* stdSH: 8-bit mono samples at offset 22 */
         v->samples     = (const uint8_t *)(snd_hdr + 22);
         v->num_samples = length;
+        v->is16bit     = 0;
         v->active      = 1;
     } else if (encode == 0xFF) {
-        /* extSH: 16-bit at offset 64 - not common in this game, skip for now */
-        v->active = 0;
+        /* extSH: sample data begins at offset 64.
+         * sampleSize (big-endian uint16) at bytes 44-45 gives bits per sample. */
+        uint16_t sample_size = ((uint16_t)snd_hdr[44] << 8) | snd_hdr[45];
+        v->samples     = (const uint8_t *)(snd_hdr + 64);
+        v->num_samples = length; /* numFrames, same field as stdSH length */
+        v->is16bit     = (sample_size == 16) ? 1 : 0;
+        v->active      = 1;
     } else {
         /* cmpSH or other - not supported */
-        v->active = 0;
+        v->is16bit = 0;
+        v->active  = 0;
     }
 }
 
