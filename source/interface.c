@@ -122,7 +122,7 @@ void DrawScreen(int button,GWorldPtr src)
 		MoveTo(10,15);
 		if(gLevelResFile)
 		{
-			DrawString("\x13Custom Level File: ");
+			DrawString("\x13" "Custom Level File: ");
 			DrawString(gLevelFileName);
 		}
 		ForeColor(blackColor);

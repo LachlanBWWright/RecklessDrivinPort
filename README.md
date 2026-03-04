@@ -43,6 +43,7 @@ The port uses stub functions that print `TODO: FunctionName` for unimplemented M
 ### Credit
 
 Special thanks to **Nathan Craddock** (https://nathancraddock.com/) for his detailed analysis and documentation of the Reckless Drivin' game internals, which greatly assisted this porting effort. His blog posts cover:
+
 - [Resource Forks and LZRW Compression](https://nathancraddock.com/blog/resource-forks-and-lzrw-compression/)
 - [Moving to Zig](https://nathancraddock.com/blog/moving-to-zig/)
 - [Decryption / Generating Registration Codes](https://nathancraddock.com/blog/decryption-generating-registration-codes/)
@@ -55,6 +56,7 @@ His open-source Zig port is at https://github.com/natecraddock/open-reckless-dri
 ### Port Status
 
 The game currently compiles to a native binary on Linux. The following systems still need full implementation:
+
 - [ ] Drawing / rendering (QuickDraw stubs → SDL2/OpenGL)
 - [ ] Sound output (SoundManager stubs → OpenAL/SDL_Mixer)
 - [ ] Input handling (InputSprocket stubs → SDL2 input)
@@ -62,3 +64,12 @@ The game currently compiles to a native binary on Linux. The following systems s
 - [ ] Resource Manager (partial — reads from resources.dat)
 - [ ] File/preferences system
 
+### GitHub Pages
+
+A workflow in `.github/workflows/build.yml` builds the WebAssembly version of the game and deploys it via the
+`actions/deploy-pages` action whenever `master` (or `main`) is pushed. Make sure the repository's Pages settings are
+configured to pull from **GitHub Actions**; otherwise the site might still be serving stale content from `/docs`.
+
+> **Note:** check _Settings → Pages_ in GitHub and ensure the `github-pages` environment has no protection rules that
+> require manual approval. If you prefer to serve from `/docs` you can remove the Actions deploy job entirely, but
+> the workflow will not automatically update that directory as part of the CI run.

@@ -23,8 +23,8 @@ MyOpenFile(FSSpec *myFSS)
 		short alertHit;
 
 		DoError(StandardAlert(kAlertStopAlert,
-			"\x54You cannot use custom level files using the unregistered version of Reckless Drivin'.",
-			"\x4fPlease pay the registration fee for Reckless Drivin to get rid of this message.",
+			"\x54" "You cannot use custom level files using the unregistered version of Reckless Drivin'.",
+			"\x4f" "Please pay the registration fee for Reckless Drivin to get rid of this message.",
 			&alertParam,
 			&alertHit));
 	}

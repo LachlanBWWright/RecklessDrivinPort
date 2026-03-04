@@ -46,7 +46,7 @@ inline void GetCallerName(Str255 callerName)
 	if(name)
 		BlockMoveData(*name,callerName,(*name)[0]+1);
 	else
-		BlockMoveData("\x13<Anonymous Routine>",callerName,20);
+		BlockMoveData("\x13" "<Anonymous Routine>",callerName,20);
 }
 #else
 /* On non-PPC platforms, caller name lookup is not available */
@@ -67,7 +67,7 @@ void HandleError(int id)
 	Str255 help;
 	AlertStdAlertParamRec alertParam={
 		false,false,nil,
-		"\x04Exit",
+		"\x04" "Exit",
 		nil,
 		nil,
 		kAlertStdAlertOKButton,
@@ -83,7 +83,7 @@ void HandleError(int id)
 	ShowCursor();
 	ScreenMode(kScreenSuspended);
 	err=StandardAlert(kAlertStopAlert,
-		"\x1cA fatal error has occured!!",
+		"\x1c" "A fatal error has occured!!",
 		idStr,
 		&alertParam,
 		&hit);

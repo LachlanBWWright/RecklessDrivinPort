@@ -202,7 +202,7 @@ void PlayerHandling()
 					SimplePlaySound(144);
 				if((int)gGameTime==(int)gLevelData->time)
 				{
-					tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x09TIMEhUPee"};
+					tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x09" "TIMEhUPee"};
 					NewTextEffect(&fx);
 					SimplePlaySound(149);
 				}
@@ -219,7 +219,7 @@ void PlayerHandling()
 		gDisplayScore=gPlayerScore;
 	if(gPlayerScore>(gExtraLives+1)*kExtraLiveScore)
 	{
-		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0cEXTRAhLIFEee"};
+		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0c" "EXTRAhLIFEee"};
 		NewTextEffect(&fx);
 		gExtraLives++;
 		gPlayerLives++;
@@ -230,7 +230,7 @@ void PlayerHandling()
 	if(gPlayerObj->pos.y>gLevelData->levelEnd)
 		if(!gPlayerDeathDelay)
 		{
-			tTextEffect fx={320,240,kEffectExplode,0,"\x0fLEVELhCOMPLETED"};
+			tTextEffect fx={320,240,kEffectExplode,0,"\x0f" "LEVELhCOMPLETED"};
 			NewTextEffect(&fx);
 			if(!gFinishDelay)
 				gFinishDelay=0.001;
