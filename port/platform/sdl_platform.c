@@ -129,7 +129,7 @@ static int touch_pos_to_keymask(float nx, float ny)
     if (ny < TC_ACT_MY) {
         /* Top weapon row */
         if (nx < TC_WPN_MX) return (1 << kFire);     /* MINE  */
-        return (1 << kMissile);                        /* ROCKET */
+        return (1 << kMissile);                        /* MISSILE */
     } else {
         /* Bottom movement row */
         if (nx < TC_GAS_MX) return (1 << kBrake);    /* BRAKE */
@@ -236,7 +236,7 @@ static void sdl_render_touch_overlay(void)
         s_touch_key_state[kFire] ? alpha_active : alpha_idle);
     tc_fill_rect(w, h, TC_ACT_L, TC_Y_TOP, TC_WPN_MX, TC_ACT_MY);
 
-    /* ---- Action zone: MISSILE / ROCKET (top-right of action area) ---- */
+    /* ---- Action zone: MISSILE (top-right of action area) ---- */
     SDL_SetRenderDrawColor(s_renderer, 200, 60, 200,
         s_touch_key_state[kMissile] ? alpha_active : alpha_idle);
     tc_fill_rect(w, h, TC_WPN_MX, TC_Y_TOP, 1.0f, TC_ACT_MY);
