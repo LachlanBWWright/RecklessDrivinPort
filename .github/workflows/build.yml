@@ -34,8 +34,8 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y cmake gcc libsdl2-dev
 
-      - name: Configure CMake (SDL2 backend, Release)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
+      - name: Configure CMake (SDL2 backend, static, Release)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON -DSDL2_STATIC=ON
 
       - name: Build
         run: cmake --build build --parallel
@@ -43,11 +43,17 @@ jobs:
       - name: Check binary exists
         run: test -f build/reckless_drivin && echo "Build succeeded"
 
+      - name: Prepare Linux bundle
+        run: |
+          mkdir -p bundle
+          cp build/reckless_drivin bundle/
+          cp port/resources/resources.dat bundle/
+
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: reckless-drivin-linux
-          path: build/reckless_drivin
+          path: bundle/
           if-no-files-found: error
 
   # ============================================================
@@ -66,8 +72,8 @@ jobs:
       - name: Install SDL2
         run: brew install sdl2
 
-      - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
+      - name: Configure CMake (static SDL2)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON -DSDL2_STATIC=ON
 
       - name: Build
         run: cmake --build build --parallel
@@ -75,11 +81,17 @@ jobs:
       - name: Check binary exists
         run: test -f build/reckless_drivin && echo "Build succeeded"
 
+      - name: Prepare macOS bundle
+        run: |
+          mkdir -p bundle
+          cp build/reckless_drivin bundle/
+          cp port/resources/resources.dat bundle/
+
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: reckless-drivin-macos
-          path: build/reckless_drivin
+          path: bundle/
           if-no-files-found: error
 
   # ============================================================
@@ -95,18 +107,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install SDL2 via vcpkg
+      - name: Install SDL2 via vcpkg (static)
         run: |
-          vcpkg install sdl2:x64-windows
+          vcpkg install sdl2:x64-windows-static
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Configure CMake
+      - name: Configure CMake (static SDL2)
         run: |
           cmake -B build `
             -DCMAKE_BUILD_TYPE=Release `
             -DPORT_SDL2=ON `
+            -DSDL2_STATIC=ON `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 
       - name: Build
         run: cmake --build build --config Release --parallel
@@ -114,11 +128,17 @@ jobs:
       - name: Check binary exists
         run: Test-Path build\Release\reckless_drivin.exe
 
+      - name: Prepare Windows bundle
+        run: |
+          New-Item -ItemType Directory -Force -Path bundle
+          Copy-Item build/Release/reckless_drivin.exe bundle/
+          Copy-Item port/resources/resources.dat bundle/
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: reckless-drivin-windows
-          path: build/Release/reckless_drivin.exe
+          path: bundle/
           if-no-files-found: error
 
   # ============================================================
@@ -245,9 +265,9 @@ jobs:
         run: |
           chmod +x release/linux/reckless_drivin
           chmod +x release/macos/reckless_drivin
-          (cd release/linux   && zip -9 ../reckless-drivin-linux.zip reckless_drivin)
-          (cd release/macos   && zip -9 ../reckless-drivin-macos.zip reckless_drivin)
-          (cd release/windows && zip -9 ../reckless-drivin-windows.zip reckless_drivin.exe)
+          (cd release/linux   && zip -9 ../reckless-drivin-linux.zip *)
+          (cd release/macos   && zip -9 ../reckless-drivin-macos.zip *)
+          (cd release/windows && zip -9 ../reckless-drivin-windows.zip *)
 
       - name: Create or update release
         uses: softprops/action-gh-release@v2
@@ -257,8 +277,7 @@ jobs:
           body: |
             Automated build from `${{ github.ref_name }}` @ `${{ github.sha }}`.
 
-            Download the binary for your platform and run it alongside the game's
-            `resources.dat` file (place it in the same directory).
+            Download the zip for your platform, extract, and run. All dependencies are included.
           prerelease: false
           files: |
             release/reckless-drivin-linux.zip

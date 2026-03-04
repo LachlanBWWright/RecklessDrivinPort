@@ -61,7 +61,12 @@ endif()
 # Resource file path
 # ============================================================
 set(RESOURCES_DAT "${CMAKE_SOURCE_DIR}/port/resources/resources.dat")
-add_compile_definitions(RESOURCES_DAT_PATH="${RESOURCES_DAT}")
+if(EMSCRIPTEN)
+    add_compile_definitions(RESOURCES_DAT_PATH="/resources.dat")
+else()
+    # Use relative path so the binary finds resources.dat next to itself
+    add_compile_definitions(RESOURCES_DAT_PATH="resources.dat")
+endif()
 
 # ============================================================
 # LZRW compression library
@@ -147,6 +152,9 @@ if(PORT_SDL2)
         set(SDL2_LDFLAGS "-s USE_SDL=2")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SDL2_CFLAGS}")
     else()
+        # Prefer static SDL2 for self-contained binaries
+        option(SDL2_STATIC "Link SDL2 statically" OFF)
+
         find_package(SDL2 QUIET)
         if(SDL2_FOUND)
             include_directories(${SDL2_INCLUDE_DIRS})
@@ -154,10 +162,17 @@ if(PORT_SDL2)
             # Try sdl2-config
             find_program(SDL2_CONFIG sdl2-config)
             if(SDL2_CONFIG)
-                execute_process(COMMAND ${SDL2_CONFIG} --cflags
-                    OUTPUT_VARIABLE SDL2_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-                execute_process(COMMAND ${SDL2_CONFIG} --libs
-                    OUTPUT_VARIABLE SDL2_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+                if(SDL2_STATIC)
+                    execute_process(COMMAND ${SDL2_CONFIG} --cflags
+                        OUTPUT_VARIABLE SDL2_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+                    execute_process(COMMAND ${SDL2_CONFIG} --static-libs
+                        OUTPUT_VARIABLE SDL2_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+                else()
+                    execute_process(COMMAND ${SDL2_CONFIG} --cflags
+                        OUTPUT_VARIABLE SDL2_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+                    execute_process(COMMAND ${SDL2_CONFIG} --libs
+                        OUTPUT_VARIABLE SDL2_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+                endif()
                 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SDL2_CFLAGS}")
             else()
                 message(WARNING "SDL2 not found; falling back to stub-only build (PORT_SDL2=OFF)")
@@ -205,8 +220,6 @@ if(EMSCRIPTEN)
     string(JOIN " " EMSCRIPTEN_FLAGS_STR ${EMSCRIPTEN_FLAGS})
 
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${EMSCRIPTEN_FLAGS_STR}")
-    # For WASM, update the resource path to the virtual FS
-    add_compile_definitions(RESOURCES_DAT_PATH="/resources.dat")
     message(STATUS "Building for WebAssembly (Emscripten)")
 endif()
 
@@ -238,10 +251,12 @@ endif()
 
 # Link SDL2
 if(PORT_SDL2 AND NOT EMSCRIPTEN)
-    if(SDL2_FOUND)
+    if(SDL2_STATIC AND TARGET SDL2::SDL2-static)
+        target_link_libraries(reckless_drivin SDL2::SDL2-static SDL2::SDL2main)
+    elseif(SDL2_FOUND)
         target_link_libraries(reckless_drivin ${SDL2_LIBRARIES})
     elseif(SDL2_LDFLAGS)
-        # Parse the flags and add them
+        # Parse the flags and add them (--static-libs if SDL2_STATIC)
         separate_arguments(SDL2_LDFLAGS_LIST UNIX_COMMAND "${SDL2_LDFLAGS}")
         target_link_libraries(reckless_drivin ${SDL2_LDFLAGS_LIST})
     endif()
