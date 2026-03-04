@@ -118,9 +118,10 @@ jobs:
           vcpkg install sdl2:x64-windows-static
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Configure CMake (static SDL2)
+      - name: Configure CMake (static SDL2, clang-cl)
         run: |
           cmake -B build `
+            -T ClangCL `
             -DCMAKE_BUILD_TYPE=Release `
             -DPORT_SDL2=ON `
             -DSDL2_STATIC=ON `
