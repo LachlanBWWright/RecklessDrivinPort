@@ -76,9 +76,10 @@ int CheckRegi()
 
 	/* Name must be at least 4 chars long for the key derivation to be valid */
 	if(upName[0]<4) {
-		/* Short/empty name: running as open-source port, mark as registered */
+		/* Short/empty name: running as open-source port, mark as registered.
+		 * Use the free registration key (name "Free", code "B3FB09B1EB"). */
 		gRegistered=true;
-		gKey=0;
+		gKey=0x1E42A71F;
 		return gRegistered;
 	}
 
@@ -87,9 +88,10 @@ int CheckRegi()
 	gKey=codeNum^*nameNum;
 	check=GetResource('Chck',128);
 	if(!check) {
-		/* 'Chck' resource not available - running in open-source port mode */
+		/* 'Chck' resource not available - running in open-source port mode.
+		 * Use the free registration key (name "Free", code "B3FB09B1EB"). */
 		gRegistered=true;
-		gKey=0;
+		gKey=0x1E42A71F;
 		return gRegistered;
 	}
 	gRegistered=CheckPack(kEncryptedPack,**((UInt32**)check));

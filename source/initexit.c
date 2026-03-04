@@ -104,6 +104,7 @@ void Init()
 	Randomize();
 	LoadPrefs();
 	gRegistered=true;  /* open-source port: always registered */
+	gKey=0x1E42A71F;  /* free registration key (name "Free", code "B3FB09B1EB") */
 	InitScreen(0);
 	ShowPicScreen(1003);
 	LoadPack(kPackSnds);

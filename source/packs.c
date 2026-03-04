@@ -34,11 +34,25 @@ static inline UInt32 PACK_OFFS(const tPackHeader *h) { return h->offs; }
 UInt32 CryptData(UInt32 *data,UInt32 len)
 {
 	UInt32 check=0;
+	/*
+	 * The encryption key and data are in big-endian (Mac) byte order.
+	 * The UInt32 XOR must produce the same byte pattern as on the
+	 * original big-endian Mac, so on little-endian we byte-swap the
+	 * key for the 4-byte XOR.  The tail-byte code uses explicit
+	 * shifts that already assume big-endian bit numbering (>>24 is
+	 * the most-significant / first byte), so it uses the original key.
+	 */
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	UInt32 xorKey = ((gKey & 0xFF000000u) >> 24) | ((gKey & 0x00FF0000u) >> 8) |
+	                ((gKey & 0x0000FF00u) <<  8) | ((gKey & 0x000000FFu) << 24);
+#else
+	UInt32 xorKey = gKey;
+#endif
 	data+=kUnCryptedHeader/4;
 	len-=kUnCryptedHeader;
 	while(len>=4)
 	{
-		*data^=gKey;
+		*data^=xorKey;
 		check+=*data;
 		data++;
 		len-=4;

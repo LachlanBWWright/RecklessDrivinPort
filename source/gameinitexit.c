@@ -111,8 +111,8 @@ int LoadLevel()
 	gTrackDown=(tTrackInfo*)((Ptr)gTrackUp+sizeof(UInt32)+gTrackUp->num*sizeof(tTrackInfoSeg));
 	gRoadLenght=(UInt32*)LoadObjs((Ptr)gTrackDown+sizeof(UInt32)+gTrackDown->num*sizeof(tTrackInfoSeg));
 	gRoadData=(tRoad)((Ptr)gRoadLenght+sizeof(UInt32));
-	
-	for(i=0;i<9;i++)
+
+	for(i=0;i<10;i++)
 		if((*gLevelData).objGrps[i].resID)
 			InsertObjectGroup((*gLevelData).objGrps[i]);
 
