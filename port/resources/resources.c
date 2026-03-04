@@ -20,8 +20,16 @@
 #include <stdint.h>
 
 #ifdef _WIN32
-#include <windows.h>
-#include <direct.h>
+/* Forward-declare only what we need - cannot include windows.h due to
+   name clashes with Mac compat layer (LineTo, SetRect, ShowWindow, etc.) */
+#ifdef __cplusplus
+extern "C" {
+#endif
+__declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(
+    void *hModule, char *lpFilename, unsigned long nSize);
+#ifdef __cplusplus
+}
+#endif
 #elif defined(__linux__)
 #include <unistd.h>
 #include <limits.h>
@@ -42,9 +50,10 @@ static FILE *open_resources_beside_exe(void)
     dir[0] = '\0';
 
 #ifdef _WIN32
-    /* Use GetModuleFileName - more reliable than _pgmptr with static CRT */
-    DWORD len = GetModuleFileNameA(NULL, dir, (DWORD)sizeof(dir));
-    if (len == 0 || len >= sizeof(dir)) return NULL;
+    {
+        unsigned long len = GetModuleFileNameA(NULL, dir, (unsigned long)sizeof(dir));
+        if (len == 0 || len >= sizeof(dir)) return NULL;
+    }
 #elif defined(__linux__)
     ssize_t len = readlink("/proc/self/exe", dir, sizeof(dir) - 1);
     if (len <= 0) return NULL;
