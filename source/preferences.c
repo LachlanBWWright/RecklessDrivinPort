@@ -29,18 +29,7 @@ extern int gOSX;
 
 short GetPrefsFile(FSSpec *spec)
 {
-	int err;
-	long dirID;
-	short vRef;
-	DoError(FindFolder(kOnSystemDisk,kPreferencesFolderType,kCreateFolder,&vRef,&dirID));
-	err=FSMakeFSSpec(vRef,dirID,"\x16Reckless Drivin' Prefs",spec);
-	if(err==fnfErr)
-	{
-		DoError(FSpCreate(spec,'????','pref',smSystemScript));
-		WritePrefs(true);
-	}
-	else 
-		DoError(err);
+	return 0;
 }
 
 void ReInitGraphics()
@@ -89,7 +78,7 @@ void FirstRun()
 		/* Default preferences for port - fallback when 'Pref' resource is unavailable */
 		memset(&gPrefs, 0, sizeof(tPrefs));
 		gPrefs.version = kPrefsVersion;
-		gPrefs.volume  = 100;
+		gPrefs.volume  = 256;
 		gPrefs.sound   = 1;
 		gPrefs.engineSound = 1;
 		gPrefs.hqSound = 0;
@@ -146,59 +135,11 @@ void FirstRun()
 
 void LoadPrefs()
 {
-	FSSpec spec;
-	short refNum;
-	long count=sizeof(tPrefs),eof;
-	OSErr err;
-	GetPrefsFile(&spec);
-	err=FSpOpenDF(&spec,fsRdWrPerm,&refNum);
-	if(err!=noErr) {
-		/* Prefs file not found or can't open - use defaults */
-		FirstRun();
-		return;
-	}
-	DoError(GetEOF(refNum,&eof));
-	if(eof==count)
-	{
-		DoError(FSRead(refNum,&count,&gPrefs));
-		DoError(FSClose(refNum));
-		if(gPrefs.version!=kPrefsVersion)
-			WritePrefs(true);
-	}
-	else if(eof<count){
-	 	FirstRun();
-		if(eof>0)
-			DoError(FSRead(refNum,&eof,&gPrefs));
-		gPrefs.version=kPrefsVersion;
-		DoError(FSClose(refNum));
-	}
-	else{
-		DoError(FSClose(refNum));
-		WritePrefs(true);
-	}
-	if(gOSX)
-		gPrefs.lineSkip=false;
-#ifdef PORT_SDL2
-	/* 16-bit (hi-color) road rendering is broken in the SDL2 port.
-	 * Force 8-bit mode regardless of saved prefs so the road never
-	 * glitches on the right side of the screen. */
-	gPrefs.hiColor = 0;
-	printf("LOG: prefs loaded – hiColor forced to 0 (8-bit road mode)\n");
-#endif
+	FirstRun();
 }
 
 void WritePrefs(int reset)
 {
-	FSSpec spec;
-	short refNum;
-	long count=sizeof(tPrefs);
-	GetPrefsFile(&spec);
-	if(reset)
-		FirstRun();
-	DoError(FSpOpenDF(&spec,fsRdWrPerm,&refNum));
-	DoError(SetEOF(refNum,sizeof(tPrefs)));
-	DoError(FSWrite(refNum,&count,&gPrefs));
-	DoError(FSClose(refNum));
 }
 
 void DeactivateSubControls(ControlHandle cnt)
