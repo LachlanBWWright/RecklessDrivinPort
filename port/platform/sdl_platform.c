@@ -63,6 +63,150 @@ static UInt8 *s_back_buffer = NULL;
 /* Declared in gameinitexit.c - true while the game level is active */
 extern int gGameOn;
 
+/* ============================================================
+ * On-screen touch controls (Android / touch-screen devices)
+ *
+ * Layout (landscape):
+ *   ┌──────────┬──────────────────┬──────────┐
+ *   │          │   (top centre)   │          │
+ *   │  LEFT    │   [tap = fire]   │  RIGHT   │
+ *   │  STEER   ├──────────────────┤  STEER   │
+ *   │          │    GAS/FORWARD   │          │
+ *   └──────────┴──────────────────┴──────────┘
+ *
+ * kLeft    = left 30% of screen (full height)
+ * kRight   = right 30% of screen (full height)
+ * kForward = centre 40%, bottom 50%
+ * kFire    = centre 40%, top 50%
+ * ============================================================ */
+
+#define TOUCH_MAX_FINGERS 10
+#define TOUCH_ZONE_LEFT_MAX   0.30f   /* nx < this → left steer */
+#define TOUCH_ZONE_RIGHT_MIN  0.70f   /* nx > this → right steer */
+#define TOUCH_ZONE_GAS_Y      0.50f   /* ny > this (in centre) → gas */
+
+static struct {
+    int          active;
+    SDL_FingerID finger_id;
+    int          key_mask;   /* bitmask, bit k = kForward/kLeft/etc. */
+} s_touch_fingers[TOUCH_MAX_FINGERS];
+
+/* Per-key virtual state accumulated from all active fingers */
+static int s_touch_key_state[kNumElements];
+
+/* Non-zero once the first touch event is received (enables overlay) */
+static int s_touch_controls_active = 0;
+
+/* Returns the bitmask of game keys activated by a normalised touch at (nx,ny) */
+static int touch_pos_to_keymask(float nx, float ny)
+{
+    if (nx < TOUCH_ZONE_LEFT_MAX)    return (1 << kLeft);
+    if (nx > TOUCH_ZONE_RIGHT_MIN)   return (1 << kRight);
+    /* centre zone */
+    if (ny > TOUCH_ZONE_GAS_Y)       return (1 << kForward);
+    return (1 << kFire);
+}
+
+/* Process one SDL finger event; down=1 for FINGERDOWN/MOTION, 0 for FINGERUP */
+static void sdl_touch_finger_event(SDL_FingerID finger_id, float nx, float ny, int down)
+{
+    int i, slot = -1;
+    int combined;
+
+    /* Find existing or free slot */
+    for (i = 0; i < TOUCH_MAX_FINGERS; i++) {
+        if (s_touch_fingers[i].active && s_touch_fingers[i].finger_id == finger_id) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0 && down) {
+        for (i = 0; i < TOUCH_MAX_FINGERS; i++) {
+            if (!s_touch_fingers[i].active) { slot = i; break; }
+        }
+    }
+    if (slot < 0) return;
+
+    if (!down) {
+        s_touch_fingers[slot].active   = 0;
+        s_touch_fingers[slot].key_mask = 0;
+    } else {
+        s_touch_fingers[slot].active    = 1;
+        s_touch_fingers[slot].finger_id = finger_id;
+        s_touch_fingers[slot].key_mask  = touch_pos_to_keymask(nx, ny);
+    }
+
+    /* Rebuild per-key state from all active fingers */
+    combined = 0;
+    for (i = 0; i < TOUCH_MAX_FINGERS; i++)
+        combined |= s_touch_fingers[i].key_mask;
+    for (i = 0; i < kNumElements; i++)
+        s_touch_key_state[i] = (combined >> i) & 1;
+
+    s_touch_controls_active = 1;
+}
+
+/*
+ * SDL_Platform_GetTouchKey – query the on-screen touch state for a given
+ * game-control element (kLeft, kRight, kForward, kFire, …).
+ * Returns non-zero if the touch control is currently "pressed".
+ */
+int SDL_Platform_GetTouchKey(int element)
+{
+    if (element < 0 || element >= kNumElements) return 0;
+    return s_touch_key_state[element];
+}
+
+/* Draw the semi-transparent touch control overlay over the rendered frame */
+static void sdl_render_touch_overlay(void)
+{
+    SDL_Rect r;
+    int w = gXSize, h = gYSize;
+    Uint8 alpha_idle   = 40;   /* when button not pressed */
+    Uint8 alpha_active = 110;  /* when button pressed */
+
+    if (!s_renderer) return;
+    SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_BLEND);
+
+    /* LEFT button */
+    SDL_SetRenderDrawColor(s_renderer, 80, 160, 255,
+        s_touch_key_state[kLeft] ? alpha_active : alpha_idle);
+    r.x = 0; r.y = 0; r.w = w * 30 / 100; r.h = h;
+    SDL_RenderFillRect(s_renderer, &r);
+
+    /* RIGHT button */
+    SDL_SetRenderDrawColor(s_renderer, 80, 160, 255,
+        s_touch_key_state[kRight] ? alpha_active : alpha_idle);
+    r.x = w * 70 / 100; r.y = 0; r.w = w * 30 / 100; r.h = h;
+    SDL_RenderFillRect(s_renderer, &r);
+
+    /* GAS button (centre, bottom half) */
+    SDL_SetRenderDrawColor(s_renderer, 0, 220, 80,
+        s_touch_key_state[kForward] ? alpha_active : alpha_idle);
+    r.x = w * 30 / 100; r.y = h / 2; r.w = w * 40 / 100; r.h = h / 2;
+    SDL_RenderFillRect(s_renderer, &r);
+
+    /* FIRE button (centre, top half) */
+    SDL_SetRenderDrawColor(s_renderer, 255, 80, 80,
+        s_touch_key_state[kFire] ? alpha_active : alpha_idle);
+    r.x = w * 30 / 100; r.y = 0; r.w = w * 40 / 100; r.h = h / 2;
+    SDL_RenderFillRect(s_renderer, &r);
+
+    /* Border lines to separate zones */
+    SDL_SetRenderDrawColor(s_renderer, 255, 255, 255, 60);
+    /* vertical left divider */
+    r.x = w * 30 / 100 - 1; r.y = 0; r.w = 2; r.h = h;
+    SDL_RenderFillRect(s_renderer, &r);
+    /* vertical right divider */
+    r.x = w * 70 / 100 - 1; r.y = 0; r.w = 2; r.h = h;
+    SDL_RenderFillRect(s_renderer, &r);
+    /* horizontal centre divider */
+    r.x = w * 30 / 100; r.y = h / 2 - 1; r.w = w * 40 / 100; r.h = 2;
+    SDL_RenderFillRect(s_renderer, &r);
+
+    SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_NONE);
+}
+
 /* Helper: (re)allocate the back-buffer with the given bytes-per-pixel.
  * No-ops if the buffer is already at the correct size. */
 static void sdl_set_depth(int bpp)
@@ -381,6 +525,15 @@ void InitScreen(int unused) {
     sdl_set_depth(1);
 
     gScreenMode = kScreenSuspended;
+
+    /* Enable touch controls if any touch device is present (e.g. Android) */
+#ifdef __ANDROID__
+    s_touch_controls_active = 1;  /* always active on Android */
+#else
+    if (SDL_GetNumTouchDevices() > 0)
+        s_touch_controls_active = 1;
+#endif
+
     LOG_DEBUG("[SDL] InitScreen: %dx%d, rowBytes=%d\n", gXSize, gYSize, gRowBytes);
 }
 
@@ -526,21 +679,41 @@ void Blit2Screen(void) {
     /* Upload to texture */
     SDL_UpdateTexture(s_texture, NULL, s_rgb_surface->pixels, s_rgb_surface->pitch);
 
-    /* Render */
+    /* Render game frame */
     SDL_RenderClear(s_renderer);
     SDL_RenderCopy(s_renderer, s_texture, NULL, NULL);
+
+    /* Render on-screen touch controls overlay (if touch active) */
+    if (s_touch_controls_active)
+        sdl_render_touch_overlay();
+
     SDL_RenderPresent(s_renderer);
 
     /* Process pending sound callbacks (engine loop, etc.) during gameplay.
      * WaitNextEvent() is not called in the game loop, so we do it here. */
     sdl_audio_process_callbacks();
 
-    /* Process quit events during gameplay (WaitNextEvent is not called in game loop) */
+    /* Process quit and touch events during gameplay (WaitNextEvent not called in game loop) */
     {
         SDL_Event ev;
         extern int gExit;
         while (SDL_PollEvent(&ev)) {
-            if (ev.type == SDL_QUIT) { gExit = 1; }
+            switch (ev.type) {
+                case SDL_QUIT:
+                    gExit = 1;
+                    break;
+                case SDL_FINGERDOWN:
+                case SDL_FINGERMOTION:
+                    sdl_touch_finger_event(ev.tfinger.fingerId,
+                                           ev.tfinger.x, ev.tfinger.y, 1);
+                    break;
+                case SDL_FINGERUP:
+                    sdl_touch_finger_event(ev.tfinger.fingerId,
+                                           ev.tfinger.x, ev.tfinger.y, 0);
+                    break;
+                default:
+                    break;
+            }
         }
     }
 
@@ -763,6 +936,33 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
                     theEvent->where.v = (short)s_mouse_y;
                     theEvent->when = SDL_GetTicks();
                 }
+                return 1;
+
+            case SDL_FINGERDOWN:
+            case SDL_FINGERMOTION:
+                sdl_touch_finger_event(ev.tfinger.fingerId,
+                                       ev.tfinger.x, ev.tfinger.y, 1);
+                /* On Android, translate first touch to a mouse event for menus */
+                s_mouse_x = (int)(ev.tfinger.x * gXSize);
+                s_mouse_y = (int)(ev.tfinger.y * gYSize);
+                if (ev.type == SDL_FINGERDOWN) {
+                    s_mouse_down = 1;
+                    theEvent->what = mouseDown;
+                    theEvent->where.h = (short)s_mouse_x;
+                    theEvent->where.v = (short)s_mouse_y;
+                    theEvent->when = SDL_GetTicks();
+                    return 1;
+                }
+                break;
+
+            case SDL_FINGERUP:
+                sdl_touch_finger_event(ev.tfinger.fingerId,
+                                       ev.tfinger.x, ev.tfinger.y, 0);
+                s_mouse_down = 0;
+                theEvent->what = mouseUp;
+                theEvent->where.h = (short)(ev.tfinger.x * gXSize);
+                theEvent->where.v = (short)(ev.tfinger.y * gYSize);
+                theEvent->when = SDL_GetTicks();
                 return 1;
 
             default:

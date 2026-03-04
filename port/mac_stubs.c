@@ -179,10 +179,30 @@ Handle Get1Resource(ResType theType, short theID) {
 /* File Manager - POSIX-backed implementation                                */
 /*---------------------------------------------------------------------------*/
 
-#include <unistd.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
+#ifdef _WIN32
+#  define _CRT_NONSTDC_NO_DEPRECATE
+#  include <io.h>
+#  include <direct.h>
+#  include <sys/stat.h>
+#  include <sys/types.h>
+#  include <fcntl.h>
+#  include <errno.h>
+   typedef ptrdiff_t ssize_t;
+#  ifndef O_RDONLY
+#    define O_RDONLY  _O_RDONLY
+#    define O_WRONLY  _O_WRONLY
+#    define O_RDWR    _O_RDWR
+#    define O_CREAT   _O_CREAT
+#    define O_TRUNC   _O_TRUNC
+#  endif
+#  define ftruncate(fd, len) _chsize((fd), (long)(len))
+#  define mkdir(path, mode)  _mkdir(path)
+#else
+#  include <unistd.h>
+#  include <sys/stat.h>
+#  include <fcntl.h>
+#  include <errno.h>
+#endif
 
 /* Map Mac FSRef numbers to POSIX file descriptors (simple array) */
 #define MAX_OPEN_FILES 32
@@ -214,6 +234,16 @@ static const char *get_prefs_dir(void) {
 #ifdef __EMSCRIPTEN__
     /* Emscripten: use IDBFS-mounted /prefs */
     return "/prefs";
+#elif defined(_WIN32)
+    /* Windows: use %APPDATA%\RecklessDrivin */
+    static char dir[512] = {0};
+    if (!dir[0]) {
+        const char *appdata = getenv("APPDATA");
+        if (!appdata) appdata = getenv("USERPROFILE");
+        if (!appdata) appdata = "C:\\Temp";
+        snprintf(dir, sizeof(dir), "%s\\RecklessDrivin", appdata);
+    }
+    return dir;
 #else
     /* Linux/macOS: use $HOME/.reckless_drivin */
     static char dir[512] = {0};

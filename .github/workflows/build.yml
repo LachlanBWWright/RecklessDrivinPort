@@ -217,11 +217,81 @@ jobs:
         uses: actions/deploy-pages@v4
 
   # ============================================================
+  # Android APK build with on-screen touch controls
+  # ============================================================
+  build-android:
+    name: Build Android APK (SDL2 + touch controls)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK environment
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+
+      - name: Install Android NDK and build tools
+        run: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "ndk;25.2.9519653" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            --sdk_root=$ANDROID_HOME
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+
+      - name: Download SDL2 source
+        run: |
+          SDL2_VERSION=2.28.5
+          wget -q "https://github.com/libsdl-org/SDL/releases/download/release-${SDL2_VERSION}/SDL2-${SDL2_VERSION}.tar.gz"
+          tar xzf "SDL2-${SDL2_VERSION}.tar.gz"
+          echo "SDL2_SOURCE_DIR=$PWD/SDL2-${SDL2_VERSION}" >> $GITHUB_ENV
+
+      - name: Copy resources.dat to Android assets
+        run: |
+          mkdir -p port/android/app/src/main/assets
+          cp port/resources/resources.dat port/android/app/src/main/assets/
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
+
+      - name: Build Android APK (debug)
+        working-directory: port/android
+        run: |
+          gradle assembleDebug \
+            -PSDL2_SOURCE_DIR="$SDL2_SOURCE_DIR" \
+            --no-daemon \
+            --stacktrace
+
+      - name: Verify APK was produced
+        run: |
+          APK=$(find port/android/app/build/outputs/apk -name "*.apk" | head -1)
+          test -n "$APK" && echo "APK: $APK ($(du -sh $APK | cut -f1))" || (echo "APK not found!" && exit 1)
+
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reckless-drivin-android
+          path: port/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  # ============================================================
   # Create GitHub Release on push to main/master
   # ============================================================
   release:
     name: Create GitHub Release
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux, build-macos, build-windows, build-android]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     permissions:
@@ -249,6 +319,12 @@ jobs:
           name: reckless-drivin-windows
           path: release/windows
 
+      - name: Download Android APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: reckless-drivin-android
+          path: release/android
+
       - name: Prepare release assets
         run: |
           chmod +x release/linux/reckless_drivin
@@ -272,3 +348,4 @@ jobs:
             release/reckless-drivin-linux.zip
             release/reckless-drivin-macos.zip
             release/reckless-drivin-windows.zip
+            release/android/app-debug.apk

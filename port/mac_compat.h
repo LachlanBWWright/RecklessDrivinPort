@@ -11,16 +11,6 @@
 #ifndef MAC_COMPAT_H
 #define MAC_COMPAT_H
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#if TARGET_OS_MAC && !TARGET_OS_IPHONE
-/* On Apple platforms we might have some headers, skip our stubs */
-#define MAC_COMPAT_APPLE_NATIVE 1
-#endif
-#endif
-
-#ifndef MAC_COMPAT_APPLE_NATIVE
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -889,8 +879,6 @@ Nanoseconds  AbsoluteToNanoseconds(AbsoluteTime a);
 /* Inline no-ops and compat macros */
 #define CALL_IN_SPOCKETS_BUT_NOT_IN_CARBON
 #define CALL_NOT_IN_CARBON
-
-#endif /* MAC_COMPAT_APPLE_NATIVE */
 
 /* -----------------------------------------------------------------------
  * LOG_DEBUG – diagnostic printf guarded by the DEBUG preprocessor symbol.

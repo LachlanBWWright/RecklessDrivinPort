@@ -145,6 +145,17 @@ if(PORT_SDL2)
         set(SDL2_CFLAGS "-s USE_SDL=2")
         set(SDL2_LDFLAGS "-s USE_SDL=2")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SDL2_CFLAGS}")
+    elseif(ANDROID)
+        # Android: SDL2 source provided via SDL2_SOURCE_DIR; build it as a subdir
+        if(NOT SDL2_SOURCE_DIR)
+            message(FATAL_ERROR "SDL2_SOURCE_DIR must be set for Android builds "
+                "(pass -DSDL2_SOURCE_DIR=/path/to/SDL2-source)")
+        endif()
+        add_subdirectory(${SDL2_SOURCE_DIR} ${CMAKE_BINARY_DIR}/SDL2_build)
+        set(SDL2_INCLUDE_DIRS ${SDL2_SOURCE_DIR}/include)
+        set(SDL2_LIBRARIES SDL2)
+        set(SDL2_FOUND TRUE)
+        include_directories(${SDL2_INCLUDE_DIRS})
     else()
         find_package(SDL2 QUIET)
         if(SDL2_FOUND)
@@ -210,40 +221,67 @@ if(EMSCRIPTEN)
 endif()
 
 # ============================================================
-# Main game executable
+# Android: build a shared library (libmain.so) loaded by SDLActivity
+# Desktop/WASM: build an executable
 # ============================================================
-add_executable(reckless_drivin ${GAME_SOURCES})
+if(ANDROID)
+    # Android resources: pre-packaged in APK assets; path set by Java init code
+    add_compile_definitions(RESOURCES_DAT_PATH="/data/data/com.recklessdrivin.port/files/resources.dat")
+    message(STATUS "Building for Android (shared library)")
+    add_library(main SHARED ${GAME_SOURCES})
+    set(GAME_TARGET main)
+else()
+    add_executable(reckless_drivin ${GAME_SOURCES})
+    set(GAME_TARGET reckless_drivin)
+endif()
 
-target_link_libraries(reckless_drivin
-    -Wl,--start-group
-    mac_stubs
-    game_resources
-    lzrw
-    -Wl,--end-group
-    m   # libm for math functions
-)
+# ============================================================
+# Link libraries (common)
+# ============================================================
+if(ANDROID)
+    target_link_libraries(${GAME_TARGET}
+        mac_stubs
+        game_resources
+        lzrw
+        ${SDL2_LIBRARIES}
+        log        # Android log library
+        android    # Android native app glue
+        m
+    )
+else()
+    target_link_libraries(${GAME_TARGET}
+        -Wl,--start-group
+        mac_stubs
+        game_resources
+        lzrw
+        -Wl,--end-group
+        m   # libm for math functions
+    )
+endif()
 
-# Link SDL2
-if(PORT_SDL2 AND NOT EMSCRIPTEN)
+# Link SDL2 (non-Android, non-Emscripten desktop builds)
+if(PORT_SDL2 AND NOT EMSCRIPTEN AND NOT ANDROID)
     if(SDL2_FOUND)
-        target_link_libraries(reckless_drivin ${SDL2_LIBRARIES})
+        target_link_libraries(${GAME_TARGET} ${SDL2_LIBRARIES})
     elseif(SDL2_LDFLAGS)
         # Parse the flags and add them
         separate_arguments(SDL2_LDFLAGS_LIST UNIX_COMMAND "${SDL2_LDFLAGS}")
-        target_link_libraries(reckless_drivin ${SDL2_LDFLAGS_LIST})
+        target_link_libraries(${GAME_TARGET} ${SDL2_LDFLAGS_LIST})
     endif()
 endif()
 
 # On Linux, link pthreads and realtime clock
-if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
-    target_link_libraries(reckless_drivin rt)
+if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN AND NOT ANDROID)
+    target_link_libraries(${GAME_TARGET} rt)
 endif()
 
 # ============================================================
 # Installation
 # ============================================================
-install(TARGETS reckless_drivin DESTINATION bin)
-install(FILES port/resources/resources.dat DESTINATION share/reckless_drivin)
+if(NOT ANDROID)
+    install(TARGETS ${GAME_TARGET} DESTINATION bin)
+    install(FILES port/resources/resources.dat DESTINATION share/reckless_drivin)
+endif()
 
 # ============================================================
 # Build summary
