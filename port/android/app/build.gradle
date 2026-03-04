@@ -7,14 +7,14 @@ def sdl2Dir = project.hasProperty('SDL2_SOURCE_DIR')
         : (System.getenv('SDL2_SOURCE_DIR') ?: '/tmp/SDL2')
 
 android {
-    namespace 'com.recklessdrivin.port'
+    namespace 'com.recklessdrivin'
     compileSdk 34
 
     // NDK version pre-installed on GitHub Actions ubuntu-latest
     ndkVersion '25.2.9519653'
 
     defaultConfig {
-        applicationId 'com.recklessdrivin.port'
+        applicationId 'com.recklessdrivin'
         minSdk 21
         targetSdk 34
         versionCode 1
@@ -60,8 +60,7 @@ android {
         release { minifyEnabled false }
     }
 
-    // Suppress lint errors that block the build
-    lintOptions {
+    lint {
         abortOnError false
     }
 }

@@ -1,4 +1,4 @@
-package com.recklessdrivin.port;
+package com.recklessdrivin;
 
 import org.libsdl.app.SDLActivity;
 import android.os.Bundle;

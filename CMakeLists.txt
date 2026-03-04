@@ -226,7 +226,7 @@ endif()
 # ============================================================
 if(ANDROID)
     # Android resources: pre-packaged in APK assets; path set by Java init code
-    add_compile_definitions(RESOURCES_DAT_PATH="/data/data/com.recklessdrivin.port/files/resources.dat")
+    add_compile_definitions(RESOURCES_DAT_PATH="/data/data/com.recklessdrivin/files/resources.dat")
     message(STATUS "Building for Android (shared library)")
     add_library(main SHARED ${GAME_SOURCES})
     set(GAME_TARGET main)
