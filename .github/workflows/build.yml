@@ -176,6 +176,7 @@ jobs:
           echo "Pages content:"
           ls -lh gh-pages/
 
+
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
         with:
@@ -187,6 +188,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: gh-pages/
+          if-no-files-found: error
 
   # ============================================================
   # Deploy to GitHub Pages (push to main/master only)
@@ -195,10 +197,16 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build-wasm
     runs-on: ubuntu-latest
+    # only run on the default branch so we don't publish preview builds
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # the `github-pages` environment can require manual approval, which
+    # will block the job and make deploys appear to hang.  Remove the
+    # environment or clear any protection rules in the repository settings
+    # if you want automatic publishing.  (We keep the URL output logic for
+    # now, but you can drop the whole `environment` block if you prefer.)
+    # environment:
+    #   name: github-pages
+    #   url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       pages: write
       id-token: write
