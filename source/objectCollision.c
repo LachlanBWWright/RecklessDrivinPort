@@ -490,8 +490,10 @@ void HandleCollision(tObject *posObj)
 							NewTextEffect(&fx);
 						}
 					}
-					if(theObjFlags&kObjectKillsCars)
+					if(theObjFlags&kObjectKillsCars){
 						KillObject(posObj);
+						return; /* posObj may be freed; stop iterating */
+					}
 					if(!theObjKilled&&(theObjFlags&kObjectKilledByCars)){
 						KillObject(theObj);
 						theObjKilled=1;
