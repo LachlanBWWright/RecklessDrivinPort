@@ -248,7 +248,16 @@ if(ANDROID)
         android    # Android native app glue
         m
     )
+elseif(APPLE OR MSVC)
+    # Apple ld and MSVC linker do not understand --start-group / --end-group
+    target_link_libraries(${GAME_TARGET}
+        mac_stubs
+        game_resources
+        lzrw
+        m
+    )
 else()
+    # GNU ld (Linux) supports --start-group for resolving circular references
     target_link_libraries(${GAME_TARGET}
         -Wl,--start-group
         mac_stubs
