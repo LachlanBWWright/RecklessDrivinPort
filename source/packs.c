@@ -136,8 +136,10 @@ Ptr GetSortedPackEntry(int packNum,int entryID,int *size)
 	return (Ptr)pack+offs;
 }
 
-int ComparePackHeaders(const tPackHeader *p1,const tPackHeader *p2)
+int ComparePackHeaders(const void *a,const void *b)
 {
+	const tPackHeader *p1 = (const tPackHeader *)a;
+	const tPackHeader *p2 = (const tPackHeader *)b;
 	return PACK_ID(p1)-PACK_ID(p2);
 }
 
