@@ -19,10 +19,53 @@
 #include <string.h>
 #include <stdint.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#elif defined(__linux__)
+#include <unistd.h>
+#include <limits.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <limits.h>
+#endif
+
 /* Path to resources.dat - can be overridden at compile time */
 #ifndef RESOURCES_DAT_PATH
 #define RESOURCES_DAT_PATH "resources.dat"
 #endif
+
+/* Build a path to resources.dat next to the executable */
+static FILE *open_resources_beside_exe(void)
+{
+    char dir[4096];
+    dir[0] = '\0';
+
+#ifdef _WIN32
+    DWORD len = GetModuleFileNameA(NULL, dir, sizeof(dir));
+    if (len == 0 || len >= sizeof(dir)) return NULL;
+#elif defined(__linux__)
+    ssize_t len = readlink("/proc/self/exe", dir, sizeof(dir) - 1);
+    if (len <= 0) return NULL;
+    dir[len] = '\0';
+#elif defined(__APPLE__)
+    uint32_t sz = sizeof(dir);
+    if (_NSGetExecutablePath(dir, &sz) != 0) return NULL;
+#endif
+
+    /* Strip executable filename to get directory */
+    char *last_sep = strrchr(dir, '/');
+#ifdef _WIN32
+    char *last_bsep = strrchr(dir, '\\');
+    if (last_bsep > last_sep) last_sep = last_bsep;
+#endif
+    if (!last_sep) return NULL;
+    last_sep[1] = '\0';
+
+    if (strlen(dir) + strlen("resources.dat") >= sizeof(dir)) return NULL;
+    strcat(dir, "resources.dat");
+
+    return fopen(dir, "rb");
+}
 
 #pragma pack(push, 1)
 typedef struct {
@@ -58,8 +101,11 @@ void Pomme_InitResources(void)
     if (gResourceFile) return;
     gResourceFile = fopen(RESOURCES_DAT_PATH, "rb");
     if (!gResourceFile) {
-        /* Try relative path from executable location */
-        fprintf(stderr, "Warning: could not open resources.dat at '%s'\n",
+        /* Try next to the executable */
+        gResourceFile = open_resources_beside_exe();
+    }
+    if (!gResourceFile) {
+        fprintf(stderr, "Warning: could not open resources.dat at '%s' or next to executable\n",
                 RESOURCES_DAT_PATH);
     }
 }

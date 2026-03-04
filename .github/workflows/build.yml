@@ -215,7 +215,7 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build-wasm
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/copilot/port-application-to-modern-os'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
