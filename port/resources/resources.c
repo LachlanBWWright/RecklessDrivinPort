@@ -42,7 +42,7 @@ static FILE *open_resources_beside_exe(void)
     dir[0] = '\0';
 
 #ifdef _WIN32
-    DWORD len = GetModuleFileNameA(NULL, dir, sizeof(dir));
+    unsigned long len = GetModuleFileNameA(NULL, dir, sizeof(dir));
     if (len == 0 || len >= sizeof(dir)) return NULL;
 #elif defined(__linux__)
     ssize_t len = readlink("/proc/self/exe", dir, sizeof(dir) - 1);
@@ -100,14 +100,18 @@ int g_res_load = 1;
 void Pomme_InitResources(void)
 {
     if (gResourceFile) return;
+    /* 1. Try relative to CWD (distributed builds) */
     gResourceFile = fopen(RESOURCES_DAT_PATH, "rb");
-    if (!gResourceFile) {
-        /* Try next to the executable */
+    /* 2. Try next to the executable */
+    if (!gResourceFile)
         gResourceFile = open_resources_beside_exe();
-    }
+    /* 3. Try absolute source tree path (local dev builds) */
+#ifdef RESOURCES_DAT_FALLBACK
+    if (!gResourceFile)
+        gResourceFile = fopen(RESOURCES_DAT_FALLBACK, "rb");
+#endif
     if (!gResourceFile) {
-        fprintf(stderr, "Warning: could not open resources.dat at '%s' or next to executable\n",
-                RESOURCES_DAT_PATH);
+        fprintf(stderr, "Fatal: could not open resources.dat\n");
     }
 }
 

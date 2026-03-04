@@ -64,8 +64,10 @@ set(RESOURCES_DAT "${CMAKE_SOURCE_DIR}/port/resources/resources.dat")
 if(EMSCRIPTEN)
     add_compile_definitions(RESOURCES_DAT_PATH="/resources.dat")
 else()
-    # Use relative path so the binary finds resources.dat next to itself
+    # Primary: relative path (for distributed builds where resources.dat sits next to the binary)
     add_compile_definitions(RESOURCES_DAT_PATH="resources.dat")
+    # Fallback: absolute source tree path (for local dev builds)
+    add_compile_definitions(RESOURCES_DAT_FALLBACK="${RESOURCES_DAT}")
 endif()
 
 # ============================================================
