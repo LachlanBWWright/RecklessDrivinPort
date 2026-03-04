@@ -19,11 +19,23 @@
 #include <string.h>
 #include <stdio.h>
 
-/* Rename Mac Toolbox functions that clash with Win32 API names */
+/* Rename Mac Toolbox functions that clash with Win32 API names
+ * (user32.lib / gdi32.lib symbols pulled in by SDL2) */
 #ifdef _WIN32
-#define FillRect   Mac_FillRect
-#define ShowWindow Mac_ShowWindow
-#define PtInRect   Mac_PtInRect
+#define FillRect    Mac_FillRect
+#define ShowWindow  Mac_ShowWindow
+#define PtInRect    Mac_PtInRect
+#define OffsetRect  Mac_OffsetRect
+#define FrameRect   Mac_FrameRect
+#define InvertRect  Mac_InvertRect
+#define SetRect     Mac_SetRect
+#define LineTo      Mac_LineTo
+#define MoveTo      Mac_MoveTo
+#define ShowCursor  Mac_ShowCursor
+#define SetCursor   Mac_SetCursor
+#define BeginUpdate Mac_BeginUpdate
+#define EndUpdate   Mac_EndUpdate
+#define HideWindow  Mac_HideWindow
 #endif
 #include <stddef.h>
 

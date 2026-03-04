@@ -20,7 +20,8 @@
 #include <stdint.h>
 
 #ifdef _WIN32
-#include <windows.h>
+/* Only declare what we need to avoid Win32 name clashes with Mac stubs */
+__declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(void *hModule, char *lpFilename, unsigned long nSize);
 #elif defined(__linux__)
 #include <unistd.h>
 #include <limits.h>
