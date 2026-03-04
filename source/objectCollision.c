@@ -454,16 +454,19 @@ void HandleCollision(tObject *posObj)
 			if(sqdist<kMaxCollDist*kMaxCollDist)
 				if(TestCollision(posObj,theObj,sqdist))
 				{
-					/* Cache type flags before any KillObject calls that may free theObj */
+					/* Cache type flags and score before any KillObject calls that may free theObj */
 					UInt16 theObjFlags  = theObj->type->flags;
 					UInt16 theObjFlags2 = theObj->type->flags2;
 					t2DPoint theObjPos  = theObj->pos;
+					SInt16 theObjScore  = theObj->type->score;
+					int theObjKilled    = 0;
 					if(theObjFlags&kObjectBounce)
 					{
 						if((*posObj->type).flags2&kObjectMissile){
 							posObj->jumpHeight=0;
 							posObj->jumpVelo=0;
 							KillObject(theObj);
+							theObjKilled=1;
 						}else
 						 	BounceObjects(theObj,posObj);
 					}
@@ -471,9 +474,9 @@ void HandleCollision(tObject *posObj)
 					{
 						int jumpScore=0;
 						if(theObjFlags2&kObjectRamp)
-							{posObj->jumpVelo=VEC2D_Value(posObj->velo);jumpScore=theObj->type->score;}
+							{posObj->jumpVelo=VEC2D_Value(posObj->velo);jumpScore=theObjScore;}
 						if(theObjFlags2&kObjectBump)
-							{posObj->jumpVelo=VEC2D_Value(posObj->velo)*0.45;jumpScore=theObj->type->score;}
+							{posObj->jumpVelo=VEC2D_Value(posObj->velo)*0.45;jumpScore=theObjScore;}
 						if(posObj==gPlayerObj&&jumpScore)
 						{
 							tTextEffect fx;
@@ -489,16 +492,18 @@ void HandleCollision(tObject *posObj)
 					}
 					if(theObjFlags&kObjectKillsCars)
 						KillObject(posObj);
-					if(theObjFlags&kObjectKilledByCars)
+					if(!theObjKilled&&(theObjFlags&kObjectKilledByCars)){
 						KillObject(theObj);
+						theObjKilled=1;
+					}
 					if(theObjFlags2&kObjectOil)
 						posObj->rotVelo=(fabs(posObj->rotVelo)>0.2?1:0)*(posObj->rotVelo>0?1:-1)*PI*0.05*VEC2D_Value(posObj->velo);
 					if(posObj==gPlayerObj)
 					{
-						if(theObjFlags&kObjectBonusFlag)
+						if(!theObjKilled&&(theObjFlags&kObjectBonusFlag))
 							BonusObject(theObj);
 					}
-					else if(theObj==gSpikeObj)
+					else if(!theObjKilled&&theObj==gSpikeObj)
 						if(posObj->type->flags2&kObjectDamageble)
 						{
 							DamageObj(posObj,VEC2D_Value(gPlayerObj->velo)*kLowFrameDuration*9,VEC2D_Norm(VEC2D_Difference(theObjPos,posObj->pos)));

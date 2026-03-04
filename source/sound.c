@@ -181,12 +181,14 @@ void SetCarSound(float engine,float skidL,float skidR,float velo)
 		{
 			tSound *sound=(tSound*)GetSortedPackEntry(kPackSnds,132,nil);
 			gEngineChannel->userInfo=0;
-			cmd.cmd=bufferCmd;
-			cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
-			DoError(SndDoCommand(gEngineChannel,&cmd,false));
-			cmd.cmd=callBackCmd;
-			cmd.param1=1;
-			DoError(SndDoCommand(gEngineChannel,&cmd,false));
+			if(sound){
+				cmd.cmd=bufferCmd;
+				cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
+				DoError(SndDoCommand(gEngineChannel,&cmd,false));
+				cmd.cmd=callBackCmd;
+				cmd.param1=1;
+				DoError(SndDoCommand(gEngineChannel,&cmd,false));
+			}
 		}
 		cmd.cmd=volumeCmd;
 		cmd.param1=0;
@@ -214,12 +216,14 @@ void SetCarSound(float engine,float skidL,float skidR,float velo)
 		{
 			tSound *sound=(tSound*)GetSortedPackEntry(kPackSnds,(*gRoadInfo).skidSound,nil);
 			gSkidChannel->userInfo=0;
-			cmd.cmd=bufferCmd;
-			cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
-			DoError(SndDoCommand(gSkidChannel,&cmd,false));
-			cmd.cmd=callBackCmd;
-			cmd.param1=1;
-			DoError(SndDoCommand(gSkidChannel,&cmd,false));
+			if(sound){
+				cmd.cmd=bufferCmd;
+				cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
+				DoError(SndDoCommand(gSkidChannel,&cmd,false));
+				cmd.cmd=callBackCmd;
+				cmd.param1=1;
+				DoError(SndDoCommand(gSkidChannel,&cmd,false));
+			}
 		}
 		cmd.cmd=volumeCmd;
 		cmd.param1=0;
@@ -261,23 +265,27 @@ void StartCarChannels()
 	if(gPrefs.engineSound&&gPrefs.sound)
 		for(i=0;i<2;i++){
 			tSound *sound=(tSound*)GetSortedPackEntry(kPackSnds,132,nil);
-			cmd.cmd=bufferCmd;
-			cmd.param1=0;
-			cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
-			DoError(SndDoCommand(gEngineChannel,&cmd,false));
-			cmd.cmd=callBackCmd;
-			cmd.param1=1;
-			cmd.param2=0;
-			DoError(SndDoCommand(gEngineChannel,&cmd,false));
+			if(sound){
+				cmd.cmd=bufferCmd;
+				cmd.param1=0;
+				cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
+				DoError(SndDoCommand(gEngineChannel,&cmd,false));
+				cmd.cmd=callBackCmd;
+				cmd.param1=1;
+				cmd.param2=0;
+				DoError(SndDoCommand(gEngineChannel,&cmd,false));
+			}
 			sound=(tSound*)GetSortedPackEntry(kPackSnds,(*gRoadInfo).skidSound,nil);
-			cmd.cmd=bufferCmd;
-			cmd.param1=0;
-			cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
-			DoError(SndDoCommand(gSkidChannel,&cmd,false));	
-			cmd.cmd=callBackCmd;
-			cmd.param1=1;
-			cmd.param2=0;
-			DoError(SndDoCommand(gSkidChannel,&cmd,false));
+			if(sound){
+				cmd.cmd=bufferCmd;
+				cmd.param1=0;
+				cmd.param2=SOUND_PTR2PARAM(sound,sound->offsets[RanInt(0,TSOUND_U32(sound->numSamples))]);
+				DoError(SndDoCommand(gSkidChannel,&cmd,false));	
+				cmd.cmd=callBackCmd;
+				cmd.param1=1;
+				cmd.param2=0;
+				DoError(SndDoCommand(gSkidChannel,&cmd,false));
+			}
 		}
 	SetCarSound(0,0,0,0);	
 }
@@ -286,6 +294,7 @@ void PlaySound(t2DPoint pos,t2DPoint velo,float freq,float vol,int id)
 {
 	if(gPrefs.sound){
 		tSound *sound=(tSound*)GetSortedPackEntry(kPackSnds,id,nil);
+		if(!sound) return;
 		SndChannelPtr chan;
 		SndCommand cmd;
 		int i;
@@ -358,6 +367,7 @@ void SimplePlaySound(int id)
 		int i;
 		float pan,dist;
 		UInt32 priority=0xffffffff;
+		if(!sound) return;
 		for(i=0;i<(gPrefs.hqSound?kNumHQChannels:kNumChannels);i++)
 			if(priority>gChannels[i]->userInfo)
 			{

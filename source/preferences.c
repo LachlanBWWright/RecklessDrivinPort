@@ -123,7 +123,10 @@ void FirstRun()
 	ReleaseResource(prefDefault);
 #ifdef PORT_SDL2
 	/* The original Pref resource maps driving to the numeric keypad.
-	 * Override with standard arrow-key + modifier bindings for the SDL2 port. */
+	 * Override with standard arrow-key + modifier bindings for the SDL2 port.
+	 * The Pref resources also have sound disabled by default; enable it here. */
+	gPrefs.sound       = 1;
+	gPrefs.engineSound = 1;
 	gPrefs.keyCodes[kForward]   = 0x7E; /* Up arrow */
 	gPrefs.keyCodes[kBackward]  = 0x7D; /* Down arrow */
 	gPrefs.keyCodes[kLeft]      = 0x7B; /* Left arrow */
