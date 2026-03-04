@@ -179,10 +179,27 @@ Handle Get1Resource(ResType theType, short theID) {
 /* File Manager - POSIX-backed implementation                                */
 /*---------------------------------------------------------------------------*/
 
+#ifdef _WIN32
+#include <io.h>
+#include <direct.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#define open   _open
+#define close  _close
+#define read   _read
+#define write  _write
+#define lseek  _lseek
+#define fstat  _fstat
+#define stat   _stat
+#define ftruncate _chsize
+typedef int ssize_t;
+#else
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#endif
 
 /* Map Mac FSRef numbers to POSIX file descriptors (simple array) */
 #define MAX_OPEN_FILES 32
@@ -215,12 +232,18 @@ static const char *get_prefs_dir(void) {
     /* Emscripten: use IDBFS-mounted /prefs */
     return "/prefs";
 #else
-    /* Linux/macOS: use $HOME/.reckless_drivin */
     static char dir[512] = {0};
     if (!dir[0]) {
+#ifdef _WIN32
+        const char *home = getenv("APPDATA");
+        if (!home) home = getenv("USERPROFILE");
+        if (!home) home = "C:\\Temp";
+        snprintf(dir, sizeof(dir), "%s\\RecklessDrivin", home);
+#else
         const char *home = getenv("HOME");
         if (!home) home = "/tmp";
         snprintf(dir, sizeof(dir), "%s/.reckless_drivin", home);
+#endif
     }
     return dir;
 #endif
@@ -230,7 +253,11 @@ static void ensure_prefs_dir(void) {
     const char *d = get_prefs_dir();
     struct stat st;
     if (stat(d, &st) != 0) {
+#ifdef _WIN32
+        _mkdir(d);
+#else
         mkdir(d, 0755);
+#endif
     }
 }
 
