@@ -18,6 +18,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+/* Rename Mac Toolbox functions that clash with Win32 API names */
+#ifdef _WIN32
+#define FillRect   Mac_FillRect
+#define ShowWindow Mac_ShowWindow
+#define PtInRect   Mac_PtInRect
+#endif
 #include <stddef.h>
 
 /*---------------------------------------------------------------------------*/
