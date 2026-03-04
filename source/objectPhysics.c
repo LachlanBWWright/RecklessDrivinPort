@@ -24,7 +24,7 @@
 #define kMotorRunTime		0.3		//time in seconds for motor to reach maximum acceleration.
 #define kTrackIntensity		0.075	//Intensity of rubber Tracks left by cars.
 
-void HandleCollision(tObject *);
+int HandleCollision(tObject *);
 
 t2DPoint CalcWheelForce(float dir,float wheelPower,float fRoadFriction,float mass,float velo,t2DPoint vVelo,tObject *theObj,float *slide)
 {
@@ -160,7 +160,7 @@ float CalcPower(tObject *theObj,float velo)
 	return power;
 }
 
-inline float SlideFriction(float slide)
+static inline float SlideFriction(float slide)
 {
 	if(slide>kMinSlide)
 	{
@@ -358,6 +358,7 @@ int CheckObjectMotion(tObject *theObj)
 void MakeSmoke(tObject *theObj)
 {
 	tObject *smokeObj=NewObject(theObj,195);
+	if(!smokeObj) return;
 	tObjectTypePtr objType=theObj->type;
 	smokeObj->pos=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir)*(*objType).length*kScale,cos(theObj->dir)*(*objType).length*kScale));
 	smokeObj->pos=VEC2D_Sum(smokeObj->pos,P2D(RanFl(-10,10),RanFl(-10,10)));
@@ -368,6 +369,7 @@ void BurnObj(tObject *theObj)
 	tObject *expObj;			
 	float l=(*theObj->type).length*kScale;
 	expObj=NewObject(theObj,1001);
+	if(!expObj) return;
 	expObj->frameDuration=RanFl(0,4);
 	expObj->frame=0;
 	expObj->pos.x=theObj->pos.x+RanFl(0,l);
@@ -396,17 +398,21 @@ void ObjectPhysics(tObject *theObj)
 			ControlHeliObject(theObj);
 		if(theObj->type->flags2&kObjectMissile){
 			if(theObj->jumpHeight==0&&theObj->jumpVelo==0)
-				KillObject(theObj);}
+				{KillObject(theObj);return;}}
 		else if(fabs(theObj->pos.y-gCameraObj->pos.y)<kVisDist)
 		{
+			tObjectTypePtr savedType=theObj->type;
 			if(theObj->type->flags&kObjectBackCollFlag||theObj->type->flags2&kObjectSink&&(*gRoadInfo).deathOffs){
 				if(CalcBackCollision(theObj->pos)==2)
-					KillObject(theObj);}
+					{KillObject(theObj);return;}}
 			else if(theObj->type->flags2&kObjectFrontCollFlag){
 				if(CalcBackCollision(theObj->pos)==0)
-					KillObject(theObj);}
+					{KillObject(theObj);return;}}
 			if(theObj->type->flags&kObjectBounce)
-				HandleCollision(theObj);
+				if(HandleCollision(theObj))
+					return; /* theObj was killed; do not access it further */
+			if(theObj->type!=savedType)
+				return; /* type changed by collision; stop processing stale flags */
 			if(theObj->type->flags&kObjectCop)
 				if(!(gPlayerAddOns&kAddOnCop)&&!gFinishDelay&&!gPlayerDeathDelay)
 				{
@@ -417,7 +423,7 @@ void ObjectPhysics(tObject *theObj)
 					else if(theObj->control==kObjectDriveDown)
 					{
 						if(gPlayerObj->pos.y>theObj->pos.y+kStartChaseDist*kScale)
-							ObjectStartChase(theObj,kStartChaseDist*kScale,kStartChaseSpeed);			
+							ObjectStartChase(theObj,kStartChaseDist*kScale,kStartChaseSpeed);
 					}
 					else if(theObj->control==kObjectCopControl)
 						if(theObj->type->weaponObj)
@@ -436,7 +442,7 @@ void ObjectPhysics(tObject *theObj)
 					if(RanProb((theObj->damage-theObj->type->maxDamage)/(float)theObj->type->maxDamage*0.25))
 						Explosion(theObj->pos,theObj->velo,0,250,0);
 					if(theObj->damage>theObj->type->maxDamage*2)
-						KillObject(theObj);
+						{KillObject(theObj);return;}
 				}
 			}
 		}

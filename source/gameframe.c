@@ -9,6 +9,9 @@
 #include "gameinitexit.h"
 #include "packs.h"
 #include "random.h"
+#ifdef PORT_SDL2
+#include <SDL2/SDL.h>
+#endif
 
 #define kCalcFPMS			(kCalcFPS/(float)1000000)
 #define kGraphFrameCount 	12
@@ -38,7 +41,7 @@ void ResumeFrameCount()
 	gStartMS+=GetMSTime()-gPauseMS;
 }
 
-inline Boolean CheckFrameTime()
+static inline Boolean CheckFrameTime()
 {
 	unsigned long optFrameCount;
 	UInt64 curMS;
@@ -47,21 +50,35 @@ inline Boolean CheckFrameTime()
 	optFrameCount=curMS*kCalcFPMS;
 	if(gFrameCount>optFrameCount)
 	{
-		//AddFloatToMessageBuffer("\pFPS: ",(float)1000000/((curMS-gLastGraphFrameMS[0])/kGraphFrameCount));
-		BlockMoveData(gLastGraphFrameMS+1,gLastGraphFrameMS,sizeof(UInt64)*(kGraphFrameCount)-1);
+		//AddFloatToMessageBuffer("\x05FPS: ",(float)1000000/((curMS-gLastGraphFrameMS[0])/kGraphFrameCount));
+		BlockMoveData(gLastGraphFrameMS+1,gLastGraphFrameMS,sizeof(UInt64)*(kGraphFrameCount-1));
 		gLastGraphFrameMS[kGraphFrameCount-1]=curMS;
 		return true;
 	}
 	return false;
 }
 
-inline CheckTimeSkip()
+static inline void CheckTimeSkip(void)
 {
 	unsigned long optFrameCount;
 	UInt64 curMS;
+#ifdef PORT_SDL2
+	/* 2 ms threshold below which we skip the SDL_Delay to avoid adding
+	 * unnecessary latency on the last busy-wait iteration */
+#define kMinSleepThreshUS ((UInt64)2000)
+#endif
 	do{
 		curMS=GetMSTime()-gStartMS;
 		optFrameCount=curMS*kCalcFPMS;
+#ifdef PORT_SDL2
+		/* Yield to the OS so the window stays responsive during the wait */
+		if(gFrameCount>optFrameCount) {
+			UInt64 nextFrameUS=(UInt64)(gFrameCount/kCalcFPMS);
+			UInt64 remainUS=(curMS<nextFrameUS)?nextFrameUS-curMS:0;
+			if(remainUS>kMinSleepThreshUS) SDL_Delay(1);
+		}
+#undef kMinSleepThreshUS
+#endif
 	}while(gFrameCount>optFrameCount);
 }
 
@@ -87,6 +104,7 @@ void CopClear()
 void ResurrectPlayer()
 {
 	int i;
+	LOG_DEBUG("LOG: ResurrectPlayer called (lives=%d)\n", gPlayerLives);
 	for(i=0;(i<gTrackUp->num)&&(gTrackUp->track[i].y<gPlayerObj->pos.y);i++);
 	gPlayerObj=NewObject(gFirstObj,gRoadInfo->water?kNormalPlayerBoatID:gPlayerCarID);
 	gPlayerObj->pos.x=gTrackUp->track[i-1].x;
@@ -184,7 +202,7 @@ void PlayerHandling()
 					SimplePlaySound(144);
 				if((int)gGameTime==(int)gLevelData->time)
 				{
-					tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\pTIMEhUPee"};
+					tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x09TIMEhUPee"};
 					NewTextEffect(&fx);
 					SimplePlaySound(149);
 				}
@@ -201,7 +219,7 @@ void PlayerHandling()
 		gDisplayScore=gPlayerScore;
 	if(gPlayerScore>(gExtraLives+1)*kExtraLiveScore)
 	{
-		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\pEXTRAhLIFEee"};
+		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0cEXTRAhLIFEee"};
 		NewTextEffect(&fx);
 		gExtraLives++;
 		gPlayerLives++;
@@ -212,7 +230,7 @@ void PlayerHandling()
 	if(gPlayerObj->pos.y>gLevelData->levelEnd)
 		if(!gPlayerDeathDelay)
 		{
-			tTextEffect fx={320,240,kEffectExplode,0,"\pLEVELhCOMPLETED"};
+			tTextEffect fx={320,240,kEffectExplode,0,"\x0fLEVELhCOMPLETED"};
 			NewTextEffect(&fx);
 			if(!gFinishDelay)
 				gFinishDelay=0.001;
@@ -269,18 +287,40 @@ void PlayerHandling()
 	} 
 	//invincibility
 	gPlayerObj->damage=0;
-	/*AddFloatToMessageBuffer("\pVelo: ",VEC2D_Value(gCameraObj->velo)*3.6);	
-	AddFloatToMessageBuffer("\pSlide: ",gCameraObj->slide);
-	AddFloatToMessageBuffer("\pBrake: ",gCameraObj->input.brake);0*/
+	/*AddFloatToMessageBuffer("\x06Velo: ",VEC2D_Value(gCameraObj->velo)*3.6);
+	AddFloatToMessageBuffer("\x07Slide: ",gCameraObj->slide);
+	AddFloatToMessageBuffer("\x07Brake: ",gCameraObj->input.brake);0*/
 }
 
 void GameFrame()
 {
+#ifdef PORT_SDL2
+	/* Log every 180 frames (~3 seconds) so user can see the game is running */
+	if (gFrameCount % 180 == 0) {
+		LOG_DEBUG("LOG: GameFrame count=%lu graphFrames=%lu\n",
+		       gFrameCount, gGraphFrameCount);
+	}
+	/* Throttle game-logic to real-time so gFrameCount cannot race arbitrarily
+	 * far ahead of optFrameCount.  Without this guard a vsync-less renderer can
+	 * increment gFrameCount thousands of times per second, forcing CheckTimeSkip
+	 * to busy-wait for hours before the clock catches up. */
+	{
+		UInt64 curMS=GetMSTime()-gStartMS;
+		unsigned long targetCount=(unsigned long)(curMS*kCalcFPMS);
+		if(gFrameCount>targetCount+1){
+			SDL_Delay(1);
+			return;
+		}
+	}
+#endif
+	LOG_DEBUG("LOG: GF-A MoveObjects\n"); fflush(stdout);
 	MoveObjects();
+	LOG_DEBUG("LOG: GF-B PlayerHandling\n"); fflush(stdout);
 	PlayerHandling();
 	gFrameCount++;
 	if(CheckFrameTime())
 	{
+		LOG_DEBUG("LOG: GF-C RenderFrame\n"); fflush(stdout);
 		RenderFrame();
 		gGraphFrameCount++;
 		CheckTimeSkip();

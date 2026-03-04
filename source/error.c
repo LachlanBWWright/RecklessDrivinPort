@@ -1,6 +1,9 @@
 #include "initexit.h"
 #include "screen.h"
+#include <string.h>
 
+#ifdef __ppc__
+/* PowerPC-specific stack frame and assembly code */
 typedef struct
 {
     unsigned long   fSaveSP,fSaveCR,fSaveLR,fResv0,fResv1,fSaveRTOC;
@@ -43,8 +46,18 @@ inline void GetCallerName(Str255 callerName)
 	if(name)
 		BlockMoveData(*name,callerName,(*name)[0]+1);
 	else
-		BlockMoveData("\p<Anonymous Routine>",callerName,20);
+		BlockMoveData("\x13<Anonymous Routine>",callerName,20);
 }
+#else
+/* On non-PPC platforms, caller name lookup is not available */
+static inline void GetCallerName(Str255 callerName)
+{
+    /* Pascal string format: first byte is length */
+    const char *name = "<Unknown Caller>";
+    callerName[0] = (char)strlen(name);
+    memcpy(callerName + 1, name, callerName[0]);
+}
+#endif /* __ppc__ */
 
 void HandleError(int id)
 {
@@ -54,7 +67,7 @@ void HandleError(int id)
 	Str255 help;
 	AlertStdAlertParamRec alertParam={
 		false,false,nil,
-		"\pExit",
+		"\x04Exit",
 		nil,
 		nil,
 		kAlertStdAlertOKButton,
@@ -65,18 +78,32 @@ void HandleError(int id)
 	idStr[0]+=3;
 	GetCallerName(help);	
 	BlockMoveData(help+2,idStr+idStr[0]+1,help[0]-1);
-	idStr[0]+=help[0]-1;	
+	idStr[0]+=help[0]-1;
 #if __option(scheduling)
 	ShowCursor();
 	ScreenMode(kScreenSuspended);
 	err=StandardAlert(kAlertStopAlert,
-		"\pA fatal error has occured!!",
+		"\x1cA fatal error has occured!!",
 		idStr,
 		&alertParam,
 		&hit);
 	if(err)ExitToShell();
 #else
 	DebugStr(idStr);
+	/* Port debug: print C backtrace so we can identify the error source */
+	{
+		void *bt[32]; int n;
+		extern int backtrace(void**,int);
+		extern char **backtrace_symbols(void*const*,int);
+		n = backtrace(bt, 32);
+		char **syms = backtrace_symbols(bt, n);
+		if (syms) {
+			int i;
+			fprintf(stderr, "[HandleError] error=%d, backtrace:\n", id);
+			for (i = 0; i < n; i++) fprintf(stderr, "  %s\n", syms[i]);
+			free(syms);
+		}
+	}
 #endif
 	Exit();
 }

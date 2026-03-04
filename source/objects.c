@@ -49,8 +49,9 @@ void Explosion(t2DPoint pos,t2DPoint velo,int offs,float mass,int sound)
 					expObj=NewObject(gFirstObj,195);
 				else{
 					expObj=NewObject(gFirstObj,1020);
-					expObj->jumpVelo=15;
+					if(expObj) expObj->jumpVelo=15;
 				}				
+			if(!expObj) continue;
 			expObj->frameDuration=RanFl(0,0.25);
 			expObj->frame=0;
 			expObj->pos.x=pos.x+RanFl(0,l);
@@ -206,6 +207,11 @@ tObject *NewObject(tObject *prev,SInt16 typeRes)
 	((tObject*)(prev->next))->prev=theObj;
 	prev->next=theObj;
 	theObj->type=(tObjectTypePtr)GetUnsortedPackEntry(kPackObTy,typeRes,0);
+	if(!theObj->type)
+	{
+		RemoveObject(theObj);
+		return nil;
+	}
 	if((*theObj->type).flags&kObjectRandomFrameFlag)
 		theObj->frame=(*theObj->type).frame+RanInt(0,(*theObj->type).numFrames);
 	else
@@ -257,11 +263,14 @@ void KillObject(tObject *theObj)
 {
 	tObjectTypePtr objType=theObj->type;
 	int sinkEnable=CalcBackCollision(theObj->pos)==2&&(*objType).flags2&kObjectSink;
+	LOG_DEBUG("LOG: KillObject obj=%p isPlayer=%d deathObj=%d frame=%d\n",
+	       (void*)theObj, (theObj==gPlayerObj)?1:0,
+	       (int)(*objType).deathObj, (int)theObj->frame);
 	if(theObj==gPlayerObj)
 	{
 		if(!gFinishDelay&&!(gPlayerDeathDelay!=0)&&gPlayerLives)
 		{
-			tTextEffect fx={320,240,kEffectExplode,0,"\pOUCHeee"};
+			tTextEffect fx={320,240,kEffectExplode,0,"\x07OUCHeee"};
 			NewTextEffect(&fx);
 			gPlayerLives--;
 			FFBJolt(1.0,1.0,1.0);
@@ -302,9 +311,29 @@ void KillObject(tObject *theObj)
 		RemoveObject(theObj);
 		return;
 	}
-	theObj->type=(tObjectTypePtr)GetUnsortedPackEntry(kPackObTy,(*objType).deathObj+(sinkEnable?gRoadInfo->deathOffs:0),0);
+	{
+		int deathID=(*objType).deathObj+(sinkEnable?gRoadInfo->deathOffs:0);
+		LOG_DEBUG("LOG: KillObject deathObj transform id=%d\n", deathID);
+		theObj->type=(tObjectTypePtr)GetUnsortedPackEntry(kPackObTy,deathID,0);
+	}
+	if(!theObj->type)
+	{
+		LOG_DEBUG("LOG: KillObject deathObj type NULL, removing\n");
+		RemoveObject(theObj);
+		return;
+	}
 	theObj->layer=(*theObj->type).flags2>>5&3;
-	objType=theObj->type;		
+	objType=theObj->type;
+	LOG_DEBUG("LOG: KillObject deathObj success flags=0x%x flags2=0x%x frame=%d numFrames=%d frameDur=%f deathObj2=%d\n",
+	       (unsigned)(*objType).flags, (unsigned)(*objType).flags2,
+	       (int)(*objType).frame, (int)(*objType).numFrames, (*objType).frameDuration,
+	       (int)(*objType).deathObj);
+	{
+		unsigned char *raw=(unsigned char*)objType;
+		LOG_DEBUG("LOG: KillObject raw bytes (first 40): ");
+		for(int b=0;b<40;b++) LOG_DEBUG("%02x ",raw[b]);
+		LOG_DEBUG("\n");
+	}
 	if((*objType).flags&kObjectRandomFrameFlag)
 		theObj->frame=(*objType).frame+RanInt(0,(*theObj->type).numFrames);
 	else
@@ -315,7 +344,7 @@ void KillObject(tObject *theObj)
 	theObj->control=kObjectNoInput;
 }
 
-inline void ChangeObjs(tObject* obj1,tObject* obj2)
+static inline void ChangeObjs(tObject* obj1,tObject* obj2)
 {
 	((tObject*)obj1->prev)->next=obj2;
 	((tObject*)obj2->next)->prev=obj1;
@@ -329,8 +358,8 @@ void GetVisObjs()
 {
 	tObject	*theObj=(tObject*)gFirstObj->next;
 	int minVis=gCameraObj->pos.y-kVisDist;
-	int maxVis=gCameraObj->pos.y+kVisDist;	
-	while(theObj->pos.y<minVis)
+	int maxVis=gCameraObj->pos.y+kVisDist;
+	while(theObj->pos.y<minVis&&theObj!=gFirstObj)
 		theObj=(tObject*)theObj->next;
 	gFirstVisObj=theObj;
 	while(theObj->pos.y<maxVis&&theObj!=gFirstObj)
@@ -394,7 +423,7 @@ void FireWeapon(tObject *shooter,int weaponID)
 	}
 }
 
-inline void MoveObject(tObject *theObj)
+static inline void MoveObject(tObject *theObj)
 {
 	if(*(double*)(&theObj->velo))
 	{
@@ -444,7 +473,7 @@ inline void MoveObject(tObject *theObj)
 	}
 }
 
-inline void AnimateObject(tObject *theObj)
+static inline void AnimateObject(tObject *theObj)
 {
 	tObjectTypePtr objType=theObj->type;
 	if(!(*objType).frameDuration)
@@ -497,19 +526,32 @@ void MoveObjects()
 	while(theObj!=gFirstObj)
 	{
 		tObject *next=(tObject*)theObj->next;
+		LOG_DEBUG("LOG: MO-obj %p type=%p flags=0x%x flags2=0x%x isPlayer=%d\n",
+		       (void*)theObj, (void*)theObj->type,
+		       (unsigned)(*theObj->type).flags, (unsigned)(*theObj->type).flags2,
+		       (theObj==gPlayerObj)?1:0); fflush(stdout);
 		if((theObj==gPlayerObj)||!(gFrameCount%kLowCalcRatio)){
-			if(gFrameCount%(2*kLowCalcRatio))
-				ObjectControl(theObj,input);		
+			if(gFrameCount%(2*kLowCalcRatio)){
+				LOG_DEBUG("LOG: MO-OC\n"); fflush(stdout);
+				ObjectControl(theObj,input);
+			}
+			LOG_DEBUG("LOG: MO-OP\n"); fflush(stdout);
 			ObjectPhysics(theObj);
 			if(next->prev==theObj){
-				MoveObject(theObj);		
+				LOG_DEBUG("LOG: MO-MO\n"); fflush(stdout);
+				MoveObject(theObj);
+				LOG_DEBUG("LOG: MO-AO\n"); fflush(stdout);
 				AnimateObject(theObj);
 			}
 		}else{
-			MoveObject(theObj);		
+			LOG_DEBUG("LOG: MO-MO2\n"); fflush(stdout);
+			MoveObject(theObj);
+			LOG_DEBUG("LOG: MO-AO2\n"); fflush(stdout);
 			AnimateObject(theObj);
 		}
 		theObj=next;
 	}
+	LOG_DEBUG("LOG: MO-sort\n"); fflush(stdout);
 	SortObjects();
+	LOG_DEBUG("LOG: MO-done\n"); fflush(stdout);
 }

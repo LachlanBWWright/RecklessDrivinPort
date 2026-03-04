@@ -29,18 +29,7 @@ extern int gOSX;
 
 short GetPrefsFile(FSSpec *spec)
 {
-	int err;
-	long dirID;
-	short vRef;
-	DoError(FindFolder(kOnSystemDisk,kPreferencesFolderType,kCreateFolder,&vRef,&dirID));
-	err=FSMakeFSSpec(vRef,dirID,"\pReckless Drivin' Prefs",spec);
-	if(err==fnfErr)
-	{
-		DoError(FSpCreate(spec,'????','pref',smSystemScript));
-		WritePrefs(true);
-	}
-	else 
-		DoError(err);
+	return 0;
 }
 
 void ReInitGraphics()
@@ -84,51 +73,73 @@ void FirstRun()
 	else if((UInt32)cpuSpeed<250000000)
 		prefDefault=GetResource('Pref',129);
 	else prefDefault=GetResource('Pref',130);
-	BlockMoveData(*prefDefault,&gPrefs,sizeof(tPrefs));
-	ReleaseResource(prefDefault);	
+
+	if(!prefDefault) {
+		/* Default preferences for port - fallback when 'Pref' resource is unavailable */
+		memset(&gPrefs, 0, sizeof(tPrefs));
+		gPrefs.version = kPrefsVersion;
+		gPrefs.volume  = 256;
+		gPrefs.sound   = 1;
+		gPrefs.engineSound = 1;
+		gPrefs.hqSound = 0;
+		gPrefs.lineSkip = 0;
+		gPrefs.motionBlur = 0;
+		gPrefs.hiColor = 0;
+		/* Default keyboard bindings: arrow keys + space/shift/z/x/esc */
+		gPrefs.keyCodes[kForward]   = 0x7E; /* Up arrow */
+		gPrefs.keyCodes[kBackward]  = 0x7D; /* Down arrow */
+		gPrefs.keyCodes[kLeft]      = 0x7B; /* Left arrow */
+		gPrefs.keyCodes[kRight]     = 0x7C; /* Right arrow */
+		gPrefs.keyCodes[kKickdown]  = 0x38; /* Shift */
+		gPrefs.keyCodes[kBrake]     = 0x31; /* Space */
+		gPrefs.keyCodes[kFire]      = 0x06; /* Z */
+		gPrefs.keyCodes[kMissile]   = 0x07; /* X */
+		gPrefs.keyCodes[kAbort]     = 0x35; /* Escape */
+		gPrefs.keyCodes[kPause]     = 0x0F; /* R */
+		return;
+	}
+	{
+		long copySize = GetHandleSize(prefDefault);
+		if (copySize > (long)sizeof(tPrefs)) copySize = (long)sizeof(tPrefs);
+		BlockMoveData(*prefDefault,&gPrefs,copySize);
+		/* The Pref resource contains big-endian Mac values.
+		 * Byte-swap the multi-byte fields on little-endian platforms. */
+		gPrefs.version = (UInt16)be16_swap((uint16_t)gPrefs.version);
+		gPrefs.volume  = (UInt16)be16_swap((uint16_t)gPrefs.volume);
+		/* Clamp volume to a reasonable range */
+		if(gPrefs.volume > 256) gPrefs.volume = 100;
+	}
+	ReleaseResource(prefDefault);
+#ifdef PORT_SDL2
+	/* The original Pref resource maps driving to the numeric keypad.
+	 * Override with standard arrow-key + modifier bindings for the SDL2 port.
+	 * The Pref resources also have sound disabled by default; enable it here. */
+	gPrefs.sound       = 1;
+	gPrefs.engineSound = 1;
+	/* 16-bit textures/sprites are stored big-endian in the pack and are not
+	 * byte-swapped on little-endian platforms; force 8-bit mode to avoid
+	 * visual corruption (wrong-colour/striped road and sprite glitches). */
+	gPrefs.hiColor     = 0;
+	gPrefs.keyCodes[kForward]   = 0x7E; /* Up arrow */
+	gPrefs.keyCodes[kBackward]  = 0x7D; /* Down arrow */
+	gPrefs.keyCodes[kLeft]      = 0x7B; /* Left arrow */
+	gPrefs.keyCodes[kRight]     = 0x7C; /* Right arrow */
+	gPrefs.keyCodes[kKickdown]  = 0x38; /* Left Shift */
+	gPrefs.keyCodes[kBrake]     = 0x31; /* Space */
+	gPrefs.keyCodes[kFire]      = 0x06; /* Z */
+	gPrefs.keyCodes[kMissile]   = 0x07; /* X */
+	gPrefs.keyCodes[kAbort]     = 0x35; /* Escape */
+	gPrefs.keyCodes[kPause]     = 0x0F; /* R */
+#endif
 }
 
 void LoadPrefs()
 {
-	FSSpec spec;
-	short refNum;
-	long count=sizeof(tPrefs),eof;
-	GetPrefsFile(&spec);
-	DoError(FSpOpenDF(&spec,fsRdWrPerm,&refNum));
-	DoError(GetEOF(refNum,&eof));
-	if(eof==count)
-	{
-		DoError(FSRead(refNum,&count,&gPrefs));
-		DoError(FSClose(refNum));
-		if(gPrefs.version!=kPrefsVersion)
-			WritePrefs(true);
-	}
-	else if(eof<count){
-	 	FirstRun();
-		DoError(FSRead(refNum,&eof,&gPrefs));
-		gPrefs.version=kPrefsVersion;
-		DoError(FSClose(refNum));
-	}
-	else{
-		DoError(FSClose(refNum));
-		WritePrefs(true);
-	}
-	if(gOSX)
-		gPrefs.lineSkip=false;
+	FirstRun();
 }
 
 void WritePrefs(int reset)
 {
-	FSSpec spec;
-	short refNum;
-	long count=sizeof(tPrefs);
-	GetPrefsFile(&spec);
-	if(reset)
-		FirstRun();
-	DoError(FSpOpenDF(&spec,fsRdWrPerm,&refNum));
-	DoError(SetEOF(refNum,sizeof(tPrefs)));
-	DoError(FSWrite(refNum,&count,&gPrefs));
-	DoError(FSClose(refNum));
 }
 
 void DeactivateSubControls(ControlHandle cnt)

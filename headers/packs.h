@@ -33,6 +33,7 @@ UInt32 LoadPack(int);
 void UnloadPack(int);
 Ptr GetSortedPackEntry(int,int,int*);
 Ptr GetUnsortedPackEntry(int,int,int*);
+Ptr GetPackEntryByPos(int,int,int*);
 int NumPackEntries(int);
 int CheckPack(int num,UInt32 check);
 UInt32 BlockChecksum(UInt32 *data,UInt32 len);

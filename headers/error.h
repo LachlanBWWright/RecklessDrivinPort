@@ -3,7 +3,7 @@
 
 void HandleError(int id);
 
-inline void DoError(OSErr id)
+static inline void DoError(OSErr id)
 {
 	if(id) HandleError(id);
 }

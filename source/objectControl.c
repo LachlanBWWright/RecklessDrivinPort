@@ -52,7 +52,7 @@ void CheckTarget(tObject *theObj)
 	t2DPoint targDist=VEC2D_Difference(P2D(track->track[theObj->target].x,track->track[theObj->target].y),theObj->pos);
 	float sqTargDist=targDist.x*targDist.x+targDist.y*targDist.y;
 	int passed=(theObj->control==kObjectDriveUp||theObj->control==kObjectCopControl)?track->track[theObj->target].y<theObj->pos.y:track->track[theObj->target].y>theObj->pos.y;
-	if(sqTargDist<kTargetSwitchDist*kTargetSwitchDist||passed)
+	if(track->num&&(sqTargDist<kTargetSwitchDist*kTargetSwitchDist||passed))
 		theObj->target=(theObj->target+1)%track->num;
 }
 
@@ -214,7 +214,6 @@ void ObjectCrossRoad(tObject *theObj,tInputData *input)
 
 void ObjectControl(tObject *theObj,tInputData *input)
 {
-	CheckTarget(theObj);
 	if(theObj==gPlayerObj)
 	{
 		theObj->input=*input;
@@ -225,6 +224,8 @@ void ObjectControl(tObject *theObj,tInputData *input)
 		}
 	}
 	else if(!((*theObj->type).flags2&kObjectDamageble)||theObj->damage<(*theObj->type).maxDamage)
+	{
+		CheckTarget(theObj);
 		switch(theObj->control)
 		{
 			case kObjectNoInput:
@@ -243,6 +244,7 @@ void ObjectControl(tObject *theObj,tInputData *input)
 				CopFollow(theObj,&theObj->input);
 				break;
 		}
+	}
 	else{
 		theObj->input.brake=0;
 		theObj->input.throttle=0;

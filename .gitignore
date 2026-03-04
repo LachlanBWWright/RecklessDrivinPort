@@ -1,0 +1,26 @@
+# Build directories
+build/
+build_wasm/
+cmake-build-*/
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+install_manifest.txt
+
+# Compiled binaries
+*.o
+*.a
+*.so
+*.dylib
+reckless_drivin
+
+# macOS
+.DS_Store

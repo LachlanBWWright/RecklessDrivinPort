@@ -16,6 +16,10 @@
 #include "register.h"
 #include "preferences.h"
 #include "gamesounds.h"
+#include "byteswap_packs.h"
+#ifdef PORT_SDL2
+#include <SDL.h>
+#endif
 
 tRoad gRoadData;	
 UInt32 *gRoadLenght;
@@ -87,7 +91,7 @@ int LoadLevel()
 			return false;
 		}
 
-	(Ptr)gFirstObj=NewPtrClear(sizeof(tObject));
+	gFirstObj=(tObject*)NewPtrClear(sizeof(tObject));
 	gFirstObj->next=gFirstObj;
 	gFirstObj->prev=gFirstObj;
 	
@@ -98,16 +102,17 @@ int LoadLevel()
 	}
 
 	LoadPack(kPackLevel1+gLevelID);
-	(Ptr)gLevelData=GetSortedPackEntry(kPackLevel1+gLevelID,1,nil);
-	(Ptr)gMarks=GetSortedPackEntry(kPackLevel1+gLevelID,2,&gMarkSize);
+	PortByteSwapLevelPack(kPackLevel1+gLevelID);
+	gLevelData=(tLevelData*)GetSortedPackEntry(kPackLevel1+gLevelID,1,nil);
+	gMarks=(tMarkSeg*)GetSortedPackEntry(kPackLevel1+gLevelID,2,&gMarkSize);
 	gMarkSize/=sizeof(tMarkSeg);
-	(Ptr)gRoadInfo=GetSortedPackEntry(kPackRoad,gLevelData->roadInfo,nil);
-	(Ptr)gTrackUp=(Ptr)gLevelData+sizeof(tLevelData);
-	(Ptr)gTrackDown=(Ptr)gTrackUp+sizeof(UInt32)+gTrackUp->num*sizeof(tTrackInfoSeg);
-	(Ptr)gRoadLenght=LoadObjs((Ptr)gTrackDown+sizeof(UInt32)+gTrackDown->num*sizeof(tTrackInfoSeg));
-	(Ptr)gRoadData=(Ptr)gRoadLenght+sizeof(UInt32);
-	
-	for(i=0;i<9;i++)
+	gRoadInfo=(tRoadInfo*)GetSortedPackEntry(kPackRoad,gLevelData->roadInfo,nil);
+	gTrackUp=(tTrackInfo*)((Ptr)gLevelData+sizeof(tLevelData));
+	gTrackDown=(tTrackInfo*)((Ptr)gTrackUp+sizeof(UInt32)+gTrackUp->num*sizeof(tTrackInfoSeg));
+	gRoadLenght=(UInt32*)LoadObjs((Ptr)gTrackDown+sizeof(UInt32)+gTrackDown->num*sizeof(tTrackInfoSeg));
+	gRoadData=(tRoad)((Ptr)gRoadLenght+sizeof(UInt32));
+
+	for(i=0;i<10;i++)
 		if((*gLevelData).objGrps[i].resID)
 			InsertObjectGroup((*gLevelData).objGrps[i]);
 
@@ -193,6 +198,7 @@ void GetLevelNumber()
 
 void StartGame(int lcheat)
 {
+	LOG_DEBUG("LOG: StartGame called (lcheat=%d)\n", lcheat);
 	DisposeInterface();
 	gPlayerLives=3;
 	gExtraLives=0;
@@ -206,8 +212,32 @@ void StartGame(int lcheat)
 	gNumMines=0;
 	gGameOn=true;
 	gEndGame=false;
+#ifdef PORT_SDL2
+	/* Level-skip cheat: hold a number key (0-9) when clicking Start */
+	{
+		const Uint8 *keys = SDL_GetKeyboardState(NULL);
+		int i;
+		for(i=1;i<=9;i++)
+			if(keys[SDL_SCANCODE_1+i-1])
+			{
+				gLevelID=i-1;
+				if(gLevelID>=NumLevels())gLevelID=0;
+				lcheat=1;
+				LOG_DEBUG("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
+				break;
+			}
+		if(!lcheat&&keys[SDL_SCANCODE_0])
+		{
+			gLevelID=9;
+			if(gLevelID>=NumLevels())gLevelID=0;
+			lcheat=1;
+			LOG_DEBUG("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
+		}
+	}
+#else
 	if(lcheat)
 		GetLevelNumber();
+#endif
 	gLCheat=lcheat;
 	FadeScreen(1);
 	HideCursor();

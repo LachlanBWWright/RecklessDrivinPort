@@ -4,7 +4,7 @@
 #include "input.h"
 
 #define kNumHighScoreEntrys	10
-#define kPrefsVersion 4
+#define kPrefsVersion 5
 
 typedef struct{
 	Str15 name;

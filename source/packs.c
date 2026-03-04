@@ -14,30 +14,62 @@ typedef tPackHeader **tPackHandle;
 Handle gPacks[kNumPacks];
 #define kUnCryptedHeader 256
 
+/*
+ * Pack data is stored in Mac big-endian byte order.
+ * On little-endian platforms we must byte-swap when reading
+ * tPackHeader fields (SInt16 id, UInt32 offs).
+ */
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+static inline SInt16 PACK_ID(const tPackHeader *h)   { return (SInt16)(((h->id & 0xFF) << 8) | ((h->id >> 8) & 0xFF)); }
+static inline UInt32 PACK_OFFS(const tPackHeader *h) {
+    UInt32 v = h->offs;
+    return ((v & 0xFF000000u) >> 24) | ((v & 0x00FF0000u) >> 8) |
+           ((v & 0x0000FF00u) <<  8) | ((v & 0x000000FFu) << 24);
+}
+#else
+static inline SInt16 PACK_ID(const tPackHeader *h)   { return h->id; }
+static inline UInt32 PACK_OFFS(const tPackHeader *h) { return h->offs; }
+#endif
+
 UInt32 CryptData(UInt32 *data,UInt32 len)
 {
 	UInt32 check=0;
+	/*
+	 * The encryption key and data are in big-endian (Mac) byte order.
+	 * The UInt32 XOR must produce the same byte pattern as on the
+	 * original big-endian Mac, so on little-endian we byte-swap the
+	 * key for the 4-byte XOR.  The tail-byte code uses explicit
+	 * shifts that already assume big-endian bit numbering (>>24 is
+	 * the most-significant / first byte), so it uses the original key.
+	 */
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	UInt32 xorKey = ((gKey & 0xFF000000u) >> 24) | ((gKey & 0x00FF0000u) >> 8) |
+	                ((gKey & 0x0000FF00u) <<  8) | ((gKey & 0x000000FFu) << 24);
+#else
+	UInt32 xorKey = gKey;
+#endif
 	data+=kUnCryptedHeader/4;
 	len-=kUnCryptedHeader;
 	while(len>=4)
 	{
-		*data^=gKey;
+		*data^=xorKey;
 		check+=*data;
 		data++;
 		len-=4;
    	}
 	if(len)
 	{
-		*((UInt8*)data)^=gKey>>24;
-		check+=(*((UInt8*)data)++)<<24;
+		UInt8 *byteData = (UInt8*)data;
+		*byteData^=gKey>>24;
+		check+=(*byteData++)<<24;
 		if(len>1)
 		{
-			*((UInt8*)data)^=(gKey>>16)&0xff;
-			check+=(*((UInt8*)data)++)<<16;
+			*byteData^=(gKey>>16)&0xff;
+			check+=(*byteData++)<<16;
 			if(len>2)
 			{
-				*((UInt8*)data)^=(gKey>>8)&0xff;
-				check+=(*((UInt8*)data)++)<<8;
+				*byteData^=(gKey>>8)&0xff;
+				check+=(*byteData++)<<8;
 			}
 		}
 	}
@@ -94,19 +126,19 @@ void UnloadPack(int num)
 Ptr GetSortedPackEntry(int packNum,int entryID,int *size)
 {
 	tPackHeader *pack=(tPackHeader*)*gPacks[packNum];
-	int startId=pack[1].id;
-	UInt32 offs=pack[entryID-startId+1].offs;
+	int startId=PACK_ID(&pack[1]);
+	UInt32 offs=PACK_OFFS(&pack[entryID-startId+1]);
 	if(size)
-		if(entryID-startId+1==pack->id)
+		if(entryID-startId+1==PACK_ID(pack))
 			*size=GetHandleSize(gPacks[packNum])-offs;
 		else
-			*size=pack[entryID-startId+2].offs-offs;
+			*size=PACK_OFFS(&pack[entryID-startId+2])-offs;
 	return (Ptr)pack+offs;
 }
 
 int ComparePackHeaders(const tPackHeader *p1,const tPackHeader *p2)
 {
-	return p1->id-p2->id;
+	return PACK_ID(p1)-PACK_ID(p2);
 }
 
 Ptr GetUnsortedPackEntry(int packNum,int entryID,int *size)
@@ -114,16 +146,21 @@ Ptr GetUnsortedPackEntry(int packNum,int entryID,int *size)
 	tPackHeader *pack=(tPackHeader*)*gPacks[packNum];
 	tPackHeader key,*found;
 	UInt32 offs;
-	key.id=entryID;
-	found=bsearch(&key,pack+1,pack->id,sizeof(tPackHeader),ComparePackHeaders);
+	/* For bsearch key, store ID in big-endian (same as on-disk format) */
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	key.id = (SInt16)(((entryID & 0xFF) << 8) | ((entryID >> 8) & 0xFF));
+#else
+	key.id = entryID;
+#endif
+	found=bsearch(&key,pack+1,PACK_ID(pack),sizeof(tPackHeader),ComparePackHeaders);
 	if(found)
 	{
-		offs=found->offs;
+		offs=PACK_OFFS(found);
 		if(size)
-			if(pack->id==found-pack)
+			if(PACK_ID(pack)==found-pack)
 				*size=GetHandleSize(gPacks[packNum])-offs;
 			else
-				*size=(found+1)->offs-offs;
+				*size=PACK_OFFS(found+1)-offs;
 		return (Ptr)pack+offs;
 	}
 	else return 0;
@@ -131,5 +168,30 @@ Ptr GetUnsortedPackEntry(int packNum,int entryID,int *size)
 
 int NumPackEntries(int num)
 {
-	return gPacks[num]?(**(tPackHandle)gPacks[num]).id:0;
+	if (!gPacks[num]) return 0;
+	tPackHeader *pack = (tPackHeader*)*gPacks[num];
+	return PACK_ID(pack);
+}
+
+/* Get pack entry by 1-based position in the header array.
+ * Position 1 = first entry, position n = last entry.
+ * Unlike GetSortedPackEntry this does not assume sequential IDs,
+ * so it can iterate every entry in a pack regardless of ID gaps. */
+Ptr GetPackEntryByPos(int packNum, int pos, int *size)
+{
+	tPackHeader *pack;
+	int n;
+	UInt32 offs;
+	if (!gPacks[packNum]) return 0;
+	pack = (tPackHeader*)*gPacks[packNum];
+	n = PACK_ID(pack);
+	if (pos < 1 || pos > n) return 0;
+	offs = PACK_OFFS(&pack[pos]);
+	if (size) {
+		if (pos == n)
+			*size = (int)GetHandleSize(gPacks[packNum]) - (int)offs;
+		else
+			*size = (int)PACK_OFFS(&pack[pos+1]) - (int)offs;
+	}
+	return (Ptr)pack + offs;
 }

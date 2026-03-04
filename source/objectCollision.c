@@ -75,7 +75,7 @@ t2DPoint SectPoint(t2DPoint *l1p1,t2DPoint *l1p2,t2DPoint *l2p1,t2DPoint *l2p2)
 	return P2D(x,y);		
 }
 
-inline float sqr(float x)
+static inline float sqr(float x)
 {
 	return x*x;
 }
@@ -111,56 +111,65 @@ void MakeDebris(tObject *theObj,int damagePos,float damage,float maxDamage)
 	float xSize=(*objType).width*kScale,ySize=(*objType).length*kScale;
 	if(damagePos!=kMotor&&RanProb(kDebrisProbility*damage/maxDamage))
 	{
-		tObject *debrisObj;
+		tObject *debrisObj=nil;
 		switch(damagePos){
 			case kFrontBumper:
 				debrisObj=NewObject(theObj,1014);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir)*ySize,cos(theObj->dir)*ySize));
 				debrisObj->dir=theObj->dir;
 				break;	
 			case kBackBumper:
 				debrisObj=NewObject(theObj,1014);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(-sin(theObj->dir)*ySize,-cos(theObj->dir)*ySize));
 				debrisObj->dir=theObj->dir+PI;
 				break;	
 			case kFrontLeftTire:
 				debrisObj=NewObject(theObj,1012);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir)*ySize,cos(theObj->dir)*ySize));
 				debrisObj->pos=VEC2D_Sum(debrisObj->pos,P2D(-cos(theObj->dir)*xSize,-sin(theObj->dir)*xSize));
 				debrisObj->dir=RanFl(0,2*PI);
 				break;	
 			case kFrontRightTire:
 				debrisObj=NewObject(theObj,1012);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir)*ySize,cos(theObj->dir)*ySize));
 				debrisObj->pos=VEC2D_Sum(debrisObj->pos,P2D(cos(theObj->dir)*xSize,sin(theObj->dir)*xSize));
 				debrisObj->dir=RanFl(0,2*PI);
 				break;	
 			case kBackLeftTire:
 				debrisObj=NewObject(theObj,1012);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(-sin(theObj->dir)*(*objType).length*kScale,-cos(theObj->dir)*(*objType).length*kScale));;
 				debrisObj->pos=VEC2D_Sum(debrisObj->pos,P2D(-cos(theObj->dir)*(*objType).width*kScale,-sin(theObj->dir)*(*objType).width*kScale));;
 				debrisObj->dir=RanFl(0,2*PI);
 				break;	
 			case kBackRightTire:
 				debrisObj=NewObject(theObj,1012);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(-sin(theObj->dir)*(*objType).length*kScale,-cos(theObj->dir)*(*objType).length*kScale));;
 				debrisObj->pos=VEC2D_Sum(debrisObj->pos,P2D(cos(theObj->dir)*(*objType).width*kScale,sin(theObj->dir)*(*objType).width*kScale));;
 				debrisObj->dir=RanFl(0,2*PI);
 				break;	
 			case kLeftDoor:
 				debrisObj=NewObject(theObj,1015);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(-cos(theObj->dir)*(*objType).width*kScale,-sin(theObj->dir)*(*objType).width*kScale));;
 				debrisObj->dir=theObj->dir;
 				debrisObj->rotVelo=-2*PI;
 				break;	
 			case kRightDoor:
 				debrisObj=NewObject(theObj,1016);
+				if(!debrisObj) break;
 				debrisObj->pos=VEC2D_Sum(theObj->pos,P2D(cos(theObj->dir)*(*objType).width*kScale,sin(theObj->dir)*(*objType).width*kScale));;
 				debrisObj->dir=theObj->dir;
 				debrisObj->rotVelo=2*PI;
 				break;					
 		}
-		debrisObj->velo=VEC2D_Sum(theObj->velo,P2D(sin(debrisObj->dir)*10,cos(debrisObj->dir)*10));
+		if(debrisObj)
+			debrisObj->velo=VEC2D_Sum(theObj->velo,P2D(sin(debrisObj->dir)*10,cos(debrisObj->dir)*10));
 	}
 }
 
@@ -323,6 +332,8 @@ void DoBounceElastic(tObject *obj1,tObject *obj2,t2DPoint diff)
 void BounceObjects(tObject *obj1,tObject *obj2)
 {
 	t2DPoint diff;
+	int sepIter=0;
+	const int kMaxSeparationIterations=200;
 	float boom=(VEC2D_Value(VEC2D_Difference(obj1->velo,obj2->velo))-kMinDamageVelo)*0.05;
 	boom=boom<0?0:boom;
 	if(boom)
@@ -336,8 +347,9 @@ void BounceObjects(tObject *obj1,tObject *obj2)
 			diff.y=1;		
 		obj2->pos=VEC2D_Sum(obj1->pos,VEC2D_Scale(diff,-kSeperatio));
 		obj1->pos=VEC2D_Sum(obj2->pos,VEC2D_Scale(diff,kSeperatio*kSeperatio));
+		sepIter++;
 	}
-	while(TestCollision(obj1,obj2,INFINITY));
+	while(TestCollision(obj1,obj2,INFINITY)&&sepIter<kMaxSeparationIterations);
 	diff=VEC2D_Norm(diff);
 	DoBounce(obj1,obj2,diff);    
 }
@@ -352,68 +364,76 @@ void BonusObject(tObject *theObj)
 			switch(RanInt(0,8))
 			{
 				case 0:
+        LOG_DEBUG("Addon: Lock triggered\n");
 					if(!(gPlayerAddOns&kAddOnLock))
 					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\pADDONShLOCKEDf"};
+						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\x0eADDONShLOCKEDf"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnLock;
 						ok=true;
 					}
 					break;	
 				case 1:
+        LOG_DEBUG("Addon: Mines triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\pMINESee"};
+						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x07MINESee"};
 						NewTextEffect(&fx);
 						gNumMines+=5;
 						ok=true;
 					}
 					break;	
 				case 2:
+        LOG_DEBUG("Addon: Missiles triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\pMISSILESe"};
+						tTextEffect fx={320,240,kEffectExplode,0,"\x09MISSILESe"};
 						NewTextEffect(&fx);
 						gNumMissiles+=5;
 						ok=true;
 					}
 					break;	
 				case 3:
+        LOG_DEBUG("Addon: Spikes triggered\n");
 					if(!(gPlayerAddOns&kAddOnSpikes))
 					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\pSPIKESe"};
+						tTextEffect fx={320,240,kEffectExplode,0,"\x07SPIKESe"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnSpikes;
 						ok=true;
 					}
 					break;
 				case 4:
+        LOG_DEBUG("Addon: Police jammer triggered\n");
 					if(!(gPlayerAddOns&kAddOnCop))
 					{
-						tTextEffect fx={320,240,kEffectSinLines,0,"\pPOLICEhJAMMER"};
+						tTextEffect fx={320,240,kEffectSinLines,0,"\x0dPOLICEhJAMMER"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnCop;
 						ok=true;
 					}
 					break;	
 				case 5:
+        LOG_DEBUG("Addon: Turbo engine triggered\n");
 					if(!(gPlayerAddOns&kAddOnTurbo))
 					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\pTURBOhENGINEeee"};
+						tTextEffect fx={320,240,kEffectExplode,0,"\x0fTURBOhENGINEeee"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnTurbo;
 						ok=true;
 					}
 					break;	
 				case 6:
+        LOG_DEBUG("Addon: Score award triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\p][[[hAWARDEDf"};
+						tTextEffect fx={320,240,kEffectExplode,0,"\x0d][[[hAWARDEDf"};
 						NewTextEffect(&fx);
 						gPlayerScore+=2000;
 						ok=true;
 					}
 					break;
 				case 7:
+        LOG_DEBUG("Addon: Extra life triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\pEXTRAhLIFEee"};
+						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0cEXTRAhLIFEee"};
 						NewTextEffect(&fx);
 						gPlayerLives++;
 						SimplePlaySound(154);
@@ -428,11 +448,14 @@ void BonusObject(tObject *theObj)
 	KillObject(theObj);
 }
 
-void HandleCollision(tObject *posObj)
+int HandleCollision(tObject *posObj)
 {
 	tObject	*theObj=gFirstVisObj;
+	int hcIter=0;
 	while(theObj!=gLastVisObj)
 	{
+		if(++hcIter>10000){LOG_DEBUG("LOG: HandleCollision infinite loop! posObj=%p theObj=%p gFirstVisObj=%p gLastVisObj=%p\n",(void*)posObj,(void*)theObj,(void*)gFirstVisObj,(void*)gLastVisObj);break;}
+		tObject *nextObj=(tObject*)theObj->next;
 		if(theObj!=posObj&&theObj!=posObj->shooter&&posObj!=theObj->shooter)
 		{
 			float xdist=theObj->pos.x-posObj->pos.x;
@@ -440,57 +463,71 @@ void HandleCollision(tObject *posObj)
 			float sqdist=xdist*xdist+ydist*ydist;
 			if(sqdist<kMaxCollDist*kMaxCollDist)
 				if(TestCollision(posObj,theObj,sqdist))
-				{						
-					if((*theObj->type).flags&kObjectBounce)
+				{
+					/* Cache type flags and score before any KillObject calls that may free theObj */
+					UInt16 theObjFlags  = theObj->type->flags;
+					UInt16 theObjFlags2 = theObj->type->flags2;
+					t2DPoint theObjPos  = theObj->pos;
+					SInt16 theObjScore  = theObj->type->score;
+					int theObjKilled    = 0;
+					if(theObjFlags&kObjectBounce)
 					{
 						if((*posObj->type).flags2&kObjectMissile){
 							posObj->jumpHeight=0;
 							posObj->jumpVelo=0;
 							KillObject(theObj);
+							theObjKilled=1;
 						}else
 						 	BounceObjects(theObj,posObj);
 					}
 					if(VEC2D_Value(posObj->velo)>kMinJumpVelo)
 					{
 						int jumpScore=0;
-						if(theObj->type->flags2&kObjectRamp)
-							{posObj->jumpVelo=VEC2D_Value(posObj->velo);jumpScore=theObj->type->score;}
-						if(theObj->type->flags2&kObjectBump)
-							{posObj->jumpVelo=VEC2D_Value(posObj->velo)*0.45;jumpScore=theObj->type->score;}
+						if(theObjFlags2&kObjectRamp)
+							{posObj->jumpVelo=VEC2D_Value(posObj->velo);jumpScore=theObjScore;}
+						if(theObjFlags2&kObjectBump)
+							{posObj->jumpVelo=VEC2D_Value(posObj->velo)*0.45;jumpScore=theObjScore;}
 						if(posObj==gPlayerObj&&jumpScore)
 						{
 							tTextEffect fx;
 							Str31 str;
 							gPlayerScore+=jumpScore;
 							NumToString(jumpScore,str);
-							fx.x=theObj->pos.x;
-							fx.y=theObj->pos.y;
+							fx.x=theObjPos.x;
+							fx.y=theObjPos.y;
 							fx.effectFlags=kEffectExplode+kEffectTiny+kEffectAbsPos;
 							MakeFXStringFromNumStr(str,fx.text);
 							NewTextEffect(&fx);
 						}
 					}
-					if(theObj->type->flags&kObjectKillsCars)
+					if(theObjFlags&kObjectKillsCars){
+						LOG_DEBUG("LOG: HandleCollision – posObj killed by kObjectKillsCars (posObj=%p)\n",
+						       (void*)posObj);
 						KillObject(posObj);
-					if(theObj->type->flags&kObjectKilledByCars)
+						return 1; /* posObj may be freed; caller must not use posObj */
+					}
+					if(!theObjKilled&&(theObjFlags&kObjectKilledByCars)){
 						KillObject(theObj);
-					if((*theObj->type).flags2&kObjectOil)
+						theObjKilled=1;
+					}
+					if(theObjFlags2&kObjectOil)
 						posObj->rotVelo=(fabs(posObj->rotVelo)>0.2?1:0)*(posObj->rotVelo>0?1:-1)*PI*0.05*VEC2D_Value(posObj->velo);
 					if(posObj==gPlayerObj)
 					{
-						if((*theObj->type).flags&kObjectBonusFlag)
+						if(!theObjKilled&&(theObjFlags&kObjectBonusFlag))
 							BonusObject(theObj);
 					}
-					else if(theObj==gSpikeObj)
+					else if(!theObjKilled&&theObj==gSpikeObj)
 						if(posObj->type->flags2&kObjectDamageble)
 						{
-							DamageObj(posObj,VEC2D_Value(gPlayerObj->velo)*kLowFrameDuration*9,VEC2D_Norm(VEC2D_Difference(theObj->pos,posObj->pos)));
+							DamageObj(posObj,VEC2D_Value(gPlayerObj->velo)*kLowFrameDuration*9,VEC2D_Norm(VEC2D_Difference(theObjPos,posObj->pos)));
 							PlaySound(posObj->pos,gPlayerObj->velo,1,VEC2D_Value(gPlayerObj->velo)/70,143);
 						}
 				}
 		}
-		theObj=(tObject*)theObj->next;
+		theObj=nextObj;
 	}
+	return 0;
 }
 
 void ShotHitObject(tObject *theObj,t2DPoint *srcPoint,t2DPoint *shotPoint,t2DPoint *impactPoint)

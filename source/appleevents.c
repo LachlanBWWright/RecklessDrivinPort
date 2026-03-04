@@ -14,7 +14,7 @@ MyOpenFile(FSSpec *myFSS)
 	else{
 		AlertStdAlertParamRec alertParam={
 		false,false,nil,
-		"\pOK",
+		"\x02OK",
 		nil,
 		nil,
 		kAlertStdAlertOKButton,
@@ -23,8 +23,8 @@ MyOpenFile(FSSpec *myFSS)
 		short alertHit;
 
 		DoError(StandardAlert(kAlertStopAlert,
-			"\pYou cannot use custom level files using the unregistered version of Reckless Drivin'.",
-			"\pPlease pay the registration fee for Reckless Drivin to get rid of this message.",
+			"\x54You cannot use custom level files using the unregistered version of Reckless Drivin'.",
+			"\x4fPlease pay the registration fee for Reckless Drivin to get rid of this message.",
 			&alertParam,
 			&alertHit));
 	}

@@ -110,24 +110,26 @@ void DrawScreen(int button,GWorldPtr src)
 		MoveTo(630,475);
 		if(gRegistered)
 		{
-			Move(-StringWidth("\pRegistered To: "),0);
+			Move(-StringWidth("\x0fRegistered To: "),0);
 			Move(-StringWidth(gPrefs.name),0);
-			DrawString("\pRegistered To: ");
+			DrawString("\x0fRegistered To: ");
 			DrawString(gPrefs.name);
 		}
 		else{
-			Move(-StringWidth("\pеее This Copy is not Registered! еее"),0);
-			DrawString("\pеее This Copy is not Registered! еее");
+			Move(-StringWidth("\x24\xA0\xA0\xA0 This Copy is not Registered! \xA0\xA0\xA0"),0);
+			DrawString("\x24\xA0\xA0\xA0 This Copy is not Registered! \xA0\xA0\xA0");
 		}		
 		MoveTo(10,15);
 		if(gLevelResFile)
 		{
-			DrawString("\pCustom Level File: ");
+			DrawString("\x13Custom Level File: ");
 			DrawString(gLevelFileName);
 		}
 		ForeColor(blackColor);
 	}		
 	SetGWorld(oldGW,oldGD);
+	/* Flush to display after drawing to screen GWorld */
+	Blit2Screen();
 }
 
 void ScreenUpdate(WindowPtr win)
@@ -195,17 +197,27 @@ void InitInterface()
 		DrawPicture((PicHandle)pic,&gwSize);
 		DisposeHandle(pic);	
 		SetGWorld(oldGW,oldGD);
-		(Handle)gButtonList=GetResource('Recs',1000);
+		gButtonList=(Rect**)GetResource('Recs',1000);
+		/* The Recs resource contains big-endian Mac Rect structs.
+		 * On little-endian platforms we must byte-swap all fields. */
+		if(gButtonList && *gButtonList) {
+			int nRects=(int)(GetHandleSize((Handle)gButtonList)/sizeof(Rect));
+			int ri;
+			HLock((Handle)gButtonList);
+			for(ri=0;ri<nRects;ri++)
+				SwapRect((*gButtonList)+ri);
+			HUnlock((Handle)gButtonList);
+		}
 		gButtonRgn=NewRgn();
 		gInterfaceInited=true;
 	}
 	InputMode(kInputSuspended);
 	FadeScreen(1);
+	gGameOn=false;
 	ScreenMode(kScreenRunning);
 	ScreenUpdate(nil);
 	FadeScreen(0);
 	SaveFlushEvents();
-	gGameOn=false;
 }
 
 void UpdateButtonLocation()

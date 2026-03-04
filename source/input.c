@@ -1,8 +1,15 @@
+#ifndef PORT_SDL2
 #define CALL_IN_SPOCKETS_BUT_NOT_IN_CARBON 1
 #include <InputSprocket.h>
 #include <DriverServices.h>
-#include <math.h>
 #include <iShockXForceAPI.h>
+#include <HID_Utilities_CFM.h>
+#define kCreator 0x52000002u  /* Mac creator code */
+#endif /* !PORT_SDL2 */
+#ifdef PORT_SDL2
+#include <SDL2/SDL.h>
+#endif
+#include <math.h>
 #include "error.h"
 #include "input.h"
 #include "interface.h"
@@ -10,13 +17,13 @@
 #include "screen.h"
 #include "gameframe.h"
 #include "preferences.h"
-#include <HID_Utilities_CFM.h>
 
-#define kCreator 'RŒ2'
 #define kMinSwitchDelay		15		//Minimum Delay between siwtching reverse gears in frames.
 
+#ifndef PORT_SDL2
 ISpElementReference *gVirtualElements;
 ISpElementListReference gEventElements;
+#endif
 tInputData gInputData;
 int gFire,gMissile;
 int gInputISp=false;
@@ -24,15 +31,18 @@ int gInputHID=false;
 int gForceFeedback=false;
 unsigned long gSwitchDelayStart;
 int gLastScan[kNumElements];
+#ifndef PORT_SDL2
 iS2F_DeviceRef_t giShockList[iS2F_MAX_ISHOCK2_NUM];
 pRecElement *gElements;
 pRecDevice gController;
 int gNumHIDElements=0;
 extern int gOSX;
+#endif
 
 int gFFBBlock=0;
 void FFBJolt(float lMag,float rMag,float duration)
 {
+#ifndef PORT_SDL2
 	if(gForceFeedback)
 	{
 		iS2F_JoltCmd_t joltCmd;
@@ -42,10 +52,14 @@ void FFBJolt(float lMag,float rMag,float duration)
 		iS2F_SimpleJolt(giShockList[0],&joltCmd);
 		gFFBBlock=gFrameCount+duration*kCalcFPS;
 	}
+#else
+	(void)lMag; (void)rMag; (void)duration;
+#endif
 }
 
 void FFBDirect(float lMag,float rMag)
 {
+#ifndef PORT_SDL2
 	if(gForceFeedback&&gFrameCount>gFFBBlock)
 	{
 		iS2F_MotorCmd_t directCmd;
@@ -53,10 +67,14 @@ void FFBDirect(float lMag,float rMag)
 		directCmd.rightMotorMagnitude=rMag*10;
 		iS2F_SimpleDirectControl(giShockList[0],&directCmd);
 	}
+#else
+	(void)lMag; (void)rMag;
+#endif
 }
 
 void FFBStop()
 {
+#ifndef PORT_SDL2
 	if(gForceFeedback)
 	{
 		iS2F_MotorCmd_t directCmd;
@@ -64,10 +82,12 @@ void FFBStop()
 		directCmd.rightMotorMagnitude=0;
 		iS2F_SimpleDirectControl(giShockList[0],&directCmd);
 	}
+#endif
 }
 
 void InputMode(int mode)
 {
+#ifndef PORT_SDL2
 	if(gInputISp)
 	{
 		switch(mode){
@@ -82,6 +102,7 @@ void InputMode(int mode)
 		}
 	}
 	else
+#endif
 	{
 		int i;
 		for(i=0;i<kNumElements;i++)
@@ -89,6 +110,7 @@ void InputMode(int mode)
 	}
 	if(mode==kInputStopped)
 	{
+#ifndef PORT_SDL2
 		if(gForceFeedback)
 		{
 			FFBStop();
@@ -99,11 +121,13 @@ void InputMode(int mode)
 			HIDReleaseDeviceList();
 			TearDownHIDCFM();
 		}
+#endif
 	}
 	if(mode==kInputSuspended&&gForceFeedback)
 		FFBStop();
 }
 
+#ifndef PORT_SDL2
 #define kHIDPage_GenericDesktop 0x1
 #define kHIDUsage_GD_Mouse 0x2
 #define kHIDUsage_GD_Keyboard 0x6
@@ -152,10 +176,10 @@ void InitInput()
 		ISpNeed** needs;
 		int needCount;
 		
-		(Handle)needs=GetResource('ISpN',128);
+		needs=(ISpNeed**)GetResource('ISpN',128);
 		HLock((Handle)needs);
 		needCount=GetHandleSize((Handle)needs)/sizeof(ISpNeed);
-		(Ptr)gVirtualElements=NewPtr(sizeof(ISpElementReference)*needCount);
+		gVirtualElements=(ISpElementReference*)NewPtr(sizeof(ISpElementReference)*needCount);
 		DoError(ISpElement_NewVirtualFromNeeds(needCount, *needs, gVirtualElements, 0));
 		DoError(ISpInit(needCount,*needs,gVirtualElements,kCreator,'????',0,128,0));
 		//DoError(ISpDevices_ActivateClass(kISpDeviceClass_SpeechRecognition));
@@ -183,6 +207,7 @@ void InitInput()
 	}
 
 }
+#endif /* !PORT_SDL2 */
 
 
 float ThrottleReset(float throttle)
@@ -212,6 +237,7 @@ short IsPressed(unsigned short k )
 
 int GetElement(int element)
 {
+#ifndef PORT_SDL2
 	if(gInputISp)
 	{
 		UInt32 tempInput;
@@ -219,23 +245,45 @@ int GetElement(int element)
 		return tempInput;
 	}
 	else
+#endif
 		if(IsPressed(gPrefs.keyCodes[element]))
 			return true;
+#ifdef PORT_SDL2
+	/* Hardcoded SDL2 fallback: arrow keys and WASD always drive,
+	 * independent of the keyCodes stored in preferences.
+	 * (The original 'Pref' resource defaults to numpad keys, not arrows.) */
+	{
+		const Uint8 *sdl_keys = SDL_GetKeyboardState(NULL);
+		switch(element)
+		{
+			case kForward:  if(sdl_keys[SDL_SCANCODE_UP]    || sdl_keys[SDL_SCANCODE_W]) return true; break;
+			case kBackward: if(sdl_keys[SDL_SCANCODE_DOWN]  || sdl_keys[SDL_SCANCODE_S]) return true; break;
+			case kLeft:     if(sdl_keys[SDL_SCANCODE_LEFT]  || sdl_keys[SDL_SCANCODE_A]) return true; break;
+			case kRight:    if(sdl_keys[SDL_SCANCODE_RIGHT] || sdl_keys[SDL_SCANCODE_D]) return true; break;
+			case kAbort:    if(sdl_keys[SDL_SCANCODE_ESCAPE]) return true; break;
+			default: break;
+		}
+	}
+#endif
+#ifndef PORT_SDL2
 	if(gInputHID&&element<=kMissile)
 		if(gPrefs.hidElements[element]<gNumHIDElements)
 			if(gElements[gPrefs.hidElements[element]]->type==2)
 				if(HIDGetElementValue(gController,gElements[gPrefs.hidElements[element]]))
 					return true;
+#endif
 	return false;
 }
 
 int GetElementHIDOnly(int element)
 {
+#ifndef PORT_SDL2
 	if(gInputHID&&element<=kMissile)
 		if(gPrefs.hidElements[element]<gNumHIDElements)
 			if(gElements[gPrefs.hidElements[element]]->type==2)
 				if(HIDGetElementValue(gController,gElements[gPrefs.hidElements[element]]))
 					return true;
+#endif
 	return false;
 }
 
@@ -252,6 +300,7 @@ int ContinuePress()
 
 int GetEvent(int *element,int *data)
 {
+#ifndef PORT_SDL2
 	if(gInputISp)
 	{
 		Boolean wasEvent;
@@ -265,6 +314,7 @@ int GetEvent(int *element,int *data)
 		else return false;
 	}
 	else
+#endif
 	{
 		int i;
 		for(i=0;i<kNumElements;i++)
@@ -423,6 +473,14 @@ void Input(tInputData **data)
 
 UInt64 GetMSTime()
 {
+#ifdef PORT_SDL2
+	/* SDL_GetTicks64 not available in Emscripten SDL2 port; use SDL_GetTicks */
+#if defined(__EMSCRIPTEN__)
+	return (UInt64)SDL_GetTicks() * 1000ULL;
+#else
+	return (UInt64)SDL_GetTicks64() * 1000ULL;
+#endif
+#else
 	if(gInputISp)
 	{
 		AbsoluteTime t=ISpUptime();
@@ -437,14 +495,18 @@ UInt64 GetMSTime()
 		UInt64 tMS=n/1000;
 		return tMS;
 	}
+#endif
 }
 
 void FlushInput()
 {
+#ifndef PORT_SDL2
 	if(gInputISp)
 		DoError(ISpElementList_Flush(gEventElements));
+#endif
 }
 
+#ifndef PORT_SDL2
 void GetKeyPress(int element,DialogPtr keyDlg,UInt8 *elements)
 {
 	int i,pressed=false;
@@ -483,7 +545,7 @@ void GetHIDPress(int element,DialogPtr keyDlg,UInt8 *elements)
 			{
 				if(HIDGetElementValue(gController,gElements[i]))
 				{
-					Str255 text="\pButton XXX";
+					Str255 text="\x0aButton XXX";
 					GetDialogItem(keyDlg,element+4,&type,&item,&box);
 					elements[element]=i;
 					text[10]='0'+(elements[element]%10);
@@ -511,7 +573,7 @@ void ConfigureHID()
 		DoError(SetDialogCancelItem(keyDlg,3));
 		for(i=0;i<8;i++)
 		{
-			Str255 text="\pButton XXX";
+			Str255 text="\x0aButton XXX";
 			GetDialogItem(keyDlg,i+4,&type,&item,&box);
 			elements[i]=gPrefs.hidElements[i];
 			text[10]='0'+(elements[i]%10);
@@ -542,8 +604,8 @@ void ConfigureHID()
 		0,
 		kWindowDefaultPosition};
 		DoError(StandardAlert(kAlertStopAlert,
-			"\pCouldn't find a compatible Gamepad.",
-			"\pPlug in your Gamepad and re-launch Reckless Drivin'.",
+			"\x23Couldn't find a compatible Gamepad.",
+			"\x31Plug in your Gamepad and re-launch Reckless Drivin'.",
 			&alertParam,
 			&hit));
 	}
@@ -586,3 +648,4 @@ void ConfigureInput()
 		DisposeDialog(keyDlg);
 	}
 }
+#endif /* !PORT_SDL2 */

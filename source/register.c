@@ -7,7 +7,8 @@
 #include "initexit.h"
 #include <math.h>
 
-#define kCreator 'Råç2'
+/* Mac creator code 'R??2' - used in Mac-only code paths */
+#define kCreator 0x52000002u
 
 UInt32 gKey;
 int gRegistered=false;
@@ -72,10 +73,27 @@ int CheckRegi()
 	BlockMoveData(gPrefs.name,upName,gPrefs.name[0]+1);
 	UpperString(upName,false);
 	StripSpaces(upName);
+
+	/* Name must be at least 4 chars long for the key derivation to be valid */
+	if(upName[0]<4) {
+		/* Short/empty name: running as open-source port, mark as registered.
+		 * Use the free registration key (name "Free", code "B3FB09B1EB"). */
+		gRegistered=true;
+		gKey=0x1E42A71F;
+		return gRegistered;
+	}
+
 	nameNum=upName+upName[0]-3;
 	codeNum=CodeStr2Long(gPrefs.code);
 	gKey=codeNum^*nameNum;
 	check=GetResource('Chck',128);
+	if(!check) {
+		/* 'Chck' resource not available - running in open-source port mode.
+		 * Use the free registration key (name "Free", code "B3FB09B1EB"). */
+		gRegistered=true;
+		gKey=0x1E42A71F;
+		return gRegistered;
+	}
 	gRegistered=CheckPack(kEncryptedPack,**((UInt32**)check));
 	ReleaseResource(check);
 	return gRegistered;
@@ -138,7 +156,7 @@ void EnterCode()
 		if(hit==kCodeOKButton){
 			AlertStdAlertParamRec alertParam={
 				false,false,nil,
-				"\pOK",
+				"\x02OK",
 				nil,
 				nil,
 				kAlertStdAlertOKButton,
@@ -153,14 +171,14 @@ void EnterCode()
 			WritePrefs(false);
 			if(CheckRegi())
 				DoError(StandardAlert(kAlertNoteAlert,
-					"\pThank you very much for registering.",
-					"\pHave fun!",
+					"\x24Thank you very much for registering.",
+					"\x09Have fun!",
 					&alertParam,
 					&hit));
 			else{
 				DoError(StandardAlert(kAlertStopAlert,
-					"\pSorry, your registration code and/or name are not correct.",
-					"\pPlease make sure you entered both exactly as you recieved them.",
+					"\x39Sorry, your registration code and/or name are not correct.",
+					"\x3ePlease make sure you entered both exactly as you recieved them.",
 					&alertParam,
 					&hit));
 				repeat=true;
@@ -174,7 +192,7 @@ void Register(int fullscreen)
 {
 	AlertStdAlertParamRec alertParam={
 		false,false,nil,
-		"\pOK",
+		"\x02OK",
 		nil,
 		nil,
 		kAlertStdAlertOKButton,
@@ -201,14 +219,14 @@ void Register(int fullscreen)
 					/*err=RR_Launch();
 					if(err==memFullErr)
 						DoError(StandardAlert(kAlertStopAlert,
-							"\pNot enough memory to launch Register.",
-							"\pPlease quit Reckless Drivin' and launch Register from the Finder.",
+							"\x24Not enough memory to launch Register.",
+							"\x40Please quit Reckless Drivin' and launch Register from the Finder.",
 							&alertParam,
 							&alertHit));
 					else if(err==dskFulErr)
 						DoError(StandardAlert(kAlertStopAlert,
-							"\pNot enough free space to put Register on your drive.",
-							"\pPlease delete some files.",
+							"\x32Not enough free space to put Register on your drive.",
+							"\x19Please delete some files.",
 							&alertParam,
 							&alertHit));				
 					else DoError(err);*/
@@ -218,19 +236,19 @@ void Register(int fullscreen)
 				{
 					ICInstance inst;
 					int icFailed=true;
-					Str255 url="\phttp://order.kagi.com/?F6";
+					Str255 url="\x19http://order.kagi.com/?F6";
 					long start=0,end=url[0];
 					if((Ptr)ICStart!=(Ptr)kUnresolvedCFragSymbolAddress)
 						if(!ICStart(&inst,kCreator))
 						{	
 							icFailed=false;
-				   			DoError(ICLaunchURL(inst,"\p",url+1,url[0],&start,&end));
+				   			DoError(ICLaunchURL(inst,"\x00",url+1,url[0],&start,&end));
 				   			DoError(ICStop(inst));
 			   			}
 			   		if(icFailed)
 		   				DoError(StandardAlert(kAlertStopAlert,
-								"\pUnable to access Internet Config",
-								"\pPlease manually enter the URL 'http://order.kagi.com/?F6' into your browser.",
+								"\x20Unable to access Internet Config",
+								"\x4cPlease manually enter the URL 'http://order.kagi.com/?F6' into your browser.",
 								&alertParam,
 								&alertHit));
 					Exit();
@@ -243,8 +261,8 @@ void Register(int fullscreen)
 	}
 	else{
 		DoError(StandardAlert(kAlertNoteAlert,
-		"\pYou have already registered this game.",
-		"\pThank you once again!",
+		"\x26You have already registered this game.",
+		"\x15Thank you once again!",
 		&alertParam,
 		&alertHit));
 	}
@@ -259,7 +277,7 @@ MANUALLY LANUCH REGISTER APP
 				int err;
 				FSSpec regApp;
 				LaunchParamBlockRec launchParams;
-				FSMakeFSSpec(0,0,"\pRegister",&regApp);
+				FSMakeFSSpec(0,0,"\x08Register",&regApp);
 				launchParams.launchBlockID=extendedBlock;
 				launchParams.launchEPBLength=extendedBlockLen;
 				launchParams.launchAppSpec=&regApp;
@@ -268,14 +286,14 @@ MANUALLY LANUCH REGISTER APP
 				err=LaunchApplication(&launchParams);
 				if(err==memFullErr)
 					DoError(StandardAlert(kAlertStopAlert,
-						"\pNot enough memory to launch Register.",
-						"\pPlease quit Reckless Drivin' and launch Register from the Finder",
+						"\x24Not enough memory to launch Register.",
+						"\x3ePlease quit Reckless Drivin' and launch Register from the Finder",
 						&alertParam,
 						&hit));
 				else if(err==fnfErr)
 					DoError(StandardAlert(kAlertStopAlert,
-						"\pThe Register Application could not be found.",
-						"\p",
+						"\x2aThe Register Application could not be found.",
+						"\x00",
 						&alertParam,
 						&hit));
 				else DoError(err);
