@@ -180,6 +180,7 @@ Handle Get1Resource(ResType theType, short theID) {
 /*---------------------------------------------------------------------------*/
 
 #ifdef _WIN32
+#include <windows.h>
 #include <io.h>
 #include <direct.h>
 #include <sys/stat.h>
@@ -778,10 +779,14 @@ void EndUpdate(WindowPtr w)   { }
 
 void Delay(long numTicks, long *finalTicks) {
     /* 1 tick = 1/60 second */
+#ifdef _WIN32
+    Sleep((DWORD)(numTicks * 1000 / 60));
+#else
     struct timespec ts;
     ts.tv_sec  = numTicks / 60;
     ts.tv_nsec = (numTicks % 60) * 16666667L;
     nanosleep(&ts, NULL);
+#endif
     if (finalTicks) *finalTicks = TickCount();
 }
 

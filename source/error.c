@@ -90,7 +90,7 @@ void HandleError(int id)
 	if(err)ExitToShell();
 #else
 	DebugStr(idStr);
-#if !defined(__EMSCRIPTEN__)
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
 	/* Port debug: print C backtrace so we can identify the error source */
 	{
 		void *bt[32]; int n;
