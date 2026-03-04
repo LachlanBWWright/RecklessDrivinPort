@@ -367,7 +367,7 @@ void BonusObject(tObject *theObj)
         LOG_DEBUG("Addon: Lock triggered\n");
 					if(!(gPlayerAddOns&kAddOnLock))
 					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\x0eADDONShLOCKEDf"};
+						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\x0e" "ADDONShLOCKEDf"};
 						NewTextEffect(&fx);
 						gPlayerAddOns|=kAddOnLock;
 						ok=true;
@@ -433,7 +433,7 @@ void BonusObject(tObject *theObj)
 				case 7:
         LOG_DEBUG("Addon: Extra life triggered\n");
 					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0cEXTRAhLIFEee"};
+						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0c" "EXTRAhLIFEee"};
 						NewTextEffect(&fx);
 						gPlayerLives++;
 						SimplePlaySound(154);

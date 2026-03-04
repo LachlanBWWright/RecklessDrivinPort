@@ -219,7 +219,7 @@ void PlayerHandling()
 		gDisplayScore=gPlayerScore;
 	if(gPlayerScore>(gExtraLives+1)*kExtraLiveScore)
 	{
-		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0cEXTRAhLIFEee"};
+		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0c" "EXTRAhLIFEee"};
 		NewTextEffect(&fx);
 		gExtraLives++;
 		gPlayerLives++;

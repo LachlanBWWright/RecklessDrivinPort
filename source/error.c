@@ -67,7 +67,7 @@ void HandleError(int id)
 	Str255 help;
 	AlertStdAlertParamRec alertParam={
 		false,false,nil,
-		"\x04Exit",
+		"\x04" "Exit",
 		nil,
 		nil,
 		kAlertStdAlertOKButton,
@@ -83,7 +83,7 @@ void HandleError(int id)
 	ShowCursor();
 	ScreenMode(kScreenSuspended);
 	err=StandardAlert(kAlertStopAlert,
-		"\x1cA fatal error has occured!!",
+		"\x1c" "A fatal error has occured!!",
 		idStr,
 		&alertParam,
 		&hit);

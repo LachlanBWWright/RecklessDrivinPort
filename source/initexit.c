@@ -57,7 +57,7 @@ int ReqCheck()
 	SInt32 resp;
 	AlertStdAlertParamRec alertParam={
 		false,false,nil,
-		"\x04Exit",
+		"\x04" "Exit",
 		nil,
 		nil,
 		kAlertStdAlertOKButton,
