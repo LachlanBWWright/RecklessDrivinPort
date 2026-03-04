@@ -17,6 +17,9 @@
 #include "preferences.h"
 #include "gamesounds.h"
 #include "byteswap_packs.h"
+#ifdef PORT_SDL2
+#include <SDL.h>
+#endif
 
 tRoad gRoadData;	
 UInt32 *gRoadLenght;
@@ -209,8 +212,25 @@ void StartGame(int lcheat)
 	gNumMines=0;
 	gGameOn=true;
 	gEndGame=false;
+#ifdef PORT_SDL2
+	/* Level-skip cheat: hold a number key (1-9) when clicking Start */
+	{
+		const Uint8 *keys = SDL_GetKeyboardState(NULL);
+		int i;
+		for(i=1;i<=9;i++)
+			if(keys[SDL_SCANCODE_1+i-1])
+			{
+				gLevelID=i-1;
+				if(gLevelID>=NumLevels())gLevelID=0;
+				lcheat=1;
+				printf("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
+				break;
+			}
+	}
+#else
 	if(lcheat)
 		GetLevelNumber();
+#endif
 	gLCheat=lcheat;
 	FadeScreen(1);
 	HideCursor();
