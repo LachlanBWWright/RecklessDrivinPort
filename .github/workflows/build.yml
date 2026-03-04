@@ -41,7 +41,8 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Check binary exists
-        run: test -f build/reckless_drivin && echo "Build succeeded: $(file build/reckless_drivin)"
+        run: |
+          test -f build/reckless_drivin && echo "Build succeeded: $(file build/reckless_drivin)"
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
@@ -188,7 +189,6 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: gh-pages/
-          if-no-files-found: error
 
   # ============================================================
   # Deploy to GitHub Pages (push to main/master only)
