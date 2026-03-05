@@ -752,6 +752,9 @@ void InitScreen(int unused) {
 #endif
 
     LOG_DEBUG("[SDL] InitScreen: %dx%d, rowBytes=%d\n", gXSize, gYSize, gRowBytes);
+#ifdef __EMSCRIPTEN__
+    EM_ASM({ console.log('[WASM] SDL InitScreen complete – video and audio ready'); });
+#endif
 }
 
 void ScreenMode(int mode) {
@@ -1748,7 +1751,9 @@ static void emscripten_main_loop(void) {
 /* WASM entry point - called from JS after page loads */
 int main(int argc, char *argv[]) {
     (void)argc; (void)argv;
+    EM_ASM({ console.log('[WASM] Reckless Drivin WASM starting up...'); });
     Init();
+    EM_ASM({ console.log('[WASM] Init() complete – entering main loop'); });
     s_initialized = 1;
     /* 0 = use browser's requestAnimationFrame (60fps), simulate_infinite_loop=1 */
     emscripten_set_main_loop(emscripten_main_loop, 0, 1);

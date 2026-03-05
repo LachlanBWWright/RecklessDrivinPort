@@ -135,6 +135,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js (for Angular build)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: port/angular-site/package-lock.json
+
+      - name: Install Angular dependencies
+        run: npm ci --prefix port/angular-site
+
+      - name: Build Angular site
+        run: |
+          cd port/angular-site
+          npx ng build --configuration=production --base-href=/RecklessDrivinPort/
+          echo "Angular build output:"
+          ls -lh dist/reckless-drivin/browser/
+
       - name: Install Emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
@@ -159,20 +176,24 @@ jobs:
       - name: Prepare GitHub Pages content (Angular + WASM)
         run: |
           mkdir -p gh-pages
-          # Copy WASM game files
-          cp build_wasm/reckless_drivin.js   gh-pages/ 2>/dev/null || true
-          cp build_wasm/reckless_drivin.wasm gh-pages/ 2>/dev/null || true
-          cp build_wasm/reckless_drivin.data gh-pages/ 2>/dev/null || true
-          # Copy Angular site (pre-built static files from port/angular-site/)
-          if [ -d port/angular-site/dist ]; then
-            cp -r port/angular-site/dist/. gh-pages/
+          # Copy WASM game files (they go at the repo root so the Angular
+          # app can fetch them at /RecklessDrivinPort/reckless_drivin.js etc.)
+          cp build_wasm/reckless_drivin.js   gh-pages/
+          cp build_wasm/reckless_drivin.wasm gh-pages/
+          cp build_wasm/reckless_drivin.data gh-pages/
+          # Copy Angular pre-built static files (browser/ sub-dir from ng build)
+          ANGULAR_DIST="port/angular-site/dist/reckless-drivin/browser"
+          if [ -d "$ANGULAR_DIST" ]; then
+            cp -r "$ANGULAR_DIST"/. gh-pages/
+            echo "Deployed Angular site from $ANGULAR_DIST"
           else
-            # Fallback: use shell.html as index
+            # Fallback: use WASM shell HTML or our custom shell
             if [ -f build_wasm/reckless_drivin.html ]; then
               cp build_wasm/reckless_drivin.html gh-pages/index.html
             else
               cp port/wasm/shell.html gh-pages/index.html
             fi
+            echo "Fallback: deployed shell.html as index.html"
           fi
           echo "Pages content:"
           ls -lh gh-pages/

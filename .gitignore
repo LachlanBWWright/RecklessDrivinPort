@@ -25,3 +25,8 @@ reckless_drivin
 # macOS
 .DS_Store
 nohup.out
+
+# Angular site build artifacts (node_modules, cache)
+port/angular-site/node_modules/
+port/angular-site/.angular/
+port/angular-site/dist/

@@ -203,12 +203,17 @@ if(EMSCRIPTEN)
     )
 
     # Memory: start with 64MB, allow growth
+    # ASYNCIFY is required to support blocking C idioms (while(StillDown()),
+    # WaitForPress(), etc.) in the single-threaded browser environment.
+    # Without it those loops spin forever and freeze the page.
     set(EMSCRIPTEN_FLAGS
         "-s USE_SDL=2"
         "-s ALLOW_MEMORY_GROWTH=1"
         "-s INITIAL_MEMORY=67108864"
         "-s WASM=1"
         "-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap]"
+        "-s ASYNCIFY=1"
+        "-s ASYNCIFY_STACK_SIZE=1048576"
         "--preload-file ${CMAKE_SOURCE_DIR}/port/resources/resources.dat@/resources.dat"
         "--shell-file ${CMAKE_SOURCE_DIR}/port/wasm/shell.html"
     )
@@ -217,7 +222,7 @@ if(EMSCRIPTEN)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${EMSCRIPTEN_FLAGS_STR}")
     # For WASM, update the resource path to the virtual FS
     add_compile_definitions(RESOURCES_DAT_PATH="/resources.dat")
-    message(STATUS "Building for WebAssembly (Emscripten)")
+    message(STATUS "Building for WebAssembly (Emscripten) with ASYNCIFY support")
 endif()
 
 # ============================================================

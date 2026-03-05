@@ -1,0 +1,231 @@
+/* ---- Design tokens ---- */
+:root {
+  --accent:     #e53935;
+  --bg:         #121212;
+  --surface:    #1e1e1e;
+  --surface2:   #252525;
+  --on-surface: #eeeeee;
+  --muted:      #9e9e9e;
+  --border:     #333;
+}
+
+/* ---- Toolbar ---- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--accent);
+  color: #fff;
+  padding: 0 16px;
+  height: 56px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.badge {
+  background: rgba(255,255,255,.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: .7rem;
+}
+
+.toolbar-spacer { flex: 1; }
+
+.toolbar-link {
+  color: #fff;
+  text-decoration: none;
+  font-size: .875rem;
+  opacity: .85;
+  transition: opacity .2s;
+  &:hover { opacity: 1; }
+}
+
+/* ---- Main layout ---- */
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 16px;
+  gap: 24px;
+}
+
+/* ---- Hero card ---- */
+.hero-card {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 28px 36px;
+  text-align: center;
+  max-width: 720px;
+  width: 100%;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+
+  h1 {
+    font-size: 1.8rem;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  p {
+    color: var(--muted);
+    line-height: 1.7;
+    font-size: .95rem;
+  }
+
+  kbd {
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: .8rem;
+    font-family: monospace;
+    color: #ddd;
+  }
+}
+
+/* ---- Game section ---- */
+.game-section {
+  background: var(--surface);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  max-width: 720px;
+  width: 100%;
+}
+
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: .875rem;
+  color: var(--muted);
+}
+
+.status-label { flex: 1; text-align: center; font-size: .8rem; }
+
+.btn-fullscreen {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--on-surface);
+  cursor: pointer;
+  padding: 4px 12px;
+  font-size: .8rem;
+  transition: background .15s;
+  &:hover { background: #333; }
+}
+
+/* ---- Canvas wrapper ---- */
+.canvas-wrapper {
+  position: relative;
+  width: 640px;
+  height: 480px;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #000;
+}
+
+canvas#canvas {
+  display: block;
+  width: 640px;
+  height: 480px;
+  max-width: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---- Loading overlay ---- */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  transition: opacity .4s;
+  z-index: 10;
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #333;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-msg { color: var(--muted); font-size: .9rem; }
+
+.progress-track {
+  width: 220px;
+  height: 5px;
+  background: #333;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width .2s ease;
+}
+
+/* ---- Controls bar ---- */
+.controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  font-size: .8rem;
+  color: var(--muted);
+}
+
+.controls-label { font-weight: 500; margin-right: 4px; }
+
+kbd {
+  background: #2a2a2a;
+  border: 1px solid #555;
+  border-radius: 3px;
+  padding: 2px 7px;
+  font-size: .75rem;
+  font-family: monospace;
+  color: #ccc;
+}
+
+/* ---- Footer ---- */
+footer {
+  text-align: center;
+  padding: 18px 16px;
+  color: var(--muted);
+  font-size: .75rem;
+  border-top: 1px solid #2a2a2a;
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}

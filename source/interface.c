@@ -10,6 +10,9 @@
 #include "lzrwHandleInterface.h"
 #include "register.h"
 #include <DrawSprocket.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 enum{
 	kNoButton=-1,
@@ -262,6 +265,9 @@ int GetButtonClick(Point mPos)
 			}else
 				DrawScreen(button,gMainScreenGW);
 			oldclicked=clicked;
+#ifdef __EMSCRIPTEN__
+			emscripten_sleep(16); /* yield to browser event loop (~60fps) */
+#endif
 		}
 	}
 	if(clicked){
@@ -331,8 +337,15 @@ void WaitForPress()
 		GetKeys(theKeys);
 		pressed=theKeys[0]|theKeys[1]|theKeys[2]|theKeys[3]|Button()|ContinuePress();
 		WaitNextEvent(everyEvent,&event,0,nil);
+#ifdef __EMSCRIPTEN__
+		emscripten_sleep(16); /* yield to browser event loop */
+#endif
 	}while(!pressed);
-	while(Button());
+	while(Button()){
+#ifdef __EMSCRIPTEN__
+		emscripten_sleep(16); /* yield to browser event loop */
+#endif
+	}
 	SaveFlushEvents();
 }
 
