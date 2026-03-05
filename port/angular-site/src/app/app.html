@@ -1,0 +1,68 @@
+<!-- Toolbar -->
+<header class="toolbar">
+  <span class="toolbar-title">Reckless Drivin'</span>
+  <span class="badge">WASM Port</span>
+  <span class="toolbar-spacer"></span>
+  <a href="https://github.com/LachlanBWWright/RecklessDrivinPort" target="_blank" rel="noopener" class="toolbar-link">
+    GitHub
+  </a>
+</header>
+
+<!-- Main content -->
+<main>
+  <!-- Hero card -->
+  <div class="hero-card">
+    <h1>Reckless Drivin' — WebAssembly Port</h1>
+    <p>
+      A fan-made SDL2 / Emscripten port of the classic Mac OS&nbsp;9 racing game
+      <em>Reckless Drivin'</em> by Jonas Echterhoff.<br />
+      Click inside the canvas and press <kbd>Enter</kbd> or click the <strong>Start</strong> button to play.
+    </p>
+  </div>
+
+  <!-- Game section -->
+  <section class="game-section">
+    <div class="game-header">
+      <span>Game</span>
+      <span class="status-label">{{ statusText() }}</span>
+      <button class="btn-fullscreen" (click)="toggleFullscreen()">&#x26F6; Fullscreen</button>
+    </div>
+
+    <!-- Canvas wrapper -->
+    <div class="canvas-wrapper">
+      <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
+
+      <!-- Loading overlay -->
+      <div class="loading-overlay" [class.hidden]="!overlayVisible()">
+        <div class="spinner"></div>
+        <p class="loading-msg">{{ statusText() }}</p>
+        <div class="progress-track">
+          <div class="progress-fill" [style.width.%]="progressPct()"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls hint -->
+    <div class="controls-bar">
+      <span class="controls-label">Controls:</span>
+      <kbd>Up</kbd> Gas &nbsp;
+      <kbd>Down</kbd> Brake &nbsp;
+      <kbd>Left</kbd><kbd>Right</kbd> Steer &nbsp;
+      <kbd>Space</kbd> Handbrake &nbsp;
+      <kbd>Z</kbd> Mine &nbsp;
+      <kbd>X</kbd> Missile &nbsp;
+      <kbd>Esc</kbd> Menu
+    </div>
+  </section>
+</main>
+
+<!-- Footer -->
+<footer>
+  Reckless Drivin' &#169; Jonas Echterhoff &nbsp;&middot;&nbsp;
+  SDL2/WASM port by
+  <a href="https://github.com/LachlanBWWright/RecklessDrivinPort" target="_blank" rel="noopener">
+    LachlanBWWright
+  </a>
+  &nbsp;&middot;&nbsp; Research by
+  <a href="https://nathancraddock.com/" target="_blank" rel="noopener">Nathan Craddock</a>
+</footer>

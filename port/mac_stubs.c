@@ -10,6 +10,9 @@
 #include <stdio.h>
 #include <time.h>
 #include <ctype.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 /* Forward declarations for QuickDraw helpers used by DrawPicture */
 static UInt8 *current_port_pixels(void);
@@ -785,7 +788,10 @@ void EndUpdate(WindowPtr w)   { }
 
 void Delay(long numTicks, UInt32 *finalTicks) {
     /* 1 tick = 1/60 second */
-#ifdef _WIN32
+#ifdef __EMSCRIPTEN__
+    /* In WASM, use emscripten_sleep to yield to the browser event loop */
+    emscripten_sleep((unsigned int)((numTicks * 1000UL + 59) / 60));
+#elif defined(_WIN32)
     /* Windows: Sleep() takes milliseconds */
     Sleep((DWORD)((numTicks * 1000UL + 59) / 60));
 #else

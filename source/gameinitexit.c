@@ -20,6 +20,9 @@
 #ifdef PORT_SDL2
 #include <SDL.h>
 #endif
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 tRoad gRoadData;	
 UInt32 *gRoadLenght;
@@ -78,6 +81,10 @@ void GameEndSequence();
 int LoadLevel()
 {
 	int i,sound;
+	LOG_DEBUG("LOG: LoadLevel called – gLevelID=%d\n", gLevelID);
+#ifdef __EMSCRIPTEN__
+	EM_ASM_INT({ console.log('[WASM] LoadLevel: level ' + $0); }, gLevelID);
+#endif
 	if(gLevelID>=kEncryptedPack-kPackLevel1||gLevelResFile)
 		if(!gRegistered)
 		{
@@ -199,6 +206,9 @@ void GetLevelNumber()
 void StartGame(int lcheat)
 {
 	LOG_DEBUG("LOG: StartGame called (lcheat=%d)\n", lcheat);
+#ifdef __EMSCRIPTEN__
+	EM_ASM({ console.log('[WASM] StartGame called - loading level...'); });
+#endif
 	DisposeInterface();
 	gPlayerLives=3;
 	gExtraLives=0;
