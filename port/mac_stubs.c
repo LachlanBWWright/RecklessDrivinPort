@@ -97,7 +97,9 @@ OSErr PtrToHand(const void *srcPtr, Handle *dstHndl, Size size)
 Ptr NewPtr(Size s)     { return (Ptr)malloc(s ? s : 1); }
 Ptr NewPtrClear(Size s){ Ptr p = NewPtr(s); if(p && s) memset(p,0,s); return p; }
 Size GetPtrSize(Ptr p) { 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
+    /* Android's libc declares malloc_usable_size as (const void*), which
+     * conflicts with the Linux (glibc) signature.  Return 0 on Android. */
     extern size_t malloc_usable_size(void *ptr);
     return (Size)malloc_usable_size(p); 
 #else
@@ -180,6 +182,8 @@ Handle Get1Resource(ResType theType, short theID) {
 /*---------------------------------------------------------------------------*/
 
 #ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>   /* Sleep(), DWORD */
 #  define _CRT_NONSTDC_NO_DEPRECATE
 #  include <io.h>
 #  include <direct.h>
@@ -781,10 +785,15 @@ void EndUpdate(WindowPtr w)   { }
 
 void Delay(long numTicks, UInt32 *finalTicks) {
     /* 1 tick = 1/60 second */
+#ifdef _WIN32
+    /* Windows: Sleep() takes milliseconds */
+    Sleep((DWORD)((numTicks * 1000UL + 59) / 60));
+#else
     struct timespec ts;
     ts.tv_sec  = numTicks / 60;
     ts.tv_nsec = (numTicks % 60) * 16666667L;
     nanosleep(&ts, NULL);
+#endif
     if (finalTicks) *finalTicks = TickCount();
 }
 
@@ -879,7 +888,10 @@ static int unpack_bits16(const UInt8 *src, int srcLen, UInt8 *dst, int dstCap) {
  * ~256× faster (from ~100 seconds to under 1 second for a 640×480 image).
  */
 #ifdef PORT_SDL2
-#include <SDL2/SDL.h>
+/* SDL2 include path: CMake points includes at the SDL2 header directory
+ * (e.g. /usr/include/SDL2 on Linux, or ${SDL2_SOURCE_DIR}/include on Android),
+ * so we always include SDL.h without the SDL2/ prefix, matching sdl_platform.c. */
+#include <SDL.h>
 extern SDL_Color s_palette[256];
 
 /* 32768-entry cache: rgb15 → palette index.  Invalidated by palette changes. */
