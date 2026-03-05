@@ -264,6 +264,11 @@ int GetElement(int element)
 			default: break;
 		}
 	}
+	/* On-screen touch controls (Android / touch-screen) */
+	{
+		extern int SDL_Platform_GetTouchKey(int element);
+		if (SDL_Platform_GetTouchKey(element)) return true;
+	}
 #endif
 #ifndef PORT_SDL2
 	if(gInputHID&&element<=kMissile)

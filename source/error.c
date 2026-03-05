@@ -91,6 +91,7 @@ void HandleError(int id)
 #else
 	DebugStr(idStr);
 	/* Port debug: print C backtrace so we can identify the error source */
+#if !defined(__EMSCRIPTEN__) && defined(__GLIBC__)
 	{
 		void *bt[32]; int n;
 		extern int backtrace(void**,int);
@@ -104,6 +105,7 @@ void HandleError(int id)
 			free(syms);
 		}
 	}
+#endif
 #endif
 	Exit();
 }

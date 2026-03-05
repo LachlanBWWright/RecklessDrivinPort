@@ -20,10 +20,12 @@
 
 void ObjectPhysics(tObject *);
 
+#ifndef _MSC_VER  /* MSVC treats abs() as an intrinsic; don't redefine it */
 int abs(int x)
 {
 	return x>=0?x:-x;
 }
+#endif
 
 void Explosion(t2DPoint pos,t2DPoint velo,int offs,float mass,int sound)
 {

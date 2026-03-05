@@ -1,0 +1,71 @@
+apply plugin: 'com.android.application'
+
+// SDL2_SOURCE_DIR can be passed as a Gradle property (-PSDL2_SOURCE_DIR=...)
+// or via the SDL2_SOURCE_DIR environment variable.
+def sdl2Dir = project.hasProperty('SDL2_SOURCE_DIR')
+        ? project.SDL2_SOURCE_DIR
+        : (System.getenv('SDL2_SOURCE_DIR') ?: '/tmp/SDL2')
+
+android {
+    namespace 'com.recklessdrivin'
+    compileSdk 34
+
+    // NDK version pre-installed on GitHub Actions ubuntu-latest
+    ndkVersion '25.2.9519653'
+
+    defaultConfig {
+        applicationId 'com.recklessdrivin'
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_shared",
+                          "-DPORT_SDL2=ON",
+                          "-DSDL2_SOURCE_DIR=${sdl2Dir}",
+                          "-DANDROID=1"
+                abiFilters 'arm64-v8a', 'x86_64'
+                cFlags "-Wno-implicit-function-declaration " +
+                       "-Wno-incompatible-pointer-types " +
+                       "-Wno-int-conversion"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            // Path relative to this build.gradle file:
+            // port/android/app/ → ../../.. → repo root
+            path '../../../CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = [
+                'src/main/java',
+                // SDL2 Java activity sources (copied in by CI before build)
+                "${sdl2Dir}/android-project/app/src/main/java"
+            ]
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            res.srcDirs     = ['src/main/res']
+            assets.srcDirs  = ['src/main/assets']
+        }
+    }
+
+    buildTypes {
+        debug   { minifyEnabled false }
+        release { minifyEnabled false }
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.12.0'
+}
