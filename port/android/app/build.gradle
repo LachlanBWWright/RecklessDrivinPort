@@ -36,8 +36,9 @@ android {
 
     externalNativeBuild {
         cmake {
-            // Path relative to this build.gradle file
-            path '../../CMakeLists.txt'
+            // Path relative to this build.gradle file:
+            // port/android/app/ → ../../.. → repo root
+            path '../../../CMakeLists.txt'
             version '3.22.1'
         }
     }

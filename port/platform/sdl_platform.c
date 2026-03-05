@@ -66,44 +66,43 @@ extern int gGameOn;
 /* ============================================================
  * On-screen touch controls (Android / touch-screen devices)
  *
- * Ergonomic gamepad layout (landscape), bottom 35% of screen:
+ * Ergonomic gamepad layout (landscape), bottom 30% of screen:
  *
- *  ┌──────────┬──────────┬──────────────┬────────┬──────────────┐
- *  │          │          │              │  MINE  │  MISSILE     │
- *  │  ◄ LEFT  │  RIGHT ► │   (dead)     │ (FIRE) │   (MSL)      │
- *  │          │          │              ├────────┼──────────────┤
- *  │          │          │              │ BRAKE  │   GAS  ►     │
- *  └──────────┴──────────┴──────────────┴────────┴──────────────┘
- *   x: 0%    20%        40%           55%       72%           100%
- *   y: 65%                                               100%
- *        ← D-PAD (left thumb) →              ← ACTIONS (right thumb) →
+ *   Bottom-left (left thumb):          Bottom-right (right thumb):
+ *   ┌──────────┬──────────┐           ┌──────────┬──────────┐
+ *   │          │          │           │  MINE    │ MISSILE  │
+ *   │  ◄◄ LEFT │ RIGHT ►► │           │  (●)     │  (↑)     │
+ *   │          │          │           ├──────────┼──────────┤
+ *   └──────────┴──────────┘           │  BRAKE   │  GAS     │
+ *    x:0%     20%        40%          │  (■)     │  (▲)     │
+ *    y:70%              100%          └──────────┴──────────┘
+ *                                      x:60%    80%       100%
+ *                                      y:70%              100%
  *
  * Zone fractions (normalised screen coords 0..1):
- *   Control strip: y >= TC_Y_TOP
- *   LEFT button:    x in [0,        TC_DPAD_R1], y in strip
- *   RIGHT button:   x in [TC_DPAD_R1, TC_DPAD_R2], y in strip
- *   (dead zone:     x in [TC_DPAD_R2, TC_ACT_L])
- *   MINE button:    x in [TC_ACT_L,  TC_WPN_MX],  y in [TC_Y_TOP, TC_ACT_MY]
- *   MISSILE button: x in [TC_WPN_MX, 1.0],         y in [TC_Y_TOP, TC_ACT_MY]
- *   BRAKE button:   x in [TC_ACT_L,  TC_GAS_MX],   y in [TC_ACT_MY, 1.0]
- *   GAS button:     x in [TC_GAS_MX, 1.0],          y in [TC_ACT_MY, 1.0]
+ *   Left d-pad: y >= TC_Y_TOP, x in [0, TC_DPAD_W]
+ *     LEFT:  x in [0,              TC_DPAD_L_R]
+ *     RIGHT: x in [TC_DPAD_L_R,    TC_DPAD_W  ]
+ *   Right action: y >= TC_Y_TOP, x in [TC_ACT_L, 1.0]
+ *     MINE:    x in [TC_ACT_L,  TC_ACT_MX], y in [TC_Y_TOP, TC_ACT_MY]
+ *     MISSILE: x in [TC_ACT_MX, 1.0       ], y in [TC_Y_TOP, TC_ACT_MY]
+ *     BRAKE:   x in [TC_ACT_L,  TC_ACT_MX], y in [TC_ACT_MY, 1.0      ]
+ *     GAS:     x in [TC_ACT_MX, 1.0       ], y in [TC_ACT_MY, 1.0      ]
  * ============================================================ */
 
-/* Zone boundaries (normalised 0..1) */
-#define TC_Y_TOP    0.65f  /* control strip starts at 65% of screen height */
-#define TC_DPAD_R1  0.20f  /* left edge of RIGHT button / right edge of LEFT */
-#define TC_DPAD_R2  0.40f  /* right edge of RIGHT button */
-#define TC_ACT_L    0.55f  /* left edge of action zone */
-#define TC_WPN_MX   0.72f  /* MINE/MISSILE horizontal divider */
-#define TC_GAS_MX   0.72f  /* BRAKE/GAS horizontal divider */
-#define TC_ACT_MY   0.82f  /* weapon-row / movement-row vertical divider */
+#define TC_Y_TOP    0.70f   /* control strip: bottom 30% of screen */
+#define TC_DPAD_L_R 0.20f   /* left/right split in d-pad: x < this = LEFT, else RIGHT */
+#define TC_DPAD_W   0.40f   /* d-pad occupies leftmost 40% of screen */
+#define TC_ACT_L    0.60f   /* action zone starts at 60% */
+#define TC_ACT_MX   0.80f   /* mine|missile / brake|gas vertical split */
+#define TC_ACT_MY   0.85f   /* weapon row / movement row horizontal split */
 
 #define TOUCH_MAX_FINGERS 10
 
 static struct {
     int          active;
     SDL_FingerID finger_id;
-    int          key_mask;   /* bitmask, bit k = kForward/kLeft/etc. */
+    int          key_mask;
 } s_touch_fingers[TOUCH_MAX_FINGERS];
 
 /* Per-key virtual state accumulated from all active fingers */
@@ -115,26 +114,28 @@ static int s_touch_controls_active = 0;
 /* Returns the bitmask of game keys activated by a normalised touch at (nx,ny) */
 static int touch_pos_to_keymask(float nx, float ny)
 {
-    /* Only the bottom strip is interactive */
     if (ny < TC_Y_TOP) return 0;
 
-    /* ---- Left d-pad ---- */
-    if (nx < TC_DPAD_R1) return (1 << kLeft);
-    if (nx < TC_DPAD_R2) return (1 << kRight);
-
-    /* ---- Dead zone between d-pad and action buttons ---- */
-    if (nx < TC_ACT_L) return 0;
-
-    /* ---- Right action zone ---- */
-    if (ny < TC_ACT_MY) {
-        /* Top weapon row */
-        if (nx < TC_WPN_MX) return (1 << kFire);     /* MINE  */
-        return (1 << kMissile);                        /* MISSILE */
-    } else {
-        /* Bottom movement row */
-        if (nx < TC_GAS_MX) return (1 << kBrake);    /* BRAKE */
-        return (1 << kForward);                        /* GAS   */
+    /* Left d-pad zone */
+    if (nx < TC_DPAD_W) {
+        if (nx < TC_DPAD_L_R) return (1 << kLeft);
+        return (1 << kRight);
     }
+
+    /* Right action zone */
+    if (nx >= TC_ACT_L) {
+        if (ny < TC_ACT_MY) {
+            /* Weapon row */
+            if (nx < TC_ACT_MX) return (1 << kFire);    /* MINE  */
+            return (1 << kMissile);                       /* MISSILE */
+        } else {
+            /* Drive row */
+            if (nx < TC_ACT_MX) return (1 << kBrake);   /* BRAKE */
+            return (1 << kForward);                       /* GAS   */
+        }
+    }
+
+    return 0; /* dead zone between d-pad and action */
 }
 
 /* Process one SDL finger event; down=1 for FINGERDOWN/MOTION, 0 for FINGERUP */
@@ -143,11 +144,9 @@ static void sdl_touch_finger_event(SDL_FingerID finger_id, float nx, float ny, i
     int i, slot = -1;
     int combined;
 
-    /* Find existing or free slot */
     for (i = 0; i < TOUCH_MAX_FINGERS; i++) {
         if (s_touch_fingers[i].active && s_touch_fingers[i].finger_id == finger_id) {
-            slot = i;
-            break;
+            slot = i; break;
         }
     }
     if (slot < 0 && down) {
@@ -166,7 +165,6 @@ static void sdl_touch_finger_event(SDL_FingerID finger_id, float nx, float ny, i
         s_touch_fingers[slot].key_mask  = touch_pos_to_keymask(nx, ny);
     }
 
-    /* Rebuild per-key state from all active fingers */
     combined = 0;
     for (i = 0; i < TOUCH_MAX_FINGERS; i++)
         combined |= s_touch_fingers[i].key_mask;
@@ -176,116 +174,258 @@ static void sdl_touch_finger_event(SDL_FingerID finger_id, float nx, float ny, i
     s_touch_controls_active = 1;
 }
 
-/*
- * SDL_Platform_GetTouchKey – query the on-screen touch state for a given
- * game-control element (kLeft, kRight, kForward, kFire, …).
- * Returns non-zero if the touch control is currently "pressed".
- */
 int SDL_Platform_GetTouchKey(int element)
 {
     if (element < 0 || element >= kNumElements) return 0;
     return s_touch_key_state[element];
 }
 
+/* ---- Touch overlay drawing helpers ---- */
+
+/* Fill a rect from normalised coords */
+static void tc_fill_nrect(int w, int h,
+                          float nx1, float ny1, float nx2, float ny2)
+{
+    SDL_Rect r;
+    r.x = (int)(nx1 * w);
+    r.y = (int)(ny1 * h);
+    r.w = (int)((nx2 - nx1) * w);
+    r.h = (int)((ny2 - ny1) * h);
+    if (r.w > 0 && r.h > 0)
+        SDL_RenderFillRect(s_renderer, &r);
+}
+
+/* Outline a rect from normalised coords */
+static void tc_draw_nrect(int w, int h,
+                          float nx1, float ny1, float nx2, float ny2)
+{
+    SDL_Rect r;
+    r.x = (int)(nx1 * w);
+    r.y = (int)(ny1 * h);
+    r.w = (int)((nx2 - nx1) * w);
+    r.h = (int)((ny2 - ny1) * h);
+    if (r.w > 0 && r.h > 0)
+        SDL_RenderDrawRect(s_renderer, &r);
+}
+
 /*
- * Helper: fill a rectangle defined by normalised screen fractions.
- * nx1/ny1 = top-left corner, nx2/ny2 = bottom-right corner.
+ * Draw a left-pointing arrow centred at (cx,cy) with half-width hw, half-height hh.
+ * ◄  shape: triangle + horizontal stem
  */
-static void tc_fill_rect(int w, int h, float nx1, float ny1, float nx2, float ny2)
+static void tc_draw_arrow_left(int cx, int cy, int hw, int hh)
 {
-    SDL_Rect r;
-    r.x = (int)(nx1 * w);
-    r.y = (int)(ny1 * h);
-    r.w = (int)((nx2 - nx1) * w);
-    r.h = (int)((ny2 - ny1) * h);
-    SDL_RenderFillRect(s_renderer, &r);
+    int tip = cx - hw;
+    int tail = cx + hw / 2;
+    int stem_h = hh / 3;
+
+    /* Arrowhead (filled triangle via horizontal scan lines) */
+    int i;
+    for (i = 0; i <= hw; i++) {
+        int row_half = (hh * i) / hw;
+        SDL_RenderDrawLine(s_renderer,
+            cx - i, cy - row_half,
+            cx - i, cy + row_half);
+    }
+    /* Stem */
+    SDL_Rect stem;
+    stem.x = tail - hw / 2;
+    stem.y = cy - stem_h;
+    stem.w = hw;
+    stem.h = stem_h * 2;
+    (void)stem; /* filled by triangle already */
+    SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy - stem_h);
+    SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy + stem_h);
+    SDL_RenderDrawLine(s_renderer, tail, cy - stem_h, tail, cy + stem_h);
 }
 
-static void tc_draw_border(int w, int h, float nx1, float ny1, float nx2, float ny2)
+/*
+ * Draw a right-pointing arrow centred at (cx,cy) with half-width hw, half-height hh.
+ */
+static void tc_draw_arrow_right(int cx, int cy, int hw, int hh)
 {
-    SDL_Rect r;
-    r.x = (int)(nx1 * w);
-    r.y = (int)(ny1 * h);
-    r.w = (int)((nx2 - nx1) * w);
-    r.h = (int)((ny2 - ny1) * h);
-    SDL_RenderDrawRect(s_renderer, &r);
+    int tip = cx + hw;
+    int tail = cx - hw / 2;
+    int i;
+
+    for (i = 0; i <= hw; i++) {
+        int row_half = (hh * i) / hw;
+        SDL_RenderDrawLine(s_renderer,
+            cx + i, cy - row_half,
+            cx + i, cy + row_half);
+    }
+    SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy - hh / 3);
+    SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy + hh / 3);
+    SDL_RenderDrawLine(s_renderer, tail, cy - hh / 3, tail, cy + hh / 3);
 }
 
-/* Draw the semi-transparent touch control overlay over the rendered frame */
+/*
+ * Draw an up-pointing arrow (GAS / accelerate) centred at (cx,cy).
+ */
+static void tc_draw_arrow_up(int cx, int cy, int hw, int hh)
+{
+    int tip = cy - hh;
+    int tail = cy + hh / 2;
+    int i;
+
+    for (i = 0; i <= hh; i++) {
+        int col_half = (hw * i) / hh;
+        SDL_RenderDrawLine(s_renderer,
+            cx - col_half, cy - i,
+            cx + col_half, cy - i);
+    }
+    SDL_RenderDrawLine(s_renderer, cx, tip, cx - hw / 3, tail);
+    SDL_RenderDrawLine(s_renderer, cx, tip, cx + hw / 3, tail);
+    SDL_RenderDrawLine(s_renderer, cx - hw / 3, tail, cx + hw / 3, tail);
+}
+
+/*
+ * Draw a down-pointing arrow (BRAKE) centred at (cx,cy).
+ */
+static void tc_draw_arrow_down(int cx, int cy, int hw, int hh)
+{
+    int tip = cy + hh;
+    int tail = cy - hh / 2;
+    int i;
+
+    for (i = 0; i <= hh; i++) {
+        int col_half = (hw * i) / hh;
+        SDL_RenderDrawLine(s_renderer,
+            cx - col_half, cy + i,
+            cx + col_half, cy + i);
+    }
+    SDL_RenderDrawLine(s_renderer, cx, tip, cx - hw / 3, tail);
+    SDL_RenderDrawLine(s_renderer, cx, tip, cx + hw / 3, tail);
+    SDL_RenderDrawLine(s_renderer, cx - hw / 3, tail, cx + hw / 3, tail);
+}
+
+/*
+ * Draw a simple circle (for MINE button) centred at (cx,cy) with radius r.
+ * Uses 8-way symmetry for a fast approximation.
+ */
+static void tc_draw_circle(int cx, int cy, int r)
+{
+    int x = 0, y = r, d = 3 - 2 * r;
+    while (y >= x) {
+        SDL_RenderDrawPoint(s_renderer, cx + x, cy + y);
+        SDL_RenderDrawPoint(s_renderer, cx - x, cy + y);
+        SDL_RenderDrawPoint(s_renderer, cx + x, cy - y);
+        SDL_RenderDrawPoint(s_renderer, cx - x, cy - y);
+        SDL_RenderDrawPoint(s_renderer, cx + y, cy + x);
+        SDL_RenderDrawPoint(s_renderer, cx - y, cy + x);
+        SDL_RenderDrawPoint(s_renderer, cx + y, cy - x);
+        SDL_RenderDrawPoint(s_renderer, cx - y, cy - x);
+        x++;
+        if (d < 0) d += 4 * x + 6;
+        else { d += 4 * (x - y) + 10; y--; }
+    }
+    /* Small spikes on the mine */
+    SDL_RenderDrawLine(s_renderer, cx, cy - r - 4, cx, cy - r + 2);
+    SDL_RenderDrawLine(s_renderer, cx, cy + r - 2, cx, cy + r + 4);
+    SDL_RenderDrawLine(s_renderer, cx - r - 4, cy, cx - r + 2, cy);
+    SDL_RenderDrawLine(s_renderer, cx + r - 2, cy, cx + r + 4, cy);
+}
+
+/*
+ * Draw a rocket / missile symbol (↑ with fins) centred at (cx,cy).
+ */
+static void tc_draw_rocket(int cx, int cy, int hw, int hh)
+{
+    /* Body */
+    SDL_RenderDrawLine(s_renderer, cx, cy - hh, cx, cy + hh / 2);
+    /* Nose */
+    SDL_RenderDrawLine(s_renderer, cx, cy - hh, cx - hw / 2, cy - hh / 2);
+    SDL_RenderDrawLine(s_renderer, cx, cy - hh, cx + hw / 2, cy - hh / 2);
+    /* Side fins */
+    SDL_RenderDrawLine(s_renderer, cx - hw / 2, cy - hh / 2, cx - hw, cy + hh / 2);
+    SDL_RenderDrawLine(s_renderer, cx - hw, cy + hh / 2, cx, cy + hh / 2);
+    SDL_RenderDrawLine(s_renderer, cx + hw / 2, cy - hh / 2, cx + hw, cy + hh / 2);
+    SDL_RenderDrawLine(s_renderer, cx + hw, cy + hh / 2, cx, cy + hh / 2);
+}
+
+/*
+ * Draw the semi-transparent touch control overlay over the rendered frame.
+ *
+ * Layout (in normalised coords):
+ *   [LEFT◄][RIGHT►]   ... dead zone ...   [MINE●][MISSILE🚀]
+ *                                          [BRAKE▼][GAS▲]
+ */
 static void sdl_render_touch_overlay(void)
 {
     int w = gXSize, h = gYSize;
-    Uint8 alpha_idle   = 45;
-    Uint8 alpha_active = 120;
+    /* alpha values: idle = muted translucent, active = bright */
+    Uint8 bg_idle   = 50;   /* button background when not pressed */
+    Uint8 bg_active = 140;  /* button background when pressed */
+    Uint8 ico_alpha = 220;  /* icon/glyph alpha */
+    int   pressed;
+
+    /* Button centre coords & glyph sizes */
+    int dpad_y  = (int)((TC_Y_TOP + 1.0f) * 0.5f * h);  /* vert centre of d-pad strip */
+    int left_cx = (int)(TC_DPAD_L_R * 0.5f * w);
+    int right_cx= (int)((TC_DPAD_L_R + TC_DPAD_W) * 0.5f * w);
+    int dpad_hw = (int)(TC_DPAD_L_R * w * 0.30f);
+    int dpad_hh = (int)((1.0f - TC_Y_TOP) * h * 0.25f);
+
+    /* Action zone row heights */
+    int wpn_cy  = (int)((TC_Y_TOP + TC_ACT_MY) * 0.5f * h);
+    int drv_cy  = (int)((TC_ACT_MY + 1.0f) * 0.5f * h);
+    int mine_cx = (int)((TC_ACT_L + TC_ACT_MX) * 0.5f * w);
+    int msl_cx  = (int)((TC_ACT_MX + 1.0f) * 0.5f * w);
+    int act_hw  = (int)((TC_ACT_MX - TC_ACT_L) * w * 0.25f);
+    int act_hh  = (int)((TC_ACT_MY - TC_Y_TOP) * h * 0.30f);
 
     if (!s_renderer) return;
     SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_BLEND);
 
-    /* ---- Left d-pad: LEFT button ---- */
-    SDL_SetRenderDrawColor(s_renderer, 60, 120, 255,
-        s_touch_key_state[kLeft] ? alpha_active : alpha_idle);
-    tc_fill_rect(w, h, 0.0f,     TC_Y_TOP, TC_DPAD_R1, 1.0f);
+    /* ---- LEFT button ---- */
+    pressed = s_touch_key_state[kLeft];
+    SDL_SetRenderDrawColor(s_renderer, 60, 100, 220, pressed ? bg_active : bg_idle);
+    tc_fill_nrect(w, h, 0.0f, TC_Y_TOP, TC_DPAD_L_R, 1.0f);
+    SDL_SetRenderDrawColor(s_renderer, 200, 220, 255, ico_alpha);
+    tc_draw_arrow_left(left_cx, dpad_y, dpad_hw, dpad_hh);
 
-    /* ---- Left d-pad: RIGHT button ---- */
-    SDL_SetRenderDrawColor(s_renderer, 60, 120, 255,
-        s_touch_key_state[kRight] ? alpha_active : alpha_idle);
-    tc_fill_rect(w, h, TC_DPAD_R1, TC_Y_TOP, TC_DPAD_R2, 1.0f);
+    /* ---- RIGHT button ---- */
+    pressed = s_touch_key_state[kRight];
+    SDL_SetRenderDrawColor(s_renderer, 60, 100, 220, pressed ? bg_active : bg_idle);
+    tc_fill_nrect(w, h, TC_DPAD_L_R, TC_Y_TOP, TC_DPAD_W, 1.0f);
+    SDL_SetRenderDrawColor(s_renderer, 200, 220, 255, ico_alpha);
+    tc_draw_arrow_right(right_cx, dpad_y, dpad_hw, dpad_hh);
 
-    /* ---- Action zone: MINE (top-left of action area) ---- */
-    SDL_SetRenderDrawColor(s_renderer, 220, 160, 0,
-        s_touch_key_state[kFire] ? alpha_active : alpha_idle);
-    tc_fill_rect(w, h, TC_ACT_L, TC_Y_TOP, TC_WPN_MX, TC_ACT_MY);
+    /* ---- MINE button ---- */
+    pressed = s_touch_key_state[kFire];
+    SDL_SetRenderDrawColor(s_renderer, 200, 150, 20, pressed ? bg_active : bg_idle);
+    tc_fill_nrect(w, h, TC_ACT_L, TC_Y_TOP, TC_ACT_MX, TC_ACT_MY);
+    SDL_SetRenderDrawColor(s_renderer, 255, 220, 80, ico_alpha);
+    tc_draw_circle(mine_cx, wpn_cy, (act_hw < act_hh ? act_hw : act_hh) / 2);
 
-    /* ---- Action zone: MISSILE (top-right of action area) ---- */
-    SDL_SetRenderDrawColor(s_renderer, 200, 60, 200,
-        s_touch_key_state[kMissile] ? alpha_active : alpha_idle);
-    tc_fill_rect(w, h, TC_WPN_MX, TC_Y_TOP, 1.0f, TC_ACT_MY);
+    /* ---- MISSILE button ---- */
+    pressed = s_touch_key_state[kMissile];
+    SDL_SetRenderDrawColor(s_renderer, 180, 50, 180, pressed ? bg_active : bg_idle);
+    tc_fill_nrect(w, h, TC_ACT_MX, TC_Y_TOP, 1.0f, TC_ACT_MY);
+    SDL_SetRenderDrawColor(s_renderer, 240, 160, 255, ico_alpha);
+    tc_draw_rocket(msl_cx, wpn_cy, act_hw, act_hh);
 
-    /* ---- Action zone: BRAKE (bottom-left of action area) ---- */
-    SDL_SetRenderDrawColor(s_renderer, 220, 60, 60,
-        s_touch_key_state[kBrake] ? alpha_active : alpha_idle);
-    tc_fill_rect(w, h, TC_ACT_L, TC_ACT_MY, TC_GAS_MX, 1.0f);
+    /* ---- BRAKE button ---- */
+    pressed = s_touch_key_state[kBrake];
+    SDL_SetRenderDrawColor(s_renderer, 200, 50, 50, pressed ? bg_active : bg_idle);
+    tc_fill_nrect(w, h, TC_ACT_L, TC_ACT_MY, TC_ACT_MX, 1.0f);
+    SDL_SetRenderDrawColor(s_renderer, 255, 160, 160, ico_alpha);
+    tc_draw_arrow_down(mine_cx, drv_cy, act_hw, act_hh);
 
-    /* ---- Action zone: GAS / ACCELERATE (bottom-right, largest button) ---- */
-    SDL_SetRenderDrawColor(s_renderer, 0, 200, 80,
-        s_touch_key_state[kForward] ? alpha_active : alpha_idle);
-    tc_fill_rect(w, h, TC_GAS_MX, TC_ACT_MY, 1.0f, 1.0f);
+    /* ---- GAS button (biggest, most prominent) ---- */
+    pressed = s_touch_key_state[kForward];
+    SDL_SetRenderDrawColor(s_renderer, 20, 160, 60, pressed ? bg_active : bg_idle);
+    tc_fill_nrect(w, h, TC_ACT_MX, TC_ACT_MY, 1.0f, 1.0f);
+    SDL_SetRenderDrawColor(s_renderer, 120, 255, 140, ico_alpha);
+    tc_draw_arrow_up(msl_cx, drv_cy, act_hw, act_hh);
 
-    /* ---- Border lines (thin white outlines) ---- */
-    SDL_SetRenderDrawColor(s_renderer, 255, 255, 255, 70);
-
-    /* Outer border of d-pad */
-    tc_draw_border(w, h, 0.0f, TC_Y_TOP, TC_DPAD_R2, 1.0f);
-    /* D-pad internal divider */
-    {
-        SDL_Rect r;
-        r.x = (int)(TC_DPAD_R1 * w) - 1;
-        r.y = (int)(TC_Y_TOP * h);
-        r.w = 2;
-        r.h = (int)((1.0f - TC_Y_TOP) * h);
-        SDL_RenderFillRect(s_renderer, &r);
-    }
-
-    /* Outer border of action zone */
-    tc_draw_border(w, h, TC_ACT_L, TC_Y_TOP, 1.0f, 1.0f);
-    /* Vertical divider MINE|MISSILE and BRAKE|GAS */
-    {
-        SDL_Rect r;
-        r.x = (int)(TC_WPN_MX * w) - 1;
-        r.y = (int)(TC_Y_TOP * h);
-        r.w = 2;
-        r.h = (int)((1.0f - TC_Y_TOP) * h);
-        SDL_RenderFillRect(s_renderer, &r);
-    }
-    /* Horizontal divider weapon-row / movement-row */
-    {
-        SDL_Rect r;
-        r.x = (int)(TC_ACT_L * w);
-        r.y = (int)(TC_ACT_MY * h) - 1;
-        r.w = (int)((1.0f - TC_ACT_L) * w);
-        r.h = 2;
-        SDL_RenderFillRect(s_renderer, &r);
-    }
+    /* ---- Button borders (white translucent outlines) ---- */
+    SDL_SetRenderDrawColor(s_renderer, 255, 255, 255, 90);
+    tc_draw_nrect(w, h, 0.0f,     TC_Y_TOP, TC_DPAD_L_R, 1.0f);
+    tc_draw_nrect(w, h, TC_DPAD_L_R, TC_Y_TOP, TC_DPAD_W, 1.0f);
+    tc_draw_nrect(w, h, TC_ACT_L, TC_Y_TOP, TC_ACT_MX, TC_ACT_MY);
+    tc_draw_nrect(w, h, TC_ACT_MX, TC_Y_TOP, 1.0f,    TC_ACT_MY);
+    tc_draw_nrect(w, h, TC_ACT_L, TC_ACT_MY, TC_ACT_MX, 1.0f);
+    tc_draw_nrect(w, h, TC_ACT_MX, TC_ACT_MY, 1.0f,  1.0f);
 
     SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_NONE);
 }
@@ -613,7 +753,7 @@ void InitScreen(int unused) {
 #ifdef __ANDROID__
     s_touch_controls_active = 1;  /* always active on Android */
 #else
-    if (SDL_GetNumTouchDevices() > 0)
+    if (SDL_GetNumTouchDevices() > 0 || getenv("SDL_TOUCH_CONTROLS"))
         s_touch_controls_active = 1;
 #endif
 

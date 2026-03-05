@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/tmp/wasm_serve/server.py", line 15, in <module>
+    httpd = socketserver.TCPServer(('0.0.0.0', 8777), CORSHandler)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 457, in __init__
+    self.server_bind()
+  File "/usr/lib/python3.12/socketserver.py", line 473, in server_bind
+    self.socket.bind(self.server_address)
+OSError: [Errno 98] Address already in use

@@ -779,7 +779,7 @@ Boolean StillDown(void) { return 0; }
 void BeginUpdate(WindowPtr w) { }
 void EndUpdate(WindowPtr w)   { }
 
-void Delay(long numTicks, long *finalTicks) {
+void Delay(long numTicks, UInt32 *finalTicks) {
     /* 1 tick = 1/60 second */
     struct timespec ts;
     ts.tv_sec  = numTicks / 60;

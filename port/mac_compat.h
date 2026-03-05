@@ -731,7 +731,7 @@ Boolean StillDown(void);
 /* Window update regions */
 void   BeginUpdate(WindowPtr w);
 void   EndUpdate(WindowPtr w);
-void   Delay(long numTicks, long *finalTicks);
+void   Delay(long numTicks, UInt32 *finalTicks);
 
 /* Random number generator */
 short  Random(void);
