@@ -226,13 +226,7 @@ static void tc_draw_arrow_left(int cx, int cy, int hw, int hh)
             cx - i, cy - row_half,
             cx - i, cy + row_half);
     }
-    /* Stem */
-    SDL_Rect stem;
-    stem.x = tail - hw / 2;
-    stem.y = cy - stem_h;
-    stem.w = hw;
-    stem.h = stem_h * 2;
-    (void)stem; /* filled by triangle already */
+    /* Outline the arrow shape */
     SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy - stem_h);
     SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy + stem_h);
     SDL_RenderDrawLine(s_renderer, tail, cy - stem_h, tail, cy + stem_h);
@@ -361,7 +355,7 @@ static void sdl_render_touch_overlay(void)
     /* Button centre coords & glyph sizes */
     int dpad_y  = (int)((TC_Y_TOP + 1.0f) * 0.5f * h);  /* vert centre of d-pad strip */
     int left_cx = (int)(TC_DPAD_L_R * 0.5f * w);
-    int right_cx= (int)((TC_DPAD_L_R + TC_DPAD_W) * 0.5f * w);
+    int right_cx = (int)((TC_DPAD_L_R + TC_DPAD_W) * 0.5f * w);
     int dpad_hw = (int)(TC_DPAD_L_R * w * 0.30f);
     int dpad_hh = (int)((1.0f - TC_Y_TOP) * h * 0.25f);
 
