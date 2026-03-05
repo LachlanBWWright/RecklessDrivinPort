@@ -1288,7 +1288,7 @@ void AddFloatToMessageBuffer(StringPtr label, float value) {
  */
 
 /* SDL_AudioSpec for mixer */
-#define SND_SAMPLE_RATE   22050
+#define SND_SAMPLE_RATE   22050  /* requested output rate; actual rate stored in s_output_rate */
 #define SND_CHANNELS      1
 #define SND_BUFFER_SIZE   1024
 #define MAX_SND_CHANNELS  16    /* max simultaneous Sound Manager channels */
@@ -1326,6 +1326,12 @@ static SndVoice  s_voices[MAX_SND_CHANNELS];
 static int       s_voice_count = 0;     /* high-water mark of allocated slots */
 static SDL_mutex *s_audio_mutex = NULL;
 static int       s_audio_open   = 0;
+/* Actual output sample rate reported by SDL after SDL_OpenAudio.  Initialized
+ * to the requested rate so rate calculations are safe before audio opens. */
+static int       s_output_rate  = SND_SAMPLE_RATE;
+/* Master volume scalar (0.0 -- 1.0).  Exposed to JavaScript via
+ * set_wasm_master_volume() so the browser UI slider can control it. */
+static float     s_master_volume = 1.0f;
 
 /* -------- Helper: get voice index for a channel -------- */
 static int voice_for_chan(SndChannelPtr chan) {
@@ -1377,8 +1383,8 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
                 /* stdSH / extSH 8-bit unsigned PCM: map 0-255 -> -32768..32512 */
                 sample = (int)((uint8_t)v->samples[idx] - 128) * 256;
             }
-            /* Apply volume */
-            sample = (int)(sample * v->vol_l);
+            /* Apply voice volume and master volume */
+            sample = (int)(sample * v->vol_l * s_master_volume);
             /* Clamp and mix */
             {
                 int32_t sum = (int32_t)out[i] + (int32_t)sample;
@@ -1409,10 +1415,15 @@ static void sdl_audio_open(void) {
         fprintf(stderr, "[SDL] SDL_OpenAudio failed: %s\n", SDL_GetError());
         return;
     }
+    /* Record the actual output rate the audio device agreed to use.
+     * Browsers (via Emscripten / Web Audio API) often prefer 44100 or 48000 Hz
+     * even when 22050 Hz is requested.  All voice playback-rate calculations
+     * must use this actual rate so that audio is neither sped up nor slowed. */
+    s_output_rate = (got.freq > 0) ? got.freq : SND_SAMPLE_RATE;
     s_audio_open = 1;
     SDL_PauseAudio(0);  /* start playback */
-    LOG_DEBUG("[SDL] Audio opened: %d Hz, format=%d, ch=%d\n",
-           got.freq, got.format, got.channels);
+    LOG_DEBUG("[SDL] Audio opened: %d Hz (requested %d Hz), format=%d, ch=%d\n",
+           got.freq, want.freq, got.format, got.channels);
 }
 
 /* ============================================================
@@ -1501,7 +1512,7 @@ static void voice_play_buffer(SndVoice *v, const uint8_t *snd_hdr) {
     if (src_rate < 100.0) src_rate = 22050.0;  /* sanity check */
 
     v->src_rate   = (uint32_t)src_rate;
-    v->rate       = src_rate / (double)SND_SAMPLE_RATE * v->rate_mul;
+    v->rate       = src_rate / (double)s_output_rate * v->rate_mul;
     v->loop_start = loop_start;
     v->loop_end   = loop_end;
     v->pos        = 0.0;
@@ -1566,7 +1577,7 @@ OSErr SndDoImmediate(SndChannelPtr chan, const SndCommand *cmd) {
         case 82: /* rateCmd */
             if (cmd->param2 > 0) {
                 v->rate_mul = (double)cmd->param2 / 65536.0;
-                v->rate = (double)v->src_rate / (double)SND_SAMPLE_RATE * v->rate_mul;
+                v->rate = (double)v->src_rate / (double)s_output_rate * v->rate_mul;
             }
             break;
         case 85: /* getRateCmd */
@@ -1580,7 +1591,7 @@ OSErr SndDoImmediate(SndChannelPtr chan, const SndCommand *cmd) {
             if (cmd->param2 > 0) {
                 v->rate_mul = (double)cmd->param2 / 65536.0;
                 if (v->src_rate > 0)
-                    v->rate = (double)v->src_rate / (double)SND_SAMPLE_RATE * v->rate_mul;
+                    v->rate = (double)v->src_rate / (double)s_output_rate * v->rate_mul;
             }
             break;
         case 81: /* bufferCmd - immediate version plays right away */
@@ -1704,6 +1715,19 @@ Component FindNextComponent(Component aComponent, ComponentDescription *looking)
     (void)aComponent; (void)looking;
     /* Return a fake non-NULL component so the game enters the sound rate setup */
     return (Component)(intptr_t)1;
+}
+
+/* -------- Master volume control (callable from JavaScript) -------- */
+/* set_wasm_master_volume: set the global output volume scalar (0.0 = mute,
+ * 1.0 = full).  Exported to JavaScript via EMSCRIPTEN_KEEPALIVE so the HTML
+ * volume slider can call Module._set_wasm_master_volume(value). */
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+void set_wasm_master_volume(float vol) {
+    if (vol < 0.0f) vol = 0.0f;
+    if (vol > 1.0f) vol = 1.0f;
+    s_master_volume = vol;
 }
 
 /* ============================================================

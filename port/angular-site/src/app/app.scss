@@ -205,6 +205,33 @@ canvas#canvas {
 
 .controls-label { font-weight: 500; margin-right: 4px; }
 
+/* ---- Volume bar ---- */
+.volume-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  font-size: .8rem;
+  color: var(--muted);
+}
+
+.volume-label { font-weight: 500; white-space: nowrap; }
+
+.volume-slider {
+  flex: 1;
+  max-width: 200px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.volume-value {
+  min-width: 36px;
+  text-align: right;
+  font-size: .8rem;
+  color: var(--on-surface);
+}
+
 kbd {
   background: #2a2a2a;
   border: 1px solid #555;

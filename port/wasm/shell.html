@@ -149,6 +149,25 @@
       font-family: monospace;
     }
 
+    /* Volume row */
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px;
+      border-top: 1px solid #333;
+      font-size: .75rem;
+      color: var(--muted);
+    }
+    .volume-row label { font-weight: 500; white-space: nowrap; }
+    .volume-row input[type=range] {
+      flex: 1;
+      max-width: 200px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    #volume-label { min-width: 36px; text-align: right; color: var(--on-surface); }
+
     /* Footer */
     footer {
       text-align: center;
@@ -209,6 +228,13 @@
           <kbd>X</kbd> Missile &nbsp;
           <kbd>Esc</kbd> Menu
         </div>
+
+        <div class="volume-row">
+          <label for="volume-slider"><span aria-hidden="true">🔊</span> Volume</label>
+          <input id="volume-slider" type="range" min="0" max="100" value="80"
+                 oninput="onVolumeChange(this.value)">
+          <span id="volume-label">80%</span>
+        </div>
       </section>
     </main>
 
@@ -262,6 +288,22 @@
         origOpen.apply(this, arguments);
       };
     })();
+
+    // Volume slider handler
+    function onVolumeChange(value) {
+      var pct = parseInt(value, 10);
+      var label = document.getElementById('volume-label');
+      if (label) label.textContent = pct + '%';
+      if (typeof Module !== 'undefined' && Module._set_wasm_master_volume) {
+        Module._set_wasm_master_volume(pct / 100.0);
+      }
+    }
+
+    // Apply initial volume once the WASM runtime is ready
+    Module.onRuntimeInitialized = function() {
+      var slider = document.getElementById('volume-slider');
+      if (slider) onVolumeChange(slider.value);
+    };
   </script>
   {{{ SCRIPT }}}
 </body>

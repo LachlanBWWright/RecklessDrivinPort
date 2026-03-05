@@ -186,6 +186,10 @@ Handle Get1Resource(ResType theType, short theID) {
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
+/* Exclude GDI and User32 subsystems to prevent name collisions with the Mac
+ * Toolbox stubs defined below (LineTo, SetRect, FillRect, ShowWindow, etc.). */
+#  define NOGDI
+#  define NOUSER
 #  include <windows.h>   /* Sleep(), DWORD */
 #  define _CRT_NONSTDC_NO_DEPRECATE
 #  include <io.h>

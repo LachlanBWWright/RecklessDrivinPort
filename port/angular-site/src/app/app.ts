@@ -11,6 +11,7 @@ export class App implements OnInit, OnDestroy {
   statusText = signal('Loading game data…');
   progressPct = signal(0);
   overlayVisible = signal(true);
+  masterVolume = signal(80);
 
   private wasmScript: HTMLScriptElement | null = null;
 
@@ -66,6 +67,8 @@ export class App implements OnInit, OnDestroy {
         this.statusText.set('Running');
         this.overlayVisible.set(false);
         console.log('[Angular] WASM runtime initialized');
+        // Apply the initial volume once the WASM module is ready
+        this.applyVolumeToWasm(this.masterVolume());
       },
       preRun: [],
       postRun: [],
@@ -90,6 +93,20 @@ export class App implements OnInit, OnDestroy {
       document.exitFullscreen();
     } else {
       canvas.requestFullscreen().catch((err) => console.warn('Fullscreen error:', err));
+    }
+  }
+
+  onVolumeChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const pct = parseInt(input.value, 10);
+    this.masterVolume.set(pct);
+    this.applyVolumeToWasm(pct);
+  }
+
+  private applyVolumeToWasm(pct: number): void {
+    const mod = (window as any)['Module'];
+    if (mod && typeof mod._set_wasm_master_volume === 'function') {
+      mod._set_wasm_master_volume(pct / 100.0);
     }
   }
 }
