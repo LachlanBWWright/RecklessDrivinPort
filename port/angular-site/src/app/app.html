@@ -53,6 +53,22 @@
       <kbd>X</kbd> Missile &nbsp;
       <kbd>Esc</kbd> Menu
     </div>
+
+    <!-- Volume control -->
+    <div class="volume-bar">
+      <label class="volume-label" for="volume-slider">🔊 Volume</label>
+      <input
+        id="volume-slider"
+        type="range"
+        min="0"
+        max="100"
+        [value]="masterVolume()"
+        (input)="onVolumeChange($event)"
+        class="volume-slider"
+        aria-label="Master volume"
+      />
+      <span class="volume-value">{{ masterVolume() }}%</span>
+    </div>
   </section>
 </main>
 
