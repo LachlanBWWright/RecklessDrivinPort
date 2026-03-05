@@ -1,6 +1,7 @@
 # Build directories
 build/
 build_wasm/
+build_wasm_local/
 cmake-build-*/
 
 # IDE files
