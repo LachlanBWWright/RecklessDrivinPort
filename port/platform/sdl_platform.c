@@ -1373,7 +1373,10 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
 
         /* Determine the effective loop boundary.  When a loop is defined, we
          * wrap at loop_end (not at num_samples), preventing audible clicks
-         * caused by playing the trailing audio past the intended loop point. */
+         * caused by playing the trailing audio past the intended loop point.
+         * These values are derived from the SoundHeader at voice-play time and
+         * are immutable during callback execution (the mutex is held for the
+         * duration of this entire loop, so no other thread can modify them). */
         int      has_loop = (v->loop_end > v->loop_start &&
                              v->loop_end <= v->num_samples);
         uint32_t end_pos  = has_loop ? v->loop_end : v->num_samples;
@@ -1383,7 +1386,10 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
             if (idx >= end_pos) {
                 if (has_loop) {
                     /* Loop: wrap position back to loop_start, preserving the
-                     * fractional overshoot for smooth looping. */
+                     * fractional overshoot for smooth looping.
+                     * overshoot = v->pos - end_pos.  Because idx = (uint32_t)v->pos
+                     * >= end_pos, we have v->pos >= end_pos, so overshoot >= 0.
+                     * The guard below is purely defensive. */
                     double overshoot = v->pos - (double)end_pos;
                     v->pos = (double)v->loop_start + overshoot;
                     if (v->pos < (double)v->loop_start)
