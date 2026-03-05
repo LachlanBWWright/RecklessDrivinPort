@@ -350,9 +350,9 @@ jobs:
         run: |
           chmod +x release/linux/reckless_drivin
           chmod +x release/macos/reckless_drivin
-          cd release/linux  && zip -9 ../reckless-drivin-linux.zip reckless_drivin
-          cd release/macos  && zip -9 ../reckless-drivin-macos.zip reckless_drivin
-          cd release/windows && zip -9 ../reckless-drivin-windows.zip reckless_drivin.exe
+          (cd release/linux   && zip -9 ../reckless-drivin-linux.zip reckless_drivin)
+          (cd release/macos   && zip -9 ../reckless-drivin-macos.zip reckless_drivin)
+          (cd release/windows && zip -9 ../reckless-drivin-windows.zip reckless_drivin.exe)
 
       - name: Create or update release
         uses: softprops/action-gh-release@v2

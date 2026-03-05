@@ -1290,7 +1290,13 @@ void AddFloatToMessageBuffer(StringPtr label, float value) {
 /* SDL_AudioSpec for mixer */
 #define SND_SAMPLE_RATE   22050  /* requested output rate; actual rate stored in s_output_rate */
 #define SND_CHANNELS      1
+/* WASM (Emscripten) needs a larger buffer to avoid audio underruns caused by the
+ * single-threaded browser event loop.  Desktop and Android are fine with 1024. */
+#ifdef __EMSCRIPTEN__
+#define SND_BUFFER_SIZE   4096
+#else
 #define SND_BUFFER_SIZE   1024
+#endif
 #define MAX_SND_CHANNELS  16    /* max simultaneous Sound Manager channels */
 
 typedef struct SndVoice {
@@ -1328,7 +1334,12 @@ static SDL_mutex *s_audio_mutex = NULL;
 static int       s_audio_open   = 0;
 /* Actual output sample rate reported by SDL after SDL_OpenAudio.  Initialized
  * to the requested rate so rate calculations are safe before audio opens. */
-static int       s_output_rate  = SND_SAMPLE_RATE;
+static int       s_output_rate     = SND_SAMPLE_RATE;
+/* Actual number of output channels (1=mono, 2=stereo).  Browsers often force
+ * stereo even when mono is requested, so we must check got.channels and mix
+ * accordingly; otherwise every source sample advances the position twice as
+ * fast as intended, causing audio to play at double speed. */
+static int       s_output_channels = 1;
 /* Master volume scalar (0.0 -- 1.0).  Exposed to JavaScript via
  * set_wasm_master_volume() so the browser UI slider can control it. */
 static float     s_master_volume = 1.0f;
@@ -1344,11 +1355,14 @@ static int voice_for_chan(SndChannelPtr chan) {
 /* -------- SDL audio callback -------- */
 static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
     (void)userdata;
-    int n = len;  /* len is bytes; we use int16 samples */
     int16_t *out = (int16_t *)stream;
-    int n_samples = n / 2;  /* stereo int16 = 4 bytes per frame; mono = 2 bytes */
-    /* Actually our SDL audio is mono int16 */
-    memset(out, 0, (size_t)n);
+    /* Number of output frames.  A frame is s_output_channels int16 values.
+     * We iterate over frames (not individual channel samples) so that each
+     * source sample advances the playback position exactly once, regardless
+     * of whether the output device is mono (1 ch) or stereo (2 ch).  Mixing
+     * the same sample into all channels gives a correct mono→stereo upmix. */
+    int n_frames = len / (2 * s_output_channels);
+    memset(out, 0, (size_t)len);
 
     if (!s_audio_mutex) return;
     SDL_LockMutex(s_audio_mutex);
@@ -1357,19 +1371,30 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
         SndVoice *v = &s_voices[vi];
         if (!v->active || !v->samples || v->num_samples == 0) continue;
 
-        for (int i = 0; i < n_samples; i++) {
+        /* Determine the effective loop boundary.  When a loop is defined, we
+         * wrap at loop_end (not at num_samples), preventing audible clicks
+         * caused by playing the trailing audio past the intended loop point. */
+        int      has_loop = (v->loop_end > v->loop_start &&
+                             v->loop_end <= v->num_samples);
+        uint32_t end_pos  = has_loop ? v->loop_end : v->num_samples;
+
+        for (int i = 0; i < n_frames; i++) {
             uint32_t idx = (uint32_t)v->pos;
-            if (idx >= v->num_samples) {
-                /* End of sample - check loop */
-                if (v->loop_end > v->loop_start && v->loop_end <= v->num_samples) {
-                    v->pos = v->loop_start;
-                    idx = v->loop_start;
+            if (idx >= end_pos) {
+                if (has_loop) {
+                    /* Loop: wrap position back to loop_start, preserving the
+                     * fractional overshoot for smooth looping. */
+                    double overshoot = v->pos - (double)end_pos;
+                    v->pos = (double)v->loop_start + overshoot;
+                    if (v->pos < (double)v->loop_start)
+                        v->pos = (double)v->loop_start;
+                    idx = (uint32_t)v->pos;
+                    if (idx >= v->num_samples) { v->active = 0; break; }
                 } else {
+                    /* End of non-looping sample */
                     v->active = 0;
-                    if (v->callback_pending) {
-                        /* Schedule callback to be called outside audio thread */
+                    if (v->callback_pending == 1)
                         v->callback_pending = 2;  /* 2 = needs firing */
-                    }
                     break;
                 }
             }
@@ -1385,10 +1410,12 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
             }
             /* Apply voice volume and master volume */
             sample = (int)(sample * v->vol_l * s_master_volume);
-            /* Clamp and mix */
-            {
-                int32_t sum = (int32_t)out[i] + (int32_t)sample;
-                out[i] = (int16_t)(sum > 32767 ? 32767 : sum < -32768 ? -32768 : sum);
+            /* Mix the (mono) source sample into every output channel so that
+             * stereo devices receive the same signal on both L and R channels. */
+            for (int ch = 0; ch < s_output_channels; ch++) {
+                int out_idx = i * s_output_channels + ch;
+                int32_t sum = (int32_t)out[out_idx] + (int32_t)sample;
+                out[out_idx] = (int16_t)(sum > 32767 ? 32767 : sum < -32768 ? -32768 : sum);
             }
             v->pos += v->rate;
         }
@@ -1415,11 +1442,13 @@ static void sdl_audio_open(void) {
         fprintf(stderr, "[SDL] SDL_OpenAudio failed: %s\n", SDL_GetError());
         return;
     }
-    /* Record the actual output rate the audio device agreed to use.
-     * Browsers (via Emscripten / Web Audio API) often prefer 44100 or 48000 Hz
-     * even when 22050 Hz is requested.  All voice playback-rate calculations
-     * must use this actual rate so that audio is neither sped up nor slowed. */
-    s_output_rate = (got.freq > 0) ? got.freq : SND_SAMPLE_RATE;
+    /* Record the actual output rate and channel count the audio device agreed
+     * to use.  Browsers (via Emscripten / Web Audio API) often prefer 44100
+     * or 48000 Hz even when 22050 Hz is requested, and may force stereo even
+     * when mono is requested.  Both values must be stored and used in the
+     * audio callback so that pitch and speed are correct on all platforms. */
+    s_output_rate     = (got.freq     > 0) ? got.freq     : SND_SAMPLE_RATE;
+    s_output_channels = (got.channels > 0) ? got.channels : 1;
     s_audio_open = 1;
     SDL_PauseAudio(0);  /* start playback */
     LOG_DEBUG("[SDL] Audio opened: %d Hz (requested %d Hz), format=%d, ch=%d\n",
@@ -1784,6 +1813,41 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+#else /* !__EMSCRIPTEN__ */
+
+/* ============================================================
+ * Desktop (Linux / macOS / Windows) and Android entry point.
+ *
+ * SDL.h on Android pulls in SDL_main.h which defines:
+ *   #define main SDL_main
+ * so this function is compiled as SDL_main() on Android, satisfying
+ * SDL's requirement that the user supply that symbol.  SDL's Android
+ * bootstrap then calls SDL_main() from the native game thread after
+ * the Java SDLActivity has set up the window, renderer and audio.
+ *
+ * On desktop the #define is not active, so this is the normal C
+ * entry point called by the OS.
+ *
+ * source/main.c is excluded from PORT_SDL2 builds (see CMakeLists.txt)
+ * to avoid a duplicate definition of main / SDL_main.
+ * ============================================================ */
+#include "gameframe.h"
+#include "interface.h"
+#include "gameinitexit.h"
+#include "initexit.h"
+
+int main(int argc, char *argv[]) {
+    (void)argc; (void)argv;
+    Init();
+    while (!gExit) {
+        if (gGameOn)
+            GameFrame();
+        else
+            Eventloop();
+    }
+    Exit();
+    return 0;
+}
 
 #endif /* __EMSCRIPTEN__ */
 
