@@ -105,7 +105,6 @@ set(GAME_SOURCES
     source/input.c
     source/interface.c
     source/IsPortListValid.c
-    source/main.c
     source/objectCollision.c
     source/objectControl.c
     source/objectPhysics.c
@@ -126,6 +125,14 @@ set(GAME_SOURCES
     source/textfx.c
     source/byteswap_packs.c
 )
+
+# source/main.c provides void main() for the original Mac build.
+# For PORT_SDL2 builds, sdl_platform.c provides int main() (or SDL_main on Android).
+# Including both would create a duplicate symbol, so we only add source/main.c
+# when NOT building with the SDL2 backend.
+if(NOT PORT_SDL2)
+    list(APPEND GAME_SOURCES source/main.c)
+endif()
 
 # appleevents.c uses Mac-only Apple Events API; only include it when not using
 # the SDL2 port (i.e. native Mac build).  The SDL2 port provides InitAE() stub
