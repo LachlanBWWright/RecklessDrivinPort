@@ -1584,8 +1584,8 @@ static void sdl_audio_open(void) {
      * audio callback so that pitch and speed are correct on all platforms. */
     s_output_rate     = (got.freq     > 0) ? got.freq     : SND_SAMPLE_RATE;
     s_output_channels = (got.channels > 0) ? got.channels : 1;
-    s_output_format   = got.format ? got.format : AUDIO_S16SYS;
-    s_output_sample_bytes = (int)((SDL_AUDIO_BITSIZE(s_output_format) + 7) / 8);
+    s_output_format   = got.format;
+    s_output_sample_bytes = (int)(SDL_AUDIO_BITSIZE(s_output_format) / 8);
     if (s_output_sample_bytes <= 0) s_output_sample_bytes = 2;
 #ifdef __EMSCRIPTEN__
     /* Emscripten's SDL_OpenAudio may report the *requested* sample rate in
