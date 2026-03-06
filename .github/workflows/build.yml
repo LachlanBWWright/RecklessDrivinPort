@@ -157,7 +157,7 @@ jobs:
           npx ng analytics disable || true
           npx ng build --configuration=production --base-href=/RecklessDrivinPort/
           echo "Angular build output:"
-          ls -lh dist/reckless-drivin/
+          ls -lh dist/reckless-drivin/browser/
 
       - name: Install Emscripten
         uses: mymindstorm/setup-emsdk@v14
@@ -189,7 +189,7 @@ jobs:
           cp build_wasm/reckless_drivin.wasm gh-pages/
           cp build_wasm/reckless_drivin.data gh-pages/
           # Copy Angular pre-built static files (output directory from ng build)
-          ANGULAR_DIST="port/angular-site/dist/reckless-drivin"
+          ANGULAR_DIST="port/angular-site/dist/reckless-drivin/browser"
           if [ -d "$ANGULAR_DIST" ]; then
             cp -r "$ANGULAR_DIST"/. gh-pages/
             echo "Deployed Angular site from $ANGULAR_DIST"
