@@ -345,7 +345,11 @@ static void tc_draw_rocket(int cx, int cy, int hw, int hh)
  */
 static void sdl_render_touch_overlay(void)
 {
-    int w = gXSize, h = gYSize;
+    int w, h;
+    /* Use the actual renderer output size so that touch controls are drawn
+     * at the correct scale on high-DPI or non-640×480 displays (e.g. Android
+     * devices where the window fills the native screen resolution). */
+    SDL_GetRendererOutputSize(s_renderer, &w, &h);
     /* alpha values: idle = muted translucent, active = bright */
     Uint8 bg_idle   = 50;   /* button background when not pressed */
     Uint8 bg_active = 140;  /* button background when pressed */
@@ -899,9 +903,30 @@ void Blit2Screen(void) {
     /* Upload to texture */
     SDL_UpdateTexture(s_texture, NULL, s_rgb_surface->pixels, s_rgb_surface->pitch);
 
-    /* Render game frame */
+    /* Render game frame with letterboxing to maintain 4:3 aspect ratio.
+     * The game renders at 640×480 (4:3).  On wide-screen or non-4:3 displays
+     * (e.g. an Android phone in landscape, or a maximised desktop window) we
+     * scale the game to fill the full output height, centring it horizontally
+     * with black bars on each side rather than stretching to fill the width. */
     SDL_RenderClear(s_renderer);
-    SDL_RenderCopy(s_renderer, s_texture, NULL, NULL);
+    {
+        int out_w, out_h;
+        SDL_GetRendererOutputSize(s_renderer, &out_w, &out_h);
+
+        /* Compute the largest 4:3 rect that fits inside out_w × out_h */
+        int dst_w = out_h * gXSize / gYSize;
+        int dst_h = out_h;
+        if (dst_w > out_w) {
+            dst_w = out_w;
+            dst_h = out_w * gYSize / gXSize;
+        }
+        SDL_Rect dst;
+        dst.x = (out_w - dst_w) / 2;
+        dst.y = (out_h - dst_h) / 2;
+        dst.w = dst_w;
+        dst.h = dst_h;
+        SDL_RenderCopy(s_renderer, s_texture, NULL, &dst);
+    }
 
     /* Render on-screen touch controls overlay (if touch active) */
     if (s_touch_controls_active)
@@ -1404,15 +1429,30 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
                     break;
                 }
             }
-            /* Convert sample to int16 for mixing */
+            /* Convert sample to int16 for mixing, using linear interpolation
+             * to reduce aliasing artifacts (avoids stepped waveforms that make
+             * high-frequency sounds harsh and bassy sounds muddy). */
             int sample;
-            if (v->is16bit) {
-                /* extSH 16-bit big-endian signed PCM: swap bytes to get native int16 */
-                uint32_t byte_index = idx * 2;
-                sample = (int)(int16_t)(((uint16_t)v->samples[byte_index] << 8) | v->samples[byte_index + 1]);
-            } else {
-                /* stdSH / extSH 8-bit unsigned PCM: map 0-255 -> -32768..32512 */
-                sample = (int)((uint8_t)v->samples[idx] - 128) * 256;
+            {
+                double frac = v->pos - (double)idx;
+                /* Clamp next-sample index to valid range for interpolation */
+                uint32_t idx1 = idx + 1;
+                if (idx1 >= end_pos)
+                    idx1 = has_loop ? v->loop_start : idx; /* clamp; frac*(s0-s0)=0 → nearest-neighbour at end */
+                int s0, s1;
+                if (v->is16bit) {
+                    /* extSH 16-bit big-endian signed PCM */
+                    uint32_t b0 = idx  * 2;
+                    uint32_t b1 = idx1 * 2;
+                    s0 = (int)(int16_t)(((uint16_t)v->samples[b0] << 8) | v->samples[b0 + 1]);
+                    s1 = (int)(int16_t)(((uint16_t)v->samples[b1] << 8) | v->samples[b1 + 1]);
+                } else {
+                    /* stdSH / extSH 8-bit unsigned PCM: map 0-255 -> -32768..32512 */
+                    s0 = (int)((uint8_t)v->samples[idx ] - 128) * 256;
+                    s1 = (int)((uint8_t)v->samples[idx1] - 128) * 256;
+                }
+                /* Linear interpolation between s0 and s1 */
+                sample = (int)(s0 + frac * (s1 - s0));
             }
             /* Apply voice volume and master volume */
             sample = (int)(sample * v->vol_l * s_master_volume);
@@ -1455,6 +1495,31 @@ static void sdl_audio_open(void) {
      * audio callback so that pitch and speed are correct on all platforms. */
     s_output_rate     = (got.freq     > 0) ? got.freq     : SND_SAMPLE_RATE;
     s_output_channels = (got.channels > 0) ? got.channels : 1;
+#ifdef __EMSCRIPTEN__
+    /* Emscripten's SDL_OpenAudio may report the *requested* sample rate in
+     * got.freq instead of the actual Web Audio context rate.  The
+     * ScriptProcessorNode / AudioWorklet runs at the AudioContext sample rate
+     * (typically 44100 or 48000 Hz), so using the wrong value here causes all
+     * sounds to play at the wrong speed (e.g. 2× too fast when the browser
+     * runs at 44100 but SDL reports 22050).  Query the rate directly from
+     * JavaScript to guarantee correctness. */
+    {
+        int wasm_rate = EM_ASM_INT({
+            try {
+                if (Module.SDL2 && Module.SDL2.audioContext) {
+                    return Module.SDL2.audioContext.sampleRate | 0;
+                }
+            } catch(e) {}
+            return 0;
+        });
+        if (wasm_rate > 0) {
+            if (wasm_rate != s_output_rate)
+                fprintf(stderr, "[SDL] WASM: overriding SDL audio rate %d Hz -> actual "
+                        "Web Audio rate %d Hz\n", s_output_rate, wasm_rate);
+            s_output_rate = wasm_rate;
+        }
+    }
+#endif
     s_audio_open = 1;
     SDL_PauseAudio(0);  /* start playback */
     LOG_DEBUG("[SDL] Audio opened: %d Hz (requested %d Hz), format=%d, ch=%d\n",
@@ -1844,6 +1909,32 @@ int main(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
     (void)argc; (void)argv;
+#ifdef __ANDROID__
+    /* On Android, SDL_main() is called after the Java SDLActivity has set up
+     * the JNI environment.  SDL_AndroidGetInternalStoragePath() is available
+     * at this point and returns the app's writable files directory (the same
+     * path as Java's context.getFilesDir()).
+     *
+     * MainActivity.copyAssetIfNeeded() copies resources.dat from the APK
+     * assets into that directory before this native code runs.  Open it here
+     * so that Pomme_InitResources() finds it immediately on the first
+     * GetResource() call (which happens inside LoadPrefs() before InitScreen
+     * has a chance to run). */
+    {
+        const char *storage = SDL_AndroidGetInternalStoragePath();
+        if (storage) {
+            /* Build full path: internal_storage/resources.dat
+             * Allocate dynamically to handle any path length. */
+            size_t len = SDL_strlen(storage) + SDL_strlen("/resources.dat") + 1;
+            char *res_path = (char *)SDL_malloc(len);
+            if (res_path) {
+                SDL_snprintf(res_path, len, "%s/resources.dat", storage);
+                Pomme_LoadResourceFile(res_path);
+                SDL_free(res_path);
+            }
+        }
+    }
+#endif /* __ANDROID__ */
     Init();
     while (!gExit) {
         if (gGameOn)
