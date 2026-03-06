@@ -348,11 +348,14 @@ jobs:
 
       - name: Prepare release assets
         run: |
+          cp port/resources/resources.dat release/linux/resources.dat
+          cp port/resources/resources.dat release/macos/resources.dat
+          cp port/resources/resources.dat release/windows/resources.dat
           chmod +x release/linux/reckless_drivin
           chmod +x release/macos/reckless_drivin
-          (cd release/linux   && zip -9 ../reckless-drivin-linux.zip reckless_drivin)
-          (cd release/macos   && zip -9 ../reckless-drivin-macos.zip reckless_drivin)
-          (cd release/windows && zip -9 ../reckless-drivin-windows.zip reckless_drivin.exe)
+          (cd release/linux   && zip -9 ../reckless-drivin-linux.zip reckless_drivin resources.dat)
+          (cd release/macos   && zip -9 ../reckless-drivin-macos.zip reckless_drivin resources.dat)
+          (cd release/windows && zip -9 ../reckless-drivin-windows.zip reckless_drivin.exe resources.dat)
 
       - name: Create or update release
         uses: softprops/action-gh-release@v2
@@ -362,8 +365,8 @@ jobs:
           body: |
             Automated build from `${{ github.ref_name }}` @ `${{ github.sha }}`.
 
-            Download the binary for your platform and run it alongside the game's
-            `resources.dat` file (place it in the same directory).
+            Each desktop zip already includes both the game binary and
+            `resources.dat` required to run the game.
           prerelease: false
           files: |
             release/reckless-drivin-linux.zip
