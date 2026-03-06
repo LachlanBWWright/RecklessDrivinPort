@@ -72,8 +72,8 @@ export class App implements OnInit, OnDestroy {
   isDragging = signal(false);
   dragObjIndex = signal<number | null>(null);
 
-  private _panStartX = 0;
-  private _panStartY = 0;
+  private _prevPanMouseX = 0;
+  private _prevPanMouseY = 0;
   private _isPanning = false;
 
   // ---- Mark editor ----
@@ -383,8 +383,8 @@ export class App implements OnInit, OnDestroy {
     if (event.button === 1 || event.button === 2) {
       // Middle or right click: start panning
       this._isPanning = true;
-      this._panStartX = event.offsetX - this.canvasPanX() * -this.canvasZoom();
-      this._panStartY = event.offsetY - this.canvasPanY() * -this.canvasZoom();
+      this._prevPanMouseX = event.offsetX;
+      this._prevPanMouseY = event.offsetY;
       return;
     }
     // Left click: find closest object
@@ -415,14 +415,13 @@ export class App implements OnInit, OnDestroy {
 
   onCanvasMouseMove(event: MouseEvent): void {
     if (this._isPanning) {
-      const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
-      const W = canvas?.width ?? 600;
-      const H = canvas?.height ?? 500;
       const zoom = this.canvasZoom();
-      const newPanX = (W / 2 - event.offsetX) / zoom;
-      const newPanY = (H / 2 - event.offsetY) / zoom;
-      this.canvasPanX.set(newPanX);
-      this.canvasPanY.set(newPanY);
+      const dx = event.offsetX - this._prevPanMouseX;
+      const dy = event.offsetY - this._prevPanMouseY;
+      this._prevPanMouseX = event.offsetX;
+      this._prevPanMouseY = event.offsetY;
+      this.canvasPanX.set(this.canvasPanX() - dx / zoom);
+      this.canvasPanY.set(this.canvasPanY() - dy / zoom);
       return;
     }
     if (!this.isDragging()) return;

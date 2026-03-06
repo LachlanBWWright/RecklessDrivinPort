@@ -430,6 +430,7 @@ export function serializeMarkSegs(marks: MarkSeg[]): Uint8Array {
   const view = new DataView(buf.buffer);
   for (let i = 0; i < marks.length; i++) {
     const o = i * 16;
+    // false = big-endian, matching parseMarkSegs deserialization
     view.setInt32(o,      marks[i].x1, false);
     view.setInt32(o + 4,  marks[i].y1, false);
     view.setInt32(o + 8,  marks[i].x2, false);
