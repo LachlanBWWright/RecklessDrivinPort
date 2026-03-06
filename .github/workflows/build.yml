@@ -146,11 +146,15 @@ jobs:
         run: npm ci --prefix port/angular-site
 
       - name: Build Angular site
+        env:
+          NG_CLI_ANALYTICS: "disable"
         run: |
           cd port/angular-site
+          # ensure analytics prompt doesn't block in CI
+          npx ng analytics disable || true
           npx ng build --configuration=production --base-href=/RecklessDrivinPort/
           echo "Angular build output:"
-          ls -lh dist/reckless-drivin/browser/
+          ls -lh dist/reckless-drivin/
 
       - name: Install Emscripten
         uses: mymindstorm/setup-emsdk@v14
@@ -181,16 +185,14 @@ jobs:
           cp build_wasm/reckless_drivin.js   gh-pages/
           cp build_wasm/reckless_drivin.wasm gh-pages/
           cp build_wasm/reckless_drivin.data gh-pages/
-          # Copy Angular pre-built static files (browser/ sub-dir from ng build)
-          ANGULAR_DIST="port/angular-site/dist/reckless-drivin/browser"
+          # Copy Angular pre-built static files (output directory from ng build)
+          ANGULAR_DIST="port/angular-site/dist/reckless-drivin"
           if [ -d "$ANGULAR_DIST" ]; then
             cp -r "$ANGULAR_DIST"/. gh-pages/
             echo "Deployed Angular site from $ANGULAR_DIST"
           else
-            # Fallback: if for some reason the Angular build failed, just use
-            # the bare Emscripten-generated HTML from the WASM build itself.
-            cp build_wasm/reckless_drivin.html gh-pages/index.html
-            echo "Fallback: deployed build_wasm/reckless_drivin.html as index.html"
+            echo "::error::Angular build output not found at $ANGULAR_DIST"
+            exit 1
           fi
           echo "Pages content:"
           ls -lh gh-pages/
