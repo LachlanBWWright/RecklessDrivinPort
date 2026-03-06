@@ -18,6 +18,20 @@ const OBJ_PALETTE = [
   '#8d6e63', '#78909c', '#ec407a', '#29b6f6',
 ];
 
+/** Minimum canvas hit radius (px) for object click detection. */
+const MIN_HIT_RADIUS = 10;
+/** Base world-space hit radius before zoom scaling for object click detection. */
+const BASE_HIT_RADIUS = 8;
+/** Canvas hit radius (px) for mark segment endpoint dragging. */
+const MARK_ENDPOINT_HIT_RADIUS = 10;
+
+/** Euclidean distance between two 2-D points. */
+function dist2d(ax: number, ay: number, bx: number, by: number): number {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
@@ -390,13 +404,11 @@ export class App implements OnInit, OnDestroy {
     // Left click: find closest object
     const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
     const objs = this.objects();
-    const hitRadius = Math.max(10, 8 / this.canvasZoom());
+    const hitRadius = Math.max(MIN_HIT_RADIUS, BASE_HIT_RADIUS / this.canvasZoom());
     let closest = -1;
     let closestDist = hitRadius;
     for (let i = 0; i < objs.length; i++) {
-      const dx = objs[i].x - wx;
-      const dy = objs[i].y - wy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = dist2d(objs[i].x, wx, objs[i].y, wy);
       if (dist < closestDist) {
         closestDist = dist;
         closest = i;
@@ -705,19 +717,17 @@ export class App implements OnInit, OnDestroy {
 
     const { minX, minY, rangeX, rangeY } = this.markBounds(ms);
 
-    const hitR = 10;
+    const hitR = MARK_ENDPOINT_HIT_RADIUS;
     for (let i = 0; i < ms.length; i++) {
       const m = ms[i];
       const [ax, ay] = this.markWorldToCanvas(m.x1, m.y1, canvas, minX, minY, rangeX, rangeY);
       const [bx, by] = this.markWorldToCanvas(m.x2, m.y2, canvas, minX, minY, rangeX, rangeY);
-      const dx1 = event.offsetX - ax; const dy1 = event.offsetY - ay;
-      const dx2 = event.offsetX - bx; const dy2 = event.offsetY - by;
-      if (Math.sqrt(dx1*dx1+dy1*dy1) < hitR) {
+      if (dist2d(event.offsetX, event.offsetY, ax, ay) < hitR) {
         this.selectedMarkIndex.set(i);
         this.dragMarkEndpoint.set({ markIdx: i, endpoint: 'p1' });
         return;
       }
-      if (Math.sqrt(dx2*dx2+dy2*dy2) < hitR) {
+      if (dist2d(event.offsetX, event.offsetY, bx, by) < hitR) {
         this.selectedMarkIndex.set(i);
         this.dragMarkEndpoint.set({ markIdx: i, endpoint: 'p2' });
         return;

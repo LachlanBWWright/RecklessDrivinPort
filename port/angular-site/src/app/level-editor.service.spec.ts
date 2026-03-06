@@ -4,6 +4,7 @@ import {
   parseMarkSegs,
   serializeLevelProperties,
   serializeLevelObjects,
+  serializeMarkSegs,
 } from './level-editor.service';
 
 function makeLevelEntry(overrides: Partial<{
@@ -192,5 +193,34 @@ describe('LevelEditorService', () => {
     expect(levels.length).toBe(2);
     expect(levels[0].resourceId).toBe(140);
     expect(levels[1].resourceId).toBe(141);
+  });
+});
+
+describe('serializeMarkSegs', () => {
+  it('produces big-endian bytes matching input marks', () => {
+    const marks = [{ x1: 10, y1: 20, x2: 30, y2: 40 }];
+    const buf = serializeMarkSegs(marks);
+    expect(buf.length).toBe(16);
+    const view = new DataView(buf.buffer);
+    expect(view.getInt32(0,  false)).toBe(10);
+    expect(view.getInt32(4,  false)).toBe(20);
+    expect(view.getInt32(8,  false)).toBe(30);
+    expect(view.getInt32(12, false)).toBe(40);
+  });
+
+  it('round-trips through parseMarkSegs', () => {
+    const orig = [
+      { x1: -100, y1: 200, x2: 300, y2: -400 },
+      { x1: 0,    y1: 0,   x2: 1,   y2: 1    },
+    ];
+    const serialized = serializeMarkSegs(orig);
+    const parsed = parseMarkSegs(serialized);
+    expect(parsed.length).toBe(2);
+    expect(parsed[0]).toEqual(orig[0]);
+    expect(parsed[1]).toEqual(orig[1]);
+  });
+
+  it('returns empty buffer for empty array', () => {
+    expect(serializeMarkSegs([]).length).toBe(0);
   });
 });

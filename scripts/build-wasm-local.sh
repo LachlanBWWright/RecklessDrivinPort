@@ -32,14 +32,14 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Colours
+# Colors
 # ---------------------------------------------------------------------------
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
-NC='\033[0m' # No Colour
+NC='\033[0m' # No Color
 
 info()    { echo -e "${CYAN}[build]${NC} $*"; }
 success() { echo -e "${GREEN}[ok]${NC}    $*"; }
@@ -289,31 +289,8 @@ if $SERVE; then
 
   # Try a variety of available servers
   if command -v python3 &>/dev/null; then
-    # Python's http.server doesn't set WASM MIME type correctly, use a workaround
-    python3 - <<'PYTHON_SERVER' &
-import http.server
-import os
-import sys
-
-port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-directory = sys.argv[2] if len(sys.argv) > 2 else '.'
-
-class WasmHandler(http.server.SimpleHTTPRequestHandler):
-    def guess_type(self, path):
-        if path.endswith('.wasm'):
-            return 'application/wasm'
-        return super().guess_type(path)
-    def log_message(self, fmt, *args):
-        # Suppress noisy output
-        if args[1] not in ('200', '304'):
-            super().log_message(fmt, *args)
-
-os.chdir(directory)
-with http.server.HTTPServer(('', port), WasmHandler) as httpd:
-    print(f'Serving on http://localhost:{port}')
-    httpd.serve_forever()
-PYTHON_SERVER
-    SERVER_PID=$!
+    # Use a custom handler to set the correct application/wasm MIME type,
+    # which Python's built-in http.server does not set by default.
     python3 -c "
 import http.server, os, sys
 port = $PORT

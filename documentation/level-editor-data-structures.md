@@ -400,3 +400,119 @@ Run with:
 cd port/angular-site
 npm test -- --watch=false
 ```
+
+---
+
+## 10. Drag-and-Drop Object Canvas
+
+The object placement section renders all `tObjectPos` entries on a 2D `<canvas>` element.
+
+### Coordinate System
+
+World coordinates match the game's internal pixel coordinate system:
+- X: horizontal position (left = more negative)
+- Y: vertical position (lower Y = further up-screen / earlier in level)
+
+The canvas uses an affine transform: `(worldX, worldY) → (canvasX, canvasY)`:
+
+```
+canvasX = W/2 + (worldX - panX) * zoom
+canvasY = H/2 + (worldY - panY) * zoom
+```
+
+and the inverse:
+
+```
+worldX = (canvasX - W/2) / zoom + panX
+worldY = (canvasY - H/2) / zoom + panY
+```
+
+where `W`, `H` are canvas pixel dimensions, `panX`/`panY` are the world-coordinate
+center offset, and `zoom` is the scale factor (default 1.0).
+
+### Interaction
+
+| Action | Effect |
+|--------|--------|
+| Click on object circle | Select the object; update right-side form fields |
+| Drag selected object | Move it to the new world position |
+| Double-click empty canvas | Add a new object (typeRes=128) at that world position |
+| Delete / Backspace (canvas focused) | Remove the selected object |
+| Mouse wheel | Zoom in / out (factor: 0.001 × delta, range 0.1–10×) |
+| 🔍+ / 🔍- buttons | Zoom by ±0.25 |
+| ⟲ Reset View | Reset zoom=1, pan=0 |
+
+Object circles are colored by `typeRes % 12` (12-color palette). The selected object
+is drawn with a white outer ring. A direction arrow shows the object's heading in radians.
+
+### Saving
+
+After dragging, click **💾 Save Objects to Pack** to write the updated `tObjectPos[]`
+back into the pack handle and re-encrypt if necessary.
+
+---
+
+## 11. Mark Segment Canvas
+
+Mark segments (finish lines, checkpoints) are edited on the `#mark-canvas` `<canvas>`.
+
+The canvas uses the same min/max bounding-box to-canvas projection as the track
+path visualizer, fitting all mark endpoint coordinates into the canvas area.
+
+### Interaction
+
+| Action | Effect |
+|--------|--------|
+| Click within 12px of a segment endpoint | Start dragging that endpoint |
+| Click on a segment midpoint | Select the segment |
+| Drag endpoint | Move the P1 or P2 point to a new position |
+| Release | Update the `marks` signal and redraw |
+| Numeric fields | Direct coordinate editing for selected mark |
+| + Add Mark | Append a new mark at (0, 0) → (100, 0) |
+| Remove | Delete the selected mark |
+| 💾 Save Marks | Write updated `tMarkSeg[]` back to pack entry id=2 |
+
+Endpoint dots are drawn as 8px-radius filled circles. Selected marks are highlighted.
+
+---
+
+## 12. Sprite Pixel Preview
+
+The Sprites section includes a 256×256 `<canvas>` (`#sprite-pixel-canvas`) that
+renders the PPic bytes as a grayscale 16-column bitmap:
+
+- Each byte maps to a cell in a 16-column grid
+- Cell color = `rgb(v, v, v)` where `v` is the raw byte value (0–255)
+- Cell size = floor(256 / 16) = 16px per column
+- The grid renders page×256 bytes (matching the hex viewer page)
+- The canvas is styled with `image-rendering: pixelated` for a sharp, retro look
+
+---
+
+## 13. Local Build & Deployment Script
+
+`scripts/build-wasm-local.sh` automates the full build + local serve pipeline:
+
+```sh
+# Full build (needs emsdk active in PATH)
+./scripts/build-wasm-local.sh
+
+# Build and serve at http://localhost:8080
+./scripts/build-wasm-local.sh --serve
+
+# Serve on custom port
+./scripts/build-wasm-local.sh --serve --port 3000
+
+# Skip WASM (only rebuild Angular site)
+./scripts/build-wasm-local.sh --skip-wasm --serve
+
+# Skip Angular (only rebuild WASM)
+./scripts/build-wasm-local.sh --skip-angular
+```
+
+Output is assembled into `gh-pages-local/`, mirroring the GitHub Actions `gh-pages/`
+directory exactly (Angular static files + reckless_drivin.js/.wasm/.data + resources.dat).
+
+The server sets the correct `application/wasm` MIME type for `.wasm` files,
+which is required for browser WASM loading.
+
