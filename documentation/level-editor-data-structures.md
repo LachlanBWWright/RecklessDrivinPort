@@ -1,133 +1,402 @@
-# Level Editor Data Structures
+# Reckless Drivin' – Level Editor Data Structures
 
-This document describes the binary structures used by the Angular resource editor and their relationship to the native game runtime.
+This document provides comprehensive reference for all binary structures parsed and
+written by the Angular-based level/asset editor.
+
+---
 
 ## 1. `resources.dat` Container Format
 
-The game ships with `resources.dat`, a flat concatenation of resource records.
+The game ships with `resources.dat`, a flat concatenation of resource records written
+by the open-source port's build pipeline (replacing the original Mac resource fork).
 
-Each record has this layout:
+### 1.1 Record Layout
 
-| Offset | Size | Field | Endianness | Notes |
-|---|---:|---|---|---|
-| `+0` | 8 | `resource_type` | bytes | 4-char Mac resource type in the first 4 bytes, padded to 8 bytes |
-| `+8` | 4 | `resource_id` | little-endian `uint32` | Numeric ID |
-| `+12` | 4 | `resource_size` | little-endian `uint32` | Payload size in bytes |
-| `+16` | `resource_size` | `resource_data` | raw | Resource payload |
+Each record is a contiguous header + payload block:
 
-Angular parsing/packing uses `@lachlanbwwright/rsrcdump-ts` struct templates:
+| Offset | Size | Field             | Endianness      | Notes |
+|-------:|-----:|-------------------|-----------------|-------|
+| `+0`   |    8 | `resource_type`   | bytes           | 4-char Mac resource type in first 4 bytes, zero-padded to 8 bytes |
+| `+8`   |    4 | `resource_id`     | little-endian `uint32` | Numeric resource ID |
+| `+12`  |    4 | `resource_size`   | little-endian `uint32` | Payload byte count |
+| `+16`  | `resource_size` | `resource_data` | raw | Resource payload |
 
-- Template: `<8sLL:type,id,size`
-- `8s` for raw type bytes
-- `L` + little-endian prefix `<` for `id` and `size`
+Angular parsing uses `@lachlanbwwright/rsrcdump-ts` struct templates:
 
-Relevant implementation:
+```
+<8sLL:type,id,size
+```
 
-- `port/angular-site/src/app/resource-dat.service.ts`
+| Code | Meaning |
+|------|---------|
+| `<`  | Little-endian |
+| `8s` | 8-byte string (type) |
+| `L`  | 32-bit unsigned int (id, size) |
 
-## 2. Level Resources
+**Implementation:** `port/angular-site/src/app/resource-dat.service.ts`
 
-The native game loads level packs from resource type `Pack` IDs `140..149` (Level 1..10).
+---
 
-Native loading path (C runtime):
+## 2. Pack Handle Format
 
-1. `GetResource('Pack', id)` from `resources.dat`
-2. Optional decrypt for restricted packs
-3. LZRW3-A decode
-4. Interpret decoded pack entries
+Level data and most game assets are stored as **Pack resources** (type `'Pack'`).
+The raw payload of a Pack resource is a *pack handle*, consisting of:
 
-Relevant native structures (decoded level blob entry 1):
+```
+[4-byte big-endian uint32: uncompressed_size]
+[FLAG_BYTE]
+[payload…]
+```
 
-### `tLevelData`
+| FLAG_BYTE value | Meaning |
+|-----------------|---------|
+| `0x00`          | LZRW3-A compressed payload |
+| `0x01`          | Uncompressed copy (payload is raw decompressed data) |
+
+**Implementation:** `port/angular-site/src/app/lzrw.service.ts`
+(`packHandleDecompress`, `packHandleCompress`)
+
+### 2.1 LZRW3-A Algorithm
+
+LZRW3-A is an LZ77-class dictionary compression algorithm by Ross Williams (1991).
+It is public domain and is used throughout the game for all pack resources.
+
+Key constants:
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `HASH_TABLE_LENGTH` | 4096 | Total hash table entries |
+| `HASH_TABLE_DEPTH_BITS` | 3 | Log₂ of partition depth |
+| `HASH_TABLE_DEPTH` | 8 | Partitions per hash bucket |
+| `PARTITION_LENGTH` | 512 | Entries per partition base |
+| `START_STRING` | `"123456789012345678"` | Initial hash table fill value |
+| `FLAG_BYTES` | 1 | Control byte at start of compressed stream |
+
+The hash function:
+
+```
+HASH(ptr) = (((40543 × ((buf[ptr]<<8) ^ (buf[ptr+1]<<4) ^ buf[ptr+2])) >> 4) & 511) << 3
+```
+
+Each compressed item is either a **literal** (1 byte) or a **copy** (2 bytes encoding a
+12-bit hash index and a 4-bit length-minus-3).  16 control bits (one per item) are
+packed at the start of each group.
+
+The editor always writes back using `FLAG_COPY` (no compression), which the runtime's
+`LZRWDecodeHandle` accepts and copies verbatim—this avoids the need for a full
+LZRW3-A compressor and is safe for all pack types.
+
+---
+
+## 3. Pack Internal Structure
+
+After decompression, a pack blob begins with a `tPackHeader` array:
 
 ```c
-typedef struct{
-    SInt16 roadInfo;
-    UInt16 time;
-    tObjectGroupReference objGrps[10]; // 20 x SInt16 bytes
-    SInt16 xStartPos;
-    UInt16 levelEnd;
+typedef struct {
+    SInt16  id;           // first entry: numEntries; others: entry ID
+    SInt16  placeHolder;  // unused padding
+    UInt32  offs;         // byte offset of entry data within the pack blob
+} tPackHeader;
+```
+
+All fields are **big-endian** (original Mac PPC format).
+
+- `pack[0].id` = number of entries `n`
+- `pack[1..n].id` = entry IDs
+- `pack[1..n].offs` = absolute byte offsets into the pack blob
+
+Entry data starts immediately after the `(n+1) × 8`-byte header array.
+
+**Pack resource ID mapping:**
+
+| Pack index | Resource ID | Contents |
+|-----------|-------------|----------|
+| 0 `kPackObTy`   | 128 | Object type definitions (`tObjectType[]`) |
+| 1 `kPackSprt`   | 129 | Sprite data |
+| 2 `kPackOgrp`   | 130 | Object group definitions (`tObjectGroup[]`) |
+| 3 `kPacksRLE`   | 131 | Small RLE graphics |
+| 4 `kPackcRLE`   | 132 | Color RLE graphics |
+| 5 `kPackTxtR`   | 133 | Text resources |
+| 6 `kPackSnds`   | 134 | Sound data |
+| 7 `kPackRoad`   | 135 | Road info (`tRoadInfo[]`) |
+| 8 `kPackTx16`   | 136 | 16-bit texture data |
+| 9 `kPackSp16`   | 137 | 16-bit sprite data |
+| 10 `kPacksR16`  | 138 | 16-bit small RLE |
+| 11 `kPackcR16`  | 139 | 16-bit color RLE |
+| 12 `kPackLevel1`| 140 | Level 1 pack |
+| …           | …   | … |
+| 21 `kPackLevel10`| 149 | Level 10 pack |
+
+**Encryption:** Packs with index ≥ 15 (`kPackLevel4`, resource ID ≥ 143) are
+XOR-encrypted starting at byte offset 256 (`kUnCryptedHeader`).
+
+The encryption key used in this open-source port is:
+
+```
+gKey = 0x1E42A71F   (free registration key, name "Free", code "B3FB09B1EB")
+```
+
+On little-endian hosts (browsers), the 4-byte XOR must be byte-swapped to
+`0x1FA7421E` to match original big-endian byte ordering.
+
+**Implementation:** `port/angular-site/src/app/pack-parser.service.ts`
+(`cryptPackHandle`, `parsePackHandle`, `encodePackHandle`)
+
+---
+
+## 4. Level Pack Structure
+
+Each level pack (IDs 140–149) contains two entries:
+
+### Entry ID 1 – Level Blob
+
+The level blob is a single contiguous buffer containing five sections:
+
+```
+[tLevelData]          48 bytes
+[tTrackInfo up]       4 + num × 12 bytes
+[tTrackInfo down]     4 + num × 12 bytes
+[UInt32 objCount]     4 bytes
+[tObjectPos × n]      n × 16 bytes
+[UInt32 roadLen]      4 bytes
+[tRoadSeg × roadLen]  roadLen × 8 bytes
+```
+
+All multi-byte fields are **big-endian**.
+
+#### 4.1 `tLevelData` (48 bytes)
+
+```c
+typedef struct {
+    SInt16  roadInfo;           // +0  index into kPackRoad (Pack #135)
+    UInt16  time;               // +2  level timer (centiseconds)
+    tObjectGroupReference objGrps[10];  // +4  10 × 4 = 40 bytes
+    SInt16  xStartPos;          // +44 player car start X position (pixels)
+    UInt16  levelEnd;           // +46 finish-line Y coordinate (pixels)
 } tLevelData;
 ```
 
-### `tTrackInfo`
+#### 4.2 `tObjectGroupReference` (4 bytes)
 
 ```c
-typedef struct{
-    UInt32 num;
-    tTrackInfoSeg track[1];
+typedef struct {
+    SInt16 resID;    // +0 entry ID in kPackOgrp (0 = slot unused)
+    SInt16 numObjs;  // +2 max simultaneous objects from this group
+} tObjectGroupReference;
+```
+
+#### 4.3 `tTrackInfo` + `tTrackInfoSeg` (variable length)
+
+```c
+typedef struct {
+    UInt32         num;      // +0 number of segments
+    tTrackInfoSeg  track[1]; // +4 num × 12 bytes
 } tTrackInfo;
+
+typedef struct {
+    UInt16  flags;  // +0  segment flags (bit field)
+    SInt16  x;      // +2  lateral offset from road center (pixels)
+    SInt32  y;      // +4  vertical position (pixels)
+    float   velo;   // +8  recommended speed hint (m/s)
+} tTrackInfoSeg;    // = 12 bytes
 ```
 
-### `tTrackInfoSeg`
+Two `tTrackInfo` blocks exist: **trackUp** (AI path going up-screen) and
+**trackDown** (AI path going down-screen).
+
+#### 4.4 Object Placement Block
 
 ```c
-typedef struct{
-    UInt16 flags;
-    SInt16 x;
-    SInt32 y;
-    float velo;
-} tTrackInfoSeg;
+UInt32     objCount;          // +0 number of placed objects
+tObjectPos objs[objCount];    // +4 objCount × 16 bytes
+
+typedef struct {
+    SInt32  x;       // +0  X position (pixels)
+    SInt32  y;       // +4  Y position (pixels)
+    float   dir;     // +8  heading (radians)
+    SInt16  typeRes; // +12 object type ID (entry in kPackObTy)
+    SInt16  filler;  // +14 padding (write 0)
+} tObjectPos;        // = 16 bytes
 ```
 
-### `tObjectPos`
+#### 4.5 Road Data Block
 
 ```c
-typedef struct{
-    SInt32 x, y;
-    float dir;
-    SInt16 typeRes;
-    SInt16 filler;
-} tObjectPos;
+UInt32    roadLen;              // +0 number of road segments
+tRoadSeg  roadData[roadLen];    // +4 roadLen × 8 bytes
+
+typedef SInt16 tRoadSeg[4];  // 4 × SInt16 per segment = 8 bytes
 ```
 
-### `tMarkSeg` (entry 2)
+Road segments define the driveable road surface geometry. Each segment consists of
+4 signed 16-bit integers whose interpretation depends on road orientation.
+
+---
+
+### Entry ID 2 – Mark Segments
 
 ```c
-typedef struct{
-    t2DPoint p1, p2;
-} tMarkSeg;
+typedef struct {
+    t2DPoint p1;  // +0  start point (SInt32 x, SInt32 y) = 8 bytes
+    t2DPoint p2;  // +8  end point                        = 8 bytes
+} tMarkSeg;       // = 16 bytes
+
+typedef struct {
+    SInt32 x;  // +0
+    SInt32 y;  // +4
+} t2DPoint;    // = 8 bytes
 ```
 
-The Angular editor currently exposes a compact, drag-and-drop `16x16` tile overlay view derived from pack bytes for quick visual editing and session rebundling.
+Mark segments define finish lines and checkpoint boundaries. The number of marks is
+derived from the entry byte length: `count = floor(entrySize / 16)`.
 
-Relevant implementation:
+---
 
-- `port/angular-site/src/app/level-editor.service.ts`
-- `port/angular-site/src/app/app.ts`
-- `port/angular-site/src/app/app.html`
+## 5. Road Info (`tRoadInfo`, kPackRoad entry)
 
-## 3. Sprite / Asset Resources
+```c
+typedef struct {
+    float   friction;         // +0   surface friction coefficient
+    float   airResistance;    // +4
+    float   backResistance;   // +8   (obsolete)
+    UInt16  tolerance;        // +12  collision tolerance
+    SInt16  marks;            // +14  mark group ID
+    SInt16  deathOffs;        // +16  death event offset
+    SInt16  backgroundTex;    // +18  background texture ID
+    SInt16  foregroundTex;    // +20  foreground texture ID
+    SInt16  roadLeftBorder;   // +22  left road boundary (pixels)
+    SInt16  roadRightBorder;  // +24  right road boundary (pixels)
+    SInt16  tracks;           // +26  number of tracks
+    SInt16  skidSound;        // +28  skid sound resource ID
+    SInt16  filler;           // +30  padding
+    float   xDrift;           // +32  background horizontal drift rate
+    float   yDrift;           // +36  background vertical drift rate
+    float   xFrontDrift;      // +40  foreground horizontal drift rate
+    float   yFrontDrift;      // +44  foreground vertical drift rate
+    float   trackSlide;       // +48  track sliding coefficient
+    float   dustSlide;        // +52  dust particle spread
+    UInt8   dustColor;        // +56  dust color index
+    UInt8   water;            // +57  non-zero = water/boat surface
+    UInt16  filler2;          // +58  padding
+    float   slideFriction;    // +60  slide surface friction
+} tRoadInfo;                  // = 64 bytes
+```
 
-The runtime sprite pipeline loads sprite packs (`kPackSprt`, `kPackSp16`) in native code.
+The `tLevelData.roadInfo` field indexes into the kPackRoad pack to select which
+`tRoadInfo` entry governs this level's road physics and rendering.
 
-Editor-side asset editing currently targets directly-addressable `PPic` resources in `resources.dat` and supports byte-level patching by:
+---
 
-- selecting a `PPic` resource ID
-- choosing byte offset and replacement byte value
-- rebundling via `ResourceDatService.serialize(...)`
+## 6. Object Types (`tObjectType`, kPackObTy)
 
-This preserves record ordering and untouched resources.
+```c
+typedef struct {
+    float   mass;              // object mass (kg)
+    float   maxEngineForce;
+    float   maxNegEngineForce;
+    float   friction;
+    UInt16  flags;             // kObjectWheelFlag | kObjectSolidFrictionFlag | …
+    SInt16  deathObj;          // object spawned on death (-1 = none)
+    SInt16  frame;             // sprite frame index
+    UInt16  numFrames;         // animation frame count
+    float   frameDuration;
+    float   wheelWidth;
+    float   wheelLength;
+    float   steering;
+    float   width;
+    float   length;
+    UInt16  score;
+    UInt16  flags2;            // kObjectAddOnFlag | kObjectFrontCollFlag | …
+    SInt16  creationSound;
+    SInt16  otherSound;
+    float   maxDamage;
+    SInt16  weaponObj;
+    SInt16  weaponInfo;
+} tObjectType;
+```
 
-## 4. Rebundling Rules
+Common `typeRes` values for `tObjectPos.typeRes`:
 
-When downloading edited `resources.dat` from the Angular editor:
+| typeRes | Description |
+|---------|-------------|
+| 128     | Default player car |
+| 201     | Default player boat |
+| 129–199 | NPC vehicles |
+| 200+    | Special objects (helicopters, ramps, bonuses) |
 
-1. Parsed records are kept in original order
-2. Record header structure is regenerated from typed values
-3. Modified payloads are inserted for edited level/sprite entries
-4. Unchanged payloads are preserved exactly
+---
 
-## 5. Testing Strategy
+## 7. PPic Sprite Resources
 
-Unit tests validate:
+`PPic` resources contain raw sprite pixel data as referenced by the sprite
+pipeline (`LoadSprites()` in `sprites.c`).
 
-- `resources.dat` parse/serialize round-trip
-- malformed/truncated file handling
-- level extraction/application behavior for editable pack entries
-- asset byte patch behavior for `PPic` entries
+The first 4 bytes of each `PPic` payload are a header:
 
-Test files:
+```c
+typedef struct {
+    UInt16 xSize;   // +0 sprite width in pixels (big-endian)
+    UInt16 ySize;   // +2 sprite height in pixels (big-endian)
+    // pixel data follows…
+} tSpriteHeader;
+```
 
-- `port/angular-site/src/app/resource-dat.service.spec.ts`
-- `port/angular-site/src/app/level-editor.service.spec.ts`
+Pixel data encoding depends on the color depth and RLE mode of the specific resource.
+The editor allows byte-level inspection via a 16-column hex viewer and single-byte
+patching via offset + value.
+
+---
+
+## 8. Editor Workflow Summary
+
+```
+resources.dat
+    │
+    ├── ResourceDatService.parse()
+    │       → ResourceDatEntry[]   (type, id, raw payload bytes)
+    │
+    ├── For each Pack entry (id 140–149):
+    │       parsePackHandle(entry.data, entry.id)
+    │           → decrypt if id >= 143   (XOR with gKey = 0x1E42A71F)
+    │           → packHandleDecompress() (LZRW3-A or FLAG_COPY)
+    │           → decompressedPackEntries()
+    │               → PackEntry[] with id=1 (level blob), id=2 (marks)
+    │
+    ├── parseLevelEntry(entry1.data)
+    │       → tLevelData, trackUp[], trackDown[], objects[], roadSegs[]
+    │
+    ├── parseMarkSegs(entry2.data)
+    │       → MarkSeg[]
+    │
+    ├── [User edits properties / objects / …]
+    │
+    ├── serializeLevelProperties() / serializeLevelObjects()
+    │       → patched entry1 bytes
+    │
+    ├── encodePackHandle(newEntries, resourceId)
+    │       → [4-byte BE size][0x01][decompressed bytes]  (FLAG_COPY, no recompression)
+    │       → re-encrypt if resourceId >= 143
+    │
+    └── ResourceDatService.serialize()
+            → resources.dat (for download)
+```
+
+---
+
+## 9. Test Coverage
+
+| Test file | Covers |
+|-----------|--------|
+| `lzrw.service.spec.ts` | FLAG_COPY pass-through, packHandle round-trip, size header |
+| `pack-parser.service.spec.ts` | `decompressedPackEntries`, `encodePackHandle` round-trip, `cryptPackHandle` idempotency |
+| `level-editor.service.spec.ts` | `parseLevelEntry`, `parseMarkSegs`, `serializeLevelProperties`, `serializeLevelObjects`, `LevelEditorService` methods |
+| `resource-dat.service.spec.ts` | resources.dat parse/serialize round-trip, malformed input |
+| `app.spec.ts` | Tab navigation, hero card visibility, editor section, nav DOM structure |
+
+Run with:
+
+```sh
+cd port/angular-site
+npm test -- --watch=false
+```
