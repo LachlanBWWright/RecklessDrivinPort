@@ -318,7 +318,7 @@ jobs:
     name: Create GitHub Release
     needs: [build-linux, build-macos, build-windows, build-android]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    #if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     permissions:
       contents: write
 
