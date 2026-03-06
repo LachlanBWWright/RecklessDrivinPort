@@ -15,6 +15,8 @@ export interface EditableSpriteAsset {
 }
 
 const LEVEL_TILE_COUNT = 16 * 16;
+const TILE_VALUE_MASK = 0x0f;
+const OBJ_GRPS_PLACEHOLDER_HEX = '0'.repeat(40);
 const LEVEL_IDS = new Set(Array.from({ length: 10 }, (_, index) => 140 + index));
 const LEVEL_HEADER_RESULT = structTemplateFromString('>hH20hh:roadInfo,time,objGrps,xStartPos,levelEnd');
 
@@ -135,7 +137,7 @@ export class LevelEditorService {
     const packed = packStruct(LEVEL_HEADER_RESULT.value, {
       roadInfo: metadata.roadInfo,
       time: metadata.time,
-      objGrps: '0'.repeat(40),
+      objGrps: OBJ_GRPS_PLACEHOLDER_HEX,
       xStartPos: metadata.xStartPos,
       levelEnd: metadata.levelEnd,
     });
@@ -153,7 +155,7 @@ export class LevelEditorService {
   private toEditableTiles(data: Uint8Array): number[] {
     const tiles: number[] = [];
     for (let index = 0; index < LEVEL_TILE_COUNT; index += 1) {
-      tiles.push(index < data.length ? data[index] & 0x0f : 0);
+      tiles.push(index < data.length ? data[index] & TILE_VALUE_MASK : 0);
     }
     return tiles;
   }

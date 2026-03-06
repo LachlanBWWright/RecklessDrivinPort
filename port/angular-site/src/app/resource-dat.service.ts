@@ -16,9 +16,11 @@ if (!isOk(HEADER_TEMPLATE_RESULT)) {
 const HEADER_TEMPLATE = HEADER_TEMPLATE_RESULT.value;
 
 function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((value) => value.toString(16).padStart(2, '0'))
-    .join('');
+  let output = '';
+  for (let index = 0; index < bytes.length; index += 1) {
+    output += bytes[index].toString(16).padStart(2, '0');
+  }
+  return output;
 }
 
 function hexToBytes(value: string): Uint8Array {

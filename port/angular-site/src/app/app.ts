@@ -214,7 +214,7 @@ export class App implements OnInit, OnDestroy {
 
   onVolumeChange(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const pct = parseInt(input.value, 10);
+    const pct = Number.parseInt(input.value, 10);
     this.masterVolume.set(pct);
     this.applyVolumeToWasm(pct);
   }
