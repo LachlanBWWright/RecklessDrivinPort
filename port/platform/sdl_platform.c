@@ -111,6 +111,55 @@ static int s_touch_key_state[kNumElements];
 /* Non-zero once the first touch event is received (enables overlay) */
 static int s_touch_controls_active = 0;
 
+/* Compute the destination rectangle used to display the game frame inside the
+ * renderer output while preserving the original 4:3 aspect ratio. */
+static void sdl_get_game_dst_rect(SDL_Rect *dst, int *out_w, int *out_h)
+{
+    int rw = gXSize, rh = gYSize;
+    if (s_renderer && SDL_GetRendererOutputSize(s_renderer, &rw, &rh) < 0) {
+        rw = gXSize;
+        rh = gYSize;
+    }
+    if (out_w) *out_w = rw;
+    if (out_h) *out_h = rh;
+
+    if (!dst) return;
+    {
+        int d_w = rh * gXSize / gYSize;
+        int d_h = rh;
+        if (d_w > rw) {
+            d_w = rw;
+            d_h = rw * gYSize / gXSize;
+        }
+        dst->x = (rw - d_w) / 2;
+        dst->y = (rh - d_h) / 2;
+        dst->w = d_w;
+        dst->h = d_h;
+    }
+}
+
+/* Map renderer/output coordinates to game coordinates (0..gXSize-1, 0..gYSize-1)
+ * using the same letterbox destination rectangle as Blit2Screen(). */
+static void sdl_output_to_game_xy(int px, int py, int *gx, int *gy)
+{
+    SDL_Rect dst;
+    sdl_get_game_dst_rect(&dst, NULL, NULL);
+
+    if (dst.w <= 0 || dst.h <= 0) {
+        if (gx) *gx = px;
+        if (gy) *gy = py;
+        return;
+    }
+
+    if (px < dst.x) px = dst.x;
+    if (py < dst.y) py = dst.y;
+    if (px >= dst.x + dst.w) px = dst.x + dst.w - 1;
+    if (py >= dst.y + dst.h) py = dst.y + dst.h - 1;
+
+    if (gx) *gx = (px - dst.x) * gXSize / dst.w;
+    if (gy) *gy = (py - dst.y) * gYSize / dst.h;
+}
+
 /* Returns the bitmask of game keys activated by a normalised touch at (nx,ny) */
 static int touch_pos_to_keymask(float nx, float ny)
 {
@@ -910,21 +959,8 @@ void Blit2Screen(void) {
      * with black bars on each side rather than stretching to fill the width. */
     SDL_RenderClear(s_renderer);
     {
-        int out_w, out_h;
-        SDL_GetRendererOutputSize(s_renderer, &out_w, &out_h);
-
-        /* Compute the largest 4:3 rect that fits inside out_w × out_h */
-        int dst_w = out_h * gXSize / gYSize;
-        int dst_h = out_h;
-        if (dst_w > out_w) {
-            dst_w = out_w;
-            dst_h = out_w * gYSize / gXSize;
-        }
         SDL_Rect dst;
-        dst.x = (out_w - dst_w) / 2;
-        dst.y = (out_h - dst_h) / 2;
-        dst.w = dst_w;
-        dst.h = dst_h;
+        sdl_get_game_dst_rect(&dst, NULL, NULL);
         SDL_RenderCopy(s_renderer, s_texture, NULL, &dst);
     }
 
@@ -1151,8 +1187,7 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
                 return 1;
 
             case SDL_MOUSEBUTTONDOWN:
-                s_mouse_x = ev.button.x;
-                s_mouse_y = ev.button.y;
+                sdl_output_to_game_xy(ev.button.x, ev.button.y, &s_mouse_x, &s_mouse_y);
                 s_mouse_down = 1;
                 theEvent->what = mouseDown;
                 theEvent->where.h = (short)s_mouse_x;
@@ -1161,8 +1196,7 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
                 return 1;
 
             case SDL_MOUSEBUTTONUP:
-                s_mouse_x = ev.button.x;
-                s_mouse_y = ev.button.y;
+                sdl_output_to_game_xy(ev.button.x, ev.button.y, &s_mouse_x, &s_mouse_y);
                 s_mouse_down = 0;
                 theEvent->what = mouseUp;
                 theEvent->where.h = (short)s_mouse_x;
@@ -1171,8 +1205,7 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
                 return 1;
 
             case SDL_MOUSEMOTION:
-                s_mouse_x = ev.motion.x;
-                s_mouse_y = ev.motion.y;
+                sdl_output_to_game_xy(ev.motion.x, ev.motion.y, &s_mouse_x, &s_mouse_y);
                 {
                     /* mouseMovedMessage osEvt */
                     theEvent->what = osEvt;
@@ -1188,8 +1221,14 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
                 sdl_touch_finger_event(ev.tfinger.fingerId,
                                        ev.tfinger.x, ev.tfinger.y, 1);
                 /* On Android, translate first touch to a mouse event for menus */
-                s_mouse_x = (int)(ev.tfinger.x * gXSize);
-                s_mouse_y = (int)(ev.tfinger.y * gYSize);
+                {
+                    int out_w = gXSize, out_h = gYSize;
+                    int px, py;
+                    sdl_get_game_dst_rect(NULL, &out_w, &out_h);
+                    px = (int)(ev.tfinger.x * out_w);
+                    py = (int)(ev.tfinger.y * out_h);
+                    sdl_output_to_game_xy(px, py, &s_mouse_x, &s_mouse_y);
+                }
                 if (ev.type == SDL_FINGERDOWN) {
                     s_mouse_down = 1;
                     theEvent->what = mouseDown;
@@ -1205,8 +1244,16 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
                                        ev.tfinger.x, ev.tfinger.y, 0);
                 s_mouse_down = 0;
                 theEvent->what = mouseUp;
-                theEvent->where.h = (short)(ev.tfinger.x * gXSize);
-                theEvent->where.v = (short)(ev.tfinger.y * gYSize);
+                {
+                    int out_w = gXSize, out_h = gYSize;
+                    int px, py, gx, gy;
+                    sdl_get_game_dst_rect(NULL, &out_w, &out_h);
+                    px = (int)(ev.tfinger.x * out_w);
+                    py = (int)(ev.tfinger.y * out_h);
+                    sdl_output_to_game_xy(px, py, &gx, &gy);
+                    theEvent->where.h = (short)gx;
+                    theEvent->where.v = (short)gy;
+                }
                 theEvent->when = SDL_GetTicks();
                 return 1;
 
@@ -1246,6 +1293,7 @@ Point GetScreenPos(Point *inPos) {
     } else {
         int mx, my;
         SDL_GetMouseState(&mx, &my);
+        sdl_output_to_game_xy(mx, my, &mx, &my);
         pos.h = (short)mx;
         pos.v = (short)my;
     }
@@ -1368,6 +1416,11 @@ static int       s_output_rate     = SND_SAMPLE_RATE;
  * accordingly; otherwise every source sample advances the position twice as
  * fast as intended, causing audio to play at double speed. */
 static int       s_output_channels = 1;
+/* Actual output sample format/width reported by SDL.  Browsers commonly use
+ * float32 output; assuming int16 in that case causes crackly/glitchy audio
+ * and incorrect frame stepping. */
+static SDL_AudioFormat s_output_format = AUDIO_S16SYS;
+static int       s_output_sample_bytes = 2;
 /* Master volume scalar (0.0 -- 1.0).  Exposed to JavaScript via
  * set_wasm_master_volume() so the browser UI slider can control it. */
 static float     s_master_volume = 1.0f;
@@ -1410,14 +1463,17 @@ static int sample_frame_mono(const SndVoice *v, uint32_t idx) {
 /* -------- SDL audio callback -------- */
 static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
     (void)userdata;
-    int16_t *out = (int16_t *)stream;
-    /* Number of output frames.  A frame is s_output_channels int16 values.
+    int bytes_per_sample = (s_output_sample_bytes > 0) ? s_output_sample_bytes : 2;
+    int bytes_per_frame = bytes_per_sample * s_output_channels;
+    /* Number of output frames.  A frame is s_output_channels samples in the
+     * device's actual output format.
      * We iterate over frames (not individual channel samples) so that each
      * source sample advances the playback position exactly once, regardless
      * of whether the output device is mono (1 ch) or stereo (2 ch).  Mixing
      * the same sample into all channels gives a correct mono→stereo upmix. */
-    int n_frames = len / (2 * s_output_channels);
-    memset(out, 0, (size_t)len);
+    int n_frames = (bytes_per_frame > 0) ? (len / bytes_per_frame) : 0;
+    if (n_frames <= 0) return;
+    memset(stream, 0, (size_t)len);
 
     if (!s_audio_mutex) return;
     SDL_LockMutex(s_audio_mutex);
@@ -1478,10 +1534,23 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
             sample = (int)(sample * v->vol_l * s_master_volume);
             /* Mix the (mono) source sample into every output channel so that
              * stereo devices receive the same signal on both L and R channels. */
-            for (int ch = 0; ch < s_output_channels; ch++) {
-                int out_idx = i * s_output_channels + ch;
-                int32_t sum = (int32_t)out[out_idx] + (int32_t)sample;
-                out[out_idx] = (int16_t)(sum > 32767 ? 32767 : sum < -32768 ? -32768 : sum);
+            if (s_output_format == AUDIO_F32SYS) {
+                float *out = (float *)stream;
+                float f = (float)sample / 32768.0f;
+                for (int ch = 0; ch < s_output_channels; ch++) {
+                    int out_idx = i * s_output_channels + ch;
+                    float sum = out[out_idx] + f;
+                    if (sum > 1.0f) sum = 1.0f;
+                    if (sum < -1.0f) sum = -1.0f;
+                    out[out_idx] = sum;
+                }
+            } else {
+                int16_t *out = (int16_t *)stream;
+                for (int ch = 0; ch < s_output_channels; ch++) {
+                    int out_idx = i * s_output_channels + ch;
+                    int32_t sum = (int32_t)out[out_idx] + (int32_t)sample;
+                    out[out_idx] = (int16_t)(sum > 32767 ? 32767 : sum < -32768 ? -32768 : sum);
+                }
             }
             v->pos += v->rate;
         }
@@ -1515,6 +1584,9 @@ static void sdl_audio_open(void) {
      * audio callback so that pitch and speed are correct on all platforms. */
     s_output_rate     = (got.freq     > 0) ? got.freq     : SND_SAMPLE_RATE;
     s_output_channels = (got.channels > 0) ? got.channels : 1;
+    s_output_format   = got.format;
+    s_output_sample_bytes = (int)(SDL_AUDIO_BITSIZE(s_output_format) / 8);
+    if (s_output_sample_bytes <= 0) s_output_sample_bytes = 2;
 #ifdef __EMSCRIPTEN__
     /* Emscripten's SDL_OpenAudio may report the *requested* sample rate in
      * got.freq instead of the actual Web Audio context rate.  The
@@ -1542,8 +1614,8 @@ static void sdl_audio_open(void) {
 #endif
     s_audio_open = 1;
     SDL_PauseAudio(0);  /* start playback */
-    LOG_DEBUG("[SDL] Audio opened: %d Hz (requested %d Hz), format=%d, ch=%d\n",
-           got.freq, want.freq, got.format, got.channels);
+    LOG_DEBUG("[SDL] Audio opened: %d Hz (requested %d Hz), format=%d (%d bytes), ch=%d\n",
+           got.freq, want.freq, got.format, s_output_sample_bytes, got.channels);
 }
 
 /* ============================================================
