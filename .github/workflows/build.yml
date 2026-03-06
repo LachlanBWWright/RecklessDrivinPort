@@ -187,13 +187,10 @@ jobs:
             cp -r "$ANGULAR_DIST"/. gh-pages/
             echo "Deployed Angular site from $ANGULAR_DIST"
           else
-            # Fallback: use WASM shell HTML or our custom shell
-            if [ -f build_wasm/reckless_drivin.html ]; then
-              cp build_wasm/reckless_drivin.html gh-pages/index.html
-            else
-              cp port/wasm/shell.html gh-pages/index.html
-            fi
-            echo "Fallback: deployed shell.html as index.html"
+            # Fallback: if for some reason the Angular build failed, just use
+            # the bare Emscripten-generated HTML from the WASM build itself.
+            cp build_wasm/reckless_drivin.html gh-pages/index.html
+            echo "Fallback: deployed build_wasm/reckless_drivin.html as index.html"
           fi
           echo "Pages content:"
           ls -lh gh-pages/

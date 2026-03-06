@@ -67,9 +67,14 @@ The game currently compiles to a native binary on Linux. The following systems s
 ### GitHub Pages
 
 A workflow in `.github/workflows/build.yml` builds the WebAssembly version of the game and deploys it via the
-`actions/deploy-pages` action whenever `master` (or `main`) is pushed. Make sure the repository's Pages settings are
-configured to pull from **GitHub Actions**; otherwise the site might still be serving stale content from `/docs`.
+`actions/deploy-pages` action whenever `master` (or `main`) is pushed. The CI job creates a `gh-pages` directory and
+hands it off to the Pages deployment action; the repository itself no longer needs to contain any static site files.
+The old `/docs` tree (used before the workflow existed) is now ignored and can be safely deleted — it’s retained in
+history but isn’t used by the build or by Pages any more.
 
 > **Note:** check _Settings → Pages_ in GitHub and ensure the `github-pages` environment has no protection rules that
-> require manual approval. If you prefer to serve from `/docs` you can remove the Actions deploy job entirely, but
-> the workflow will not automatically update that directory as part of the CI run.
+> require manual approval. If you ever want to serve from `/docs` instead of the Actions build, remove the deploy job
+> and re-create the directory manually, but the workflow won't keep it up to date.
+
+Additional gitignore entries have been added for `/docs`, `/port/wasm` and the temporary `gh-pages/` folder; only
+source files and the Angular project remain under version control.
