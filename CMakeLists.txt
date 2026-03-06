@@ -238,8 +238,12 @@ endif()
 # Desktop/WASM: build an executable
 # ============================================================
 if(ANDROID)
-    # Android resources: pre-packaged in APK assets; path set by Java init code
-    add_compile_definitions(RESOURCES_DAT_PATH="/data/data/com.recklessdrivin/files/resources.dat")
+    # Android resources: copied from APK assets to internal storage by
+    # MainActivity.copyAssetIfNeeded() before SDL_main() runs.  The actual
+    # full path is resolved at runtime via SDL_AndroidGetInternalStoragePath()
+    # in sdl_platform.c main(); the compile-time RESOURCES_DAT_PATH is set to
+    # just the filename as a last-resort fallback in Pomme_InitResources().
+    add_compile_definitions(RESOURCES_DAT_PATH="resources.dat")
     message(STATUS "Building for Android (shared library)")
     add_library(main SHARED ${GAME_SOURCES})
     set(GAME_TARGET main)

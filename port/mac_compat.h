@@ -663,6 +663,8 @@ long   GetResourceSizeOnDisk(Handle res);
 long   SizeResource(Handle res);
 void   SetResLoad(Boolean load);
 Handle Get1Resource(ResType theType, short theID);
+/* Resource file utilities (implemented in port/resources/resources.c) */
+void   Pomme_LoadResourceFile(const char *path);
 
 /* File Manager */
 OSErr  FSMakeFSSpec(short vRefNum, long dirID, const char *cName, FSSpec *spec);
