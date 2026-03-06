@@ -543,6 +543,7 @@ export class App implements OnInit, OnDestroy {
 
     // Draw objects
     const baseRadius = Math.min(20, Math.max(5, 8 * zoom));
+    const labelFont = `${Math.max(9, 10 * zoom)}px monospace`;
     for (let i = 0; i < objs.length; i++) {
       const obj = objs[i];
       const [cx, cy] = this.worldToCanvas(obj.x, obj.y);
@@ -575,7 +576,7 @@ export class App implements OnInit, OnDestroy {
       // Label when zoomed in enough
       if (zoom > 0.5) {
         ctx.fillStyle = '#fff';
-        ctx.font = `${Math.max(9, 10 * zoom)}px monospace`;
+        ctx.font = labelFont;
         ctx.fillText(`#${i} T${obj.typeRes}`, cx + baseRadius + 2, cy + 4);
       }
     }
@@ -632,6 +633,17 @@ export class App implements OnInit, OnDestroy {
     return [cx, cy];
   }
 
+  private markBounds(ms: MarkSeg[]): { minX: number; minY: number; maxX: number; maxY: number; rangeX: number; rangeY: number } {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const m of ms) {
+      if (m.x1 < minX) minX = m.x1; if (m.x2 < minX) minX = m.x2;
+      if (m.y1 < minY) minY = m.y1; if (m.y2 < minY) minY = m.y2;
+      if (m.x1 > maxX) maxX = m.x1; if (m.x2 > maxX) maxX = m.x2;
+      if (m.y1 > maxY) maxY = m.y1; if (m.y2 > maxY) maxY = m.y2;
+    }
+    return { minX, minY, maxX, maxY, rangeX: maxX - minX, rangeY: maxY - minY };
+  }
+
   redrawMarkCanvas(): void {
     const canvas = document.getElementById('mark-canvas') as HTMLCanvasElement | null;
     if (!canvas) return;
@@ -654,14 +666,7 @@ export class App implements OnInit, OnDestroy {
       return;
     }
 
-    const xs = ms.flatMap((m) => [m.x1, m.x2]);
-    const ys = ms.flatMap((m) => [m.y1, m.y2]);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const rangeX = maxX - minX;
-    const rangeY = maxY - minY;
+    const { minX, minY, rangeX, rangeY } = this.markBounds(ms);
 
     const toC = (wx: number, wy: number) =>
       this.markWorldToCanvas(wx, wy, canvas, minX, minY, rangeX, rangeY);
@@ -698,11 +703,7 @@ export class App implements OnInit, OnDestroy {
     const ms = this.marks();
     if (ms.length === 0) return;
 
-    const xs = ms.flatMap((m) => [m.x1, m.x2]);
-    const ys = ms.flatMap((m) => [m.y1, m.y2]);
-    const minX = Math.min(...xs); const maxX = Math.max(...xs);
-    const minY = Math.min(...ys); const maxY = Math.max(...ys);
-    const rangeX = maxX - minX; const rangeY = maxY - minY;
+    const { minX, minY, rangeX, rangeY } = this.markBounds(ms);
 
     const hitR = 10;
     for (let i = 0; i < ms.length; i++) {
@@ -740,11 +741,9 @@ export class App implements OnInit, OnDestroy {
     if (!drag) return;
     const canvas = event.target as HTMLCanvasElement;
     const ms = this.marks();
-    const xs = ms.flatMap((m) => [m.x1, m.x2]);
-    const ys = ms.flatMap((m) => [m.y1, m.y2]);
-    const minX = Math.min(...xs); const maxX = Math.max(...xs);
-    const minY = Math.min(...ys); const maxY = Math.max(...ys);
-    const rangeX = maxX - minX || 1; const rangeY = maxY - minY || 1;
+    const { minX, minY, rangeX: rawRangeX, rangeY: rawRangeY } = this.markBounds(ms);
+    const rangeX = rawRangeX || 1;
+    const rangeY = rawRangeY || 1;
     const pad = 24;
     const W = canvas.width; const H = canvas.height;
     // Invert the canvas-to-world mapping
