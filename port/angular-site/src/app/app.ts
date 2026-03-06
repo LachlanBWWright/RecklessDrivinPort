@@ -6,6 +6,8 @@ import {
 } from './level-editor.service';
 import { ResourceDatService, type ResourceDatEntry } from './resource-dat.service';
 
+export type AppTab = 'game' | 'editor';
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
@@ -14,6 +16,7 @@ import { ResourceDatService, type ResourceDatEntry } from './resource-dat.servic
 })
 export class App implements OnInit, OnDestroy {
   protected readonly title = signal("Reckless Drivin' – WebAssembly Port");
+  activeTab = signal<AppTab>('game');
   statusText = signal('Loading game data…');
   progressPct = signal(0);
   overlayVisible = signal(true);
@@ -210,6 +213,10 @@ export class App implements OnInit, OnDestroy {
     } else {
       canvas.requestFullscreen().catch((err) => console.warn('Fullscreen error:', err));
     }
+  }
+
+  setTab(tab: AppTab): void {
+    this.activeTab.set(tab);
   }
 
   onVolumeChange(event: Event): void {

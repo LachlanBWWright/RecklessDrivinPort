@@ -12,7 +12,7 @@
       </a>.
       This effort builds on earlier ports such as
       <a href="https://github.com/natecraddock/open-reckless-drivin" target="_blank" rel="noopener">
-        Nathan Craddock’s</a> work and
+        Nathan Craddock's</a> work and
       <a href="https://github.com/jorio/Pomme" target="_blank" rel="noopener">
         Pomme by Jorio</a>.
       <a href="https://github.com/LachlanBWWright/RecklessDrivinPort" target="_blank" rel="noopener">
@@ -21,8 +21,40 @@
     </p>
   </div>
 
-  <!-- Game section -->
-  <section class="game-section">
+  <!-- Top-level navigation tabs -->
+  <nav class="main-tabs" aria-label="Site sections">
+    <button
+      type="button"
+      class="main-tab"
+      [class.active]="activeTab() === 'game'"
+      (click)="setTab('game')"
+      aria-controls="panel-game"
+      [attr.aria-selected]="activeTab() === 'game'"
+      role="tab"
+    >
+      🎮 Play Game
+    </button>
+    <button
+      type="button"
+      class="main-tab"
+      [class.active]="activeTab() === 'editor'"
+      (click)="setTab('editor')"
+      aria-controls="panel-editor"
+      [attr.aria-selected]="activeTab() === 'editor'"
+      role="tab"
+    >
+      🗺️ Level Editor
+    </button>
+  </nav>
+
+  <!-- Game panel – kept in DOM so the WASM instance survives tab switches -->
+  <section
+    id="panel-game"
+    class="game-section tab-panel"
+    [class.tab-panel--hidden]="activeTab() !== 'game'"
+    role="tabpanel"
+    aria-labelledby="tab-game"
+  >
     <div class="game-header">
       <span>Game</span>
       <span class="status-label">{{ statusText() }}</span>
@@ -68,126 +100,134 @@
     </div>
   </section>
 
-  <section class="editor-section">
-    <div class="editor-header">
-      <h2>Resources.dat Level & Asset Editor (Experimental)</h2>
-      <p>{{ resourcesStatus() }}</p>
-      @if (editorError()) {
-        <p class="editor-error">{{ editorError() }}</p>
-      }
-    </div>
+  <!-- Level Editor panel -->
+  @if (activeTab() === 'editor') {
+    <section
+      id="panel-editor"
+      class="editor-section tab-panel"
+      role="tabpanel"
+      aria-labelledby="tab-editor"
+    >
+      <div class="editor-header">
+        <h2>Resources.dat Level &amp; Asset Editor (Experimental)</h2>
+        <p>{{ resourcesStatus() }}</p>
+        @if (editorError()) {
+          <p class="editor-error">{{ editorError() }}</p>
+        }
+      </div>
 
-    <div class="editor-actions">
-      <button type="button" class="btn" (click)="loadDefaultResources()">Load default resources.dat</button>
-      <label class="btn upload-btn" for="resource-file">Upload resources.dat</label>
-      <input id="resource-file" type="file" accept=".dat" (change)="onResourceFileSelected($event)" />
-      <button type="button" class="btn" (click)="downloadEditedResources()" [disabled]="!hasEditorData()">
-        Download edited resources.dat
-      </button>
-    </div>
+      <div class="editor-actions">
+        <button type="button" class="btn" (click)="loadDefaultResources()">Load default resources.dat</button>
+        <label class="btn upload-btn" for="resource-file">Upload resources.dat</label>
+        <input id="resource-file" type="file" accept=".dat" (change)="onResourceFileSelected($event)" />
+        <button type="button" class="btn" (click)="downloadEditedResources()" [disabled]="!hasEditorData()">
+          Download edited resources.dat
+        </button>
+      </div>
 
-    <div class="editor-grid">
-      <div class="level-panel">
-        <h3>Level tile editor</h3>
-        @if (levels().length === 0) {
-          <p class="muted">No editable Pack #140-149 resources found.</p>
-        } @else {
-          <div class="level-tabs">
-            @for (level of levels(); track level.resourceId) {
-              <button
-                type="button"
-                class="tab"
-                [class.active]="selectedLevelId() === level.resourceId"
-                (click)="selectLevel(level.resourceId)"
-              >
-                Level {{ level.resourceId - 139 }}
-              </button>
+      <div class="editor-grid">
+        <div class="level-panel">
+          <h3>Level tile editor</h3>
+          @if (levels().length === 0) {
+            <p class="muted">No editable Pack #140-149 resources found.</p>
+          } @else {
+            <div class="level-tabs">
+              @for (level of levels(); track level.resourceId) {
+                <button
+                  type="button"
+                  class="tab"
+                  [class.active]="selectedLevelId() === level.resourceId"
+                  (click)="selectLevel(level.resourceId)"
+                >
+                  Level {{ level.resourceId - 139 }}
+                </button>
+              }
+            </div>
+
+            <div class="palette">
+              <label for="palette-value">Tile value</label>
+              <input
+                id="palette-value"
+                type="number"
+                min="0"
+                max="15"
+                [value]="paletteValue()"
+                (input)="onPaletteInput($event)"
+              />
+              <div class="palette-items">
+                @for (tile of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; track tile) {
+                  <button
+                    type="button"
+                    draggable="true"
+                    class="palette-item"
+                    [class.active]="tile === paletteValue()"
+                    [style.background]="tileColor(tile)"
+                    (dragstart)="onPaletteDragStart($event, tile)"
+                    (click)="paletteValue.set(tile)"
+                  >
+                    {{ tile }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            @if (selectedLevel; as currentLevel) {
+              <div class="tile-grid">
+                @for (tile of currentLevel.tiles; track $index) {
+                  <button
+                    type="button"
+                    class="tile-cell"
+                    [style.background]="tileColor(tile)"
+                    (dragover)="onGridDragOver($event)"
+                    (drop)="onGridDrop($event, $index)"
+                    (click)="onGridCellClick($index)"
+                    [title]="'Index ' + $index + ' value ' + tile"
+                  >
+                    {{ tile }}
+                  </button>
+                }
+              </div>
             }
-          </div>
+          }
+        </div>
 
-          <div class="palette">
-            <label for="palette-value">Tile value</label>
+        <div class="asset-panel">
+          <h3>Sprite/asset byte editor</h3>
+          @if (spriteAssets().length === 0) {
+            <p class="muted">No PPic assets found.</p>
+          } @else {
+            <label for="sprite-select">Asset</label>
+            <select id="sprite-select" [value]="selectedSpriteId()" (change)="selectSprite(+$any($event.target).value)">
+              @for (asset of spriteAssets(); track asset.id) {
+                <option [value]="asset.id">{{ asset.type }} #{{ asset.id }} ({{ asset.size }} bytes)</option>
+              }
+            </select>
+
+            <label for="sprite-offset">Byte offset</label>
             <input
-              id="palette-value"
+              id="sprite-offset"
               type="number"
               min="0"
-              max="15"
-              [value]="paletteValue()"
-              (input)="onPaletteInput($event)"
+              [value]="spriteByteOffset()"
+              (input)="onSpriteOffsetInput($event)"
             />
-            <div class="palette-items">
-              @for (tile of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; track tile) {
-                <button
-                  type="button"
-                  draggable="true"
-                  class="palette-item"
-                  [class.active]="tile === paletteValue()"
-                  [style.background]="tileColor(tile)"
-                  (dragstart)="onPaletteDragStart($event, tile)"
-                  (click)="paletteValue.set(tile)"
-                >
-                  {{ tile }}
-                </button>
-              }
-            </div>
-          </div>
 
-          @if (selectedLevel; as currentLevel) {
-            <div class="tile-grid">
-              @for (tile of currentLevel.tiles; track $index) {
-                <button
-                  type="button"
-                  class="tile-cell"
-                  [style.background]="tileColor(tile)"
-                  (dragover)="onGridDragOver($event)"
-                  (drop)="onGridDrop($event, $index)"
-                  (click)="onGridCellClick($index)"
-                  [title]="'Index ' + $index + ' value ' + tile"
-                >
-                  {{ tile }}
-                </button>
-              }
-            </div>
+            <label for="sprite-value">Byte value</label>
+            <input
+              id="sprite-value"
+              type="number"
+              min="0"
+              max="255"
+              [value]="spriteByteValue()"
+              (input)="onSpriteValueInput($event)"
+            />
+
+            <button type="button" class="btn" (click)="applySpriteByteEdit()" [disabled]="selectedSpriteId() === null">
+              Apply byte edit
+            </button>
           }
-        }
+        </div>
       </div>
-
-      <div class="asset-panel">
-        <h3>Sprite/asset byte editor</h3>
-        @if (spriteAssets().length === 0) {
-          <p class="muted">No PPic assets found.</p>
-        } @else {
-          <label for="sprite-select">Asset</label>
-          <select id="sprite-select" [value]="selectedSpriteId()" (change)="selectSprite(+$any($event.target).value)">
-            @for (asset of spriteAssets(); track asset.id) {
-              <option [value]="asset.id">{{ asset.type }} #{{ asset.id }} ({{ asset.size }} bytes)</option>
-            }
-          </select>
-
-          <label for="sprite-offset">Byte offset</label>
-          <input
-            id="sprite-offset"
-            type="number"
-            min="0"
-            [value]="spriteByteOffset()"
-            (input)="onSpriteOffsetInput($event)"
-          />
-
-          <label for="sprite-value">Byte value</label>
-          <input
-            id="sprite-value"
-            type="number"
-            min="0"
-            max="255"
-            [value]="spriteByteValue()"
-            (input)="onSpriteValueInput($event)"
-          />
-
-          <button type="button" class="btn" (click)="applySpriteByteEdit()" [disabled]="selectedSpriteId() === null">
-            Apply byte edit
-          </button>
-        }
-      </div>
-    </div>
-  </section>
+    </section>
+  }
 </main>
