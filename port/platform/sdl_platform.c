@@ -1350,6 +1350,9 @@ typedef struct SndVoice {
 
     /* extSH 16-bit flag: samples contains big-endian int16 pairs */
     int is16bit;
+    /* Source channel count from SoundHeader (stdSH is always mono).
+     * extSH sounds can be stereo and must be downmixed per frame. */
+    int src_channels;
 } SndVoice;
 
 /* One mixer voice per SndChannel */
@@ -1375,6 +1378,33 @@ static int voice_for_chan(SndChannelPtr chan) {
     int idx = (int)(intptr_t)chan->nextChan;  /* we store index in nextChan */
     if (idx < 0 || idx >= MAX_SND_CHANNELS) return -1;
     return idx;
+}
+
+/* -------- Decode one source frame as mono int16 -------- */
+static int sample_frame_mono(const SndVoice *v, uint32_t idx) {
+    int channels = (v->src_channels > 0 && v->src_channels <= 8) ? v->src_channels : 1;
+    if (v->is16bit) {
+        uint32_t base = idx * (uint32_t)(channels * 2);
+        if (channels == 1) {
+            return (int)(int16_t)(((uint16_t)v->samples[base] << 8) | v->samples[base + 1]);
+        }
+        int sum = 0;
+        for (int ch = 0; ch < channels; ch++) {
+            uint32_t b = base + (uint32_t)(ch * 2);
+            sum += (int)(int16_t)(((uint16_t)v->samples[b] << 8) | v->samples[b + 1]);
+        }
+        return sum / channels;
+    } else {
+        uint32_t base = idx * (uint32_t)channels;
+        if (channels == 1) {
+            return (int)((uint8_t)v->samples[base] - 128) * 256;
+        }
+        int sum = 0;
+        for (int ch = 0; ch < channels; ch++) {
+            sum += (int)((uint8_t)v->samples[base + (uint32_t)ch] - 128) * 256;
+        }
+        return sum / channels;
+    }
 }
 
 /* -------- SDL audio callback -------- */
@@ -1439,18 +1469,8 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
                 uint32_t idx1 = idx + 1;
                 if (idx1 >= end_pos)
                     idx1 = has_loop ? v->loop_start : idx; /* clamp; frac*(s0-s0)=0 → nearest-neighbour at end */
-                int s0, s1;
-                if (v->is16bit) {
-                    /* extSH 16-bit big-endian signed PCM */
-                    uint32_t b0 = idx  * 2;
-                    uint32_t b1 = idx1 * 2;
-                    s0 = (int)(int16_t)(((uint16_t)v->samples[b0] << 8) | v->samples[b0 + 1]);
-                    s1 = (int)(int16_t)(((uint16_t)v->samples[b1] << 8) | v->samples[b1 + 1]);
-                } else {
-                    /* stdSH / extSH 8-bit unsigned PCM: map 0-255 -> -32768..32512 */
-                    s0 = (int)((uint8_t)v->samples[idx ] - 128) * 256;
-                    s1 = (int)((uint8_t)v->samples[idx1] - 128) * 256;
-                }
+                int s0 = sample_frame_mono(v, idx);
+                int s1 = sample_frame_mono(v, idx1);
                 /* Linear interpolation between s0 and s1 */
                 sample = (int)(s0 + frac * (s1 - s0));
             }
@@ -1568,6 +1588,7 @@ OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
     v->rate_mul = 1.0;
     v->rate     = 1.0;
     v->active   = 0;
+    v->src_channels = 1;
     v->callback = userRoutine;
     v->chan     = *chan;
 
@@ -1625,22 +1646,27 @@ static void voice_play_buffer(SndVoice *v, const uint8_t *snd_hdr) {
         v->active      = 1;
     } else if (encode == 0xFF) {
         /* extSH: sample data begins at offset 64.
+         * numChannels (big-endian uint32) at bytes 4-7.
          * numFrames (big-endian uint32) at bytes 22-25 is the frame count.
          * sampleSize (big-endian uint16) at bytes 48-49 gives bits per sample.
          * Note: offset 4 is numChannels (not a usable frame count), and
          * offset 44 is AESRecording (not sampleSize) — do not read from there. */
+        uint32_t num_channels = ((uint32_t)snd_hdr[4]<<24)|((uint32_t)snd_hdr[5]<<16)|
+                                ((uint32_t)snd_hdr[6]<<8 )|snd_hdr[7];
         uint32_t num_frames  = ((uint32_t)snd_hdr[22]<<24)|((uint32_t)snd_hdr[23]<<16)|
                                ((uint32_t)snd_hdr[24]<<8 )|snd_hdr[25];
         uint16_t sample_size = ((uint16_t)snd_hdr[48] << 8) | snd_hdr[49];
         v->samples     = (const uint8_t *)(snd_hdr + 64);
         v->num_samples = num_frames;
         v->is16bit     = (sample_size == 16) ? 1 : 0;
+        v->src_channels = (num_channels > 0 && num_channels <= 8) ? (int)num_channels : 1;
         v->active      = 1;
-        LOG_DEBUG("LOG: extSH sound: numFrames=%u sampleSize=%u is16bit=%d rate=%.1fHz\n",
-               num_frames, sample_size, v->is16bit, src_rate);
+        LOG_DEBUG("LOG: extSH sound: numChannels=%u numFrames=%u sampleSize=%u is16bit=%d rate=%.1fHz\n",
+               num_channels, num_frames, sample_size, v->is16bit, src_rate);
     } else {
         /* cmpSH or other - not supported */
         v->is16bit = 0;
+        v->src_channels = 1;
         v->active  = 0;
     }
 }
