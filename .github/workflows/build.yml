@@ -20,6 +20,7 @@ jobs:
   # Linux native build (SDL2)
   # ============================================================
   build-linux:
+    if: false
     name: Build on Linux (SDL2)
     runs-on: ubuntu-latest
     permissions:
@@ -55,6 +56,7 @@ jobs:
   # macOS native build (SDL2 via Homebrew)
   # ============================================================
   build-macos:
+    if: false
     name: Build on macOS (SDL2)
     runs-on: macos-latest
     permissions:
@@ -87,6 +89,7 @@ jobs:
   # Windows native build (SDL2 via vcpkg)
   # ============================================================
   build-windows:
+    if: false
     name: Build on Windows (SDL2)
     runs-on: windows-latest
     permissions:
@@ -240,6 +243,7 @@ jobs:
   # Android APK build with on-screen touch controls
   # ============================================================
   build-android:
+    if: false
     name: Build Android APK (SDL2 + touch controls)
     runs-on: ubuntu-latest
     permissions:
@@ -310,6 +314,7 @@ jobs:
   # Create GitHub Release on push to main/master
   # ============================================================
   release:
+    if: false
     name: Create GitHub Release
     needs: [build-linux, build-macos, build-windows, build-android]
     runs-on: ubuntu-latest

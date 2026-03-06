@@ -91,6 +91,7 @@ add_library(mac_stubs STATIC
 if(PORT_SDL2)
     target_compile_definitions(mac_stubs PRIVATE PORT_SDL2)
 endif()
+
 # ============================================================
 # Game source files
 # ============================================================
@@ -99,6 +100,7 @@ set(GAME_SOURCES
     source/gameendseq.c
     source/gameframe.c
     source/gameinitexit.c
+
     # source/HIDAccess.c - Apple CFBundle HID loader, not needed on Linux
     source/high.c
     source/initexit.c
@@ -116,6 +118,7 @@ set(GAME_SOURCES
     source/random.c
     source/register.c
     source/renderframe.c
+
     # source/renderframezoom.c - functions included/duplicated in renderframe.c
     source/rle.c
     source/roaddraw.c
@@ -158,6 +161,7 @@ if(PORT_SDL2)
             message(FATAL_ERROR "SDL2_SOURCE_DIR must be set for Android builds "
                 "(pass -DSDL2_SOURCE_DIR=/path/to/SDL2-source)")
         endif()
+
         add_subdirectory(${SDL2_SOURCE_DIR} ${CMAKE_BINARY_DIR}/SDL2_build)
         set(SDL2_INCLUDE_DIRS ${SDL2_SOURCE_DIR}/include)
         set(SDL2_LIBRARIES SDL2)
@@ -165,11 +169,13 @@ if(PORT_SDL2)
         include_directories(${SDL2_INCLUDE_DIRS})
     else()
         find_package(SDL2 QUIET)
+
         if(SDL2_FOUND)
             include_directories(${SDL2_INCLUDE_DIRS})
         else()
             # Try sdl2-config
             find_program(SDL2_CONFIG sdl2-config)
+
             if(SDL2_CONFIG)
                 execute_process(COMMAND ${SDL2_CONFIG} --cflags
                     OUTPUT_VARIABLE SDL2_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -187,6 +193,7 @@ endif()
 if(PORT_SDL2)
     # Enable SDL2 backend
     add_compile_definitions(PORT_SDL2)
+
     # Add SDL2 platform implementation (replaces source/screen.c)
     list(APPEND GAME_SOURCES port/platform/sdl_platform.c)
     message(STATUS "Building with SDL2 backend (PORT_SDL2=ON)")
@@ -223,11 +230,16 @@ if(EMSCRIPTEN)
         "-s ASYNCIFY=1"
         "-s ASYNCIFY_STACK_SIZE=1048576"
         "--preload-file ${CMAKE_SOURCE_DIR}/port/resources/resources.dat@/resources.dat"
-        "--shell-file ${CMAKE_SOURCE_DIR}/port/wasm/shell.html"
     )
+
+    if(EXISTS "${CMAKE_SOURCE_DIR}/port/wasm/shell.html")
+        set(EMSCRIPTEN_FLAGS ${EMSCRIPTEN_FLAGS} "--shell-file ${CMAKE_SOURCE_DIR}/port/wasm/shell.html")
+    endif()
+
     string(JOIN " " EMSCRIPTEN_FLAGS_STR ${EMSCRIPTEN_FLAGS})
 
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${EMSCRIPTEN_FLAGS_STR}")
+
     # For WASM, update the resource path to the virtual FS
     add_compile_definitions(RESOURCES_DAT_PATH="/resources.dat")
     message(STATUS "Building for WebAssembly (Emscripten) with ASYNCIFY support")
@@ -261,8 +273,8 @@ if(ANDROID)
         game_resources
         lzrw
         ${SDL2_LIBRARIES}
-        log        # Android log library
-        android    # Android native app glue
+        log # Android log library
+        android # Android native app glue
         m
     )
 elseif(APPLE)
@@ -288,7 +300,7 @@ else()
         game_resources
         lzrw
         -Wl,--end-group
-        m   # libm for math functions
+        m # libm for math functions
     )
 endif()
 
