@@ -57,3 +57,16 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+## Level and Asset Editor
+
+The Angular site now includes an experimental `resources.dat` editor with:
+
+- default `resources.dat` loading
+- upload/download editing workflow
+- drag-and-drop level tile editing surface for `Pack` IDs `140..149`
+- byte-level `PPic` asset editing
+
+Data structure notes are documented at:
+
+- `/documentation/level-editor-data-structures.md`
