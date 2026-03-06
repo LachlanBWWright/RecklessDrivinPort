@@ -212,71 +212,87 @@
             <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Object Placement
               <span class="badge">{{ objects().length }} objects</span>
             </h3>
-            <p class="field-hint">
-              Objects are placed at (x, y) coordinates relative to the level origin. <code>typeRes</code> refers to
-              tObjectType entries in kPackObTy (Pack #128). <code>dir</code> is heading in radians.
-            </p>
 
-            <div class="object-editor-layout">
-              <div class="object-list-col">
-                <div class="object-list-header">
-                  <span>Object list</span>
-                  <button type="button" class="btn btn-sm" (click)="addObject()">+ Add</button>
-                </div>
-                <div class="object-list">
-                  @for (obj of objects(); track $index) {
-                    <div
-                      class="object-item"
-                      [class.selected]="selectedObjIndex() === $index"
-                      (click)="selectObject($index)"
-                    >
-                      <span class="obj-idx">#{{ $index }}</span>
-                      <span class="obj-type">type {{ obj.typeRes }}</span>
-                      <span class="obj-pos">({{ obj.x }}, {{ obj.y }})</span>
-                    </div>
-                  }
-                  @if (objects().length === 0) {
-                    <p class="muted">No objects in this level.</p>
-                  }
-                </div>
+            <!-- Canvas toolbar -->
+            <div class="canvas-toolbar">
+              <span class="hint-text">🖱 Drag objects to move · Dbl-click canvas to add · Del to remove selected</span>
+              <div class="canvas-controls">
+                <button class="btn btn-sm" (click)="addObject()">+ Add Object</button>
+                <button class="btn btn-sm" (click)="removeSelectedObject()" [disabled]="selectedObjIndex() === null">🗑 Remove</button>
+                <button class="btn btn-sm" (click)="zoomIn()">🔍+</button>
+                <button class="btn btn-sm" (click)="zoomOut()">🔍-</button>
+                <button class="btn btn-sm" (click)="resetView()">⟲ Reset View</button>
+              </div>
+            </div>
+
+            <!-- Main layout: canvas left, form right -->
+            <div class="object-canvas-layout">
+              <div class="object-canvas-col">
+                <canvas id="object-canvas" class="object-canvas" width="600" height="500"
+                  tabindex="0"
+                  (mousedown)="onCanvasMouseDown($event)"
+                  (mousemove)="onCanvasMouseMove($event)"
+                  (mouseup)="onCanvasMouseUp($event)"
+                  (dblclick)="onCanvasDoubleClick($event)"
+                  (keydown)="onCanvasKeyDown($event)"
+                  (wheel)="onCanvasWheel($event)"
+                  [style.cursor]="isDragging() ? 'grabbing' : 'crosshair'"
+                ></canvas>
+                <div class="canvas-zoom-label">Zoom: {{ (canvasZoom() * 100).toFixed(0) }}%</div>
               </div>
 
               <div class="object-form-col">
                 @if (selectedObjIndex() !== null) {
-                  <h4>Edit Object #{{ selectedObjIndex() }}</h4>
+                  <h4>Object #{{ selectedObjIndex() }}</h4>
                   <div class="props-grid">
                     <div class="prop-group">
-                      <label for="obj-x">X position (SInt32)</label>
+                      <label for="obj-x">X (pixels)</label>
                       <input id="obj-x" type="number" [value]="editObjX()" (input)="onObjFieldInput('x', $event)" />
                     </div>
                     <div class="prop-group">
-                      <label for="obj-y">Y position (SInt32)</label>
+                      <label for="obj-y">Y (pixels)</label>
                       <input id="obj-y" type="number" [value]="editObjY()" (input)="onObjFieldInput('y', $event)" />
                     </div>
                     <div class="prop-group">
-                      <label for="obj-dir">Direction (float, radians)</label>
-                      <input id="obj-dir" type="number" step="0.01" [value]="editObjDir()" (input)="onObjFieldInput('dir', $event)" />
+                      <label for="obj-dir">Direction (rad)</label>
+                      <input id="obj-dir" type="number" step="0.1" [value]="editObjDir()" (input)="onObjFieldInput('dir', $event)" />
                     </div>
                     <div class="prop-group">
-                      <label for="obj-type">typeRes (object type ID)</label>
+                      <label for="obj-type">Type ID</label>
                       <input id="obj-type" type="number" [value]="editObjTypeRes()" (input)="onObjFieldInput('typeRes', $event)" />
-                      <p class="field-hint">128 = default player car. See kPackObTy (Pack #128) for all type IDs.</p>
+                      <p class="field-hint">128 = player car. See kPackObTy entries.</p>
                     </div>
                   </div>
                   <div class="save-row">
-                    <button type="button" class="btn btn-primary" (click)="applyObjEdit()">Apply Edit</button>
-                    <button type="button" class="btn btn-danger" (click)="removeSelectedObject()">Remove Object</button>
+                    <button type="button" class="btn btn-primary" (click)="applyObjEdit()">Apply</button>
+                    <button type="button" class="btn btn-danger" (click)="removeSelectedObject()">Remove</button>
                   </div>
                 } @else {
-                  <p class="muted">Select an object from the list to edit it.</p>
+                  <p class="muted">Click an object on the canvas to select it,<br>or double-click the canvas to add one.</p>
                 }
+
+                <!-- Object list panel -->
+                <div class="object-list-compact" style="margin-top:16px">
+                  <div class="object-list-header">
+                    <span>All objects</span>
+                    <span class="badge">{{ objects().length }}</span>
+                  </div>
+                  <div class="object-list">
+                    @for (obj of objects(); track $index) {
+                      <div class="object-item" [class.selected]="selectedObjIndex() === $index"
+                        (click)="selectObject($index)">
+                        <span class="obj-idx">#{{ $index }}</span>
+                        <span class="obj-type">T{{ obj.typeRes }}</span>
+                        <span class="obj-pos">({{ obj.x }},{{ obj.y }})</span>
+                      </div>
+                    }
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div class="save-row" style="margin-top:16px">
-              <button type="button" class="btn btn-primary" (click)="saveLevelObjects()">
-                💾 Save Object Placement to Pack
-              </button>
+            <div class="save-row" style="margin-top:12px">
+              <button class="btn btn-primary" (click)="saveLevelObjects()">💾 Save Objects to Pack</button>
             </div>
           </div>
         }
@@ -377,10 +393,30 @@
                 </tbody>
               </table>
             </div>
+            <h4>✏️ Checkpoint / Mark Segment Editor <span class="badge">{{ marks().length }}</span></h4>
+            <p class="field-hint">Drag the endpoint dots on the canvas to reposition mark lines. Click a line to select it.</p>
+            <div class="mark-canvas-layout">
+              <canvas id="mark-canvas" class="mark-canvas" width="600" height="300"
+                (mousedown)="onMarkCanvasMouseDown($event)"
+                (mousemove)="onMarkCanvasMouseMove($event)"
+                (mouseup)="onMarkCanvasMouseUp($event)"
+              ></canvas>
+              <div class="mark-controls">
+                <button class="btn btn-sm" (click)="addMark()">+ Add Mark</button>
+                <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex() === null" (click)="removeSelectedMark()">Remove</button>
+                <button class="btn btn-primary" (click)="saveMarks()">💾 Save Marks</button>
+              </div>
+            </div>
+            @if (selectedMarkIndex() !== null) {
+              <div class="mark-form props-grid" style="margin-top:8px">
+                <div class="prop-group"><label>P1 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x1', $event)" /></div>
+                <div class="prop-group"><label>P1 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y1', $event)" /></div>
+                <div class="prop-group"><label>P2 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x2', $event)" /></div>
+                <div class="prop-group"><label>P2 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y2', $event)" /></div>
+              </div>
+            }
           </div>
         }
-
-        <!-- ---- SPRITES SECTION ---- -->
         @if (editorSection() === 'sprites') {
           <div class="editor-panel">
             <h3>Sprite / PPic Asset Editor</h3>
@@ -442,6 +478,12 @@
                           </tbody>
                         </table>
                       </div>
+                    </div>
+
+                    <div class="sprite-preview-section">
+                      <h4>Pixel Preview (8px/cell)</h4>
+                      <p class="field-hint">The raw bytes interpreted as a 16-column indexed-color bitmap (values 0–255 mapped to a grayscale palette).</p>
+                      <canvas id="sprite-pixel-canvas" class="sprite-pixel-canvas" width="256" height="256"></canvas>
                     </div>
 
                     <div class="sprite-patch">

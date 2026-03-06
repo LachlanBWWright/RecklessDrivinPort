@@ -5,11 +5,18 @@ import {
   type LevelProperties,
   type ObjectPos,
   type EditableSpriteAsset,
+  type MarkSeg,
 } from './level-editor.service';
 import { ResourceDatService, type ResourceDatEntry } from './resource-dat.service';
 
 export type AppTab = 'game' | 'editor';
 export type EditorSection = 'properties' | 'objects' | 'road' | 'sprites';
+
+const OBJ_PALETTE = [
+  '#e53935', '#42a5f5', '#66bb6a', '#ffa726',
+  '#ab47bc', '#26c6da', '#d4e157', '#ff7043',
+  '#8d6e63', '#78909c', '#ec407a', '#29b6f6',
+];
 
 @Component({
   selector: 'app-root',
@@ -57,6 +64,28 @@ export class App implements OnInit, OnDestroy {
   editObjY = signal(0);
   editObjDir = signal(0);
   editObjTypeRes = signal(128);
+
+  // ---- Canvas interaction state ----
+  canvasZoom = signal(1.0);
+  canvasPanX = signal(0);
+  canvasPanY = signal(0);
+  isDragging = signal(false);
+  dragObjIndex = signal<number | null>(null);
+
+  private _panStartX = 0;
+  private _panStartY = 0;
+  private _isPanning = false;
+
+  // ---- Mark editor ----
+  marks = signal<MarkSeg[]>([]);
+  selectedMarkIndex = signal<number | null>(null);
+  dragMarkEndpoint = signal<{ markIdx: number; endpoint: 'p1' | 'p2' } | null>(null);
+
+  // ---- Sprite pixel grid ----
+  spriteGridZoom = signal(4);
+
+  // ---- Track segment detail ----
+  selectedTrackSegIdx = signal<number | null>(null);
 
   // ---- Sprite editor ----
   spriteAssets = signal<EditableSpriteAsset[]>([]);
@@ -113,6 +142,39 @@ export class App implements OnInit, OnDestroy {
       const section = this.editorSection();
       if (section === 'road' && level) {
         afterNextRender(() => this.drawTrackCanvas(level));
+      }
+    });
+
+    // Redraw object canvas when objects, selection, zoom or pan changes.
+    effect(() => {
+      this.objects();
+      this.selectedObjIndex();
+      this.canvasZoom();
+      this.canvasPanX();
+      this.canvasPanY();
+      const section = this.editorSection();
+      if (section === 'objects') {
+        afterNextRender(() => this.redrawObjectCanvas());
+      }
+    });
+
+    // Redraw mark canvas when marks or selection changes.
+    effect(() => {
+      this.marks();
+      this.selectedMarkIndex();
+      const section = this.editorSection();
+      if (section === 'road') {
+        afterNextRender(() => this.redrawMarkCanvas());
+      }
+    });
+
+    // Redraw sprite pixel canvas when sprite selection or page changes.
+    effect(() => {
+      this.selectedSpriteId();
+      this.spriteHexPage();
+      const section = this.editorSection();
+      if (section === 'sprites') {
+        afterNextRender(() => this.redrawSpriteCanvas());
       }
     });
   }
@@ -198,6 +260,8 @@ export class App implements OnInit, OnDestroy {
       this.propertiesDirty.set(false);
       this.objects.set([...level.objects]);
       this.selectedObjIndex.set(null);
+      this.marks.set([...level.marks]);
+      this.selectedMarkIndex.set(null);
     }
   }
 
@@ -292,6 +356,422 @@ export class App implements OnInit, OnDestroy {
     this.refreshParsedLevels();
   }
 
+  // ---- Canvas coordinate transforms ----
+
+  worldToCanvas(wx: number, wy: number): [number, number] {
+    const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+    const W = canvas?.width ?? 600;
+    const H = canvas?.height ?? 500;
+    const cx = W / 2 + (wx - this.canvasPanX()) * this.canvasZoom();
+    const cy = H / 2 + (wy - this.canvasPanY()) * this.canvasZoom();
+    return [cx, cy];
+  }
+
+  canvasToWorld(cx: number, cy: number): [number, number] {
+    const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+    const W = canvas?.width ?? 600;
+    const H = canvas?.height ?? 500;
+    const wx = (cx - W / 2) / this.canvasZoom() + this.canvasPanX();
+    const wy = (cy - H / 2) / this.canvasZoom() + this.canvasPanY();
+    return [wx, wy];
+  }
+
+  // ---- Canvas event handlers ----
+
+  onCanvasMouseDown(event: MouseEvent): void {
+    event.preventDefault();
+    if (event.button === 1 || event.button === 2) {
+      // Middle or right click: start panning
+      this._isPanning = true;
+      this._panStartX = event.offsetX - this.canvasPanX() * -this.canvasZoom();
+      this._panStartY = event.offsetY - this.canvasPanY() * -this.canvasZoom();
+      return;
+    }
+    // Left click: find closest object
+    const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
+    const objs = this.objects();
+    const hitRadius = Math.max(10, 8 / this.canvasZoom());
+    let closest = -1;
+    let closestDist = hitRadius;
+    for (let i = 0; i < objs.length; i++) {
+      const dx = objs[i].x - wx;
+      const dy = objs[i].y - wy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = i;
+      }
+    }
+    if (closest >= 0) {
+      this.selectObject(closest);
+      this.isDragging.set(true);
+      this.dragObjIndex.set(closest);
+    } else {
+      this.selectedObjIndex.set(null);
+    }
+    const canvas = event.target as HTMLCanvasElement;
+    canvas.focus();
+  }
+
+  onCanvasMouseMove(event: MouseEvent): void {
+    if (this._isPanning) {
+      const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+      const W = canvas?.width ?? 600;
+      const H = canvas?.height ?? 500;
+      const zoom = this.canvasZoom();
+      const newPanX = (W / 2 - event.offsetX) / zoom;
+      const newPanY = (H / 2 - event.offsetY) / zoom;
+      this.canvasPanX.set(newPanX);
+      this.canvasPanY.set(newPanY);
+      return;
+    }
+    if (!this.isDragging()) return;
+    const dragIdx = this.dragObjIndex();
+    if (dragIdx === null) return;
+    const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
+    const objs = [...this.objects()];
+    objs[dragIdx] = { ...objs[dragIdx], x: Math.round(wx), y: Math.round(wy) };
+    this.objects.set(objs);
+    // Sync edit fields
+    this.editObjX.set(Math.round(wx));
+    this.editObjY.set(Math.round(wy));
+  }
+
+  onCanvasMouseUp(event: MouseEvent): void {
+    if (this._isPanning) {
+      this._isPanning = false;
+      return;
+    }
+    const wasDragging = this.isDragging();
+    this.isDragging.set(false);
+    this.dragObjIndex.set(null);
+    if (wasDragging) {
+      this.applyObjEdit();
+    }
+  }
+
+  onCanvasDoubleClick(event: MouseEvent): void {
+    const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
+    const objs = [...this.objects()];
+    objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: 128 });
+    this.objects.set(objs);
+    this.selectObject(objs.length - 1);
+  }
+
+  onCanvasKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      this.removeSelectedObject();
+    }
+  }
+
+  onCanvasWheel(event: WheelEvent): void {
+    event.preventDefault();
+    const delta = event.deltaY;
+    const factor = 1 - delta * 0.001;
+    const newZoom = Math.min(10, Math.max(0.1, this.canvasZoom() * factor));
+    this.canvasZoom.set(newZoom);
+  }
+
+  zoomIn(): void {
+    this.canvasZoom.set(Math.min(10, this.canvasZoom() + 0.25));
+  }
+
+  zoomOut(): void {
+    this.canvasZoom.set(Math.max(0.1, this.canvasZoom() - 0.25));
+  }
+
+  resetView(): void {
+    this.canvasZoom.set(1.0);
+    this.canvasPanX.set(0);
+    this.canvasPanY.set(0);
+  }
+
+  // ---- Object canvas drawing ----
+
+  redrawObjectCanvas(): void {
+    const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const zoom = this.canvasZoom();
+    const panX = this.canvasPanX();
+    const panY = this.canvasPanY();
+    const objs = this.objects();
+    const selIdx = this.selectedObjIndex();
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0d0d0d';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw grid
+    ctx.strokeStyle = '#1e1e1e';
+    ctx.lineWidth = 1;
+    const gridStep = 100; // world units
+    const gridStepPx = gridStep * zoom;
+    if (gridStepPx > 8) {
+      const startWorldX = panX - W / (2 * zoom);
+      const startWorldY = panY - H / (2 * zoom);
+      const endWorldX = panX + W / (2 * zoom);
+      const endWorldY = panY + H / (2 * zoom);
+      const firstX = Math.floor(startWorldX / gridStep) * gridStep;
+      const firstY = Math.floor(startWorldY / gridStep) * gridStep;
+      for (let gx = firstX; gx <= endWorldX; gx += gridStep) {
+        const [cx] = this.worldToCanvas(gx, 0);
+        ctx.beginPath();
+        ctx.moveTo(cx, 0);
+        ctx.lineTo(cx, H);
+        ctx.stroke();
+      }
+      for (let gy = firstY; gy <= endWorldY; gy += gridStep) {
+        const [, cy] = this.worldToCanvas(0, gy);
+        ctx.beginPath();
+        ctx.moveTo(0, cy);
+        ctx.lineTo(W, cy);
+        ctx.stroke();
+      }
+    }
+
+    // Draw axes
+    const [ox, oy] = this.worldToCanvas(0, 0);
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(W, oy); ctx.stroke();
+
+    // Draw objects
+    const baseRadius = Math.min(20, Math.max(5, 8 * zoom));
+    for (let i = 0; i < objs.length; i++) {
+      const obj = objs[i];
+      const [cx, cy] = this.worldToCanvas(obj.x, obj.y);
+      if (cx < -30 || cx > W + 30 || cy < -30 || cy > H + 30) continue;
+
+      const color = OBJ_PALETTE[obj.typeRes % OBJ_PALETTE.length];
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Direction arrow
+      const arrowLen = baseRadius * 1.5;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(obj.dir) * arrowLen, cy + Math.sin(obj.dir) * arrowLen);
+      ctx.stroke();
+
+      // Selection ring
+      if (i === selIdx) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseRadius + 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Label when zoomed in enough
+      if (zoom > 0.5) {
+        ctx.fillStyle = '#fff';
+        ctx.font = `${Math.max(9, 10 * zoom)}px monospace`;
+        ctx.fillText(`#${i} T${obj.typeRes}`, cx + baseRadius + 2, cy + 4);
+      }
+    }
+
+    // Origin marker
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(ox, oy, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---- Mark segment editor ----
+
+  addMark(): void {
+    const ms = [...this.marks()];
+    ms.push({ x1: -100, y1: 0, x2: 100, y2: 0 });
+    this.marks.set(ms);
+    this.selectedMarkIndex.set(ms.length - 1);
+  }
+
+  removeSelectedMark(): void {
+    const idx = this.selectedMarkIndex();
+    if (idx === null) return;
+    const ms = this.marks().filter((_, i) => i !== idx);
+    this.marks.set(ms);
+    this.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
+  }
+
+  onMarkFieldInput(markIdx: number, field: keyof MarkSeg, event: Event): void {
+    const val = Number.parseInt((event.target as HTMLInputElement).value, 10);
+    if (Number.isNaN(val)) return;
+    const ms = [...this.marks()];
+    ms[markIdx] = { ...ms[markIdx], [field]: val };
+    this.marks.set(ms);
+  }
+
+  saveMarks(): void {
+    const id = this.selectedLevelId();
+    if (id === null) return;
+    this.resources = this.levelEditorService.applyLevelMarks(this.resources, id, this.marks());
+    this.resourcesStatus.set(`Saved ${this.marks().length} mark segments for level ${id - 139}.`);
+    this.refreshParsedLevels();
+  }
+
+  // ---- Mark canvas helpers ----
+
+  private markWorldToCanvas(wx: number, wy: number, canvas: HTMLCanvasElement,
+    minX: number, minY: number, rangeX: number, rangeY: number): [number, number] {
+    const pad = 24;
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = pad + ((wx - minX) / (rangeX || 1)) * (W - 2 * pad);
+    const cy = H - pad - ((wy - minY) / (rangeY || 1)) * (H - 2 * pad);
+    return [cx, cy];
+  }
+
+  redrawMarkCanvas(): void {
+    const canvas = document.getElementById('mark-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const ms = this.marks();
+    const selIdx = this.selectedMarkIndex();
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
+
+    if (ms.length === 0) {
+      ctx.fillStyle = '#555';
+      ctx.font = '13px monospace';
+      ctx.fillText('No mark segments. Click "+ Add Mark" to add one.', 20, H / 2);
+      return;
+    }
+
+    const xs = ms.flatMap((m) => [m.x1, m.x2]);
+    const ys = ms.flatMap((m) => [m.y1, m.y2]);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+
+    const toC = (wx: number, wy: number) =>
+      this.markWorldToCanvas(wx, wy, canvas, minX, minY, rangeX, rangeY);
+
+    for (let i = 0; i < ms.length; i++) {
+      const m = ms[i];
+      const [ax, ay] = toC(m.x1, m.y1);
+      const [bx, by] = toC(m.x2, m.y2);
+      const isSel = i === selIdx;
+
+      ctx.strokeStyle = isSel ? '#42a5f5' : '#555';
+      ctx.lineWidth = isSel ? 2 : 1;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+
+      // Endpoint dots
+      ctx.fillStyle = isSel ? '#42a5f5' : '#888';
+      ctx.beginPath(); ctx.arc(ax, ay, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI * 2); ctx.fill();
+
+      if (isSel) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px monospace';
+        ctx.fillText(`P1(${m.x1},${m.y1})`, ax + 8, ay - 4);
+        ctx.fillText(`P2(${m.x2},${m.y2})`, bx + 8, by - 4);
+      }
+    }
+  }
+
+  onMarkCanvasMouseDown(event: MouseEvent): void {
+    const canvas = event.target as HTMLCanvasElement;
+    const ms = this.marks();
+    if (ms.length === 0) return;
+
+    const xs = ms.flatMap((m) => [m.x1, m.x2]);
+    const ys = ms.flatMap((m) => [m.y1, m.y2]);
+    const minX = Math.min(...xs); const maxX = Math.max(...xs);
+    const minY = Math.min(...ys); const maxY = Math.max(...ys);
+    const rangeX = maxX - minX; const rangeY = maxY - minY;
+
+    const hitR = 10;
+    for (let i = 0; i < ms.length; i++) {
+      const m = ms[i];
+      const [ax, ay] = this.markWorldToCanvas(m.x1, m.y1, canvas, minX, minY, rangeX, rangeY);
+      const [bx, by] = this.markWorldToCanvas(m.x2, m.y2, canvas, minX, minY, rangeX, rangeY);
+      const dx1 = event.offsetX - ax; const dy1 = event.offsetY - ay;
+      const dx2 = event.offsetX - bx; const dy2 = event.offsetY - by;
+      if (Math.sqrt(dx1*dx1+dy1*dy1) < hitR) {
+        this.selectedMarkIndex.set(i);
+        this.dragMarkEndpoint.set({ markIdx: i, endpoint: 'p1' });
+        return;
+      }
+      if (Math.sqrt(dx2*dx2+dy2*dy2) < hitR) {
+        this.selectedMarkIndex.set(i);
+        this.dragMarkEndpoint.set({ markIdx: i, endpoint: 'p2' });
+        return;
+      }
+    }
+    // Click on a line to select it
+    for (let i = 0; i < ms.length; i++) {
+      const m = ms[i];
+      const [ax, ay] = this.markWorldToCanvas(m.x1, m.y1, canvas, minX, minY, rangeX, rangeY);
+      const [bx, by] = this.markWorldToCanvas(m.x2, m.y2, canvas, minX, minY, rangeX, rangeY);
+      const dist = this.pointToSegmentDist(event.offsetX, event.offsetY, ax, ay, bx, by);
+      if (dist < 8) {
+        this.selectedMarkIndex.set(i);
+        return;
+      }
+    }
+  }
+
+  onMarkCanvasMouseMove(event: MouseEvent): void {
+    const drag = this.dragMarkEndpoint();
+    if (!drag) return;
+    const canvas = event.target as HTMLCanvasElement;
+    const ms = this.marks();
+    const xs = ms.flatMap((m) => [m.x1, m.x2]);
+    const ys = ms.flatMap((m) => [m.y1, m.y2]);
+    const minX = Math.min(...xs); const maxX = Math.max(...xs);
+    const minY = Math.min(...ys); const maxY = Math.max(...ys);
+    const rangeX = maxX - minX || 1; const rangeY = maxY - minY || 1;
+    const pad = 24;
+    const W = canvas.width; const H = canvas.height;
+    // Invert the canvas-to-world mapping
+    const wx = Math.round(minX + ((event.offsetX - pad) / (W - 2 * pad)) * rangeX);
+    const wy = Math.round(minY + ((H - pad - event.offsetY) / (H - 2 * pad)) * rangeY);
+    const newMs = [...ms];
+    if (drag.endpoint === 'p1') {
+      newMs[drag.markIdx] = { ...newMs[drag.markIdx], x1: wx, y1: wy };
+    } else {
+      newMs[drag.markIdx] = { ...newMs[drag.markIdx], x2: wx, y2: wy };
+    }
+    this.marks.set(newMs);
+  }
+
+  onMarkCanvasMouseUp(_event: MouseEvent): void {
+    this.dragMarkEndpoint.set(null);
+  }
+
+  private pointToSegmentDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+    const dx = bx - ax; const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2);
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+    return Math.sqrt((px - (ax + t * dx)) ** 2 + (py - (ay + t * dy)) ** 2);
+  }
+
   // ---- Sprite editor ----
 
   selectSprite(spriteId: number): void {
@@ -328,6 +808,43 @@ export class App implements OnInit, OnDestroy {
 
   nextSpritePage(): void {
     this.spriteHexPage.set(Math.min(this.spriteMaxPage(), this.spriteHexPage() + 1));
+  }
+
+  // ---- Sprite pixel canvas ----
+
+  redrawSpriteCanvas(): void {
+    const canvas = document.getElementById('sprite-pixel-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const id = this.selectedSpriteId();
+    if (id === null) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+    const bytes = this.levelEditorService.getSpriteBytes(this.resources, id);
+    if (!bytes || bytes.length === 0) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
+    const cols = 16;
+    const rows = Math.ceil(bytes.length / cols);
+    const cellW = Math.floor(canvas.width / cols);
+    const cellH = Math.max(1, Math.floor(canvas.height / Math.max(rows, 1)));
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < bytes.length; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const v = bytes[i];
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
+      ctx.fillRect(col * cellW, row * cellH, cellW, cellH);
+    }
   }
 
   // ---- Fullscreen / volume ----

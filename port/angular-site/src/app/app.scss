@@ -537,3 +537,71 @@ input[type='file'] { display: none; }
   .nav-tab { padding: 0 12px; font-size: 0.8rem; }
   .editor-toolbar { flex-direction: column; align-items: flex-start; }
 }
+
+/* Object placement canvas */
+.object-canvas-layout {
+  display: grid;
+  grid-template-columns: 600px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.object-canvas-col { display: flex; flex-direction: column; gap: 4px; }
+.object-canvas {
+  display: block;
+  background: #0d0d0d;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: crosshair;
+  width: 100%;
+  max-width: 600px;
+  height: 500px;
+  outline: none;
+}
+.canvas-zoom-label { font-size: 0.72rem; color: var(--muted); text-align: center; }
+.canvas-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.canvas-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.hint-text { font-size: 0.78rem; color: var(--muted); }
+
+/* Object list compact */
+.object-list-compact { }
+.object-list-compact .object-list-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px; font-size: 0.8rem; color: var(--muted);
+}
+
+/* Mark canvas */
+.mark-canvas-layout { display: flex; flex-direction: column; gap: 8px; }
+.mark-canvas {
+  display: block;
+  background: #0a0a0a;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 100%;
+  max-width: 600px;
+  height: 300px;
+  cursor: crosshair;
+}
+.mark-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* Sprite pixel preview */
+.sprite-preview-section { margin-bottom: 16px; }
+.sprite-pixel-canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 256px;
+  height: 256px;
+}
+
+@media (max-width: 1100px) {
+  .object-canvas-layout { grid-template-columns: 1fr; }
+}

@@ -395,9 +395,45 @@ export class LevelEditorService {
     return entry ? entry.data : null;
   }
 
+  applyLevelMarks(
+    resources: ResourceDatEntry[],
+    resourceId: number,
+    marks: MarkSeg[],
+  ): ResourceDatEntry[] {
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== resourceId) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, res.id);
+        const e2 = packEntries.find((e) => e.id === 2);
+        const newData = serializeMarkSegs(marks);
+        const newEntries = e2
+          ? packEntries.map((e) => e.id === 2 ? { ...e, data: newData } : e)
+          : [...packEntries, { id: 2, data: newData }];
+        return { ...res, data: encodePackHandle(newEntries, resourceId) };
+      } catch (err) {
+        console.error(`[LevelEditor] applyLevelMarks error id=${resourceId}:`, err);
+        return res;
+      }
+    });
+  }
+
   private toTiles(data: Uint8Array): number[] {
     const tiles: number[] = [];
     for (let i = 0; i < 256; i++) tiles.push(i < data.length ? data[i] & 0x0f : 0);
     return tiles;
   }
+}
+
+/** Serialize mark segments back to binary */
+export function serializeMarkSegs(marks: MarkSeg[]): Uint8Array {
+  const buf = new Uint8Array(marks.length * 16);
+  const view = new DataView(buf.buffer);
+  for (let i = 0; i < marks.length; i++) {
+    const o = i * 16;
+    view.setInt32(o,      marks[i].x1, false);
+    view.setInt32(o + 4,  marks[i].y1, false);
+    view.setInt32(o + 8,  marks[i].x2, false);
+    view.setInt32(o + 12, marks[i].y2, false);
+  }
+  return buf;
 }
