@@ -96,6 +96,39 @@ describe('App', () => {
     expect(app.hasEditorData()).toBe(false);
   });
 
+  it('should duplicate the selected object with an x offset', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.objects.set([{ x: 100, y: 200, dir: 1.5, typeRes: 136 }]);
+    app.selectObject(0);
+
+    app.duplicateSelectedObject();
+
+    expect(app.objects().length).toBe(2);
+    expect(app.objects()[1]).toEqual({ x: 150, y: 200, dir: 1.5, typeRes: 136 });
+    expect(app.selectedObjIndex()).toBe(1);
+  });
+
+  it('should update raw time when editing friendly seconds', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+
+    app.onTimeSecondsInput({ target: { value: '45' } } as unknown as Event);
+
+    expect(app.editTimeSeconds()).toBe(45);
+    expect(app.editTime()).toBe(4500);
+    expect(app.propertiesDirty()).toBe(true);
+  });
+
+  it('should toggle visible object type filters', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    expect(app.visibleTypeFilter().has(3)).toBe(true);
+
+    app.toggleTypeVisibility(3);
+    expect(app.visibleTypeFilter().has(3)).toBe(false);
+
+    app.toggleTypeVisibility(3);
+    expect(app.visibleTypeFilter().has(3)).toBe(true);
+  });
+
   it('should have site-nav in the DOM', async () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

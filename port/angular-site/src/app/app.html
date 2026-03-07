@@ -160,10 +160,21 @@
                 <p class="field-hint">Index of the tRoadInfo entry in the Road pack (Pack #135). Controls friction, textures, borders, drift, sounds.</p>
               </div>
               <div class="prop-group">
-                <label for="prop-time">Time Limit (UInt16, seconds × 100)</label>
-                <input id="prop-time" type="number" min="0" [value]="editTime()"
-                  (input)="onPropsInput('time', $event)" />
-                <p class="field-hint">Level countdown timer value. Units depend on game's tick rate (typically centiseconds).</p>
+                <label for="prop-time">Time Limit</label>
+                <div class="time-input-dual">
+                  <div class="time-input-col">
+                    <input id="prop-time-seconds" type="number" min="0" [value]="editTimeSeconds()"
+                      (input)="onTimeSecondsInput($event)" />
+                    <span class="time-input-hint">seconds</span>
+                  </div>
+                  <span class="time-input-sep">/</span>
+                  <div class="time-input-col">
+                    <input id="prop-time" type="number" min="0" [value]="editTime()"
+                      (input)="onPropsInput('time', $event)" />
+                    <span class="time-input-hint">raw ×100</span>
+                  </div>
+                </div>
+                <p class="field-hint">Edit the timer in player-friendly seconds or the raw UInt16 value stored in the level pack.</p>
               </div>
               <div class="prop-group">
                 <label for="prop-xstart">Player Start X (SInt16, pixels)</label>
@@ -215,9 +226,10 @@
 
             <!-- Canvas toolbar -->
             <div class="canvas-toolbar">
-              <span class="hint-text">🖱 Drag objects to move · Dbl-click canvas to add · Del to remove selected</span>
+              <span class="hint-text">🖱 Drag objects to move · Dbl-click canvas to add · Del to remove selected · Ctrl/Cmd+D duplicates</span>
               <div class="canvas-controls">
                 <button class="btn btn-sm" (click)="addObject()">+ Add Object</button>
+                <button class="btn btn-sm" (click)="duplicateSelectedObject()" [disabled]="selectedObjIndex() === null">📋 Duplicate</button>
                 <button class="btn btn-sm" (click)="removeSelectedObject()" [disabled]="selectedObjIndex() === null">🗑 Remove</button>
                 <button class="btn btn-sm" (click)="zoomIn()">🔍+</button>
                 <button class="btn btn-sm" (click)="zoomOut()">🔍-</button>
@@ -262,6 +274,26 @@
                       <input id="obj-type" type="number" [value]="editObjTypeRes()" (input)="onObjFieldInput('typeRes', $event)" />
                       <p class="field-hint">128 = player car. See kPackObTy entries.</p>
                     </div>
+                  </div>
+                  <div class="type-visibility-filter">
+                    <div class="type-visibility-header">
+                      <span>Visible color groups</span>
+                      <div class="type-visibility-actions">
+                        <button type="button" class="btn btn-sm" (click)="showAllObjectTypes()">All</button>
+                        <button type="button" class="btn btn-sm" (click)="hideAllObjectTypes()">None</button>
+                      </div>
+                    </div>
+                    <div class="type-chip-list">
+                      @for (type of typePalette; track type.typeId) {
+                        <button type="button" class="type-chip"
+                          [class.type-chip--inactive]="!visibleTypeFilter().has(type.typeId)"
+                          (click)="toggleTypeVisibility(type.typeId)">
+                          <span class="type-chip-swatch" [style.background]="type.hex"></span>
+                          T{{ type.typeId }}
+                        </button>
+                      }
+                    </div>
+                    <p class="field-hint">Hide clutter on the canvas by color-group. Selected objects stay faintly visible even when filtered out.</p>
                   </div>
                   <div class="save-row">
                     <button type="button" class="btn btn-primary" (click)="applyObjEdit()">Apply</button>

@@ -39,6 +39,8 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
   styleUrl: './app.scss',
 })
 export class App implements OnInit, OnDestroy {
+  readonly typePalette = OBJ_PALETTE.map((hex, index) => ({ hex, typeId: index }));
+
   // ---- Navigation ----
   activeTab = signal<AppTab>('game');
   editorSection = signal<EditorSection>('properties');
@@ -67,6 +69,7 @@ export class App implements OnInit, OnDestroy {
   // ---- Level properties editing ----
   editRoadInfo = signal(0);
   editTime = signal(0);
+  editTimeSeconds = signal(0);
   editXStartPos = signal(0);
   editLevelEnd = signal(0);
   propertiesDirty = signal(false);
@@ -78,6 +81,7 @@ export class App implements OnInit, OnDestroy {
   editObjY = signal(0);
   editObjDir = signal(0);
   editObjTypeRes = signal(128);
+  visibleTypeFilter = signal<Set<number>>(new Set(this.typePalette.map((item) => item.typeId)));
 
   // ---- Canvas interaction state ----
   canvasZoom = signal(1.0);
@@ -166,6 +170,7 @@ export class App implements OnInit, OnDestroy {
       this.canvasZoom();
       this.canvasPanX();
       this.canvasPanY();
+      this.visibleTypeFilter();
       const section = this.editorSection();
       if (section === 'objects') {
         afterNextRender(() => this.redrawObjectCanvas());
@@ -269,11 +274,13 @@ export class App implements OnInit, OnDestroy {
     if (level) {
       this.editRoadInfo.set(level.properties.roadInfo);
       this.editTime.set(level.properties.time);
+      this.editTimeSeconds.set(Math.round(level.properties.time / 100));
       this.editXStartPos.set(level.properties.xStartPos);
       this.editLevelEnd.set(level.properties.levelEnd);
       this.propertiesDirty.set(false);
       this.objects.set([...level.objects]);
       this.selectedObjIndex.set(null);
+      this.visibleTypeFilter.set(new Set(this.typePalette.map((item) => item.typeId)));
       this.marks.set([...level.marks]);
       this.selectedMarkIndex.set(null);
     }
@@ -286,10 +293,24 @@ export class App implements OnInit, OnDestroy {
     if (Number.isNaN(val)) return;
     switch (field) {
       case 'roadInfo': this.editRoadInfo.set(val); break;
-      case 'time': this.editTime.set(Math.max(0, val)); break;
+      case 'time': {
+        const nextTime = Math.max(0, val);
+        this.editTime.set(nextTime);
+        this.editTimeSeconds.set(Math.round(nextTime / 100));
+        break;
+      }
       case 'xStartPos': this.editXStartPos.set(val); break;
       case 'levelEnd': this.editLevelEnd.set(Math.max(0, val)); break;
     }
+    this.propertiesDirty.set(true);
+  }
+
+  onTimeSecondsInput(event: Event): void {
+    const seconds = Number.parseInt((event.target as HTMLInputElement).value, 10);
+    if (Number.isNaN(seconds)) return;
+    const clampedSeconds = Math.max(0, seconds);
+    this.editTimeSeconds.set(clampedSeconds);
+    this.editTime.set(Math.min(65535, clampedSeconds * 100));
     this.propertiesDirty.set(true);
   }
 
@@ -354,6 +375,35 @@ export class App implements OnInit, OnDestroy {
     this.selectObject(objs.length - 1);
   }
 
+  duplicateSelectedObject(): void {
+    const idx = this.selectedObjIndex();
+    if (idx === null) return;
+    const objs = [...this.objects()];
+    if (idx < 0 || idx >= objs.length) return;
+    const original = objs[idx];
+    objs.push({ ...original, x: original.x + 50 });
+    this.objects.set(objs);
+    this.selectObject(objs.length - 1);
+  }
+
+  toggleTypeVisibility(typeId: number): void {
+    const next = new Set(this.visibleTypeFilter());
+    if (next.has(typeId)) {
+      next.delete(typeId);
+    } else {
+      next.add(typeId);
+    }
+    this.visibleTypeFilter.set(next);
+  }
+
+  showAllObjectTypes(): void {
+    this.visibleTypeFilter.set(new Set(this.typePalette.map((item) => item.typeId)));
+  }
+
+  hideAllObjectTypes(): void {
+    this.visibleTypeFilter.set(new Set());
+  }
+
   removeSelectedObject(): void {
     const idx = this.selectedObjIndex();
     if (idx === null) return;
@@ -408,7 +458,7 @@ export class App implements OnInit, OnDestroy {
     let closest = -1;
     let closestDist = hitRadius;
     for (let i = 0; i < objs.length; i++) {
-      const dist = dist2d(objs[i].x, wx, objs[i].y, wy);
+      const dist = dist2d(objs[i].x, objs[i].y, wx, wy);
       if (dist < closestDist) {
         closestDist = dist;
         closest = i;
@@ -470,6 +520,11 @@ export class App implements OnInit, OnDestroy {
   }
 
   onCanvasKeyDown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      this.duplicateSelectedObject();
+      return;
+    }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       this.removeSelectedObject();
@@ -513,6 +568,7 @@ export class App implements OnInit, OnDestroy {
     const panY = this.canvasPanY();
     const objs = this.objects();
     const selIdx = this.selectedObjIndex();
+    const visibleTypes = this.visibleTypeFilter();
 
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#0d0d0d';
@@ -558,10 +614,14 @@ export class App implements OnInit, OnDestroy {
     const labelFont = `${Math.max(9, 10 * zoom)}px monospace`;
     for (let i = 0; i < objs.length; i++) {
       const obj = objs[i];
+      const typeIdx = ((obj.typeRes % OBJ_PALETTE.length) + OBJ_PALETTE.length) % OBJ_PALETTE.length;
+      const isFilteredOut = !visibleTypes.has(typeIdx);
+      if (isFilteredOut && i !== selIdx) continue;
       const [cx, cy] = this.worldToCanvas(obj.x, obj.y);
       if (cx < -30 || cx > W + 30 || cy < -30 || cy > H + 30) continue;
 
-      const color = OBJ_PALETTE[obj.typeRes % OBJ_PALETTE.length];
+      ctx.globalAlpha = isFilteredOut ? 0.35 : 1.0;
+      const color = OBJ_PALETTE[typeIdx];
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
@@ -591,6 +651,7 @@ export class App implements OnInit, OnDestroy {
         ctx.font = labelFont;
         ctx.fillText(`#${i} T${obj.typeRes}`, cx + baseRadius + 2, cy + 4);
       }
+      ctx.globalAlpha = 1.0;
     }
 
     // Origin marker
