@@ -40,3 +40,4 @@ docs/
 port/wasm/
 # gh-pages folder is built by CI
 gh-pages/
+gh-pages-local/
