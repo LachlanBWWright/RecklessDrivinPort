@@ -24,6 +24,8 @@ const MIN_HIT_RADIUS = 10;
 const BASE_HIT_RADIUS = 8;
 /** Canvas hit radius (px) for mark segment endpoint dragging. */
 const MARK_ENDPOINT_HIT_RADIUS = 10;
+/** Max storable UInt16 time value in the level pack. */
+const MAX_TIME_VALUE = 65535;
 
 /** Euclidean distance between two 2-D points. */
 function dist2d(ax: number, ay: number, bx: number, by: number): number {
@@ -318,7 +320,7 @@ export class App implements OnInit, OnDestroy {
     if (Number.isNaN(seconds)) return;
     const clampedSeconds = Math.max(0, seconds);
     this.editTimeSeconds.set(clampedSeconds);
-    this.editTime.set(Math.min(65535, clampedSeconds * 100));
+    this.editTime.set(Math.min(MAX_TIME_VALUE, clampedSeconds * 100));
     this.propertiesDirty.set(true);
   }
 
