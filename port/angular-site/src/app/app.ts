@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, signal, computed, effect, afterNextRender } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, computed, effect } from '@angular/core';
 import {
   LevelEditorService,
   type ParsedLevel,
@@ -30,6 +30,14 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
   const dx = ax - bx;
   const dy = ay - by;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+function scheduleAfterRender(callback: () => void): void {
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(() => callback());
+    return;
+  }
+  setTimeout(callback, 0);
 }
 
 @Component({
@@ -159,7 +167,7 @@ export class App implements OnInit, OnDestroy {
       const level = this.selectedLevel();
       const section = this.editorSection();
       if (section === 'road' && level) {
-        afterNextRender(() => this.drawTrackCanvas(level));
+        scheduleAfterRender(() => this.drawTrackCanvas(level));
       }
     });
 
@@ -173,7 +181,7 @@ export class App implements OnInit, OnDestroy {
       this.visibleTypeFilter();
       const section = this.editorSection();
       if (section === 'objects') {
-        afterNextRender(() => this.redrawObjectCanvas());
+        scheduleAfterRender(() => this.redrawObjectCanvas());
       }
     });
 
@@ -183,7 +191,7 @@ export class App implements OnInit, OnDestroy {
       this.selectedMarkIndex();
       const section = this.editorSection();
       if (section === 'road') {
-        afterNextRender(() => this.redrawMarkCanvas());
+        scheduleAfterRender(() => this.redrawMarkCanvas());
       }
     });
 
@@ -193,7 +201,7 @@ export class App implements OnInit, OnDestroy {
       this.spriteHexPage();
       const section = this.editorSection();
       if (section === 'sprites') {
-        afterNextRender(() => this.redrawSpriteCanvas());
+        scheduleAfterRender(() => this.redrawSpriteCanvas());
       }
     });
   }
