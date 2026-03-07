@@ -81,7 +81,7 @@ done
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ANGULAR_DIR="$REPO_ROOT/port/angular-site"
+ANGULAR_DIR="$REPO_ROOT/angular-site"
 OUTPUT_DIR="$REPO_ROOT/gh-pages-local"
 BUILD_WASM_DIR="$REPO_ROOT/build_wasm"
 
@@ -180,8 +180,9 @@ if ! $SKIP_ANGULAR; then
   fi
 
   info "Running ng build…"
-  # Use base-href / for local serving (no /RecklessDrivinPort/ subpath)
-  npx ng build --configuration=production --base-href=/
+  # The Angular site now uses a relative base href, so one production build
+  # works both at / locally and at /RecklessDrivinPort/ on GitHub Pages.
+  npx ng build --configuration=production
 
   ANGULAR_OUT="$ANGULAR_DIR/dist/reckless-drivin/browser"
   if [[ ! -d "$ANGULAR_OUT" ]]; then
@@ -229,8 +230,8 @@ if ! $SKIP_WASM; then
 else
   warn "--skip-wasm: reusing existing WASM outputs in $BUILD_WASM_DIR"
   if [[ ! -f "$BUILD_WASM_DIR/reckless_drivin.js" ]]; then
-    error "WASM output not found at $BUILD_WASM_DIR/reckless_drivin.js"
-    exit 1
+    warn "No existing WASM outputs found. Continuing with an editor-only/site-shell build."
+    warn "Build the WASM bundle later by rerunning without --skip-wasm."
   fi
 fi
 
@@ -248,12 +249,17 @@ for f in reckless_drivin.js reckless_drivin.wasm; do
   if [[ -f "$BUILD_WASM_DIR/$f" ]]; then
     cp "$BUILD_WASM_DIR/$f" "$OUTPUT_DIR/"
     info "Copied $f"
+  elif ! $SKIP_WASM; then
+    error "Expected WASM output not found during assembly: $BUILD_WASM_DIR/$f"
+    exit 1
   fi
 done
 # .data is optional
 if [[ -f "$BUILD_WASM_DIR/reckless_drivin.data" ]]; then
   cp "$BUILD_WASM_DIR/reckless_drivin.data" "$OUTPUT_DIR/"
   info "Copied reckless_drivin.data"
+elif $SKIP_WASM; then
+  warn "No reckless_drivin.data found – the local site will run without the game bundle"
 fi
 
 # Copy resources.dat if present (the editor needs this)

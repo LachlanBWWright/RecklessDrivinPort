@@ -33,7 +33,7 @@ Angular parsing uses `@lachlanbwwright/rsrcdump-ts` struct templates:
 | `8s` | 8-byte string (type) |
 | `L`  | 32-bit unsigned int (id, size) |
 
-**Implementation:** `port/angular-site/src/app/resource-dat.service.ts`
+**Implementation:** `angular-site/src/app/resource-dat.service.ts`
 
 ---
 
@@ -53,7 +53,7 @@ The raw payload of a Pack resource is a *pack handle*, consisting of:
 | `0x00`          | LZRW3-A compressed payload |
 | `0x01`          | Uncompressed copy (payload is raw decompressed data) |
 
-**Implementation:** `port/angular-site/src/app/lzrw.service.ts`
+**Implementation:** `angular-site/src/app/lzrw.service.ts`
 (`packHandleDecompress`, `packHandleCompress`)
 
 ### 2.1 LZRW3-A Algorithm
@@ -140,7 +140,7 @@ gKey = 0x1E42A71F   (free registration key, name "Free", code "B3FB09B1EB")
 On little-endian hosts (browsers), the 4-byte XOR must be byte-swapped to
 `0x1FA7421E` to match original big-endian byte ordering.
 
-**Implementation:** `port/angular-site/src/app/pack-parser.service.ts`
+**Implementation:** `angular-site/src/app/pack-parser.service.ts`
 (`cryptPackHandle`, `parsePackHandle`, `encodePackHandle`)
 
 ---
@@ -397,7 +397,7 @@ resources.dat
 Run with:
 
 ```sh
-cd port/angular-site
+cd angular-site
 npm test -- --watch=false
 ```
 
@@ -515,4 +515,3 @@ directory exactly (Angular static files + reckless_drivin.js/.wasm/.data + resou
 
 The server sets the correct `application/wasm` MIME type for `.wasm` files,
 which is required for browser WASM loading.
-
