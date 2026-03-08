@@ -664,7 +664,20 @@ input[type='file'] { display: none; }
   margin-bottom: 8px;
 }
 .canvas-controls { display: flex; flex-wrap: wrap; gap: 6px; }
-.hint-text { font-size: 0.78rem; color: var(--muted); }
+.hint-text {
+  font-size: 0.78rem;
+  color: var(--muted);
+  kbd {
+    display: inline-block;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    color: var(--on-surface);
+  }
+}
 
 .object-form-col {
   min-width: 0;
@@ -741,6 +754,40 @@ input[type='file'] { display: none; }
 .object-list-compact .object-list-header {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 6px; font-size: 0.8rem; color: var(--muted);
+}
+
+/* Object list search input */
+.object-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--on-surface);
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  outline: none;
+  &:focus { border-color: var(--accent2); }
+  &::placeholder { color: var(--muted); }
+}
+
+/* Type dimension badge next to Type ID hint */
+.type-dim-badge {
+  display: inline-block;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.72rem;
+  color: var(--accent2);
+  margin-left: 6px;
+}
+
+/* Auto-apply note in the inspector save row */
+.auto-apply-note {
+  margin-left: 6px;
+  font-style: italic;
 }
 
 /* Mark canvas */

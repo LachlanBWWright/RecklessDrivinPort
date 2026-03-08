@@ -180,16 +180,16 @@
                   <div class="time-input-col">
                     <input id="prop-time-seconds" type="number" min="0" [value]="editTimeSeconds()"
                       (input)="onTimeSecondsInput($event)" />
-                    <span class="time-input-hint">seconds</span>
+                    <span class="time-input-hint">sec</span>
                   </div>
-                  <span class="time-input-sep">/</span>
+                  <span class="time-input-sep">≡</span>
                   <div class="time-input-col">
                     <input id="prop-time" type="number" min="0" [value]="editTime()"
                       (input)="onPropsInput('time', $event)" />
-                    <span class="time-input-hint">raw ×100</span>
+                    <span class="time-input-hint">raw (÷100)</span>
                   </div>
                 </div>
-                <p class="field-hint">Edit the timer in player-friendly seconds or the raw UInt16 value stored in the level pack.</p>
+                <p class="field-hint">Set in seconds for convenience, or edit the raw UInt16 (stored value ÷ 100 = seconds).</p>
               </div>
               <div class="prop-group">
                 <label for="prop-xstart">Player Start X (SInt16, pixels)</label>
@@ -241,7 +241,9 @@
 
             <!-- Canvas toolbar -->
             <div class="canvas-toolbar">
-              <span class="hint-text">🖱 Drag objects to move · Dbl-click canvas to add · Del removes · Ctrl/Cmd+D duplicates · road + AI track preview + decoded object sprites shown inline</span>
+              <span class="hint-text" title="Drag: move object · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate">
+                🖱 Drag to move · Dbl-click to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> duplicates
+              </span>
               <div class="canvas-controls">
                 <button class="btn btn-sm" (click)="addObject()">+ Add Object</button>
                 <button class="btn btn-sm" (click)="duplicateSelectedObject()" [disabled]="selectedObjIndex() === null">📋 Duplicate</button>
@@ -291,7 +293,12 @@
                     <div class="prop-group">
                       <label for="obj-type">Type ID</label>
                       <input id="obj-type" type="number" [value]="editObjTypeRes()" (input)="onObjFieldInput('typeRes', $event)" />
-                      <p class="field-hint">128 = player car. The object canvas uses the matching object-type sprite frame when one exists in the sprite packs.</p>
+                      <p class="field-hint">
+                        128 = player car. The canvas uses the matching object-type sprite when available.
+                        @if (getObjTypeDimensionLabel(editObjTypeRes()); as dim) {
+                          <span class="type-dim-badge">{{ dim }}</span>
+                        }
+                      </p>
                     </div>
                   </div>
                   <div class="type-visibility-filter">
@@ -315,8 +322,8 @@
                     <p class="field-hint">Hide clutter on the canvas by color-group. Selected objects stay faintly visible even when filtered out.</p>
                   </div>
                   <div class="save-row">
-                    <button type="button" class="btn btn-primary" (click)="applyObjEdit()">Apply</button>
-                    <button type="button" class="btn btn-danger" (click)="removeSelectedObject()">Remove</button>
+                    <button type="button" class="btn btn-danger" (click)="removeSelectedObject()">🗑 Remove</button>
+                    <span class="field-hint auto-apply-note">Changes apply automatically.</span>
                   </div>
                 } @else {
                   <p class="muted">Click an object on the canvas to select it,<br>or double-click the canvas to add one.</p>
@@ -326,16 +333,28 @@
                 <div class="object-list-compact" style="margin-top:16px">
                   <div class="object-list-header">
                     <span>All objects</span>
-                    <span class="badge">{{ objects().length }}</span>
+                    <span class="badge">{{ filteredObjectIndices().length }} / {{ objects().length }}</span>
                   </div>
+                  <input
+                    type="search"
+                    class="object-search-input"
+                    placeholder="Filter by #index or Ttype…"
+                    [value]="objectSearchTerm()"
+                    (input)="objectSearchTerm.set($any($event.target).value)"
+                    aria-label="Filter objects"
+                  />
                   <div class="object-list">
-                    @for (obj of objects(); track $index) {
-                      <div class="object-item" [class.selected]="selectedObjIndex() === $index"
-                        (click)="selectObject($index)">
-                        <span class="obj-idx">#{{ $index }}</span>
-                        <span class="obj-type">T{{ obj.typeRes }}</span>
-                        <span class="obj-pos">({{ obj.x }},{{ obj.y }})</span>
+                    @for (idx of filteredObjectIndices(); track idx) {
+                      <div class="object-item" [class.selected]="selectedObjIndex() === idx"
+                        (click)="selectObject(idx, true)"
+                        [title]="'Object #' + idx + ' · TypeRes ' + objects()[idx].typeRes + ' · (' + objects()[idx].x + ', ' + objects()[idx].y + ')'">
+                        <span class="obj-idx">#{{ idx }}</span>
+                        <span class="obj-type">T{{ objects()[idx].typeRes }}</span>
+                        <span class="obj-pos">({{ objects()[idx].x }},{{ objects()[idx].y }})</span>
                       </div>
+                    }
+                    @if (filteredObjectIndices().length === 0 && objectSearchTerm()) {
+                      <p class="muted" style="padding:8px 4px;font-size:0.75rem">No objects match "{{ objectSearchTerm() }}".</p>
                     }
                   </div>
                 </div>

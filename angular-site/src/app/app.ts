@@ -102,6 +102,20 @@ export class App implements OnInit, OnDestroy {
   editObjDir = signal(0);
   editObjTypeRes = signal(128);
   visibleTypeFilter = signal<Set<number>>(new Set(this.typePalette.map((item) => item.typeId)));
+  /** Text typed into the object-list search box. */
+  objectSearchTerm = signal('');
+  /** Indices of objects that match the current search term. */
+  readonly filteredObjectIndices = computed(() => {
+    const term = this.objectSearchTerm().trim().toLowerCase();
+    const objs = this.objects();
+    if (!term) return objs.map((_, i) => i);
+    return objs.reduce<number[]>((acc, obj, i) => {
+      const typeStr = `t${obj.typeRes}`;
+      const idxStr = `#${i}`;
+      if (idxStr.includes(term) || typeStr.includes(term)) acc.push(i);
+      return acc;
+    }, []);
+  });
 
   // ---- Canvas interaction state ----
   canvasZoom = signal(1.0);
@@ -371,7 +385,7 @@ export class App implements OnInit, OnDestroy {
 
   // ---- Object placement ----
 
-  selectObject(index: number): void {
+  selectObject(index: number, centerCanvas = false): void {
     this.selectedObjIndex.set(index);
     const objs = this.objects();
     if (index >= 0 && index < objs.length) {
@@ -380,6 +394,7 @@ export class App implements OnInit, OnDestroy {
       this.editObjY.set(obj.y);
       this.editObjDir.set(obj.dir);
       this.editObjTypeRes.set(obj.typeRes);
+      if (centerCanvas) this.centerOnSelectedObject();
     }
   }
 
@@ -392,6 +407,8 @@ export class App implements OnInit, OnDestroy {
       case 'dir': this.editObjDir.set(val); break;
       case 'typeRes': this.editObjTypeRes.set(Math.round(val)); break;
     }
+    // Auto-apply so the canvas reflects changes immediately without a separate button press.
+    this.applyObjEdit();
   }
 
   applyObjEdit(): void {
@@ -442,6 +459,15 @@ export class App implements OnInit, OnDestroy {
 
   hideAllObjectTypes(): void {
     this.visibleTypeFilter.set(new Set());
+  }
+
+  /** Return a short human-readable dimension string for a type resource ID (e.g. "32×64 px"). */
+  getObjTypeDimensionLabel(typeRes: number): string {
+    const def = this.objectTypeDefinitions.get(typeRes);
+    if (!def) return '';
+    const w = Math.round(def.width);
+    const l = Math.round(def.length);
+    return `${w}×${l} px`;
   }
 
   removeSelectedObject(): void {

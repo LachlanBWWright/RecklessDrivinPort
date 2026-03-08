@@ -1,0 +1,17 @@
+{
+  "extractedAt": "2026-03-08T07:32:00Z",
+  "sourceFile": "port/resources/resources.dat",
+  "description": "Level data and object type definitions extracted from resources.dat for Reckless Drivin' (Mac OS 9). Levels 1-3 are unencrypted; levels 4-10 use XOR encryption.",
+  "levels": [],
+  "objectTypeCount": 67,
+  "files": [
+    "levels.json",
+    "object-types.json",
+    "level-1-objects.csv",
+    "level-2-objects.csv",
+    "level-3-objects.csv",
+    "level-1-road-segments.csv",
+    "level-2-road-segments.csv",
+    "level-3-road-segments.csv"
+  ]
+}
