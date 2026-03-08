@@ -1,15 +1,21 @@
 import { Component, OnDestroy, OnInit, signal, computed, effect } from '@angular/core';
-import {
-  LevelEditorService,
-  type ParsedLevel,
-  type LevelProperties,
-  type ObjectPos,
-  type EditableSpriteAsset,
-  type MarkSeg,
-  type ObjectTypeDefinition,
-  type DecodedSpriteFrame,
+import type {
+  ParsedLevel,
+  LevelProperties,
+  ObjectPos,
+  EditableSpriteAsset,
+  MarkSeg,
+  ObjectTypeDefinition,
 } from './level-editor.service';
-import { ResourceDatService, type ResourceDatEntry } from './resource-dat.service';
+
+/** Worker response envelope sent from pack.worker.ts */
+interface WorkerResponse {
+  id: number;
+  ok: boolean;
+  cmd: string;
+  result?: unknown;
+  error?: string;
+}
 
 export type AppTab = 'game' | 'editor';
 export type EditorSection = 'properties' | 'objects' | 'road' | 'sprites';
@@ -67,6 +73,8 @@ export class App implements OnInit, OnDestroy {
   resourcesStatus = signal('No resources.dat loaded. Use the buttons below to load one.');
   editorError = signal('');
   hasEditorData = signal(false);
+  /** True while the pack worker is busy parsing or saving. */
+  workerBusy = signal(false);
 
   // ---- Level selector ----
   parsedLevels = signal<ParsedLevel[]>([]);
@@ -123,11 +131,11 @@ export class App implements OnInit, OnDestroy {
   spriteByteOffset = signal(0);
   spriteByteValue = signal(0);
   spriteHexPage = signal(0);
+  /** Raw bytes of the currently selected sprite (loaded from worker). */
+  currentSpriteBytes = signal<Uint8Array | null>(null);
 
   readonly spriteHexRows = computed(() => {
-    const id = this.selectedSpriteId();
-    if (id === null) return [];
-    const bytes = this.levelEditorService.getSpriteBytes(this.resources, id);
+    const bytes = this.currentSpriteBytes();
     if (!bytes) return [];
     const page = this.spriteHexPage();
     const pageSize = 256;
@@ -153,19 +161,18 @@ export class App implements OnInit, OnDestroy {
   });
 
   readonly spriteMaxPage = computed(() => {
-    const id = this.selectedSpriteId();
-    if (id === null) return 0;
-    const bytes = this.levelEditorService.getSpriteBytes(this.resources, id);
+    const bytes = this.currentSpriteBytes();
     return bytes ? Math.max(0, Math.ceil(bytes.length / 256) - 1) : 0;
   });
 
   private wasmScript: HTMLScriptElement | null = null;
-  private resources: ResourceDatEntry[] = [];
   private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
   private objectSpritePreviews = new Map<number, HTMLCanvasElement | null>();
 
-  private readonly resourceDatService = new ResourceDatService();
-  private readonly levelEditorService = new LevelEditorService();
+  // ---- Pack Worker ----
+  private packWorker: Worker | null = null;
+  private pendingCallbacks = new Map<number, (resp: WorkerResponse) => void>();
+  private nextMsgId = 0;
 
   constructor() {
     // Redraw track canvas whenever the selected level or section changes.
@@ -213,6 +220,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.initPackWorker();
     this.setupEmscriptenModule();
     this.loadWasmScript();
   }
@@ -221,6 +229,8 @@ export class App implements OnInit, OnDestroy {
     if (this.wasmScript?.parentNode) {
       (this.wasmScript.parentNode as HTMLElement).removeChild(this.wasmScript);
     }
+    this.packWorker?.terminate();
+    this.packWorker = null;
   }
 
   // ---- Tab / section navigation ----
@@ -240,10 +250,11 @@ export class App implements OnInit, OnDestroy {
       this.editorError.set('');
       this.resourcesStatus.set('Loading default resources.dat…');
       const bytes = await this.readAssetBytes('resources.dat');
-      this.loadResourcesBytes(bytes, 'default resources.dat');
+      await this.loadResourcesBytes(bytes, 'default resources.dat');
     } catch (error) {
       this.editorError.set(error instanceof Error ? error.message : 'Failed to load resources.dat');
       this.resourcesStatus.set('Failed to load resources.');
+      this.workerBusy.set(false);
     }
   }
 
@@ -254,28 +265,35 @@ export class App implements OnInit, OnDestroy {
     this.editorError.set('');
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      this.loadResourcesBytes(bytes, file.name);
+      await this.loadResourcesBytes(bytes, file.name);
     } catch (error) {
       this.editorError.set(error instanceof Error ? error.message : 'Failed to load file');
       this.resourcesStatus.set('Failed to load uploaded file.');
+      this.workerBusy.set(false);
     }
   }
 
-  downloadEditedResources(): void {
+  async downloadEditedResources(): Promise<void> {
     if (!this.hasEditorData()) return;
-    const output = this.resourceDatService.serialize(this.resources);
-    const safeBuffer = new ArrayBuffer(output.byteLength);
-    new Uint8Array(safeBuffer).set(output);
-    const blob = new Blob([safeBuffer], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'resources.dat';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    this.resourcesStatus.set('Downloaded updated resources.dat.');
+    try {
+      this.workerBusy.set(true);
+      this.resourcesStatus.set('Serializing resources…');
+      const buf = await this.dispatchWorker<ArrayBuffer>('SERIALIZE');
+      const blob = new Blob([buf], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'resources.dat';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      this.resourcesStatus.set('Downloaded updated resources.dat.');
+    } catch (error) {
+      this.editorError.set(error instanceof Error ? error.message : 'Failed to serialize resources');
+    } finally {
+      this.workerBusy.set(false);
+    }
   }
 
   // ---- Level selection ----
@@ -326,7 +344,7 @@ export class App implements OnInit, OnDestroy {
     this.propertiesDirty.set(true);
   }
 
-  saveLevelProperties(): void {
+  async saveLevelProperties(): Promise<void> {
     const id = this.selectedLevelId();
     if (id === null) return;
     const props: LevelProperties = {
@@ -335,10 +353,17 @@ export class App implements OnInit, OnDestroy {
       xStartPos: this.editXStartPos(),
       levelEnd: this.editLevelEnd(),
     };
-    this.resources = this.levelEditorService.applyLevelProperties(this.resources, id, props);
-    this.propertiesDirty.set(false);
-    this.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
-    this.refreshParsedLevels();
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_PROPS', { resourceId: id, props });
+      this.applyLevelsResult(result.levels);
+      this.propertiesDirty.set(false);
+      this.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
+    } catch (error) {
+      this.editorError.set(error instanceof Error ? error.message : 'Save failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
   }
 
   // ---- Object placement ----
@@ -424,12 +449,22 @@ export class App implements OnInit, OnDestroy {
     this.selectedObjIndex.set(objs.length > 0 ? Math.min(idx, objs.length - 1) : null);
   }
 
-  saveLevelObjects(): void {
+  async saveLevelObjects(): Promise<void> {
     const id = this.selectedLevelId();
     if (id === null) return;
-    this.resources = this.levelEditorService.applyLevelObjects(this.resources, id, this.objects());
-    this.resourcesStatus.set(`Saved objects for level ${id - 139} (${this.objects().length} objects).`);
-    this.refreshParsedLevels();
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_OBJECTS', {
+        resourceId: id,
+        objects: this.objects(),
+      });
+      this.applyLevelsResult(result.levels);
+      this.resourcesStatus.set(`Saved objects for level ${id - 139} (${this.objects().length} objects).`);
+    } catch (error) {
+      this.editorError.set(error instanceof Error ? error.message : 'Save failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
   }
 
   // ---- Canvas coordinate transforms ----
@@ -745,12 +780,22 @@ export class App implements OnInit, OnDestroy {
     this.marks.set(ms);
   }
 
-  saveMarks(): void {
+  async saveMarks(): Promise<void> {
     const id = this.selectedLevelId();
     if (id === null) return;
-    this.resources = this.levelEditorService.applyLevelMarks(this.resources, id, this.marks());
-    this.resourcesStatus.set(`Saved ${this.marks().length} mark segments for level ${id - 139}.`);
-    this.refreshParsedLevels();
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_MARKS', {
+        resourceId: id,
+        marks: this.marks(),
+      });
+      this.applyLevelsResult(result.levels);
+      this.resourcesStatus.set(`Saved ${this.marks().length} mark segments for level ${id - 139}.`);
+    } catch (error) {
+      this.editorError.set(error instanceof Error ? error.message : 'Save failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
   }
 
   // ---- Mark canvas helpers ----
@@ -902,12 +947,19 @@ export class App implements OnInit, OnDestroy {
 
   // ---- Sprite editor ----
 
-  selectSprite(spriteId: number): void {
+  async selectSprite(spriteId: number): Promise<void> {
     this.selectedSpriteId.set(spriteId);
     this.spriteByteOffset.set(0);
     this.spriteHexPage.set(0);
-    const bytes = this.levelEditorService.getSpriteBytes(this.resources, spriteId);
-    this.spriteByteValue.set(bytes && bytes.length > 0 ? bytes[0] : 0);
+    this.currentSpriteBytes.set(null);
+    try {
+      const result = await this.dispatchWorker<{ bytes: Uint8Array | null }>('GET_SPRITE_BYTES', { spriteId });
+      const bytes = result.bytes;
+      this.currentSpriteBytes.set(bytes);
+      this.spriteByteValue.set(bytes && bytes.length > 0 ? bytes[0] : 0);
+    } catch {
+      // non-fatal: hex viewer just stays empty
+    }
   }
 
   onSpriteOffsetInput(event: Event): void {
@@ -920,14 +972,23 @@ export class App implements OnInit, OnDestroy {
     if (!Number.isNaN(val)) this.spriteByteValue.set(Math.max(0, Math.min(255, val)));
   }
 
-  applySpriteByteEdit(): void {
+  async applySpriteByteEdit(): Promise<void> {
     const id = this.selectedSpriteId();
     if (id === null) return;
-    this.resources = this.levelEditorService.applySpriteByte(
-      this.resources, id, this.spriteByteOffset(), this.spriteByteValue(),
-    );
-    this.resourcesStatus.set(`Patched PPic #${id} offset ${this.spriteByteOffset()}.`);
-    this.refreshSpriteAssets();
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ bytes: Uint8Array | null }>('APPLY_SPRITE_BYTE', {
+        spriteId: id,
+        offset: this.spriteByteOffset(),
+        value: this.spriteByteValue(),
+      });
+      this.currentSpriteBytes.set(result.bytes);
+      this.resourcesStatus.set(`Patched PPic #${id} offset ${this.spriteByteOffset()}.`);
+    } catch (error) {
+      this.editorError.set(error instanceof Error ? error.message : 'Patch failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
   }
 
   prevSpritePage(): void {
@@ -951,7 +1012,7 @@ export class App implements OnInit, OnDestroy {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
-    const bytes = this.levelEditorService.getSpriteBytes(this.resources, id);
+    const bytes = this.currentSpriteBytes();
     if (!bytes || bytes.length === 0) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       return;
@@ -994,19 +1055,65 @@ export class App implements OnInit, OnDestroy {
 
   // ---- Private helpers ----
 
-  private loadResourcesBytes(bytes: Uint8Array, sourceName: string): void {
-    this.resources = this.resourceDatService.parse(bytes);
-    this.objectTypeDefinitions = this.levelEditorService.extractObjectTypeDefinitions(this.resources);
-    this.objectSpritePreviews.clear();
-    this.resourcesStatus.set(`Loaded ${this.resources.length} resources from ${sourceName}.`);
+  private async loadResourcesBytes(bytes: Uint8Array, sourceName: string): Promise<void> {
+    this.workerBusy.set(true);
+    this.resourcesStatus.set(`Parsing ${sourceName}…`);
     this.editorError.set('');
-    this.hasEditorData.set(true);
-    this.refreshParsedLevels();
-    this.refreshSpriteAssets();
+    try {
+      // Transfer the underlying ArrayBuffer to avoid copying inside postMessage.
+      const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      type LoadResult = {
+        levels: ParsedLevel[];
+        sprites: EditableSpriteAsset[];
+        objectTypesArr: [number, ObjectTypeDefinition][];
+        decodedSprites: { typeRes: number; pixels: ArrayBuffer; width: number; height: number }[];
+      };
+      const result = await this.dispatchWorker<LoadResult>('LOAD', buffer, [buffer]);
+
+      // Rebuild object type definitions map
+      this.objectTypeDefinitions.clear();
+      for (const [typeRes, def] of result.objectTypesArr) {
+        if (def) this.objectTypeDefinitions.set(typeRes, def as ObjectTypeDefinition);
+      }
+
+      // Rebuild sprite previews from pre-decoded pixel data sent by the worker
+      this.objectSpritePreviews.clear();
+      for (const { typeRes, pixels, width, height } of result.decodedSprites) {
+        const clamped = new Uint8ClampedArray(pixels);
+        const canvas = this.renderSpritePixels(clamped, width, height);
+        this.objectSpritePreviews.set(typeRes, canvas);
+      }
+
+      this.parsedLevels.set(result.levels);
+      this.spriteAssets.set(result.sprites);
+      this.hasEditorData.set(true);
+      this.resourcesStatus.set(
+        `Loaded ${result.levels.length} level(s) and ${result.sprites.length} sprite(s) from ${sourceName}.`,
+      );
+
+      // Auto-select first level
+      const curId = this.selectedLevelId();
+      if (curId !== null && result.levels.some((l) => l.resourceId === curId)) {
+        this.selectLevel(curId);
+      } else if (result.levels.length > 0) {
+        this.selectLevel(result.levels[0].resourceId);
+      } else {
+        this.selectedLevelId.set(null);
+      }
+      if (result.sprites.length > 0 && this.selectedSpriteId() === null) {
+        // Don't await – just trigger the fetch in the background
+        void this.selectSprite(result.sprites[0].id);
+      }
+    } catch (error) {
+      this.editorError.set(error instanceof Error ? error.message : 'Failed to parse resources');
+      this.resourcesStatus.set('Failed to parse resources.');
+    } finally {
+      this.workerBusy.set(false);
+    }
   }
 
-  private refreshParsedLevels(): void {
-    const levels = this.levelEditorService.extractParsedLevels(this.resources);
+  /** Apply fresh level list received from the worker after a save operation. */
+  private applyLevelsResult(levels: ParsedLevel[]): void {
     this.parsedLevels.set(levels);
     const curId = this.selectedLevelId();
     if (curId !== null && levels.some((l) => l.resourceId === curId)) {
@@ -1018,12 +1125,65 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  private refreshSpriteAssets(): void {
-    const assets = this.levelEditorService.extractSpriteAssets(this.resources);
-    this.spriteAssets.set(assets);
-    if (assets.length > 0 && this.selectedSpriteId() === null) {
-      this.selectedSpriteId.set(assets[0].id);
+  // ---- Pack Worker management ----
+
+  /** Initialise the pack web worker and wire up the message handler. */
+  private initPackWorker(): void {
+    if (typeof Worker === 'undefined') {
+      // Worker not available (e.g., some test environments). The editor
+      // will not be able to parse resources in this environment.
+      console.warn('[App] Web Worker not available; pack operations will not work.');
+      return;
     }
+    try {
+      this.packWorker = new Worker(new URL('./pack.worker', import.meta.url), { type: 'module' });
+      this.packWorker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+        const { id, ok, result, error } = event.data;
+        const callback = this.pendingCallbacks.get(id);
+        if (callback) {
+          this.pendingCallbacks.delete(id);
+          callback({ id, ok, cmd: event.data.cmd, result, error });
+        }
+      };
+      this.packWorker.onerror = (err: ErrorEvent) => {
+        console.error('[PackWorker] Error:', err.message);
+        this.editorError.set(`Worker error: ${err.message}`);
+        this.workerBusy.set(false);
+        // Reject all outstanding calls so they don't hang forever.
+        for (const cb of this.pendingCallbacks.values()) {
+          cb({ id: -1, ok: false, cmd: '', error: err.message });
+        }
+        this.pendingCallbacks.clear();
+      };
+    } catch (err) {
+      console.error('[App] Failed to create pack worker:', err);
+    }
+  }
+
+  /**
+   * Send a command to the pack worker and return a Promise that resolves with
+   * the result when the worker responds, or rejects on error.
+   */
+  private dispatchWorker<T>(cmd: string, payload?: unknown, transferables?: Transferable[]): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      if (!this.packWorker) {
+        reject(new Error('Pack worker not available'));
+        return;
+      }
+      const id = this.nextMsgId++;
+      this.pendingCallbacks.set(id, (resp: WorkerResponse) => {
+        if (resp.ok) {
+          resolve(resp.result as T);
+        } else {
+          reject(new Error(resp.error ?? 'Worker error'));
+        }
+      });
+      if (transferables?.length) {
+        this.packWorker.postMessage({ id, cmd, payload }, transferables);
+      } else {
+        this.packWorker.postMessage({ id, cmd, payload });
+      }
+    });
   }
 
   private setupEmscriptenModule(): void {
@@ -1180,28 +1340,20 @@ export class App implements OnInit, OnDestroy {
   }
 
   private getObjectSpritePreview(typeRes: number): HTMLCanvasElement | null {
-    if (this.objectSpritePreviews.has(typeRes)) {
-      return this.objectSpritePreviews.get(typeRes) ?? null;
-    }
-    const objectType = this.objectTypeDefinitions.get(typeRes);
-    if (!objectType) {
-      this.objectSpritePreviews.set(typeRes, null);
-      return null;
-    }
-    const decoded = this.levelEditorService.decodeSpriteFrame(this.resources, objectType.frame);
-    const preview = decoded ? this.renderSpritePreview(decoded) : null;
-    this.objectSpritePreviews.set(typeRes, preview);
-    return preview;
+    // Sprite previews are pre-decoded by the worker during LOAD and stored in objectSpritePreviews.
+    return this.objectSpritePreviews.get(typeRes) ?? null;
   }
 
-  private renderSpritePreview(sprite: DecodedSpriteFrame): HTMLCanvasElement | null {
+  private renderSpritePixels(pixels: Uint8ClampedArray, width: number, height: number): HTMLCanvasElement | null {
     if (typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
-    canvas.width = sprite.width;
-    canvas.height = sprite.height;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    const imageData = new ImageData(new Uint8ClampedArray(sprite.pixels), sprite.width, sprite.height);
+    // Ensure the Uint8ClampedArray is backed by a plain ArrayBuffer for ImageData.
+    const safePixels = new Uint8ClampedArray(pixels);
+    const imageData = new ImageData(safePixels, width, height);
     ctx.putImageData(imageData, 0, 0);
     return canvas;
   }

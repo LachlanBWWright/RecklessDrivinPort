@@ -86,14 +86,20 @@
       <!-- Toolbar -->
       <div class="editor-toolbar">
         <div class="toolbar-left">
-          <button type="button" class="btn" (click)="loadDefaultResources()">Load default resources.dat</button>
-          <label class="btn upload-btn" for="resource-file">Upload resources.dat</label>
-          <input id="resource-file" type="file" accept=".dat" (change)="onResourceFileSelected($event)" />
-          <button type="button" class="btn btn-primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData()">
+          <button type="button" class="btn" (click)="loadDefaultResources()" [disabled]="workerBusy()">Load default resources.dat</button>
+          <label class="btn upload-btn" [class.btn--disabled]="workerBusy()" for="resource-file">Upload resources.dat</label>
+          <input id="resource-file" type="file" accept=".dat" (change)="onResourceFileSelected($event)" [disabled]="workerBusy()" />
+          <button type="button" class="btn btn-primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
             ⬇ Download edited resources.dat
           </button>
         </div>
         <div class="toolbar-right">
+          @if (workerBusy()) {
+            <span class="worker-busy-indicator">
+              <span class="worker-spinner"></span>
+              Processing…
+            </span>
+          }
           <span class="resources-status" [class.has-data]="hasEditorData()">{{ resourcesStatus() }}</span>
           @if (editorError()) {
             <span class="editor-error">⚠ {{ editorError() }}</span>
@@ -101,11 +107,19 @@
         </div>
       </div>
 
-      @if (!hasEditorData()) {
+      @if (!hasEditorData() && !workerBusy()) {
         <div class="no-data-hint">
           <p>Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
-          <p class="muted">The editor decompresses and parses all LZRW3-A compressed level packs in-browser, without any server-side processing.</p>
+          <p class="muted">All LZRW3-A decompression runs in a <strong>background web worker</strong> so the page stays responsive while large packs are parsed.</p>
           <p class="muted">If you are on the Angular dev server, run <code>cd angular-site &amp;&amp; npm start</code> again first — it now syncs <code>port/resources/resources.dat</code> automatically before launch.</p>
+        </div>
+      }
+
+      @if (workerBusy() && !hasEditorData()) {
+        <div class="worker-loading-panel">
+          <div class="worker-loading-spinner"></div>
+          <p>{{ resourcesStatus() }}</p>
+          <p class="muted">Decompressing LZRW3-A level packs in background worker…</p>
         </div>
       }
 
@@ -208,8 +222,8 @@
             </table>
 
             <div class="save-row">
-              <button type="button" class="btn btn-primary" (click)="saveLevelProperties()" [disabled]="!propertiesDirty()">
-                💾 Save Properties to Pack
+              <button type="button" class="btn btn-primary" (click)="saveLevelProperties()" [disabled]="!propertiesDirty() || workerBusy()">
+                @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Properties to Pack }
               </button>
               @if (!propertiesDirty()) {
                 <span class="muted">No unsaved changes.</span>
@@ -329,7 +343,9 @@
             </div>
 
             <div class="save-row" style="margin-top:12px">
-              <button class="btn btn-primary" (click)="saveLevelObjects()">💾 Save Objects to Pack</button>
+              <button class="btn btn-primary" (click)="saveLevelObjects()" [disabled]="workerBusy()">
+                @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Objects to Pack }
+              </button>
             </div>
           </div>
         }
@@ -439,9 +455,11 @@
                 (mouseup)="onMarkCanvasMouseUp($event)"
               ></canvas>
               <div class="mark-controls">
-                <button class="btn btn-sm" (click)="addMark()">+ Add Mark</button>
-                <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex() === null" (click)="removeSelectedMark()">Remove</button>
-                <button class="btn btn-primary" (click)="saveMarks()">💾 Save Marks</button>
+                <button class="btn btn-sm" (click)="addMark()" [disabled]="workerBusy()">+ Add Mark</button>
+                <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex() === null || workerBusy()" (click)="removeSelectedMark()">Remove</button>
+                <button class="btn btn-primary" (click)="saveMarks()" [disabled]="workerBusy()">
+                  @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Marks }
+                </button>
               </div>
             </div>
             @if (selectedMarkIndex() !== null) {
@@ -537,8 +555,8 @@
                             [value]="spriteByteValue()" (input)="onSpriteValueInput($event)" />
                         </div>
                       </div>
-                      <button type="button" class="btn btn-primary" (click)="applySpriteByteEdit()">
-                        Apply Byte Patch
+                      <button type="button" class="btn btn-primary" (click)="applySpriteByteEdit()" [disabled]="workerBusy()">
+                        @if (workerBusy()) { <span class="btn-spinner"></span> Patching… } @else { Apply Byte Patch }
                       </button>
                     </div>
                   } @else {
