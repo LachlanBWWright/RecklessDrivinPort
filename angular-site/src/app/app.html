@@ -1,0 +1,555 @@
+<!-- Site navigation header with tab selector -->
+<header class="site-nav">
+  <span class="site-title">Reckless Drivin'</span>
+  <nav class="nav-tabs" role="tablist" aria-label="Site sections">
+    <button
+      type="button"
+      role="tab"
+      class="nav-tab"
+      [class.active]="activeTab() === 'game'"
+      [attr.aria-selected]="activeTab() === 'game'"
+      (click)="setTab('game')"
+    >🎮 Play Game</button>
+    <button
+      type="button"
+      role="tab"
+      class="nav-tab"
+      [class.active]="activeTab() === 'editor'"
+      [attr.aria-selected]="activeTab() === 'editor'"
+      (click)="setTab('editor')"
+    >🗺️ Level Editor</button>
+  </nav>
+</header>
+
+<main>
+  <!-- =================== GAME TAB =================== -->
+  @if (activeTab() === 'game') {
+    <div class="hero-card">
+      <h1>Reckless Drivin' — WebAssembly Port</h1>
+      <p>
+        A fan-made SDL2 / Emscripten port of the classic Mac OS&nbsp;9 racing game
+        <em>Reckless Drivin'</em> by Jonas Echterhoff. Hold a number key when clicking Start to skip
+        directly to that level. Source at
+        <a href="https://github.com/jechter/RecklessDrivin" target="_blank" rel="noopener">github.com/jechter/RecklessDrivin</a>.
+        Builds on <a href="https://github.com/natecraddock/open-reckless-drivin" target="_blank" rel="noopener">Nathan Craddock's</a>
+        work and <a href="https://github.com/jorio/Pomme" target="_blank" rel="noopener">Pomme by Jorio</a>.
+        <a href="https://github.com/LachlanBWWright/RecklessDrivinPort" target="_blank" rel="noopener">View port repository</a>.
+      </p>
+    </div>
+  }
+
+  <!-- Game panel – always in DOM so WASM survives tab switches -->
+  <section
+    id="panel-game"
+    role="tabpanel"
+    class="game-section"
+    [class.tab-panel--hidden]="activeTab() !== 'game'"
+  >
+    <div class="game-header">
+      <span>Game</span>
+      <span class="status-label">{{ statusText() }}</span>
+      <button class="btn-fullscreen" (click)="toggleFullscreen()">&#x26F6; Fullscreen</button>
+    </div>
+    <div class="canvas-wrapper">
+      <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
+      <div class="loading-overlay" [class.hidden]="!overlayVisible()">
+        <div class="spinner"></div>
+        <p class="loading-msg">{{ statusText() }}</p>
+        <div class="progress-track">
+          <div class="progress-fill" [style.width.%]="progressPct()"></div>
+        </div>
+      </div>
+    </div>
+    <div class="controls-bar">
+      <span class="controls-label">Controls:</span>
+      <kbd>Up</kbd> Gas &nbsp;
+      <kbd>Down</kbd> Brake &nbsp;
+      <kbd>Left</kbd><kbd>Right</kbd> Steer &nbsp;
+      <kbd>Space</kbd> Handbrake &nbsp;
+      <kbd>Z</kbd> Mine &nbsp;
+      <kbd>X</kbd> Missile &nbsp;
+      <kbd>Esc</kbd> Menu
+    </div>
+    <div class="volume-bar">
+      <label class="volume-label" for="volume-slider">🔊 Volume</label>
+      <input id="volume-slider" type="range" min="0" max="100"
+        [value]="masterVolume()" (input)="onVolumeChange($event)"
+        class="volume-slider" aria-label="Master volume" />
+      <span class="volume-value">{{ masterVolume() }}%</span>
+    </div>
+  </section>
+
+  <!-- =================== EDITOR TAB =================== -->
+  @if (activeTab() === 'editor') {
+    <section id="panel-editor" role="tabpanel" class="editor-section">
+
+      <!-- Toolbar -->
+      <div class="editor-toolbar">
+        <div class="toolbar-left">
+          <button type="button" class="btn" (click)="loadDefaultResources()">Load default resources.dat</button>
+          <label class="btn upload-btn" for="resource-file">Upload resources.dat</label>
+          <input id="resource-file" type="file" accept=".dat" (change)="onResourceFileSelected($event)" />
+          <button type="button" class="btn btn-primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData()">
+            ⬇ Download edited resources.dat
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <span class="resources-status" [class.has-data]="hasEditorData()">{{ resourcesStatus() }}</span>
+          @if (editorError()) {
+            <span class="editor-error">⚠ {{ editorError() }}</span>
+          }
+        </div>
+      </div>
+
+      @if (!hasEditorData()) {
+        <div class="no-data-hint">
+          <p>Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
+          <p class="muted">The editor decompresses and parses all LZRW3-A compressed level packs in-browser, without any server-side processing.</p>
+          <p class="muted">If you are on the Angular dev server, run <code>cd angular-site &amp;&amp; npm start</code> again first — it now syncs <code>port/resources/resources.dat</code> automatically before launch.</p>
+        </div>
+      }
+
+      @if (hasEditorData()) {
+        <!-- Level selector -->
+        <div class="level-selector-bar">
+          <span class="label-text">Level:</span>
+          @for (level of parsedLevels(); track level.resourceId) {
+            <button
+              type="button"
+              class="level-btn"
+              [class.active]="selectedLevelId() === level.resourceId"
+              [class.encrypted]="level.encrypted"
+              (click)="selectLevel(level.resourceId)"
+              [title]="level.encrypted ? 'Encrypted pack (level 4+)' : ''"
+            >
+              {{ level.resourceId - 139 }}
+              @if (level.encrypted) { 🔒 }
+            </button>
+          }
+          @if (parsedLevels().length === 0) {
+            <span class="muted">No Pack #140-149 entries found.</span>
+          }
+        </div>
+
+        <!-- Editor section tabs -->
+        <div class="editor-section-tabs">
+          <button type="button" class="section-tab" [class.active]="editorSection() === 'properties'" (click)="setSection('properties')">⚙️ Properties</button>
+          <button type="button" class="section-tab" [class.active]="editorSection() === 'objects'"    (click)="setSection('objects')">📦 Objects</button>
+          <button type="button" class="section-tab" [class.active]="editorSection() === 'road'"       (click)="setSection('road')">🛣️ Road &amp; Tracks</button>
+          <button type="button" class="section-tab" [class.active]="editorSection() === 'sprites'"    (click)="setSection('sprites')">🎨 Sprites (PPic)</button>
+        </div>
+
+        <!-- ---- PROPERTIES SECTION ---- -->
+        @if (editorSection() === 'properties' && selectedLevel()) {
+          <div class="editor-panel">
+            @if (selectedLevel()!.encrypted) {
+              <div class="info-box info-box--warn">
+                🔒 This level pack is encrypted (Level {{ selectedLevel()!.resourceId - 139 }}).
+                The editor reads and can write it back using the known open-source registration key,
+                but changes require care – saving with incorrect encryption may cause the game to reject the pack.
+              </div>
+            }
+            <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Properties
+              <span class="badge">Pack ID {{ selectedLevel()!.resourceId }}</span>
+            </h3>
+
+            <div class="props-grid">
+              <div class="prop-group">
+                <label for="prop-roadinfo">Road Info (kPackRoad entry index)</label>
+                <input id="prop-roadinfo" type="number" [value]="editRoadInfo()"
+                  (input)="onPropsInput('roadInfo', $event)" />
+                <p class="field-hint">Index of the tRoadInfo entry in the Road pack (Pack #135). Controls friction, textures, borders, drift, sounds.</p>
+              </div>
+              <div class="prop-group">
+                <label for="prop-time">Time Limit</label>
+                <div class="time-input-dual">
+                  <div class="time-input-col">
+                    <input id="prop-time-seconds" type="number" min="0" [value]="editTimeSeconds()"
+                      (input)="onTimeSecondsInput($event)" />
+                    <span class="time-input-hint">seconds</span>
+                  </div>
+                  <span class="time-input-sep">/</span>
+                  <div class="time-input-col">
+                    <input id="prop-time" type="number" min="0" [value]="editTime()"
+                      (input)="onPropsInput('time', $event)" />
+                    <span class="time-input-hint">raw ×100</span>
+                  </div>
+                </div>
+                <p class="field-hint">Edit the timer in player-friendly seconds or the raw UInt16 value stored in the level pack.</p>
+              </div>
+              <div class="prop-group">
+                <label for="prop-xstart">Player Start X (SInt16, pixels)</label>
+                <input id="prop-xstart" type="number" [value]="editXStartPos()"
+                  (input)="onPropsInput('xStartPos', $event)" />
+                <p class="field-hint">Horizontal start position of the player car. Y is fixed at 500 by the runtime.</p>
+              </div>
+              <div class="prop-group">
+                <label for="prop-levelend">Level End Y (UInt16, pixels)</label>
+                <input id="prop-levelend" type="number" min="0" [value]="editLevelEnd()"
+                  (input)="onPropsInput('levelEnd', $event)" />
+                <p class="field-hint">The Y coordinate of the finish line. The player wins when they cross this Y threshold.</p>
+              </div>
+            </div>
+
+            <h4>Object Group References (10 slots)</h4>
+            <table class="data-table">
+              <thead>
+                <tr><th>#</th><th>resID (kPackOgrp entry)</th><th>numObjs</th></tr>
+              </thead>
+              <tbody>
+                @for (grp of selectedLevel()!.objectGroups; track $index) {
+                  <tr [class.inactive]="grp.resID === 0">
+                    <td>{{ $index }}</td>
+                    <td>{{ grp.resID }}</td>
+                    <td>{{ grp.numObjs }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+
+            <div class="save-row">
+              <button type="button" class="btn btn-primary" (click)="saveLevelProperties()" [disabled]="!propertiesDirty()">
+                💾 Save Properties to Pack
+              </button>
+              @if (!propertiesDirty()) {
+                <span class="muted">No unsaved changes.</span>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- ---- OBJECTS SECTION ---- -->
+        @if (editorSection() === 'objects' && selectedLevel()) {
+          <div class="editor-panel">
+            <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Object Placement
+              <span class="badge">{{ objects().length }} objects</span>
+            </h3>
+
+            <!-- Canvas toolbar -->
+            <div class="canvas-toolbar">
+              <span class="hint-text">🖱 Drag objects to move · Dbl-click canvas to add · Del removes · Ctrl/Cmd+D duplicates · road + AI track preview + decoded object sprites shown inline</span>
+              <div class="canvas-controls">
+                <button class="btn btn-sm" (click)="addObject()">+ Add Object</button>
+                <button class="btn btn-sm" (click)="duplicateSelectedObject()" [disabled]="selectedObjIndex() === null">📋 Duplicate</button>
+                <button class="btn btn-sm" (click)="removeSelectedObject()" [disabled]="selectedObjIndex() === null">🗑 Remove</button>
+                <button class="btn btn-sm" (click)="frameAllObjects()">🧭 Frame All</button>
+                <button class="btn btn-sm" (click)="centerOnSelectedObject()" [disabled]="selectedObjIndex() === null">🎯 Center Selected</button>
+                <button class="btn btn-sm" (click)="zoomIn()">🔍+</button>
+                <button class="btn btn-sm" (click)="zoomOut()">🔍-</button>
+                <button class="btn btn-sm" (click)="resetView()">⟲ Reset View</button>
+              </div>
+            </div>
+
+            <!-- Main layout: canvas left, form right -->
+            <div class="object-canvas-layout">
+              <div class="object-canvas-col">
+                <div class="subtle-section-title">Scene preview</div>
+                <canvas id="object-canvas" class="object-canvas" width="600" height="500"
+                  tabindex="0"
+                  (mousedown)="onCanvasMouseDown($event)"
+                  (mousemove)="onCanvasMouseMove($event)"
+                  (mouseup)="onCanvasMouseUp($event)"
+                  (dblclick)="onCanvasDoubleClick($event)"
+                  (keydown)="onCanvasKeyDown($event)"
+                  (wheel)="onCanvasWheel($event)"
+                  [style.cursor]="isDragging() ? 'grabbing' : 'crosshair'"
+                ></canvas>
+                <div class="canvas-zoom-label">Zoom: {{ (canvasZoom() * 100).toFixed(0) }}%</div>
+              </div>
+
+              <div class="object-form-col">
+                <div class="subtle-section-title">Inspector</div>
+                @if (selectedObjIndex() !== null) {
+                  <h4>Object #{{ selectedObjIndex() }}</h4>
+                  <div class="props-grid">
+                    <div class="prop-group">
+                      <label for="obj-x">X (pixels)</label>
+                      <input id="obj-x" type="number" [value]="editObjX()" (input)="onObjFieldInput('x', $event)" />
+                    </div>
+                    <div class="prop-group">
+                      <label for="obj-y">Y (pixels)</label>
+                      <input id="obj-y" type="number" [value]="editObjY()" (input)="onObjFieldInput('y', $event)" />
+                    </div>
+                    <div class="prop-group">
+                      <label for="obj-dir">Direction (rad)</label>
+                      <input id="obj-dir" type="number" step="0.1" [value]="editObjDir()" (input)="onObjFieldInput('dir', $event)" />
+                    </div>
+                    <div class="prop-group">
+                      <label for="obj-type">Type ID</label>
+                      <input id="obj-type" type="number" [value]="editObjTypeRes()" (input)="onObjFieldInput('typeRes', $event)" />
+                      <p class="field-hint">128 = player car. The object canvas uses the matching object-type sprite frame when one exists in the sprite packs.</p>
+                    </div>
+                  </div>
+                  <div class="type-visibility-filter">
+                    <div class="type-visibility-header">
+                      <span>Visible color groups</span>
+                      <div class="type-visibility-actions">
+                        <button type="button" class="btn btn-sm" (click)="showAllObjectTypes()">All</button>
+                        <button type="button" class="btn btn-sm" (click)="hideAllObjectTypes()">None</button>
+                      </div>
+                    </div>
+                    <div class="type-chip-list">
+                      @for (type of typePalette; track type.typeId) {
+                        <button type="button" class="type-chip"
+                          [class.type-chip--inactive]="!visibleTypeFilter().has(type.typeId)"
+                          (click)="toggleTypeVisibility(type.typeId)">
+                          <span class="type-chip-swatch" [style.background]="type.hex"></span>
+                          T{{ type.typeId }}
+                        </button>
+                      }
+                    </div>
+                    <p class="field-hint">Hide clutter on the canvas by color-group. Selected objects stay faintly visible even when filtered out.</p>
+                  </div>
+                  <div class="save-row">
+                    <button type="button" class="btn btn-primary" (click)="applyObjEdit()">Apply</button>
+                    <button type="button" class="btn btn-danger" (click)="removeSelectedObject()">Remove</button>
+                  </div>
+                } @else {
+                  <p class="muted">Click an object on the canvas to select it,<br>or double-click the canvas to add one.</p>
+                }
+
+                <!-- Object list panel -->
+                <div class="object-list-compact" style="margin-top:16px">
+                  <div class="object-list-header">
+                    <span>All objects</span>
+                    <span class="badge">{{ objects().length }}</span>
+                  </div>
+                  <div class="object-list">
+                    @for (obj of objects(); track $index) {
+                      <div class="object-item" [class.selected]="selectedObjIndex() === $index"
+                        (click)="selectObject($index)">
+                        <span class="obj-idx">#{{ $index }}</span>
+                        <span class="obj-type">T{{ obj.typeRes }}</span>
+                        <span class="obj-pos">({{ obj.x }},{{ obj.y }})</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="save-row" style="margin-top:12px">
+              <button class="btn btn-primary" (click)="saveLevelObjects()">💾 Save Objects to Pack</button>
+            </div>
+          </div>
+        }
+
+        <!-- ---- ROAD & TRACKS SECTION ---- -->
+        @if (editorSection() === 'road' && selectedLevel()) {
+          <div class="editor-panel">
+            <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Road &amp; Track Data</h3>
+
+            <div class="road-stats">
+              <div class="stat-card">
+                <div class="stat-value">{{ selectedLevel()!.trackUp.length }}</div>
+                <div class="stat-label">Track Up segments</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">{{ selectedLevel()!.trackDown.length }}</div>
+                <div class="stat-label">Track Down segments</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">{{ selectedLevel()!.roadSegCount }}</div>
+                <div class="stat-label">Road segments</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">{{ selectedLevel()!.marks.length }}</div>
+                <div class="stat-label">Mark segments</div>
+              </div>
+            </div>
+
+            <h4>Track Path Visualizer</h4>
+            <p class="field-hint">
+              Track segments define the AI/player path. Each segment is a point (x, y) with flags and velocity hint.
+              The up-track is for driving up-screen; down-track for driving down-screen.
+              Road segments (tRoadSeg = 4×SInt16) define the driveable surface geometry.
+            </p>
+            <canvas id="track-canvas" class="track-canvas" width="600" height="300"
+              [attr.title]="'Track Up (' + selectedLevel()!.trackUp.length + ' segs) + Track Down (' + selectedLevel()!.trackDown.length + ' segs)'">
+            </canvas>
+            <div class="track-legend">
+              <span class="legend-up">■ Track Up</span>
+              <span class="legend-down">■ Track Down</span>
+            </div>
+
+            <h4>Track Up segments <span class="badge">{{ selectedLevel()!.trackUp.length }}</span></h4>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>flags</th><th>x</th><th>y</th><th>velo</th></tr></thead>
+                <tbody>
+                  @for (seg of selectedLevel()!.trackUp.slice(0, 100); track $index) {
+                    <tr>
+                      <td>{{ $index }}</td>
+                      <td>0x{{ seg.flags.toString(16).padStart(4,'0') }}</td>
+                      <td>{{ seg.x }}</td>
+                      <td>{{ seg.y }}</td>
+                      <td>{{ seg.velo.toFixed(2) }}</td>
+                    </tr>
+                  }
+                  @if (selectedLevel()!.trackUp.length > 100) {
+                    <tr><td colspan="5" class="muted">… {{ selectedLevel()!.trackUp.length - 100 }} more rows</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <h4>Mark Segments (finish line / checkpoints) <span class="badge">{{ selectedLevel()!.marks.length }}</span></h4>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr></thead>
+                <tbody>
+                  @for (mark of selectedLevel()!.marks; track $index) {
+                    <tr>
+                      <td>{{ $index }}</td>
+                      <td>{{ mark.x1 }}</td><td>{{ mark.y1 }}</td>
+                      <td>{{ mark.x2 }}</td><td>{{ mark.y2 }}</td>
+                    </tr>
+                  }
+                  @if (selectedLevel()!.marks.length === 0) {
+                    <tr><td colspan="5" class="muted">No mark segments.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <h4>Road Segments (tRoadSeg = 4×SInt16) <span class="badge">{{ selectedLevel()!.roadSegs.slice(0,50).length }} shown of {{ selectedLevel()!.roadSegCount }}</span></h4>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>v0</th><th>v1</th><th>v2</th><th>v3</th></tr></thead>
+                <tbody>
+                  @for (seg of selectedLevel()!.roadSegs.slice(0, 50); track $index) {
+                    <tr>
+                      <td>{{ $index }}</td>
+                      <td>{{ seg.v0 }}</td><td>{{ seg.v1 }}</td>
+                      <td>{{ seg.v2 }}</td><td>{{ seg.v3 }}</td>
+                    </tr>
+                  }
+                  @if (selectedLevel()!.roadSegCount > 50) {
+                    <tr><td colspan="5" class="muted">… {{ selectedLevel()!.roadSegCount - 50 }} more segments</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <h4>✏️ Checkpoint / Mark Segment Editor <span class="badge">{{ marks().length }}</span></h4>
+            <p class="field-hint">Drag the endpoint dots on the canvas to reposition mark lines. Click a line to select it.</p>
+            <div class="mark-canvas-layout">
+              <canvas id="mark-canvas" class="mark-canvas" width="600" height="300"
+                (mousedown)="onMarkCanvasMouseDown($event)"
+                (mousemove)="onMarkCanvasMouseMove($event)"
+                (mouseup)="onMarkCanvasMouseUp($event)"
+              ></canvas>
+              <div class="mark-controls">
+                <button class="btn btn-sm" (click)="addMark()">+ Add Mark</button>
+                <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex() === null" (click)="removeSelectedMark()">Remove</button>
+                <button class="btn btn-primary" (click)="saveMarks()">💾 Save Marks</button>
+              </div>
+            </div>
+            @if (selectedMarkIndex() !== null) {
+              <div class="mark-form props-grid" style="margin-top:8px">
+                <div class="prop-group"><label>P1 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x1', $event)" /></div>
+                <div class="prop-group"><label>P1 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y1', $event)" /></div>
+                <div class="prop-group"><label>P2 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x2', $event)" /></div>
+                <div class="prop-group"><label>P2 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y2', $event)" /></div>
+              </div>
+            }
+          </div>
+        }
+        @if (editorSection() === 'sprites') {
+          <div class="editor-panel">
+            <h3>Sprite / PPic Asset Editor</h3>
+            <p class="field-hint">
+              PPic resources are raw sprite data referenced by the sprite pipeline.
+              Use the hex viewer to inspect bytes and the patch tool to modify individual bytes.
+              Changes are incorporated when you download the edited resources.dat.
+            </p>
+
+            @if (spriteAssets().length === 0) {
+              <p class="muted">No PPic resources found in the loaded file.</p>
+            } @else {
+              <div class="sprite-layout">
+                <div class="sprite-list-col">
+                  <h4>Assets</h4>
+                  <div class="sprite-list">
+                    @for (asset of spriteAssets(); track asset.id) {
+                      <div
+                        class="sprite-item"
+                        [class.selected]="selectedSpriteId() === asset.id"
+                        (click)="selectSprite(asset.id)"
+                      >
+                        <span class="sprite-id">PPic #{{ asset.id }}</span>
+                        <span class="sprite-size">{{ asset.size }} B</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <div class="sprite-editor-col">
+                  @if (selectedSpriteId() !== null) {
+                    <div class="hex-viewer">
+                      <div class="hex-nav">
+                        <button type="button" class="btn btn-sm" (click)="prevSpritePage()" [disabled]="spriteHexPage() === 0">‹ Prev</button>
+                        <span>Page {{ spriteHexPage() + 1 }} / {{ spriteMaxPage() + 1 }} (256 bytes/page)</span>
+                        <button type="button" class="btn btn-sm" (click)="nextSpritePage()" [disabled]="spriteHexPage() >= spriteMaxPage()">Next ›</button>
+                      </div>
+                      <div class="hex-table-wrapper">
+                        <table class="hex-table">
+                          <thead>
+                            <tr>
+                              <th class="hex-addr">Addr</th>
+                              @for (col of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]; track col) {
+                                <th class="hex-byte">{{ col.toString(16).padStart(2,'0') }}</th>
+                              }
+                              <th class="hex-ascii">ASCII</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (row of spriteHexRows(); track row.addr) {
+                              <tr>
+                                <td class="hex-addr">{{ row.addr }}</td>
+                                @for (cell of row.hex; track $index) {
+                                  <td class="hex-byte" [class.hex-byte--empty]="cell === '  '">{{ cell }}</td>
+                                }
+                                <td class="hex-ascii">{{ row.ascii }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div class="sprite-preview-section">
+                      <h4>Pixel Preview</h4>
+                      <p class="field-hint">The raw bytes interpreted as a 16-column indexed-color bitmap (values 0–255 mapped to a grayscale palette).</p>
+                      <canvas id="sprite-pixel-canvas" class="sprite-pixel-canvas" width="256" height="256"></canvas>
+                    </div>
+
+                    <div class="sprite-patch">
+                      <h4>Byte Patch</h4>
+                      <div class="props-grid">
+                        <div class="prop-group">
+                          <label for="sprite-offset">Byte offset (decimal)</label>
+                          <input id="sprite-offset" type="number" min="0"
+                            [value]="spriteByteOffset()" (input)="onSpriteOffsetInput($event)" />
+                        </div>
+                        <div class="prop-group">
+                          <label for="sprite-value">New byte value (0–255)</label>
+                          <input id="sprite-value" type="number" min="0" max="255"
+                            [value]="spriteByteValue()" (input)="onSpriteValueInput($event)" />
+                        </div>
+                      </div>
+                      <button type="button" class="btn btn-primary" (click)="applySpriteByteEdit()">
+                        Apply Byte Patch
+                      </button>
+                    </div>
+                  } @else {
+                    <p class="muted">Select an asset to inspect and edit.</p>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+    </section>
+  }
+</main>

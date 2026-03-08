@@ -38,6 +38,10 @@ yarn-error.log
 testem.log
 /typings
 __screenshots__/
+/public/resources.dat
+/public/reckless_drivin.js
+/public/reckless_drivin.wasm
+/public/reckless_drivin.data
 
 # System files
 .DS_Store

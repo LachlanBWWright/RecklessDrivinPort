@@ -143,19 +143,19 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: port/angular-site/package-lock.json
+          cache-dependency-path: angular-site/package-lock.json
 
       - name: Install Angular dependencies
-        run: npm ci --prefix port/angular-site
+        run: npm ci --prefix angular-site
 
       - name: Build Angular site
         env:
           NG_CLI_ANALYTICS: "disable"
         run: |
-          cd port/angular-site
+          cd angular-site
           # ensure analytics prompt doesn't block in CI
           npx ng analytics disable || true
-          npx ng build --configuration=production --base-href=/RecklessDrivinPort/
+          npx ng build --configuration=production
           echo "Angular build output:"
           ls -lh dist/reckless-drivin/browser/
 
@@ -189,7 +189,7 @@ jobs:
           cp build_wasm/reckless_drivin.wasm gh-pages/
           cp build_wasm/reckless_drivin.data gh-pages/
           # Copy Angular pre-built static files (output directory from ng build)
-          ANGULAR_DIST="port/angular-site/dist/reckless-drivin/browser"
+          ANGULAR_DIST="angular-site/dist/reckless-drivin/browser"
           if [ -d "$ANGULAR_DIST" ]; then
             cp -r "$ANGULAR_DIST"/. gh-pages/
             echo "Deployed Angular site from $ANGULAR_DIST"
