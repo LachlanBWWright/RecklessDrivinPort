@@ -94,7 +94,12 @@ export function lzrw3aDecompress(src: Uint8Array): Uint8Array {
     for (let u = 0; u < unroll && pSrc < srcLen; u++) {
       if (control & 1) {
         // ---- Copy item ----
-        if (pSrc + 1 >= srcLen) break;
+        if (pSrc + 1 >= srcLen) {
+          // Incomplete copy item at end of stream: advance past end to
+          // terminate the outer while loop and avoid an infinite loop.
+          pSrc = srcLen;
+          break;
+        }
         const lenmt_raw = src[pSrc++];
         const byte2 = src[pSrc++];
         const index = ((lenmt_raw & 0xf0) << 4) | byte2;

@@ -440,6 +440,51 @@ export class LevelEditorService {
       ?? this.decodeSpriteFromPack(resources, SPRITE_PACK_8_ID, frameId);
   }
 
+  /**
+   * Decode multiple sprite frames in one pass, parsing each sprite pack only once.
+   *
+   * This is significantly faster than calling `decodeSpriteFrame` in a loop,
+   * because each pack handle (LZRW3-A compressed) is decompressed only once
+   * regardless of how many frames need to be decoded from it.
+   */
+  batchDecodeSpriteFrames(
+    resources: ResourceDatEntry[],
+    frameIds: number[],
+  ): Map<number, DecodedSpriteFrame> {
+    const result = new Map<number, DecodedSpriteFrame>();
+    if (frameIds.length === 0) return result;
+
+    // Parse each sprite pack exactly once.
+    const getPackEntries = (packId: number): Map<number, Uint8Array> => {
+      const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+      if (!pack) return new Map();
+      try {
+        const entries = parsePackHandle(pack.data, pack.id);
+        return new Map(entries.map((e) => [e.id, e.data]));
+      } catch {
+        return new Map();
+      }
+    };
+
+    const pack16 = getPackEntries(SPRITE_PACK_16_ID);
+    const pack8  = getPackEntries(SPRITE_PACK_8_ID);
+
+    for (const frameId of frameIds) {
+      if (result.has(frameId)) continue;
+      const data16 = pack16.get(frameId);
+      if (data16 && data16.length >= SPRITE_HEADER_SIZE) {
+        const decoded = this.decode16BitSprite(data16, frameId);
+        if (decoded) { result.set(frameId, decoded); continue; }
+      }
+      const data8 = pack8.get(frameId);
+      if (data8 && data8.length >= SPRITE_HEADER_SIZE) {
+        const decoded = this.decode8BitSprite(data8, frameId);
+        if (decoded) { result.set(frameId, decoded); }
+      }
+    }
+    return result;
+  }
+
   applySpriteByte(
     resources: ResourceDatEntry[],
     spriteId: number,

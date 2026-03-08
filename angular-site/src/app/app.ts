@@ -173,6 +173,8 @@ export class App implements OnInit, OnDestroy {
   private packWorker: Worker | null = null;
   private pendingCallbacks = new Map<number, (resp: WorkerResponse) => void>();
   private nextMsgId = 0;
+  /** Bumped whenever sprite previews are updated; canvas effects depend on this. */
+  spritePreviewsVersion = signal(0);
 
   constructor() {
     // Redraw track canvas whenever the selected level or section changes.
@@ -184,7 +186,7 @@ export class App implements OnInit, OnDestroy {
       }
     });
 
-    // Redraw object canvas when objects, selection, zoom or pan changes.
+    // Redraw object canvas when objects, selection, zoom, pan, or sprite previews change.
     effect(() => {
       this.objects();
       this.selectedObjIndex();
@@ -192,6 +194,7 @@ export class App implements OnInit, OnDestroy {
       this.canvasPanX();
       this.canvasPanY();
       this.visibleTypeFilter();
+      this.spritePreviewsVersion();
       const section = this.editorSection();
       if (section === 'objects') {
         scheduleAfterRender(() => this.redrawObjectCanvas());
@@ -1066,23 +1069,17 @@ export class App implements OnInit, OnDestroy {
         levels: ParsedLevel[];
         sprites: EditableSpriteAsset[];
         objectTypesArr: [number, ObjectTypeDefinition][];
-        decodedSprites: { typeRes: number; pixels: ArrayBuffer; width: number; height: number }[];
       };
       const result = await this.dispatchWorker<LoadResult>('LOAD', buffer, [buffer]);
 
       // Rebuild object type definitions map
       this.objectTypeDefinitions.clear();
       for (const [typeRes, def] of result.objectTypesArr) {
-        if (def) this.objectTypeDefinitions.set(typeRes, def as ObjectTypeDefinition);
+        if (def) this.objectTypeDefinitions.set(typeRes, def);
       }
 
-      // Rebuild sprite previews from pre-decoded pixel data sent by the worker
+      // Clear previews — fresh ones will arrive shortly from DECODE_SPRITE_PREVIEWS
       this.objectSpritePreviews.clear();
-      for (const { typeRes, pixels, width, height } of result.decodedSprites) {
-        const clamped = new Uint8ClampedArray(pixels);
-        const canvas = this.renderSpritePixels(clamped, width, height);
-        this.objectSpritePreviews.set(typeRes, canvas);
-      }
 
       this.parsedLevels.set(result.levels);
       this.spriteAssets.set(result.sprites);
@@ -1101,14 +1098,38 @@ export class App implements OnInit, OnDestroy {
         this.selectedLevelId.set(null);
       }
       if (result.sprites.length > 0 && this.selectedSpriteId() === null) {
-        // Don't await – just trigger the fetch in the background
         void this.selectSprite(result.sprites[0].id);
       }
+
+      // Kick off sprite pre-decoding in the background so the editor
+      // is usable immediately while previews are being decoded.
+      void this.decodeSpritePreviewsInBackground(result.objectTypesArr);
     } catch (error) {
       this.editorError.set(error instanceof Error ? error.message : 'Failed to parse resources');
       this.resourcesStatus.set('Failed to parse resources.');
     } finally {
       this.workerBusy.set(false);
+    }
+  }
+
+  /** Ask the worker to decode sprite previews and populate the preview cache. */
+  private async decodeSpritePreviewsInBackground(
+    objectTypesArr: [number, ObjectTypeDefinition][],
+  ): Promise<void> {
+    try {
+      type DecodeResult = {
+        decodedSprites: { typeRes: number; pixels: ArrayBuffer; width: number; height: number }[];
+      };
+      const result = await this.dispatchWorker<DecodeResult>('DECODE_SPRITE_PREVIEWS', { objectTypesArr });
+      for (const { typeRes, pixels, width, height } of result.decodedSprites) {
+        const clamped = new Uint8ClampedArray(pixels);
+        const canvas = this.renderSpritePixels(clamped, width, height);
+        this.objectSpritePreviews.set(typeRes, canvas);
+      }
+      // Bump the version signal so the object canvas redraws with sprite previews.
+      this.spritePreviewsVersion.update((v) => v + 1);
+    } catch {
+      // Non-fatal: sprites just show as colored circles.
     }
   }
 
