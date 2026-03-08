@@ -138,6 +138,7 @@ function writeBigFloat32(view: DataView, offset: number, value: number): void {
   view.setFloat32(offset, value, false);
 }
 
+/** Convert a packed big-endian RGB565 pixel into 8-bit RGBA for canvas previews. */
 function rgb565ToRgba(value: number): [number, number, number, number] {
   const r = ((value >> 11) & 0x1f) * 255 / 31;
   const g = ((value >> 5) & 0x3f) * 255 / 63;
@@ -145,6 +146,7 @@ function rgb565ToRgba(value: number): [number, number, number, number] {
   return [Math.round(r), Math.round(g), Math.round(b), 255];
 }
 
+/** Approximate the legacy 8-bit indexed sprite format as 3:3:2 RGB for previews. */
 function indexed8ToRgba(value: number): [number, number, number, number] {
   const r = ((value >> 5) & 0x07) * 255 / 7;
   const g = ((value >> 2) & 0x07) * 255 / 7;

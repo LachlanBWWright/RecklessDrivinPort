@@ -36,7 +36,7 @@ function hexToBytes(value: string): Uint8Array {
 }
 
 function decodeResourceType(rawTypeBytes: Uint8Array): string {
-  return String.fromCharCode(...Array.from(rawTypeBytes.slice(0, 4))).replace(/\0+$/g, '');
+  return String.fromCharCode(...rawTypeBytes.slice(0, 4)).replace(/\0+$/g, '');
 }
 
 function encodeResourceType(type: string): string {
