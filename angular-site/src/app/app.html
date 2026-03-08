@@ -105,6 +105,7 @@
         <div class="no-data-hint">
           <p>Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
           <p class="muted">The editor decompresses and parses all LZRW3-A compressed level packs in-browser, without any server-side processing.</p>
+          <p class="muted">If you are on the Angular dev server, run <code>cd angular-site &amp;&amp; npm start</code> again first — it now syncs <code>port/resources/resources.dat</code> automatically before launch.</p>
         </div>
       }
 
@@ -226,7 +227,7 @@
 
             <!-- Canvas toolbar -->
             <div class="canvas-toolbar">
-              <span class="hint-text">🖱 Drag objects to move · Dbl-click canvas to add · Del to remove selected · Ctrl/Cmd+D duplicates</span>
+              <span class="hint-text">🖱 Drag objects to move · Dbl-click canvas to add · Del removes · Ctrl/Cmd+D duplicates · road + AI track preview + decoded object sprites shown inline</span>
               <div class="canvas-controls">
                 <button class="btn btn-sm" (click)="addObject()">+ Add Object</button>
                 <button class="btn btn-sm" (click)="duplicateSelectedObject()" [disabled]="selectedObjIndex() === null">📋 Duplicate</button>
@@ -242,6 +243,7 @@
             <!-- Main layout: canvas left, form right -->
             <div class="object-canvas-layout">
               <div class="object-canvas-col">
+                <div class="subtle-section-title">Scene preview</div>
                 <canvas id="object-canvas" class="object-canvas" width="600" height="500"
                   tabindex="0"
                   (mousedown)="onCanvasMouseDown($event)"
@@ -256,6 +258,7 @@
               </div>
 
               <div class="object-form-col">
+                <div class="subtle-section-title">Inspector</div>
                 @if (selectedObjIndex() !== null) {
                   <h4>Object #{{ selectedObjIndex() }}</h4>
                   <div class="props-grid">
@@ -274,7 +277,7 @@
                     <div class="prop-group">
                       <label for="obj-type">Type ID</label>
                       <input id="obj-type" type="number" [value]="editObjTypeRes()" (input)="onObjFieldInput('typeRes', $event)" />
-                      <p class="field-hint">128 = player car. See kPackObTy entries.</p>
+                      <p class="field-hint">128 = player car. The object canvas uses the matching object-type sprite frame when one exists in the sprite packs.</p>
                     </div>
                   </div>
                   <div class="type-visibility-filter">

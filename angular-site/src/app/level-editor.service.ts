@@ -92,6 +92,22 @@ export interface EditableSpriteAsset {
   size: number;
 }
 
+export interface ObjectTypeDefinition {
+  typeRes: number;
+  frame: number;
+  numFrames: number;
+  width: number;
+  length: number;
+}
+
+export interface DecodedSpriteFrame {
+  frameId: number;
+  width: number;
+  height: number;
+  pixels: Uint8ClampedArray;
+  bitDepth: 8 | 16;
+}
+
 // ------------------------------------------------------------------
 // Constants
 // ------------------------------------------------------------------
@@ -104,6 +120,11 @@ const OBJECT_POS_SIZE   = 16;  // sizeof(tObjectPos)
 const ROAD_SEG_SIZE     = 8;   // 4 × SInt16
 const MARK_SEG_SIZE     = 16;  // 2 × t2DPoint (SInt32 x + SInt32 y)
 const T2D_POINT_SIZE    = 8;   // SInt32 x + SInt32 y
+const OBJECT_TYPE_SIZE  = 64;  // sizeof(tObjectType)
+const OBJECT_TYPES_PACK_ID = 128;
+const SPRITE_PACK_8_ID = 129;
+const SPRITE_PACK_16_ID = 137;
+const SPRITE_HEADER_SIZE = 8;
 
 // ------------------------------------------------------------------
 // Helpers
@@ -115,6 +136,20 @@ function readBigFloat32(view: DataView, offset: number): number {
 
 function writeBigFloat32(view: DataView, offset: number, value: number): void {
   view.setFloat32(offset, value, false);
+}
+
+function rgb565ToRgba(value: number): [number, number, number, number] {
+  const r = ((value >> 11) & 0x1f) * 255 / 31;
+  const g = ((value >> 5) & 0x3f) * 255 / 63;
+  const b = (value & 0x1f) * 255 / 31;
+  return [Math.round(r), Math.round(g), Math.round(b), 255];
+}
+
+function indexed8ToRgba(value: number): [number, number, number, number] {
+  const r = ((value >> 5) & 0x07) * 255 / 7;
+  const g = ((value >> 2) & 0x07) * 255 / 7;
+  const b = (value & 0x03) * 255 / 3;
+  return [Math.round(r), Math.round(g), Math.round(b), 255];
 }
 
 // ------------------------------------------------------------------
@@ -375,6 +410,34 @@ export class LevelEditorService {
       .sort((a, b) => a.id - b.id);
   }
 
+  extractObjectTypeDefinitions(resources: ResourceDatEntry[]): Map<number, ObjectTypeDefinition> {
+    const pack = resources.find((e) => e.type === 'Pack' && e.id === OBJECT_TYPES_PACK_ID);
+    const defs = new Map<number, ObjectTypeDefinition>();
+    if (!pack) return defs;
+    try {
+      const entries = parsePackHandle(pack.data, pack.id);
+      for (const entry of entries) {
+        if (entry.data.length < OBJECT_TYPE_SIZE) continue;
+        const view = new DataView(entry.data.buffer, entry.data.byteOffset, entry.data.byteLength);
+        defs.set(entry.id, {
+          typeRes: entry.id,
+          frame: view.getInt16(20, false),
+          numFrames: view.getUint16(22, false),
+          width: view.getFloat32(40, false),
+          length: view.getFloat32(44, false),
+        });
+      }
+    } catch (err) {
+      console.warn('[LevelEditor] failed to parse object types:', err);
+    }
+    return defs;
+  }
+
+  decodeSpriteFrame(resources: ResourceDatEntry[], frameId: number): DecodedSpriteFrame | null {
+    return this.decodeSpriteFromPack(resources, SPRITE_PACK_16_ID, frameId)
+      ?? this.decodeSpriteFromPack(resources, SPRITE_PACK_8_ID, frameId);
+  }
+
   applySpriteByte(
     resources: ResourceDatEntry[],
     spriteId: number,
@@ -421,6 +484,83 @@ export class LevelEditorService {
     const tiles: number[] = [];
     for (let i = 0; i < 256; i++) tiles.push(i < data.length ? data[i] & 0x0f : 0);
     return tiles;
+  }
+
+  private decodeSpriteFromPack(
+    resources: ResourceDatEntry[],
+    packId: number,
+    frameId: number,
+  ): DecodedSpriteFrame | null {
+    const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+    if (!pack) return null;
+    try {
+      const entry = parsePackHandle(pack.data, pack.id).find((item) => item.id === frameId);
+      if (!entry || entry.data.length < SPRITE_HEADER_SIZE) return null;
+      return packId === SPRITE_PACK_16_ID
+        ? this.decode16BitSprite(entry.data, frameId)
+        : this.decode8BitSprite(entry.data, frameId);
+    } catch (err) {
+      console.warn(`[LevelEditor] failed to decode sprite frame ${frameId} from Pack #${packId}:`, err);
+      return null;
+    }
+  }
+
+  private decode8BitSprite(data: Uint8Array, frameId: number): DecodedSpriteFrame | null {
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const width = view.getUint16(0, false);
+    const height = view.getUint16(2, false);
+    const log2xSize = data[4];
+    const stride = 1 << log2xSize;
+    if (width <= 0 || height <= 0 || stride <= 0) return null;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const mask = data[SPRITE_HEADER_SIZE];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcOffset = SPRITE_HEADER_SIZE + y * stride + x;
+        if (srcOffset >= data.length) continue;
+        const value = data[srcOffset];
+        const dstOffset = (y * width + x) * 4;
+        if (value === mask) {
+          pixels[dstOffset + 3] = 0;
+          continue;
+        }
+        const [r, g, b, a] = indexed8ToRgba(value);
+        pixels[dstOffset] = r;
+        pixels[dstOffset + 1] = g;
+        pixels[dstOffset + 2] = b;
+        pixels[dstOffset + 3] = a;
+      }
+    }
+    return { frameId, width, height, pixels, bitDepth: 8 };
+  }
+
+  private decode16BitSprite(data: Uint8Array, frameId: number): DecodedSpriteFrame | null {
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const width = view.getUint16(0, false);
+    const height = view.getUint16(2, false);
+    const log2xSize = data[4];
+    const stride = 1 << log2xSize;
+    if (width <= 0 || height <= 0 || stride <= 0) return null;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const mask = view.getUint16(SPRITE_HEADER_SIZE, false);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
+        if (srcOffset + 1 >= data.length) continue;
+        const value = view.getUint16(srcOffset, false);
+        const dstOffset = (y * width + x) * 4;
+        if (value === mask) {
+          pixels[dstOffset + 3] = 0;
+          continue;
+        }
+        const [r, g, b, a] = rgb565ToRgba(value);
+        pixels[dstOffset] = r;
+        pixels[dstOffset + 1] = g;
+        pixels[dstOffset + 2] = b;
+        pixels[dstOffset + 3] = a;
+      }
+    }
+    return { frameId, width, height, pixels, bitDepth: 16 };
   }
 }
 

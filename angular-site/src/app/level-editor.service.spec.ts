@@ -6,6 +6,7 @@ import {
   serializeLevelObjects,
   serializeMarkSegs,
 } from './level-editor.service';
+import { encodePackHandle } from './pack-parser.service';
 
 function makeLevelEntry(overrides: Partial<{
   roadInfo: number;
@@ -193,6 +194,55 @@ describe('LevelEditorService', () => {
     expect(levels.length).toBe(2);
     expect(levels[0].resourceId).toBe(140);
     expect(levels[1].resourceId).toBe(141);
+  });
+
+  it('extractObjectTypeDefinitions reads object frame and size info from Pack #128', () => {
+    const objectType = new Uint8Array(64);
+    const view = new DataView(objectType.buffer);
+    view.setInt16(20, 321, false); // frame
+    view.setUint16(22, 4, false);  // numFrames
+    view.setFloat32(40, 36, false); // width
+    view.setFloat32(44, 52, false); // length
+
+    const resources = [{
+      type: 'Pack',
+      id: 128,
+      data: encodePackHandle([{ id: 150, data: objectType }], 128),
+    }];
+
+    const defs = svc.extractObjectTypeDefinitions(resources);
+    expect(defs.get(150)).toEqual({
+      typeRes: 150,
+      frame: 321,
+      numFrames: 4,
+      width: 36,
+      length: 52,
+    });
+  });
+
+  it('decodeSpriteFrame decodes 16-bit sprite pixels from Pack #137', () => {
+    const sprite = new Uint8Array(8 + 2 * 4);
+    const view = new DataView(sprite.buffer);
+    view.setUint16(0, 2, false); // width
+    view.setUint16(2, 2, false); // height
+    sprite[4] = 1; // log2xSize => stride 2
+    view.setUint16(8, 0x0000, false); // mask / transparent
+    view.setUint16(10, 0xf800, false); // red
+    view.setUint16(12, 0x07e0, false); // green
+    view.setUint16(14, 0x001f, false); // blue
+
+    const resources = [{
+      type: 'Pack',
+      id: 137,
+      data: encodePackHandle([{ id: 321, data: sprite }], 137),
+    }];
+
+    const decoded = svc.decodeSpriteFrame(resources, 321);
+    expect(decoded?.width).toBe(2);
+    expect(decoded?.height).toBe(2);
+    expect(decoded?.bitDepth).toBe(16);
+    expect(decoded?.pixels[3]).toBe(0);
+    expect(decoded?.pixels[4]).toBeGreaterThan(decoded?.pixels[6] ?? 0);
   });
 });
 

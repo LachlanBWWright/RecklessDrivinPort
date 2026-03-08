@@ -3,12 +3,17 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "sync:dev-assets": "node ../scripts/sync-angular-dev-assets.mjs",
     "start": "ng serve",
     "start:repo": "ng serve --serve-path /RecklessDrivinPort/",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
+  "prestart": "npm run sync:dev-assets",
+  "prestart:repo": "npm run sync:dev-assets",
+  "prebuild": "npm run sync:dev-assets",
+  "prewatch": "npm run sync:dev-assets",
   "private": true,
   "packageManager": "npm@11.9.0",
   "dependencies": {
@@ -26,6 +31,7 @@
     "@angular/build": "^21.2.0",
     "@angular/cli": "^21.2.0",
     "@angular/compiler-cli": "^21.2.0",
+    "@types/node": "^25.3.5",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2",

@@ -6,6 +6,8 @@ import {
   type ObjectPos,
   type EditableSpriteAsset,
   type MarkSeg,
+  type ObjectTypeDefinition,
+  type DecodedSpriteFrame,
 } from './level-editor.service';
 import { ResourceDatService, type ResourceDatEntry } from './resource-dat.service';
 
@@ -159,6 +161,8 @@ export class App implements OnInit, OnDestroy {
 
   private wasmScript: HTMLScriptElement | null = null;
   private resources: ResourceDatEntry[] = [];
+  private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
+  private objectSpritePreviews = new Map<number, HTMLCanvasElement | null>();
 
   private readonly resourceDatService = new ResourceDatService();
   private readonly levelEditorService = new LevelEditorService();
@@ -235,9 +239,7 @@ export class App implements OnInit, OnDestroy {
     try {
       this.editorError.set('');
       this.resourcesStatus.set('Loading default resources.dat…');
-      const response = await fetch(this.assetUrl('resources.dat'));
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const bytes = new Uint8Array(await response.arrayBuffer());
+      const bytes = await this.readAssetBytes('resources.dat');
       this.loadResourcesBytes(bytes, 'default resources.dat');
     } catch (error) {
       this.editorError.set(error instanceof Error ? error.message : 'Failed to load resources.dat');
@@ -599,13 +601,18 @@ export class App implements OnInit, OnDestroy {
     const objs = this.objects();
     const selIdx = this.selectedObjIndex();
     const visibleTypes = this.visibleTypeFilter();
+    const level = this.selectedLevel();
 
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#0d0d0d';
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, H);
+    bgGradient.addColorStop(0, '#16202d');
+    bgGradient.addColorStop(0.35, '#10151d');
+    bgGradient.addColorStop(1, '#090b0f');
+    ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, W, H);
 
     // Draw grid
-    ctx.strokeStyle = '#1e1e1e';
+    ctx.strokeStyle = '#111922';
     ctx.lineWidth = 1;
     const gridStep = 100; // world units
     const gridStepPx = gridStep * zoom;
@@ -632,9 +639,14 @@ export class App implements OnInit, OnDestroy {
       }
     }
 
+    if (level) {
+      this.drawObjectRoadPreview(ctx, level);
+      this.drawObjectTrackPreview(ctx, level);
+    }
+
     // Draw axes
     const [ox, oy] = this.worldToCanvas(0, 0);
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = '#243342';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, H); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(W, oy); ctx.stroke();
@@ -652,13 +664,30 @@ export class App implements OnInit, OnDestroy {
 
       ctx.globalAlpha = isFilteredOut ? 0.35 : 1.0;
       const color = OBJ_PALETTE[typeIdx];
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
-      ctx.fill();
+      const objectType = this.objectTypeDefinitions.get(obj.typeRes) ?? null;
+      const preview = this.getObjectSpritePreview(obj.typeRes);
+      const drawWidth = objectType ? Math.max(24, objectType.width * zoom * 0.45) : baseRadius * 3;
+      const drawHeight = objectType ? Math.max(24, objectType.length * zoom * 0.45) : baseRadius * 3;
+
+      if (preview) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(obj.dir);
+        ctx.drawImage(preview, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - drawWidth / 2, cy - drawHeight / 2, drawWidth, drawHeight);
 
       // Direction arrow
-      const arrowLen = baseRadius * 1.5;
+      const arrowLen = Math.max(baseRadius * 1.5, drawHeight * 0.55);
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -676,10 +705,10 @@ export class App implements OnInit, OnDestroy {
       }
 
       // Label when zoomed in enough
-      if (zoom > 0.5) {
+      if (zoom > 0.4 || i === selIdx) {
         ctx.fillStyle = '#fff';
         ctx.font = labelFont;
-        ctx.fillText(`#${i} T${obj.typeRes}`, cx + baseRadius + 2, cy + 4);
+        ctx.fillText(`#${i} T${obj.typeRes}`, cx + drawWidth / 2 + 4, cy + 4);
       }
       ctx.globalAlpha = 1.0;
     }
@@ -967,6 +996,8 @@ export class App implements OnInit, OnDestroy {
 
   private loadResourcesBytes(bytes: Uint8Array, sourceName: string): void {
     this.resources = this.resourceDatService.parse(bytes);
+    this.objectTypeDefinitions = this.levelEditorService.extractObjectTypeDefinitions(this.resources);
+    this.objectSpritePreviews.clear();
     this.resourcesStatus.set(`Loaded ${this.resources.length} resources from ${sourceName}.`);
     this.editorError.set('');
     this.hasEditorData.set(true);
@@ -1040,7 +1071,7 @@ export class App implements OnInit, OnDestroy {
     this.wasmScript.src = this.assetUrl('reckless_drivin.js');
     this.wasmScript.async = true;
     this.wasmScript.onerror = () => {
-      this.statusText.set('Error: failed to load reckless_drivin.js');
+      this.statusText.set('WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).');
       console.error('[Angular] Failed to load WASM JS module');
     };
     document.body.appendChild(this.wasmScript);
@@ -1048,6 +1079,26 @@ export class App implements OnInit, OnDestroy {
 
   private assetUrl(path: string): string {
     return new URL(path, document.baseURI).toString();
+  }
+
+  private async readAssetBytes(path: string): Promise<Uint8Array> {
+    const response = await fetch(this.assetUrl(path));
+    if (!response.ok) {
+      throw new Error(`Could not fetch ${path} (HTTP ${response.status}). Run \`npm start\` again so dev assets are synced.`);
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.includes('text/html') || this.looksLikeHtml(bytes)) {
+      throw new Error(
+        `${path} is not being served as a binary asset. Run \`cd angular-site && npm start\` again; it now auto-syncs default assets before launching the dev server.`,
+      );
+    }
+    return bytes;
+  }
+
+  private looksLikeHtml(bytes: Uint8Array): boolean {
+    const prefix = new TextDecoder().decode(bytes.slice(0, 32)).toLowerCase();
+    return prefix.includes('<!doctype html') || prefix.includes('<html');
   }
 
   private frameWorldRect(minX: number, maxX: number, minY: number, maxY: number): void {
@@ -1062,6 +1113,97 @@ export class App implements OnInit, OnDestroy {
     this.canvasZoom.set(zoom);
     this.canvasPanX.set((minX + maxX) / 2);
     this.canvasPanY.set((minY + maxY) / 2);
+  }
+
+  private drawObjectRoadPreview(ctx: CanvasRenderingContext2D, level: ParsedLevel): void {
+    if (level.roadSegs.length < 2) return;
+
+    const drawStrip = (
+      x0a: number, x1a: number, y0: number,
+      x0b: number, x1b: number, y1: number,
+      fill: string,
+    ): void => {
+      const [ax0, ay0] = this.worldToCanvas(x0a, y0);
+      const [ax1, ay1] = this.worldToCanvas(x1a, y0);
+      const [bx1, by1] = this.worldToCanvas(x1b, y1);
+      const [bx0, by0] = this.worldToCanvas(x0b, y1);
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.moveTo(ax0, ay0);
+      ctx.lineTo(ax1, ay1);
+      ctx.lineTo(bx1, by1);
+      ctx.lineTo(bx0, by0);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    for (let index = 0; index < level.roadSegs.length - 1; index++) {
+      const current = level.roadSegs[index];
+      const next = level.roadSegs[index + 1];
+      const y0 = index * 2;
+      const y1 = (index + 1) * 2;
+      drawStrip(current.v0, current.v1, y0, next.v0, next.v1, y1, 'rgba(72, 58, 38, 0.52)');
+      drawStrip(current.v1, current.v2, y0, next.v1, next.v2, y1, 'rgba(92, 98, 108, 0.76)');
+      drawStrip(current.v2, current.v3, y0, next.v2, next.v3, y1, 'rgba(72, 58, 38, 0.52)');
+    }
+
+    ctx.strokeStyle = 'rgba(255, 248, 196, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath();
+    for (let index = 0; index < level.roadSegs.length; index += 4) {
+      const seg = level.roadSegs[index];
+      const [cx, cy] = this.worldToCanvas((seg.v1 + seg.v2) / 2, index * 2);
+      if (index === 0) ctx.moveTo(cx, cy);
+      else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  private drawObjectTrackPreview(ctx: CanvasRenderingContext2D, level: ParsedLevel): void {
+    const drawPath = (segs: typeof level.trackUp, strokeStyle: string): void => {
+      if (segs.length === 0) return;
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      segs.forEach((seg, index) => {
+        const [cx, cy] = this.worldToCanvas(seg.x, seg.y);
+        if (index === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+      });
+      ctx.stroke();
+    };
+
+    drawPath(level.trackUp, 'rgba(66, 165, 245, 0.9)');
+    drawPath(level.trackDown, 'rgba(239, 83, 80, 0.75)');
+  }
+
+  private getObjectSpritePreview(typeRes: number): HTMLCanvasElement | null {
+    if (this.objectSpritePreviews.has(typeRes)) {
+      return this.objectSpritePreviews.get(typeRes) ?? null;
+    }
+    const objectType = this.objectTypeDefinitions.get(typeRes);
+    if (!objectType) {
+      this.objectSpritePreviews.set(typeRes, null);
+      return null;
+    }
+    const decoded = this.levelEditorService.decodeSpriteFrame(this.resources, objectType.frame);
+    const preview = decoded ? this.renderSpritePreview(decoded) : null;
+    this.objectSpritePreviews.set(typeRes, preview);
+    return preview;
+  }
+
+  private renderSpritePreview(sprite: DecodedSpriteFrame): HTMLCanvasElement | null {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = sprite.width;
+    canvas.height = sprite.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const imageData = new ImageData(new Uint8ClampedArray(sprite.pixels), sprite.width, sprite.height);
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
   }
 
   private applyVolumeToWasm(pct: number): void {
