@@ -159,6 +159,11 @@ int DrawComplCount()
 	if(gFinishDelay>=kStartBonusDelay+countTime+kCloseDelay)
 	{
 		gPlayerScore=gNoBonusScore+bonus*gPlayerBonus;
+		/* Stop any lingering one-shot or looping channels before tearing down
+		 * the level.  PauseGame() already does this, and matching that pattern
+		 * prevents sounds from leaking into the next level if a channel is still
+		 * active during the transition. */
+		BeQuiet();
 		DisposeLevel();
 		gLevelID++;
 		return LoadLevel();
