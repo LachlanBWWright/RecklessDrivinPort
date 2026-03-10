@@ -29,12 +29,6 @@ const OBJ_PALETTE = [
 
 /** typeRes value that identifies the player car object. */
 const PLAYER_CAR_TYPE_RES = 128;
-/** Road kerb stripe segment interval (kerb colour changes every this many segs × 2 units = 40 world units). */
-const KERB_STRIPE_SEGMENT_INTERVAL = 20;
-/** Road surface texture strip segment interval (alternates every this many segs × 2 units = 400 world units). */
-const ROAD_TEXTURE_SEGMENT_INTERVAL = 200;
-/** Max road segments to draw per call in the track canvas (performance limit). */
-const MAX_ROAD_SEGMENTS_DRAW = 400;
 
 /**
  * Per-level road colour themes derived from the actual game texture pack (kPackTx16, ID 136).
@@ -488,7 +482,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   /** Valid field names: 'x' | 'y' | 'dir' | 'typeRes' */
-  onObjFieldInput(field: string, event: Event): void {
+  onObjFieldInput(field: 'x' | 'y' | 'dir' | 'typeRes', event: Event): void {
     const val = parseFloat((event.target as HTMLInputElement).value);
     if (Number.isNaN(val)) return;
     switch (field) {
@@ -988,7 +982,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   /** Valid field names: 'x1' | 'y1' | 'x2' | 'y2' */
-  onMarkFieldInput(markIdx: number, field: string, event: Event): void {
+  onMarkFieldInput(markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event): void {
     const val = Number.parseInt((event.target as HTMLInputElement).value, 10);
     if (Number.isNaN(val)) return;
     const ms = [...this.marks()];

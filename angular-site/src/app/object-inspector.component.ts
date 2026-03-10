@@ -17,7 +17,7 @@ export class ObjectInspectorComponent {
   @Input() workerBusy = false;
   @Input() typeDimLabel = '';
 
-  @Output() fieldInput = new EventEmitter<{field: string, event: Event}>();
+  @Output() fieldInput = new EventEmitter<{field: 'x' | 'y' | 'dir' | 'typeRes', event: Event}>();
   @Output() typeVisibilityToggle = new EventEmitter<number>();
   @Output() showAll = new EventEmitter<void>();
   @Output() hideAll = new EventEmitter<void>();

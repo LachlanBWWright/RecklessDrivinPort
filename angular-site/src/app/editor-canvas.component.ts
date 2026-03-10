@@ -41,5 +41,5 @@ export class EditorCanvasComponent {
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();
   @Output() saveMarks = new EventEmitter<void>();
-  @Output() markFieldInput = new EventEmitter<{idx: number, field: string, event: Event}>();
+  @Output() markFieldInput = new EventEmitter<{idx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event}>();
 }
