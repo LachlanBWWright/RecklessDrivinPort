@@ -1,0 +1,58 @@
+<div class="subtle-section-title">Inspector</div>
+@if (selectedIndex !== null) {
+  <div class="obj-inspector-header">
+    @if (spriteUrl; as url) {
+      <img [src]="url" class="obj-inspector-sprite" alt="sprite preview" />
+    }
+    <h4 style="margin:0">Object #{{ selectedIndex }}</h4>
+  </div>
+  <div class="props-grid">
+    <div class="prop-group">
+      <label for="obj-x">X (pixels)</label>
+      <input id="obj-x" type="number" [value]="editX" (input)="fieldInput.emit({field: 'x', event: $event})" />
+    </div>
+    <div class="prop-group">
+      <label for="obj-y">Y (pixels)</label>
+      <input id="obj-y" type="number" [value]="editY" (input)="fieldInput.emit({field: 'y', event: $event})" />
+    </div>
+    <div class="prop-group">
+      <label for="obj-dir">Direction (rad)</label>
+      <input id="obj-dir" type="number" step="0.1" [value]="editDir" (input)="fieldInput.emit({field: 'dir', event: $event})" />
+    </div>
+    <div class="prop-group">
+      <label for="obj-type">Type ID</label>
+      <input id="obj-type" type="number" [value]="editTypeRes" (input)="fieldInput.emit({field: 'typeRes', event: $event})" />
+      <p class="field-hint">
+        128 = player car.
+        @if (typeDimLabel; as dim) {
+          <span class="type-dim-badge">{{ dim }}</span>
+        }
+      </p>
+    </div>
+  </div>
+  <div class="type-visibility-filter">
+    <div class="type-visibility-header">
+      <span>Visible color groups</span>
+      <div class="type-visibility-actions">
+        <button type="button" class="btn btn-sm" (click)="showAll.emit()">All</button>
+        <button type="button" class="btn btn-sm" (click)="hideAll.emit()">None</button>
+      </div>
+    </div>
+    <div class="type-chip-list">
+      @for (type of typePalette; track type.typeId) {
+        <button type="button" class="type-chip"
+          [class.type-chip--inactive]="!visibleTypeFilter.has(type.typeId)"
+          (click)="typeVisibilityToggle.emit(type.typeId)">
+          <span class="type-chip-swatch" [style.background]="type.hex"></span>
+          T{{ type.typeId }}
+        </button>
+      }
+    </div>
+  </div>
+  <div class="save-row">
+    <button type="button" class="btn btn-danger" (click)="removeSelected.emit()">🗑 Remove</button>
+    <span class="field-hint auto-apply-note">Changes apply automatically.</span>
+  </div>
+} @else {
+  <p class="muted">Click an object on the canvas to select it,<br>or double-click the canvas to add one.<br>Drag track waypoints (coloured dots) to reposition them.</p>
+}

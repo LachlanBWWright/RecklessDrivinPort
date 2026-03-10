@@ -1,0 +1,89 @@
+<!-- Canvas toolbar -->
+<div class="canvas-toolbar">
+  <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate">
+    🖱 Drag objects or track waypoints · Dbl-click to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> duplicates
+  </span>
+  <div class="canvas-controls">
+    <button class="btn btn-sm" (click)="addObject.emit()">+ Add Object</button>
+    <button class="btn btn-sm" (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null">📋 Duplicate</button>
+    <button class="btn btn-sm" (click)="removeObject.emit()" [disabled]="selectedObjIndex === null">🗑 Remove</button>
+    <button class="btn btn-sm" (click)="frameAll.emit()">🧭 Frame All</button>
+    <button class="btn btn-sm" (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null">🎯 Center</button>
+    <button class="btn btn-sm" [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()">
+      🛣 {{ showTrackOverlay ? 'Hide' : 'Show' }} Tracks
+    </button>
+    <button class="btn btn-sm" (click)="zoomIn.emit()">🔍+</button>
+    <button class="btn btn-sm" (click)="zoomOut.emit()">🔍-</button>
+    <button class="btn btn-sm" (click)="resetView.emit()">⟲ Reset</button>
+  </div>
+</div>
+
+<div class="object-canvas-col">
+  <div class="subtle-section-title">Scene preview – drag objects &amp; track waypoints (blue/red dots)</div>
+  <canvas id="object-canvas" class="object-canvas" width="640" height="540"
+    tabindex="0"
+    (mousedown)="canvasMouseDown.emit($event)"
+    (mousemove)="canvasMouseMove.emit($event)"
+    (mouseup)="canvasMouseUp.emit($event)"
+    (dblclick)="canvasDblClick.emit($event)"
+    (keydown)="canvasKeyDown.emit($event)"
+    (wheel)="canvasWheel.emit($event)"
+    [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : 'crosshair'"
+  ></canvas>
+  <div class="canvas-zoom-label">Zoom: {{ (zoom * 100).toFixed(0) }}%
+    &nbsp;·&nbsp; <span style="color:#42a5f5">■ Up track</span>
+    &nbsp; <span style="color:#ef5350">■ Down track</span>
+    &nbsp; <span style="color:#ffeb3b">■ Marks</span>
+  </div>
+
+  <!-- Marks editor panel, inline below canvas -->
+  <details class="marks-details" style="margin-top:8px">
+    <summary>✏️ Checkpoint / Mark Segments <span class="badge">{{ marks.length }}</span></summary>
+    <div class="mark-editor-inline">
+      <div class="mark-controls">
+        <button class="btn btn-sm" (click)="addMark.emit()" [disabled]="workerBusy">+ Add Mark</button>
+        <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex === null || workerBusy" (click)="removeMark.emit()">Remove</button>
+        <button class="btn btn-primary btn-sm" (click)="saveMarks.emit()" [disabled]="workerBusy">
+          @if (workerBusy) { <span class="btn-spinner"></span> } 💾 Save Marks
+        </button>
+      </div>
+      @if (selectedMarkIndex !== null) {
+        <div class="mark-form props-grid" style="margin-top:6px">
+          <div class="prop-group"><label>P1 X</label><input type="number" [value]="marks[selectedMarkIndex!].x1" (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x1', event: $event})" /></div>
+          <div class="prop-group"><label>P1 Y</label><input type="number" [value]="marks[selectedMarkIndex!].y1" (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y1', event: $event})" /></div>
+          <div class="prop-group"><label>P2 X</label><input type="number" [value]="marks[selectedMarkIndex!].x2" (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x2', event: $event})" /></div>
+          <div class="prop-group"><label>P2 Y</label><input type="number" [value]="marks[selectedMarkIndex!].y2" (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y2', event: $event})" /></div>
+        </div>
+      }
+      <div class="table-scroll" style="max-height:120px;margin-top:6px">
+        <table class="data-table">
+          <thead><tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr></thead>
+          <tbody>
+            @for (mark of marks; track $index) {
+              <tr [class.selected]="selectedMarkIndex === $index" (click)="markSelected.emit($index)" style="cursor:pointer">
+                <td>{{ $index }}</td>
+                <td>{{ mark.x1 }}</td><td>{{ mark.y1 }}</td>
+                <td>{{ mark.x2 }}</td><td>{{ mark.y2 }}</td>
+              </tr>
+            }
+            @if (marks.length === 0) {
+              <tr><td colspan="5" class="muted">No mark segments.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+  <!-- Road stats inline -->
+  <details class="road-details" style="margin-top:8px">
+    <summary>🛣️ Road &amp; Track Data</summary>
+    <div class="road-stats" style="margin-top:8px">
+      <div class="stat-card"><div class="stat-value">{{ trackUpCount }}</div><div class="stat-label">Track Up segs</div></div>
+      <div class="stat-card"><div class="stat-value">{{ trackDownCount }}</div><div class="stat-label">Track Down segs</div></div>
+      <div class="stat-card"><div class="stat-value">{{ roadSegCount }}</div><div class="stat-label">Road segments</div></div>
+      <div class="stat-card"><div class="stat-value">{{ marks.length }}</div><div class="stat-label">Mark segments</div></div>
+    </div>
+    <p class="field-hint" style="margin-top:4px">Track waypoints shown as blue (up) and red (down) dots. Drag them to reposition.</p>
+  </details>
+</div>

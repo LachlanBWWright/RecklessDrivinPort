@@ -6,6 +6,7 @@ import type {
   EditableSpriteAsset,
   MarkSeg,
   ObjectTypeDefinition,
+  RoadInfoData,
 } from './level-editor.service';
 
 /** Worker response envelope sent from pack.worker.ts */
@@ -109,6 +110,8 @@ function scheduleAfterRender(callback: () => void): void {
 })
 export class App implements OnInit, OnDestroy {
   readonly typePalette = OBJ_PALETTE.map((hex, index) => ({ hex, typeId: index }));
+  readonly getSpritePreviewDataUrlBound = this.getSpritePreviewDataUrl.bind(this);
+  readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
 
   // ---- Navigation ----
   activeTab = signal<AppTab>('game');
@@ -243,6 +246,13 @@ export class App implements OnInit, OnDestroy {
   private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
   private objectSpritePreviews = new Map<number, HTMLCanvasElement | null>();
 
+  /** Decoded road info from kPackRoad: roadInfoId → texture IDs + flags. */
+  private roadInfoDataMap = new Map<number, RoadInfoData>();
+  /** Decoded texture canvases from kPackTx16: texId → HTMLCanvasElement. */
+  private roadTextureCanvases = new Map<number, HTMLCanvasElement>();
+  /** Version signal bumped when road textures are loaded (triggers canvas redraw). */
+  roadTexturesVersion = signal(0);
+
   // ---- Pack Worker ----
   private packWorker: Worker | null = null;
   private pendingCallbacks = new Map<number, (resp: WorkerResponse) => void>();
@@ -260,6 +270,7 @@ export class App implements OnInit, OnDestroy {
       this.canvasPanY();
       this.visibleTypeFilter();
       this.spritePreviewsVersion();
+      this.roadTexturesVersion();
       this.showTrackOverlay();
       this.editTrackUp();
       this.editTrackDown();
@@ -379,6 +390,35 @@ export class App implements OnInit, OnDestroy {
       this.editTrackUp.set(level.trackUp.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })));
       this.editTrackDown.set(level.trackDown.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })));
       this.dragTrackWaypoint.set(null);
+      // Set a smart default zoom/pan so the road appears at correct game proportions.
+      this.resetViewToRoad(level);
+    }
+  }
+
+  /**
+   * Set zoom and pan so the road fills the canvas width at ~1:1 game scale.
+   * World X range of road segs → determines zoom; Y=0 (start) near top of canvas.
+   */
+  private resetViewToRoad(level: ParsedLevel): void {
+    const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+    const W = canvas?.width ?? 640;
+    const H = canvas?.height ?? 540;
+    if (level.roadSegs.length > 0) {
+      const minX = Math.min(...level.roadSegs.slice(0, 100).map((s) => s.v0));
+      const maxX = Math.max(...level.roadSegs.slice(0, 100).map((s) => s.v3));
+      const roadW = Math.max(50, maxX - minX);
+      // Fill ~85 % of canvas width with the road
+      const zoom = Math.min(4.0, Math.max(0.25, (W * 0.85) / roadW));
+      this.canvasZoom.set(zoom);
+      // Centre the road horizontally
+      this.canvasPanX.set((minX + maxX) / 2);
+      // Show the first ~400 world units of road (start near top of canvas)
+      const visibleH = H / zoom;
+      this.canvasPanY.set(visibleH * 0.15);
+    } else {
+      this.canvasZoom.set(1.5);
+      this.canvasPanX.set(0);
+      this.canvasPanY.set(0);
     }
   }
 
@@ -447,7 +487,7 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  onObjFieldInput(field: keyof ObjectPos, event: Event): void {
+  onObjFieldInput(field: string, event: Event): void {
     const val = parseFloat((event.target as HTMLInputElement).value);
     if (Number.isNaN(val)) return;
     switch (field) {
@@ -715,9 +755,14 @@ export class App implements OnInit, OnDestroy {
   }
 
   resetView(): void {
-    this.canvasZoom.set(1.0);
-    this.canvasPanX.set(0);
-    this.canvasPanY.set(0);
+    const level = this.selectedLevel();
+    if (level) {
+      this.resetViewToRoad(level);
+    } else {
+      this.canvasZoom.set(1.5);
+      this.canvasPanX.set(0);
+      this.canvasPanY.set(0);
+    }
   }
 
   frameAllObjects(): void {
@@ -941,7 +986,7 @@ export class App implements OnInit, OnDestroy {
     this.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
   }
 
-  onMarkFieldInput(markIdx: number, field: keyof MarkSeg, event: Event): void {
+  onMarkFieldInput(markIdx: number, field: string, event: Event): void {
     const val = Number.parseInt((event.target as HTMLInputElement).value, 10);
     if (Number.isNaN(val)) return;
     const ms = [...this.marks()];
@@ -1270,6 +1315,8 @@ export class App implements OnInit, OnDestroy {
       // Kick off sprite pre-decoding in the background so the editor
       // is usable immediately while previews are being decoded.
       void this.decodeSpritePreviewsInBackground(result.objectTypesArr);
+      // Kick off road texture decoding in the background.
+      void this.decodeRoadTexturesInBackground();
     } catch (error) {
       this.editorError.set(error instanceof Error ? error.message : 'Failed to parse resources');
       this.resourcesStatus.set('Failed to parse resources.');
@@ -1296,6 +1343,44 @@ export class App implements OnInit, OnDestroy {
       this.spritePreviewsVersion.update((v) => v + 1);
     } catch {
       // Non-fatal: sprites just show as colored circles.
+    }
+  }
+
+  /**
+   * Ask the worker to decode road textures from kPackTx16 and store them as
+   * OffscreenCanvas / HTMLCanvasElement entries for use as CanvasPattern fills.
+   */
+  private async decodeRoadTexturesInBackground(): Promise<void> {
+    try {
+      type RoadTexResult = {
+        roadInfoArr: [number, RoadInfoData][];
+        textures: { texId: number; width: number; height: number; pixels: ArrayBuffer }[];
+      };
+      const result = await this.dispatchWorker<RoadTexResult>('DECODE_ROAD_TEXTURES');
+
+      // Rebuild road info map
+      this.roadInfoDataMap.clear();
+      for (const [id, ri] of result.roadInfoArr) {
+        this.roadInfoDataMap.set(id, ri);
+      }
+
+      // Build one HTMLCanvasElement per texture (for createPattern use)
+      for (const { texId, width, height, pixels } of result.textures) {
+        const clamped = new Uint8ClampedArray(pixels);
+        const tc = document.createElement('canvas');
+        tc.width = width;
+        tc.height = height;
+        const tctx = tc.getContext('2d');
+        if (tctx) {
+          const imgData = new ImageData(clamped, width, height);
+          tctx.putImageData(imgData, 0, 0);
+        }
+        this.roadTextureCanvases.set(texId, tc);
+      }
+      // Bump version to trigger canvas redraw with real textures
+      this.roadTexturesVersion.update((v) => v + 1);
+    } catch {
+      // Non-fatal: road falls back to flat colours.
     }
   }
 
@@ -1467,36 +1552,65 @@ export class App implements OnInit, OnDestroy {
 
     const W = (ctx.canvas as HTMLCanvasElement).width;
     const H = (ctx.canvas as HTMLCanvasElement).height;
+    const zoom  = this.canvasZoom();
+    const panX  = this.canvasPanX();
+    const panY  = this.canvasPanY();
 
-    // Use per-level colours sourced from actual game texture (kPackTx16) dominant colours.
-    const GRASS_COLOUR   = theme.bg;
-    const DIRT_COLOUR    = theme.dirt;
-    const ASPHALT_COLOUR = theme.road;
-    const KERB_A_COLOUR  = theme.kerbA;
-    const KERB_B_COLOUR  = theme.kerbB;
-    // Centre line: yellow for asphalt roads, white for snow/ice, cyan for water
-    const CENTRE_COLOUR  = theme.water ? 'rgba(80, 255, 180, 0.85)' : 'rgba(255, 248, 140, 0.85)';
+    // Look up the road info for this level to get real texture IDs.
+    const roadInfo  = level.properties.roadInfo;
+    const ri        = this.roadInfoDataMap.get(roadInfo);
+    const KERB_WIDTH = 14; // world units
 
-    const KERB_WIDTH = 14; // world units wide per kerb stripe
+    /**
+     * Create a tiled CanvasPattern from a decoded texture canvas, aligned to world space.
+     * texWorldSize: world units per tile (128 for main textures, 16 for border textures)
+     */
+    const makePattern = (texId: number, texWorldSize: number): CanvasPattern | string | null => {
+      const tc = this.roadTextureCanvases.get(texId);
+      if (!tc) return null;
+      try {
+        const pat = ctx.createPattern(tc, 'repeat');
+        if (!pat) return null;
+        // Scale: one world unit = (zoom) canvas pixels
+        // Texture tile is texWorldSize world units → texCanvas.width pixels
+        // Scale factor = zoom * texCanvas.width / texWorldSize (but txCanvas is already texWorldSize px)
+        const scale = zoom;
+        // Translate so tile origin lines up with world (0,0) which is at canvas (W/2 - panX*zoom, H/2 - panY*zoom)
+        const tileW = tc.width * zoom;
+        const tileH = tc.height * zoom;
+        const tx = ((W / 2 - panX * zoom) % tileW + tileW) % tileW;
+        const ty = ((H / 2 - panY * zoom) % tileH + tileH) % tileH;
+        // DOMMatrix: [a, b, c, d, e, f] = [scaleX, 0, 0, scaleY, translateX, translateY]
+        pat.setTransform(new DOMMatrix([scale, 0, 0, scale, tx - tileW, ty - tileH]));
+        return pat;
+      } catch {
+        return null;
+      }
+    };
 
-    /** Fill a screen-space quadrilateral given four world-space corners */
+    // Obtain patterns (fall back to theme colours if textures not yet loaded)
+    const bgPat   = ri ? (makePattern(ri.backgroundTex, 128)  ?? theme.bg)   : theme.bg;
+    const fgPat   = ri ? (makePattern(ri.foregroundTex, 128)  ?? theme.road)  : theme.road;
+    const lbPat   = ri ? (makePattern(ri.roadLeftBorder, 16)  ?? theme.kerbA) : theme.kerbA;
+    const rbPat   = ri ? (makePattern(ri.roadRightBorder, 16) ?? theme.kerbB) : theme.kerbB;
+    // Centre line: cyan for water, yellow for asphalt
+    const CENTRE_COLOUR = theme.water ? 'rgba(80, 255, 180, 0.85)' : 'rgba(255, 248, 140, 0.85)';
+
+    /** Fill a screen-space quad given four world-space corners */
     const fillQuad = (
       x0: number, y0: number,
       x1: number, y1: number,
       x2: number, y2: number,
       x3: number, y3: number,
-      fill: string,
+      fill: CanvasPattern | string,
     ): void => {
       const [ax0, ay0] = this.worldToCanvas(x0, y0);
       const [ax1, ay1] = this.worldToCanvas(x1, y1);
       const [ax2, ay2] = this.worldToCanvas(x2, y2);
       const [ax3, ay3] = this.worldToCanvas(x3, y3);
-      // Quick frustum-cull: skip if all 4 corners are fully off-screen.
-      // The bottom threshold uses H * 2 to avoid popping artefacts with tall quads
-      // (road segments near the viewport edge can be very tall when zoomed in).
       if (ay0 < -H && ay1 < -H && ay2 < -H && ay3 < -H) return;
       if (ay0 > H * 2 && ay1 > H * 2 && ay2 > H * 2 && ay3 > H * 2) return;
-      ctx.fillStyle = fill;
+      ctx.fillStyle = fill as string; // CanvasPattern is assignable here
       ctx.beginPath();
       ctx.moveTo(ax0, ay0);
       ctx.lineTo(ax1, ay1);
@@ -1506,43 +1620,37 @@ export class App implements OnInit, OnDestroy {
       ctx.fill();
     };
 
-    // Draw every adjacent segment pair (step=1 gives the most accurate road edge path).
+    // Draw road geometry using actual textures
     const step = 1;
     for (let index = 0; index < level.roadSegs.length - step; index += step) {
-      const cur  = level.roadSegs[index];
-      const nxt  = level.roadSegs[index + step];
-      const y0   = index * 2;
-      const y1   = (index + step) * 2;
+      const cur = level.roadSegs[index];
+      const nxt = level.roadSegs[index + step];
+      const y0  = index * 2;
+      const y1  = (index + step) * 2;
 
-      // -- Grass far left (off-road left) --
-      fillQuad(-1500, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  -1500, y1,  GRASS_COLOUR);
+      // Off-road (background texture)
+      fillQuad(-1500, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  -1500, y1,  bgPat ?? theme.bg);
 
-      // -- Left kerb stripe (alternating red/white every ~40 world units) --
-      const kerbPhase = Math.floor(index / KERB_STRIPE_SEGMENT_INTERVAL) % 2;
-      const kerbColour = kerbPhase === 0 ? KERB_A_COLOUR : KERB_B_COLOUR;
-      fillQuad(cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1,  kerbColour);
+      // Left border/kerb
+      fillQuad(cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1,  lbPat ?? theme.kerbA);
 
-      // -- Dirt shoulder left (v0 to v1) --
-      fillQuad(cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1,  DIRT_COLOUR);
+      // Dirt shoulder left (v0 to v1)
+      fillQuad(cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1,  bgPat ?? theme.bg);
 
-      // -- Road surface (v1 to v2) --
-      // Subtle alternating strip every 400 units to give the road texture sense
-      const stripPhase = Math.floor(index / ROAD_TEXTURE_SEGMENT_INTERVAL) % 2;
-      const roadColour = stripPhase === 0 ? ASPHALT_COLOUR : '#505050';
-      fillQuad(cur.v1, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v1, y1,  roadColour);
+      // Road surface (v1 to v2)
+      fillQuad(cur.v1, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v1, y1,  fgPat ?? theme.road);
 
-      // -- Dirt shoulder right (v2 to v3) --
-      fillQuad(cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1,  DIRT_COLOUR);
+      // Dirt shoulder right (v2 to v3)
+      fillQuad(cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1,  bgPat ?? theme.bg);
 
-      // -- Right kerb stripe (mirrored phase) --
-      const kerbRColour = kerbPhase === 0 ? KERB_B_COLOUR : KERB_A_COLOUR;
-      fillQuad(cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1,  kerbRColour);
+      // Right border/kerb
+      fillQuad(cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1,  rbPat ?? theme.kerbB);
 
-      // -- Grass far right --
-      fillQuad(cur.v3 + KERB_WIDTH, y0,  1500, y0,  1500, y1,  nxt.v3 + KERB_WIDTH, y1,  GRASS_COLOUR);
+      // Off-road far right
+      fillQuad(cur.v3 + KERB_WIDTH, y0,  1500, y0,  1500, y1,  nxt.v3 + KERB_WIDTH, y1,  bgPat ?? theme.bg);
     }
 
-    // -- Centre dashed line (between two lanes: midpoint of v1→v2) --
+    // Centre dashed line (between lanes: midpoint of v1→v2)
     ctx.strokeStyle = CENTRE_COLOUR;
     ctx.lineWidth = Math.max(1, 1.5);
     ctx.setLineDash([12, 10]);
@@ -1558,7 +1666,7 @@ export class App implements OnInit, OnDestroy {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // -- Finish line: checkerboard band at levelEnd Y --
+    // Finish line: checkerboard band at levelEnd Y
     const levelEnd = level.properties.levelEnd;
     if (levelEnd > 0 && level.roadSegs.length > 0) {
       const endSegIdx = Math.min(Math.floor(levelEnd / 2), level.roadSegs.length - 1);
@@ -1579,15 +1687,14 @@ export class App implements OnInit, OnDestroy {
       }
     }
 
-    // -- Y-axis ruler tick marks (every 1000 world units) for distance reference --
+    // Y-axis ruler tick marks (every 1000 world units)
     const canvasEl = ctx.canvas as HTMLCanvasElement;
-    const canvasW = canvasEl.width;
-    const canvasH = canvasEl.height;
-    const panYVal = this.canvasPanY();
+    const canvasW  = canvasEl.width;
+    const canvasH  = canvasEl.height;
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = '9px monospace';
-    const startY = Math.floor((panYVal - canvasH / (2 * this.canvasZoom())) / 1000) * 1000;
-    const endY   = panYVal + canvasH / (2 * this.canvasZoom());
+    const startY = Math.floor((panY - canvasH / (2 * zoom)) / 1000) * 1000;
+    const endY   = panY + canvasH / (2 * zoom);
     for (let wy = startY; wy <= endY; wy += 1000) {
       const [, tickY] = this.worldToCanvas(0, wy);
       if (tickY < 0 || tickY > canvasH) continue;

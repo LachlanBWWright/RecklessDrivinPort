@@ -25,7 +25,7 @@
 import { ResourceDatService } from './resource-dat.service';
 import { LevelEditorService } from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
-import type { LevelProperties, ObjectPos, MarkSeg, ObjectTypeDefinition } from './level-editor.service';
+import type { LevelProperties, ObjectPos, MarkSeg, ObjectTypeDefinition, DecodedRoadTexture } from './level-editor.service';
 
 const resourceDatSvc = new ResourceDatService();
 const levelEditorSvc = new LevelEditorService();
@@ -99,6 +99,30 @@ self.addEventListener('message', (event: MessageEvent) => {
         const decodedSprites = decodeAllSpritePreviews(objectTypesArr);
         const transferables: ArrayBuffer[] = decodedSprites.map((s) => s.pixels);
         self.postMessage({ id, ok: true, cmd, result: { decodedSprites } }, transferables);
+        break;
+      }
+
+      case 'DECODE_ROAD_TEXTURES': {
+        // Parse kPackRoad to get texture IDs used by each roadInfo.
+        const roadInfoMap = levelEditorSvc.extractRoadInfos(resources);
+        // Collect unique texture IDs needed across all roadInfo entries.
+        const neededTexIds = new Set<number>();
+        for (const ri of roadInfoMap.values()) {
+          neededTexIds.add(ri.backgroundTex);
+          neededTexIds.add(ri.foregroundTex);
+          neededTexIds.add(ri.roadLeftBorder);
+          neededTexIds.add(ri.roadRightBorder);
+        }
+        const textures: DecodedRoadTexture[] = levelEditorSvc.extractRoadTextures(
+          resources,
+          [...neededTexIds],
+        );
+        // Transfer pixel ArrayBuffers to avoid copying.
+        const transferables2: ArrayBuffer[] = textures.map((t) => t.pixels);
+        self.postMessage(
+          { id, ok: true, cmd, result: { roadInfoArr: [...roadInfoMap.entries()], textures } },
+          transferables2,
+        );
         break;
       }
 

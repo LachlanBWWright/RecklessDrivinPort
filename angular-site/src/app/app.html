@@ -240,197 +240,73 @@
               <span class="badge" style="background:#ef5350;margin-left:4px">{{ selectedLevel()!.trackDown.length }} down</span>
             </h3>
 
-            <!-- Canvas toolbar -->
-            <div class="canvas-toolbar">
-              <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate">
-                🖱 Drag objects or track waypoints · Dbl-click to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> duplicates
-              </span>
-              <div class="canvas-controls">
-                <button class="btn btn-sm" (click)="addObject()">+ Add Object</button>
-                <button class="btn btn-sm" (click)="duplicateSelectedObject()" [disabled]="selectedObjIndex() === null">📋 Duplicate</button>
-                <button class="btn btn-sm" (click)="removeSelectedObject()" [disabled]="selectedObjIndex() === null">🗑 Remove</button>
-                <button class="btn btn-sm" (click)="frameAllObjects()">🧭 Frame All</button>
-                <button class="btn btn-sm" (click)="centerOnSelectedObject()" [disabled]="selectedObjIndex() === null">🎯 Center</button>
-                <button class="btn btn-sm" [class.btn-active]="showTrackOverlay()" (click)="showTrackOverlay.set(!showTrackOverlay())">
-                  🛣 {{ showTrackOverlay() ? 'Hide' : 'Show' }} Tracks
-                </button>
-                <button class="btn btn-sm" (click)="zoomIn()">🔍+</button>
-                <button class="btn btn-sm" (click)="zoomOut()">🔍-</button>
-                <button class="btn btn-sm" (click)="resetView()">⟲ Reset</button>
-              </div>
-            </div>
-
-            <!-- Main layout: canvas left, form right -->
             <div class="object-canvas-layout">
-              <div class="object-canvas-col">
-                <div class="subtle-section-title">Scene preview – drag objects &amp; track waypoints (blue/red dots)</div>
-                <canvas id="object-canvas" class="object-canvas" width="640" height="540"
-                  tabindex="0"
-                  (mousedown)="onCanvasMouseDown($event)"
-                  (mousemove)="onCanvasMouseMove($event)"
-                  (mouseup)="onCanvasMouseUp($event)"
-                  (dblclick)="onCanvasDoubleClick($event)"
-                  (keydown)="onCanvasKeyDown($event)"
-                  (wheel)="onCanvasWheel($event)"
-                  [style.cursor]="isDragging() || dragTrackWaypoint() ? 'grabbing' : 'crosshair'"
-                ></canvas>
-                <div class="canvas-zoom-label">Zoom: {{ (canvasZoom() * 100).toFixed(0) }}%
-                  &nbsp;·&nbsp; <span style="color:#42a5f5">■ Up track</span>
-                  &nbsp; <span style="color:#ef5350">■ Down track</span>
-                  &nbsp; <span style="color:#ffeb3b">■ Marks</span>
-                </div>
-
-                <!-- Marks editor panel, inline below canvas -->
-                <details class="marks-details" style="margin-top:8px">
-                  <summary>✏️ Checkpoint / Mark Segments <span class="badge">{{ marks().length }}</span></summary>
-                  <div class="mark-editor-inline">
-                    <div class="mark-controls">
-                      <button class="btn btn-sm" (click)="addMark()" [disabled]="workerBusy()">+ Add Mark</button>
-                      <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex() === null || workerBusy()" (click)="removeSelectedMark()">Remove</button>
-                      <button class="btn btn-primary btn-sm" (click)="saveMarks()" [disabled]="workerBusy()">
-                        @if (workerBusy()) { <span class="btn-spinner"></span> } 💾 Save Marks
-                      </button>
-                    </div>
-                    @if (selectedMarkIndex() !== null) {
-                      <div class="mark-form props-grid" style="margin-top:6px">
-                        <div class="prop-group"><label>P1 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x1', $event)" /></div>
-                        <div class="prop-group"><label>P1 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y1', $event)" /></div>
-                        <div class="prop-group"><label>P2 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x2', $event)" /></div>
-                        <div class="prop-group"><label>P2 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y2', $event)" /></div>
-                      </div>
-                    }
-                    <div class="table-scroll" style="max-height:120px;margin-top:6px">
-                      <table class="data-table">
-                        <thead><tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr></thead>
-                        <tbody>
-                          @for (mark of marks(); track $index) {
-                            <tr [class.selected]="selectedMarkIndex() === $index" (click)="selectedMarkIndex.set($index)" style="cursor:pointer">
-                              <td>{{ $index }}</td>
-                              <td>{{ mark.x1 }}</td><td>{{ mark.y1 }}</td>
-                              <td>{{ mark.x2 }}</td><td>{{ mark.y2 }}</td>
-                            </tr>
-                          }
-                          @if (marks().length === 0) {
-                            <tr><td colspan="5" class="muted">No mark segments.</td></tr>
-                          }
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </details>
-
-                <!-- Road stats inline -->
-                <details class="road-details" style="margin-top:8px">
-                  <summary>🛣️ Road &amp; Track Data</summary>
-                  <div class="road-stats" style="margin-top:8px">
-                    <div class="stat-card"><div class="stat-value">{{ selectedLevel()!.trackUp.length }}</div><div class="stat-label">Track Up segs</div></div>
-                    <div class="stat-card"><div class="stat-value">{{ selectedLevel()!.trackDown.length }}</div><div class="stat-label">Track Down segs</div></div>
-                    <div class="stat-card"><div class="stat-value">{{ selectedLevel()!.roadSegCount }}</div><div class="stat-label">Road segments</div></div>
-                    <div class="stat-card"><div class="stat-value">{{ marks().length }}</div><div class="stat-label">Mark segments</div></div>
-                  </div>
-                  <p class="field-hint" style="margin-top:4px">Track waypoints shown as blue (up) and red (down) dots. Drag them to reposition.</p>
-                </details>
-              </div>
+              <app-editor-canvas
+                [objects]="objects()"
+                [selectedObjIndex]="selectedObjIndex()"
+                [marks]="marks()"
+                [selectedMarkIndex]="selectedMarkIndex()"
+                [showTrackOverlay]="showTrackOverlay()"
+                [trackUpCount]="selectedLevel()!.trackUp.length"
+                [trackDownCount]="selectedLevel()!.trackDown.length"
+                [roadSegCount]="selectedLevel()!.roadSegCount"
+                [zoom]="canvasZoom()"
+                [levelNum]="selectedLevel()!.resourceId - 139"
+                [workerBusy]="workerBusy()"
+                [isDragging]="isDragging()"
+                [dragTrackWaypoint]="dragTrackWaypoint()"
+                (canvasMouseDown)="onCanvasMouseDown($event)"
+                (canvasMouseMove)="onCanvasMouseMove($event)"
+                (canvasMouseUp)="onCanvasMouseUp($event)"
+                (canvasDblClick)="onCanvasDoubleClick($event)"
+                (canvasKeyDown)="onCanvasKeyDown($event)"
+                (canvasWheel)="onCanvasWheel($event)"
+                (addObject)="addObject()"
+                (removeObject)="removeSelectedObject()"
+                (duplicateObject)="duplicateSelectedObject()"
+                (frameAll)="frameAllObjects()"
+                (centerSelected)="centerOnSelectedObject()"
+                (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
+                (zoomIn)="zoomIn()"
+                (zoomOut)="zoomOut()"
+                (resetView)="resetView()"
+                (markSelected)="selectedMarkIndex.set($event)"
+                (addMark)="addMark()"
+                (removeMark)="removeSelectedMark()"
+                (saveMarks)="saveMarks()"
+                (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
+              ></app-editor-canvas>
 
               <div class="object-form-col">
-                <div class="subtle-section-title">Inspector</div>
-                @if (selectedObjIndex() !== null) {
-                  <div class="obj-inspector-header">
-                    @if (getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes); as url) {
-                      <img [src]="url" class="obj-inspector-sprite" alt="sprite preview" />
-                    }
-                    <h4 style="margin:0">Object #{{ selectedObjIndex() }}</h4>
-                  </div>
-                  <div class="props-grid">
-                    <div class="prop-group">
-                      <label for="obj-x">X (pixels)</label>
-                      <input id="obj-x" type="number" [value]="editObjX()" (input)="onObjFieldInput('x', $event)" />
-                    </div>
-                    <div class="prop-group">
-                      <label for="obj-y">Y (pixels)</label>
-                      <input id="obj-y" type="number" [value]="editObjY()" (input)="onObjFieldInput('y', $event)" />
-                    </div>
-                    <div class="prop-group">
-                      <label for="obj-dir">Direction (rad)</label>
-                      <input id="obj-dir" type="number" step="0.1" [value]="editObjDir()" (input)="onObjFieldInput('dir', $event)" />
-                    </div>
-                    <div class="prop-group">
-                      <label for="obj-type">Type ID</label>
-                      <input id="obj-type" type="number" [value]="editObjTypeRes()" (input)="onObjFieldInput('typeRes', $event)" />
-                      <p class="field-hint">
-                        128 = player car.
-                        @if (getObjTypeDimensionLabel(editObjTypeRes()); as dim) {
-                          <span class="type-dim-badge">{{ dim }}</span>
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  <div class="type-visibility-filter">
-                    <div class="type-visibility-header">
-                      <span>Visible color groups</span>
-                      <div class="type-visibility-actions">
-                        <button type="button" class="btn btn-sm" (click)="showAllObjectTypes()">All</button>
-                        <button type="button" class="btn btn-sm" (click)="hideAllObjectTypes()">None</button>
-                      </div>
-                    </div>
-                    <div class="type-chip-list">
-                      @for (type of typePalette; track type.typeId) {
-                        <button type="button" class="type-chip"
-                          [class.type-chip--inactive]="!visibleTypeFilter().has(type.typeId)"
-                          (click)="toggleTypeVisibility(type.typeId)">
-                          <span class="type-chip-swatch" [style.background]="type.hex"></span>
-                          T{{ type.typeId }}
-                        </button>
-                      }
-                    </div>
-                  </div>
-                  <div class="save-row">
-                    <button type="button" class="btn btn-danger" (click)="removeSelectedObject()">🗑 Remove</button>
-                    <span class="field-hint auto-apply-note">Changes apply automatically.</span>
-                  </div>
-                } @else {
-                  <p class="muted">Click an object on the canvas to select it,<br>or double-click the canvas to add one.<br>Drag track waypoints (coloured dots) to reposition them.</p>
-                }
+                <app-object-inspector
+                  [selectedIndex]="selectedObjIndex()"
+                  [editX]="editObjX()"
+                  [editY]="editObjY()"
+                  [editDir]="editObjDir()"
+                  [editTypeRes]="editObjTypeRes()"
+                  [spriteUrl]="selectedObjIndex() !== null ? getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes) : null"
+                  [typePalette]="typePalette"
+                  [visibleTypeFilter]="visibleTypeFilter()"
+                  [workerBusy]="workerBusy()"
+                  [typeDimLabel]="getObjTypeDimensionLabel(editObjTypeRes())"
+                  (fieldInput)="onObjFieldInput($event.field, $event.event)"
+                  (typeVisibilityToggle)="toggleTypeVisibility($event)"
+                  (showAll)="showAllObjectTypes()"
+                  (hideAll)="hideAllObjectTypes()"
+                  (removeSelected)="removeSelectedObject()"
+                ></app-object-inspector>
 
-                <!-- Object list panel with sprite thumbnails -->
-                <div class="object-list-compact" style="margin-top:12px">
-                  <div class="object-list-header">
-                    <span>All objects</span>
-                    <span class="badge">{{ filteredObjectIndices().length }} / {{ objects().length }}</span>
-                  </div>
-                  <input
-                    type="search"
-                    class="object-search-input"
-                    placeholder="Filter by #index or Ttype…"
-                    [value]="objectSearchTerm()"
-                    (input)="objectSearchTerm.set($any($event.target).value)"
-                    aria-label="Filter objects"
-                  />
-                  <div class="object-list">
-                    @for (idx of filteredObjectIndices(); track idx) {
-                      <div class="object-item" [class.selected]="selectedObjIndex() === idx"
-                        (click)="selectObject(idx, true)"
-                        [title]="'Object #' + idx + ' · TypeRes ' + objects()[idx].typeRes + ' · (' + objects()[idx].x + ', ' + objects()[idx].y + ')'">
-                        <span class="obj-sprite-thumb">
-                          @if (getSpritePreviewDataUrl(objects()[idx].typeRes); as url) {
-                            <img [src]="url" class="obj-list-sprite" alt="" />
-                          } @else {
-                            <span class="obj-list-sprite-fallback"
-                              [style.background]="getObjFallbackColor(objects()[idx].typeRes)">
-                              T
-                            </span>
-                          }
-                        </span>
-                        <span class="obj-idx">#{{ idx }}</span>
-                        <span class="obj-type">T{{ objects()[idx].typeRes }}</span>
-                        <span class="obj-pos">({{ objects()[idx].x }},{{ objects()[idx].y }})</span>
-                      </div>
-                    }
-                    @if (filteredObjectIndices().length === 0 && objectSearchTerm()) {
-                      <p class="muted" style="padding:8px 4px;font-size:0.75rem">No objects match "{{ objectSearchTerm() }}".</p>
-                    }
-                  </div>
-                </div>
+                <app-object-list
+                  style="margin-top:12px; display:block"
+                  [objects]="objects()"
+                  [filteredIndices]="filteredObjectIndices()"
+                  [selectedIndex]="selectedObjIndex()"
+                  [searchTerm]="objectSearchTerm()"
+                  [getSpriteUrl]="getSpritePreviewDataUrlBound"
+                  [getFallbackColor]="getObjFallbackColorBound"
+                  (objectSelected)="selectObject($event, true)"
+                  (searchTermChange)="objectSearchTerm.set($event)"
+                ></app-object-list>
               </div>
             </div>
 

@@ -126,6 +126,67 @@ const SPRITE_PACK_8_ID = 129;
 const SPRITE_PACK_16_ID = 137;
 const SPRITE_HEADER_SIZE = 8;
 
+/** Pack ID for kPackRoad (tRoadInfo array, resource ID 135). */
+const ROAD_PACK_ID = 135;
+/** Pack ID for kPackTx16 (16-bit RGB555 textures, resource ID 136). */
+const TX16_PACK_ID = 136;
+
+/**
+ * tRoadInfo struct – layout (all big-endian, no padding on PPC):
+ *   float friction       @0
+ *   float airResistance  @4
+ *   float backResistance @8
+ *   UInt16 tolerance     @12
+ *   SInt16 marks         @14
+ *   SInt16 deathOffs     @16
+ *   SInt16 backgroundTex @18   ← bg texture ID in kPackTx16
+ *   SInt16 foregroundTex @20   ← road-surface texture ID in kPackTx16
+ *   SInt16 roadLeftBorder  @22 ← left border (kerb) texture ID
+ *   SInt16 roadRightBorder @24 ← right border (kerb) texture ID
+ *   … (remaining fields not needed for rendering)
+ *   UInt8  water         @57
+ */
+const RI_OFFSET_BG_TEX     = 18;
+const RI_OFFSET_FG_TEX     = 20;
+const RI_OFFSET_LEFT_BORD  = 22;
+const RI_OFFSET_RIGHT_BORD = 24;
+const RI_OFFSET_WATER      = 57;
+const ROAD_INFO_SIZE       = 64;  // sizeof(tRoadInfo)
+
+/** Texture dimensions (pixels) for tiles in kPackTx16. */
+const BIG_TEX_SIZE   = 128;  // background + road surface textures: 128×128 px
+const BORDER_TEX_W   = 16;   // kerb border textures: 16 px wide
+const BORDER_TEX_H   = 128;  // kerb border textures: 128 px tall
+
+// ------------------------------------------------------------------
+// Road texture data types (exported so worker can transfer them)
+// ------------------------------------------------------------------
+
+/** Decoded info for a single tRoadInfo entry in kPackRoad. */
+export interface RoadInfoData {
+  /** tRoadInfo entry ID (= roadInfo field in level data, e.g. 128–136). */
+  id: number;
+  /** Texture ID in kPackTx16 for the off-road / background fill. */
+  backgroundTex: number;
+  /** Texture ID in kPackTx16 for the driveable road surface. */
+  foregroundTex: number;
+  /** Texture ID in kPackTx16 for the left (inside) kerb border. */
+  roadLeftBorder: number;
+  /** Texture ID in kPackTx16 for the right (outside) kerb border. */
+  roadRightBorder: number;
+  /** True for water levels (level 5 / roadInfo 133). */
+  water: boolean;
+}
+
+/** Decoded 16-bit RGB555 texture ready for ImageData. */
+export interface DecodedRoadTexture {
+  texId: number;
+  width: number;
+  height: number;
+  /** Raw RGBA8888 pixel data (width × height × 4 bytes). */
+  pixels: ArrayBuffer;
+}
+
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
@@ -608,6 +669,91 @@ export class LevelEditorService {
       }
     }
     return { frameId, width, height, pixels, bitDepth: 16 };
+  }
+
+  // ------------------------------------------------------------------
+  // Road texture extraction
+  // ------------------------------------------------------------------
+
+  /**
+   * Parse kPackRoad (Pack ID 135) and return per-roadInfo texture ID mappings.
+   * Each entry in kPackRoad is a tRoadInfo struct (64 bytes, big-endian).
+   */
+  extractRoadInfos(resources: ResourceDatEntry[]): Map<number, RoadInfoData> {
+    const result = new Map<number, RoadInfoData>();
+    const pack = resources.find((e) => e.type === 'Pack' && e.id === ROAD_PACK_ID);
+    if (!pack) return result;
+    try {
+      const entries = parsePackHandle(pack.data, pack.id);
+      for (const entry of entries) {
+        if (entry.data.length < RI_OFFSET_WATER + 1) continue;
+        const view = new DataView(entry.data.buffer, entry.data.byteOffset, entry.data.byteLength);
+        result.set(entry.id, {
+          id: entry.id,
+          backgroundTex:  view.getInt16(RI_OFFSET_BG_TEX,    false),
+          foregroundTex:  view.getInt16(RI_OFFSET_FG_TEX,    false),
+          roadLeftBorder: view.getInt16(RI_OFFSET_LEFT_BORD, false),
+          roadRightBorder: view.getInt16(RI_OFFSET_RIGHT_BORD, false),
+          water: entry.data[RI_OFFSET_WATER] !== 0,
+        });
+      }
+    } catch (err) {
+      console.warn('[LevelEditor] extractRoadInfos error:', err);
+    }
+    return result;
+  }
+
+  /**
+   * Decode all textures needed for road rendering from kPackTx16 (Pack ID 136).
+   * Returns decoded RGBA8888 textures keyed by texture ID.
+   *
+   * Large textures (128–137, 2000–3000): 128×128 px (32768 bytes @ 16bpp)
+   * Border textures (1000–1014): 16×128 px  (4096 bytes @ 16bpp)
+   */
+  extractRoadTextures(
+    resources: ResourceDatEntry[],
+    neededTexIds: number[],
+  ): DecodedRoadTexture[] {
+    const result: DecodedRoadTexture[] = [];
+    const pack = resources.find((e) => e.type === 'Pack' && e.id === TX16_PACK_ID);
+    if (!pack) return result;
+    try {
+      const entries = parsePackHandle(pack.data, pack.id);
+      const entryMap = new Map(entries.map((e) => [e.id, e.data]));
+      for (const texId of neededTexIds) {
+        const data = entryMap.get(texId);
+        if (!data || data.length < 2) continue;
+
+        // Determine dimensions from size: 4096 = 16×128 (border), 32768 = 128×128 (main)
+        let w: number, h: number;
+        const pixelCount = data.length / 2;
+        if (pixelCount === BORDER_TEX_W * BORDER_TEX_H) {
+          w = BORDER_TEX_W; h = BORDER_TEX_H;
+        } else {
+          // Default: square (128×128, or 256×256 for 2000-2004)
+          w = Math.round(Math.sqrt(pixelCount));
+          h = pixelCount / w;
+        }
+        const pixels = new Uint8ClampedArray(w * h * 4);
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        for (let i = 0; i < w * h; i++) {
+          const pv = view.getUint16(i * 2, false); // big-endian RGB555
+          const r  = Math.round(((pv >> 10) & 0x1f) * (255 / 31));
+          const g  = Math.round(((pv >> 5)  & 0x1f) * (255 / 31));
+          const b  = Math.round((pv & 0x1f)          * (255 / 31));
+          pixels[i * 4]     = r;
+          pixels[i * 4 + 1] = g;
+          pixels[i * 4 + 2] = b;
+          pixels[i * 4 + 3] = 255;
+        }
+        const buf = new ArrayBuffer(pixels.byteLength);
+        new Uint8Array(buf).set(pixels);
+        result.push({ texId, width: w, height: h, pixels: buf });
+      }
+    } catch (err) {
+      console.warn('[LevelEditor] extractRoadTextures error:', err);
+    }
+    return result;
   }
 }
 

@@ -1,0 +1,38 @@
+<div class="object-list-compact">
+  <div class="object-list-header">
+    <span>All objects</span>
+    <span class="badge">{{ filteredIndices.length }} / {{ objects.length }}</span>
+  </div>
+  <input
+    type="search"
+    class="object-search-input"
+    placeholder="Filter by #index or Ttype…"
+    [value]="searchTerm"
+    (input)="searchTermChange.emit($any($event.target).value)"
+    aria-label="Filter objects"
+  />
+  <div class="object-list">
+    @for (idx of filteredIndices; track idx) {
+      <div class="object-item" [class.selected]="selectedIndex === idx"
+        (click)="objectSelected.emit(idx)"
+        [title]="'Object #' + idx + ' · TypeRes ' + objects[idx].typeRes + ' · (' + objects[idx].x + ', ' + objects[idx].y + ')'">
+        <span class="obj-sprite-thumb">
+          @if (getSpriteUrl(objects[idx].typeRes); as url) {
+            <img [src]="url" class="obj-list-sprite" alt="" />
+          } @else {
+            <span class="obj-list-sprite-fallback"
+              [style.background]="getFallbackColor(objects[idx].typeRes)">
+              T
+            </span>
+          }
+        </span>
+        <span class="obj-idx">#{{ idx }}</span>
+        <span class="obj-type">T{{ objects[idx].typeRes }}</span>
+        <span class="obj-pos">({{ objects[idx].x }},{{ objects[idx].y }})</span>
+      </div>
+    }
+    @if (filteredIndices.length === 0 && searchTerm) {
+      <p class="muted" style="padding:8px 4px;font-size:0.75rem">No objects match "{{ searchTerm }}".</p>
+    }
+  </div>
+</div>
