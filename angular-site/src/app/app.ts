@@ -26,6 +26,15 @@ const OBJ_PALETTE = [
   '#8d6e63', '#78909c', '#ec407a', '#29b6f6',
 ];
 
+/** typeRes value that identifies the player car object. */
+const PLAYER_CAR_TYPE_RES = 128;
+/** Road kerb stripe segment interval (kerb colour changes every this many segs × 2 units = 40 world units). */
+const KERB_STRIPE_SEGMENT_INTERVAL = 20;
+/** Road surface texture strip segment interval (alternates every this many segs × 2 units = 400 world units). */
+const ROAD_TEXTURE_SEGMENT_INTERVAL = 200;
+/** Max road segments to draw per call in the track canvas (performance limit). */
+const MAX_ROAD_SEGMENTS_DRAW = 400;
+
 /** Minimum canvas hit radius (px) for object click detection. */
 const MIN_HIT_RADIUS = 10;
 /** Base world-space hit radius before zoom scaling for object click detection. */
@@ -668,15 +677,13 @@ export class App implements OnInit, OnDestroy {
     const level = this.selectedLevel();
 
     ctx.clearRect(0, 0, W, H);
-    const bgGradient = ctx.createLinearGradient(0, 0, 0, H);
-    bgGradient.addColorStop(0, '#16202d');
-    bgGradient.addColorStop(0.35, '#10151d');
-    bgGradient.addColorStop(1, '#090b0f');
-    ctx.fillStyle = bgGradient;
+
+    // ---- Background: grass/dirt fill (matches game background colour)
+    ctx.fillStyle = '#2d3a1e';
     ctx.fillRect(0, 0, W, H);
 
-    // Draw grid
-    ctx.strokeStyle = '#111922';
+    // Draw grid (subtle, over the grass background)
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
     ctx.lineWidth = 1;
     const gridStep = 100; // world units
     const gridStepPx = gridStep * zoom;
@@ -708,12 +715,14 @@ export class App implements OnInit, OnDestroy {
       this.drawObjectTrackPreview(ctx, level);
     }
 
-    // Draw axes
-    const [ox, oy] = this.worldToCanvas(0, 0);
-    ctx.strokeStyle = '#243342';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, H); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(W, oy); ctx.stroke();
+    // Draw axes (faint, only if road not drawn)
+    if (!level || level.roadSegs.length === 0) {
+      const [ox2, oy2] = this.worldToCanvas(0, 0);
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(ox2, 0); ctx.lineTo(ox2, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, oy2); ctx.lineTo(W, oy2); ctx.stroke();
+    }
 
     // Draw objects
     const baseRadius = Math.min(20, Math.max(5, 8 * zoom));
@@ -724,64 +733,102 @@ export class App implements OnInit, OnDestroy {
       const isFilteredOut = !visibleTypes.has(typeIdx);
       if (isFilteredOut && i !== selIdx) continue;
       const [cx, cy] = this.worldToCanvas(obj.x, obj.y);
-      if (cx < -30 || cx > W + 30 || cy < -30 || cy > H + 30) continue;
+      if (cx < -50 || cx > W + 50 || cy < -50 || cy > H + 50) continue;
 
-      ctx.globalAlpha = isFilteredOut ? 0.35 : 1.0;
+      ctx.globalAlpha = isFilteredOut ? 0.3 : 1.0;
       const color = OBJ_PALETTE[typeIdx];
       const objectType = this.objectTypeDefinitions.get(obj.typeRes) ?? null;
       const preview = this.getObjectSpritePreview(obj.typeRes);
-      const drawWidth = objectType ? Math.max(24, objectType.width * zoom * 0.45) : baseRadius * 3;
-      const drawHeight = objectType ? Math.max(24, objectType.length * zoom * 0.45) : baseRadius * 3;
+
+      // Scale object size with zoom, clamped to reasonable display range
+      const drawWidth  = objectType ? Math.max(16, Math.min(120, objectType.width  * zoom * 0.5)) : baseRadius * 2.5;
+      const drawHeight = objectType ? Math.max(16, Math.min(120, objectType.length * zoom * 0.5)) : baseRadius * 2.5;
+
+      const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
+      const isSel = i === selIdx;
 
       if (preview) {
+        // Draw sprite rotated to match direction (game Y-axis is up, so negate for canvas)
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.rotate(obj.dir);
+        ctx.rotate(-obj.dir);
         ctx.drawImage(preview, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
         ctx.restore();
       } else {
-        ctx.fillStyle = color;
+        // Fallback circle
+        ctx.fillStyle = isPlayerCar ? '#ffe082' : color;
         ctx.beginPath();
         ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
+      // Bounding-box outline (colour-coded by type)
+      ctx.strokeStyle = isSel ? '#ffffff' : (isPlayerCar ? '#ffe082' : color);
+      ctx.lineWidth = isSel ? 2 : 1;
       ctx.strokeRect(cx - drawWidth / 2, cy - drawHeight / 2, drawWidth, drawHeight);
 
-      // Direction arrow
-      const arrowLen = Math.max(baseRadius * 1.5, drawHeight * 0.55);
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
+      // Direction arrow – always visible so user can see AI direction in the layout
+      const arrowLen = Math.max(baseRadius * 1.2, drawHeight * 0.6);
+      const arrowColor = isSel ? '#ffffff' : 'rgba(255,255,255,0.6)';
+      ctx.strokeStyle = arrowColor;
+      ctx.lineWidth = isSel ? 2 : 1;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(obj.dir) * arrowLen, cy + Math.sin(obj.dir) * arrowLen);
+      // In world space Y is "up the track"; dir=0 means pointing up (+Y world = −Y canvas)
+      ctx.lineTo(cx + Math.sin(obj.dir) * arrowLen, cy - Math.cos(obj.dir) * arrowLen);
       ctx.stroke();
 
       // Selection ring
-      if (i === selIdx) {
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
+      if (isSel) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        ctx.arc(cx, cy, baseRadius + 4, 0, Math.PI * 2);
+        ctx.arc(cx, cy, Math.max(drawWidth, drawHeight) / 2 + 5, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.setLineDash([]);
       }
 
-      // Label when zoomed in enough
-      if (zoom > 0.4 || i === selIdx) {
-        ctx.fillStyle = '#fff';
+      // Player-car star marker
+      if (isPlayerCar) {
+        ctx.fillStyle = '#ffe082';
+        ctx.font = `${Math.max(10, 12 * zoom)}px sans-serif`;
+        ctx.fillText('★', cx - 6, cy - drawHeight / 2 - 4);
+      }
+
+      // Label when zoomed in enough or selected
+      if (zoom > 0.35 || isSel) {
+        ctx.fillStyle = isSel ? '#ffffff' : 'rgba(220,220,220,0.85)';
         ctx.font = labelFont;
         ctx.fillText(`#${i} T${obj.typeRes}`, cx + drawWidth / 2 + 4, cy + 4);
       }
       ctx.globalAlpha = 1.0;
     }
 
-    // Origin marker
-    ctx.fillStyle = '#fff';
+    // Origin marker + start position marker
+    const [ox, oy] = this.worldToCanvas(0, 0);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.beginPath();
     ctx.arc(ox, oy, 3, 0, Math.PI * 2);
     ctx.fill();
+
+    // Finish line at levelEnd Y
+    if (level && level.properties.levelEnd > 0) {
+      const [, finishY] = this.worldToCanvas(0, level.properties.levelEnd);
+      if (finishY > -2 && finishY < H + 2) {
+        ctx.strokeStyle = '#f9a825';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 6]);
+        ctx.beginPath();
+        ctx.moveTo(0, finishY);
+        ctx.lineTo(W, finishY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#f9a825';
+        ctx.font = `${Math.max(9, 11 * zoom)}px monospace`;
+        ctx.fillText('FINISH', 6, finishY - 4);
+      }
+    }
   }
 
   // ---- Mark segment editor ----
@@ -1325,54 +1372,143 @@ export class App implements OnInit, OnDestroy {
   private drawObjectRoadPreview(ctx: CanvasRenderingContext2D, level: ParsedLevel): void {
     if (level.roadSegs.length < 2) return;
 
-    const drawStrip = (
-      x0a: number, x1a: number, y0: number,
-      x0b: number, x1b: number, y1: number,
+    const W = (ctx.canvas as HTMLCanvasElement).width;
+    const H = (ctx.canvas as HTMLCanvasElement).height;
+
+    // Colour palette that matches the original Mac game's palettised look:
+    // grass/dirt outside the road, asphalt between v1 and v2, kerb borders
+    const GRASS_COLOUR   = '#3a5228'; // dark grass
+    const DIRT_COLOUR    = '#6b5040'; // dirt/soil shoulder
+    const ASPHALT_COLOUR = '#4a4a4a'; // road surface
+    const KERB_A_COLOUR  = '#e53935'; // kerb red
+    const KERB_B_COLOUR  = '#f5f5f5'; // kerb white
+    const CENTRE_COLOUR  = 'rgba(255, 248, 140, 0.85)'; // yellow centre line
+
+    const KERB_WIDTH = 14; // world units wide per kerb stripe
+
+    /** Fill a screen-space quadrilateral given four world-space corners */
+    const fillQuad = (
+      x0: number, y0: number,
+      x1: number, y1: number,
+      x2: number, y2: number,
+      x3: number, y3: number,
       fill: string,
     ): void => {
-      const [ax0, ay0] = this.worldToCanvas(x0a, y0);
-      const [ax1, ay1] = this.worldToCanvas(x1a, y0);
-      const [bx1, by1] = this.worldToCanvas(x1b, y1);
-      const [bx0, by0] = this.worldToCanvas(x0b, y1);
+      const [ax0, ay0] = this.worldToCanvas(x0, y0);
+      const [ax1, ay1] = this.worldToCanvas(x1, y1);
+      const [ax2, ay2] = this.worldToCanvas(x2, y2);
+      const [ax3, ay3] = this.worldToCanvas(x3, y3);
+      // Quick frustum-cull: skip if all 4 corners are fully off-screen.
+      // The bottom threshold uses H * 2 to avoid popping artefacts with tall quads
+      // (road segments near the viewport edge can be very tall when zoomed in).
+      if (ay0 < -H && ay1 < -H && ay2 < -H && ay3 < -H) return;
+      if (ay0 > H * 2 && ay1 > H * 2 && ay2 > H * 2 && ay3 > H * 2) return;
       ctx.fillStyle = fill;
       ctx.beginPath();
       ctx.moveTo(ax0, ay0);
       ctx.lineTo(ax1, ay1);
-      ctx.lineTo(bx1, by1);
-      ctx.lineTo(bx0, by0);
+      ctx.lineTo(ax2, ay2);
+      ctx.lineTo(ax3, ay3);
       ctx.closePath();
       ctx.fill();
     };
 
-    for (let index = 0; index < level.roadSegs.length - 1; index++) {
-      const current = level.roadSegs[index];
-      const next = level.roadSegs[index + 1];
-      const y0 = index * 2;
-      const y1 = (index + 1) * 2;
-      drawStrip(current.v0, current.v1, y0, next.v0, next.v1, y1, 'rgba(72, 58, 38, 0.52)');
-      drawStrip(current.v1, current.v2, y0, next.v1, next.v2, y1, 'rgba(92, 98, 108, 0.76)');
-      drawStrip(current.v2, current.v3, y0, next.v2, next.v3, y1, 'rgba(72, 58, 38, 0.52)');
+    // Draw every adjacent segment pair (step=1 gives the most accurate road edge path).
+    const step = 1;
+    for (let index = 0; index < level.roadSegs.length - step; index += step) {
+      const cur  = level.roadSegs[index];
+      const nxt  = level.roadSegs[index + step];
+      const y0   = index * 2;
+      const y1   = (index + step) * 2;
+
+      // -- Grass far left (off-road left) --
+      fillQuad(-1500, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  -1500, y1,  GRASS_COLOUR);
+
+      // -- Left kerb stripe (alternating red/white every ~40 world units) --
+      const kerbPhase = Math.floor(index / KERB_STRIPE_SEGMENT_INTERVAL) % 2;
+      const kerbColour = kerbPhase === 0 ? KERB_A_COLOUR : KERB_B_COLOUR;
+      fillQuad(cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1,  kerbColour);
+
+      // -- Dirt shoulder left (v0 to v1) --
+      fillQuad(cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1,  DIRT_COLOUR);
+
+      // -- Road surface (v1 to v2) --
+      // Subtle alternating strip every 400 units to give the road texture sense
+      const stripPhase = Math.floor(index / ROAD_TEXTURE_SEGMENT_INTERVAL) % 2;
+      const roadColour = stripPhase === 0 ? ASPHALT_COLOUR : '#505050';
+      fillQuad(cur.v1, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v1, y1,  roadColour);
+
+      // -- Dirt shoulder right (v2 to v3) --
+      fillQuad(cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1,  DIRT_COLOUR);
+
+      // -- Right kerb stripe (mirrored phase) --
+      const kerbRColour = kerbPhase === 0 ? KERB_B_COLOUR : KERB_A_COLOUR;
+      fillQuad(cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1,  kerbRColour);
+
+      // -- Grass far right --
+      fillQuad(cur.v3 + KERB_WIDTH, y0,  1500, y0,  1500, y1,  nxt.v3 + KERB_WIDTH, y1,  GRASS_COLOUR);
     }
 
-    ctx.strokeStyle = 'rgba(255, 248, 196, 0.7)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([8, 8]);
+    // -- Centre dashed line (between two lanes: midpoint of v1→v2) --
+    ctx.strokeStyle = CENTRE_COLOUR;
+    ctx.lineWidth = Math.max(1, 1.5);
+    ctx.setLineDash([12, 10]);
     ctx.beginPath();
-    for (let index = 0; index < level.roadSegs.length; index += 4) {
+    let dashStarted = false;
+    for (let index = 0; index < level.roadSegs.length; index += 2) {
       const seg = level.roadSegs[index];
-      const [cx, cy] = this.worldToCanvas((seg.v1 + seg.v2) / 2, index * 2);
-      if (index === 0) ctx.moveTo(cx, cy);
+      const midX = (seg.v1 + seg.v2) / 2;
+      const [cx, cy] = this.worldToCanvas(midX, index * 2);
+      if (!dashStarted) { ctx.moveTo(cx, cy); dashStarted = true; }
       else ctx.lineTo(cx, cy);
     }
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // -- Finish line: checkerboard band at levelEnd Y --
+    const levelEnd = level.properties.levelEnd;
+    if (levelEnd > 0 && level.roadSegs.length > 0) {
+      const endSegIdx = Math.min(Math.floor(levelEnd / 2), level.roadSegs.length - 1);
+      const seg = level.roadSegs[endSegIdx];
+      const [leftX, lineY] = this.worldToCanvas(seg.v1, levelEnd);
+      const [rightX] = this.worldToCanvas(seg.v2, levelEnd);
+      if (lineY > -10 && lineY < H + 10) {
+        const roadWidth = Math.max(4, rightX - leftX);
+        const sqSz = Math.max(6, roadWidth / 10);
+        const numSq = Math.ceil(roadWidth / sqSz);
+        for (let s = 0; s < numSq; s++) {
+          ctx.fillStyle = s % 2 === 0 ? '#000000' : '#ffffff';
+          ctx.fillRect(leftX + s * sqSz, lineY - sqSz, sqSz, sqSz * 2);
+        }
+        ctx.fillStyle = '#f9a825';
+        ctx.font = `bold 11px monospace`;
+        ctx.fillText('FINISH', leftX + 4, lineY - sqSz - 4);
+      }
+    }
+
+    // -- Y-axis ruler tick marks (every 1000 world units) for distance reference --
+    const canvasEl = ctx.canvas as HTMLCanvasElement;
+    const canvasW = canvasEl.width;
+    const canvasH = canvasEl.height;
+    const panYVal = this.canvasPanY();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = '9px monospace';
+    const startY = Math.floor((panYVal - canvasH / (2 * this.canvasZoom())) / 1000) * 1000;
+    const endY   = panYVal + canvasH / (2 * this.canvasZoom());
+    for (let wy = startY; wy <= endY; wy += 1000) {
+      const [, tickY] = this.worldToCanvas(0, wy);
+      if (tickY < 0 || tickY > canvasH) continue;
+      ctx.fillRect(canvasW - 28, tickY - 0.5, 28, 1);
+      ctx.fillText(`${wy}`, canvasW - 60, tickY - 2);
+    }
   }
 
   private drawObjectTrackPreview(ctx: CanvasRenderingContext2D, level: ParsedLevel): void {
-    const drawPath = (segs: typeof level.trackUp, strokeStyle: string): void => {
+    // Draw trackUp and trackDown as coloured lines with arrowheads showing travel direction.
+    const drawPath = (segs: typeof level.trackUp, strokeStyle: string, label: string): void => {
       if (segs.length === 0) return;
       ctx.strokeStyle = strokeStyle;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       segs.forEach((seg, index) => {
         const [cx, cy] = this.worldToCanvas(seg.x, seg.y);
@@ -1380,10 +1516,39 @@ export class App implements OnInit, OnDestroy {
         else ctx.lineTo(cx, cy);
       });
       ctx.stroke();
+
+      // Arrow heads every N segments to show travel direction
+      const arrowStep = Math.max(1, Math.floor(segs.length / 12));
+      ctx.fillStyle = strokeStyle;
+      for (let i = arrowStep; i < segs.length - 1; i += arrowStep) {
+        const [x1, y1] = this.worldToCanvas(segs[i - 1].x, segs[i - 1].y);
+        const [x2, y2] = this.worldToCanvas(segs[i].x, segs[i].y);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const size = 7;
+        ctx.save();
+        ctx.translate(x2, y2);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-size, -size / 2);
+        ctx.lineTo(-size, size / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Start dot with label
+      const [sx, sy] = this.worldToCanvas(segs[0].x, segs[0].y);
+      ctx.fillStyle = strokeStyle;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = '10px monospace';
+      ctx.fillText(label, sx + 8, sy + 4);
     };
 
-    drawPath(level.trackUp, 'rgba(66, 165, 245, 0.9)');
-    drawPath(level.trackDown, 'rgba(239, 83, 80, 0.75)');
+    drawPath(level.trackUp,   'rgba(66, 165, 245, 0.95)',  '▲ Up');
+    drawPath(level.trackDown, 'rgba(239, 83, 80, 0.90)',   '▼ Down');
   }
 
   private getObjectSpritePreview(typeRes: number): HTMLCanvasElement | null {
@@ -1412,8 +1577,8 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  /** Render trackUp (blue) and trackDown (red) path onto the track canvas. */
-  private drawTrackCanvas(level: { trackUp: { x: number; y: number }[]; trackDown: { x: number; y: number }[] } | null): void {
+  /** Render trackUp (blue) and trackDown (red) path onto the track canvas, with road background. */
+  private drawTrackCanvas(level: { trackUp: { x: number; y: number }[]; trackDown: { x: number; y: number }[]; roadSegs?: { v0: number; v1: number; v2: number; v3: number }[] } | null): void {
     const canvas = document.getElementById('track-canvas') as HTMLCanvasElement | null;
     if (!canvas || !level) return;
     const ctx = canvas.getContext('2d');
@@ -1422,31 +1587,79 @@ export class App implements OnInit, OnDestroy {
     const W = canvas.width;
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#0a0a0a';
+    ctx.fillStyle = '#3a5228'; // grass background matching object canvas
     ctx.fillRect(0, 0, W, H);
 
     const allSegs = [...level.trackUp, ...level.trackDown];
     if (allSegs.length === 0) {
-      ctx.fillStyle = '#555';
+      ctx.fillStyle = '#ccc';
       ctx.font = '14px monospace';
       ctx.fillText('No track segments', W / 2 - 70, H / 2);
       return;
     }
 
+    // Collect road geometry bounds for scale – use road segs if available
+    const roadSegs = (level as ParsedLevel).roadSegs ?? [];
+    const hasRoad = roadSegs.length > 1;
+    const roadMaxY = hasRoad ? (roadSegs.length - 1) * 2 : 0;
+    const roadMinX = hasRoad ? Math.min(...roadSegs.map((s) => s.v0)) : 0;
+    const roadMaxX = hasRoad ? Math.max(...roadSegs.map((s) => s.v3)) : 0;
+
+    // Determine bounding box from both tracks + road extents
     const xs = allSegs.map((s) => s.x);
     const ys = allSegs.map((s) => s.y);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const minX = hasRoad ? Math.min(roadMinX, Math.min(...xs)) : Math.min(...xs);
+    const maxX = hasRoad ? Math.max(roadMaxX, Math.max(...xs)) : Math.max(...xs);
+    const minY = 0;
+    const maxY = hasRoad ? Math.max(roadMaxY, Math.max(...ys)) : Math.max(...ys);
     const rangeX = maxX - minX || 1;
     const rangeY = maxY - minY || 1;
-    const pad = 20;
+    const pad = 28;
 
     const toCanvas = (x: number, y: number): [number, number] => [
       pad + ((x - minX) / rangeX) * (W - 2 * pad),
       H - pad - ((y - minY) / rangeY) * (H - 2 * pad),
     ];
 
-    const drawPath = (segs: typeof level.trackUp, color: string): void => {
+    // Draw road geometry if available
+    if (hasRoad) {
+      const step = Math.max(1, Math.floor(roadSegs.length / MAX_ROAD_SEGMENTS_DRAW));
+      for (let i = 0; i < roadSegs.length - step; i += step) {
+        const cur = roadSegs[i];
+        const nxt = roadSegs[i + step];
+        const y0 = i * 2;
+        const y1 = (i + step) * 2;
+        const [x0a, y0a] = toCanvas(cur.v1, y0);
+        const [x0b, y0b] = toCanvas(cur.v2, y0);
+        const [x1b, y1b] = toCanvas(nxt.v2, y1);
+        const [x1a, y1a] = toCanvas(nxt.v1, y1);
+        // Shoulder
+        const [ds0a] = toCanvas(cur.v0, y0);
+        const [ds1a] = toCanvas(nxt.v0, y1);
+        const [ds0b] = toCanvas(cur.v3, y0);
+        const [ds1b] = toCanvas(nxt.v3, y1);
+        ctx.fillStyle = '#6b5040';
+        ctx.beginPath(); ctx.moveTo(ds0a, y0a); ctx.lineTo(x0a, y0a); ctx.lineTo(x1a, y1a); ctx.lineTo(ds1a, y1a); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x0b, y0b); ctx.lineTo(ds0b, y0b); ctx.lineTo(ds1b, y1b); ctx.lineTo(x1b, y1b); ctx.closePath(); ctx.fill();
+        // Road surface
+        ctx.fillStyle = '#4a4a4a';
+        ctx.beginPath(); ctx.moveTo(x0a, y0a); ctx.lineTo(x0b, y0b); ctx.lineTo(x1b, y1b); ctx.lineTo(x1a, y1a); ctx.closePath(); ctx.fill();
+      }
+      // Centre line
+      ctx.strokeStyle = 'rgba(255,248,140,0.7)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      for (let i = 0; i < roadSegs.length; i += 2) {
+        const seg = roadSegs[i];
+        const [cx2, cy2] = toCanvas((seg.v1 + seg.v2) / 2, i * 2);
+        if (i === 0) ctx.moveTo(cx2, cy2); else ctx.lineTo(cx2, cy2);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    const drawPath = (segs: typeof level.trackUp, color: string, label: string): void => {
       if (segs.length === 0) return;
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
@@ -1458,14 +1671,51 @@ export class App implements OnInit, OnDestroy {
         ctx.lineTo(px, py);
       }
       ctx.stroke();
-      // Draw start dot
+
+      // Arrow markers
+      const arrowStep = Math.max(1, Math.floor(segs.length / 10));
+      ctx.fillStyle = color;
+      for (let i = arrowStep; i < segs.length - 1; i += arrowStep) {
+        const [x1, y1] = toCanvas(segs[i - 1].x, segs[i - 1].y);
+        const [x2, y2] = toCanvas(segs[i].x, segs[i].y);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const sz = 6;
+        ctx.save(); ctx.translate(x2, y2); ctx.rotate(angle);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-sz, -sz / 2); ctx.lineTo(-sz, sz / 2); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+
+      // Start dot
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(sx, sy, 5, 0, Math.PI * 2);
       ctx.fill();
+
+      // Label
+      ctx.fillStyle = color;
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText(label, sx + 8, sy + 4);
     };
 
-    drawPath(level.trackUp, '#42a5f5');   // blue = track up
-    drawPath(level.trackDown, '#ef5350'); // red = track down
+    drawPath(level.trackUp,   '#42a5f5', '▲ Up');
+    drawPath(level.trackDown, '#ef5350', '▼ Down');
+
+    // Legend
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(6, 6, 120, 44);
+    ctx.fillStyle = '#42a5f5';
+    ctx.fillRect(12, 14, 14, 3);
+    ctx.fillStyle = '#f5f5f5';
+    ctx.font = '10px monospace';
+    ctx.fillText('AI track up', 30, 18);
+    ctx.fillStyle = '#ef5350';
+    ctx.fillRect(12, 28, 14, 3);
+    ctx.fillStyle = '#f5f5f5';
+    ctx.fillText('AI track down', 30, 32);
+    if (hasRoad) {
+      ctx.fillStyle = '#f5f5f5';
+      ctx.font = '9px monospace';
+      ctx.fillText(`${roadSegs.length} road segs`, 8, 56);
+    }
   }
 }

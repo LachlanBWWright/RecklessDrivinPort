@@ -1,1 +1,959 @@
-[]
+[
+  {
+    "levelNumber": 1,
+    "packId": 140,
+    "properties": {
+      "roadInfo": 128,
+      "timeLimitRaw": 150,
+      "timeLimitSec": 1.5,
+      "xStartPos": 115,
+      "levelEnd": 38000
+    },
+    "objectGroupRefs": [
+      {
+        "resID": 128,
+        "numObjs": 70
+      },
+      {
+        "resID": 129,
+        "numObjs": 12
+      },
+      {
+        "resID": 130,
+        "numObjs": 10
+      },
+      {
+        "resID": 132,
+        "numObjs": 4
+      },
+      {
+        "resID": 138,
+        "numObjs": 4
+      },
+      {
+        "resID": 131,
+        "numObjs": 180
+      },
+      {
+        "resID": 134,
+        "numObjs": 1
+      },
+      {
+        "resID": 133,
+        "numObjs": 3
+      },
+      {
+        "resID": 142,
+        "numObjs": 6
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      }
+    ],
+    "objectCount": 53,
+    "objects": [
+      {
+        "x": 158,
+        "y": 388,
+        "dirRad": 0.0,
+        "typeRes": 174
+      },
+      {
+        "x": 359,
+        "y": 2097,
+        "dirRad": 1.57,
+        "typeRes": 215
+      },
+      {
+        "x": -401,
+        "y": 3346,
+        "dirRad": 0.0,
+        "typeRes": 205
+      },
+      {
+        "x": -106,
+        "y": 4132,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": -466,
+        "y": 4434,
+        "dirRad": 1.57,
+        "typeRes": 215
+      },
+      {
+        "x": -1291,
+        "y": 6034,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": -561,
+        "y": 7260,
+        "dirRad": 0.0,
+        "typeRes": 229
+      },
+      {
+        "x": -448,
+        "y": 8344,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": -450,
+        "y": 8735,
+        "dirRad": 3.141,
+        "typeRes": 215
+      },
+      {
+        "x": -1232,
+        "y": 10135,
+        "dirRad": 3.1415,
+        "typeRes": 205
+      },
+      {
+        "x": -713,
+        "y": 10157,
+        "dirRad": 0.0,
+        "typeRes": 172
+      },
+      {
+        "x": -721,
+        "y": 10645,
+        "dirRad": 0.0,
+        "typeRes": 174
+      },
+      {
+        "x": -1182,
+        "y": 10696,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": -219,
+        "y": 11507,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": -70,
+        "y": 11802,
+        "dirRad": 0.0,
+        "typeRes": 165
+      },
+      {
+        "x": -160,
+        "y": 12308,
+        "dirRad": 1.57,
+        "typeRes": 215
+      },
+      {
+        "x": -173,
+        "y": 14562,
+        "dirRad": 3.1415,
+        "typeRes": 215
+      },
+      {
+        "x": 417,
+        "y": 15141,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 378,
+        "y": 15469,
+        "dirRad": 0.0,
+        "typeRes": 205
+      },
+      {
+        "x": 190,
+        "y": 17022,
+        "dirRad": 0.0,
+        "typeRes": 167
+      },
+      {
+        "x": 54,
+        "y": 17037,
+        "dirRad": 0.0,
+        "typeRes": 167
+      },
+      {
+        "x": 536,
+        "y": 17967,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": -389,
+        "y": 18846,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": -341,
+        "y": 21833,
+        "dirRad": 0.0,
+        "typeRes": 205
+      },
+      {
+        "x": 656,
+        "y": 22559,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 1000,
+        "y": 22647,
+        "dirRad": 1.57,
+        "typeRes": 215
+      },
+      {
+        "x": 645,
+        "y": 23613,
+        "dirRad": 0.0,
+        "typeRes": 205
+      },
+      {
+        "x": 610,
+        "y": 25302,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 1060,
+        "y": 25504,
+        "dirRad": 0.0,
+        "typeRes": 168
+      },
+      {
+        "x": 1259,
+        "y": 25549,
+        "dirRad": 0.0,
+        "typeRes": 168
+      },
+      {
+        "x": 1444,
+        "y": 26858,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 807,
+        "y": 27150,
+        "dirRad": 3.1415,
+        "typeRes": 229
+      },
+      {
+        "x": 1199,
+        "y": 27393,
+        "dirRad": 0.0,
+        "typeRes": 172
+      },
+      {
+        "x": 1198,
+        "y": 27705,
+        "dirRad": 0.0,
+        "typeRes": 173
+      },
+      {
+        "x": 1026,
+        "y": 27731,
+        "dirRad": 0.0,
+        "typeRes": 170
+      },
+      {
+        "x": 1200,
+        "y": 27739,
+        "dirRad": 0.0,
+        "typeRes": 170
+      },
+      {
+        "x": 1450,
+        "y": 28607,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 837,
+        "y": 28625,
+        "dirRad": 0.0,
+        "typeRes": 205
+      },
+      {
+        "x": 1306,
+        "y": 29063,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 1171,
+        "y": 30798,
+        "dirRad": 0.0,
+        "typeRes": 171
+      },
+      {
+        "x": 1043,
+        "y": 31510,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 1332,
+        "y": 31608,
+        "dirRad": 0.0,
+        "typeRes": 171
+      },
+      {
+        "x": 1255,
+        "y": 32395,
+        "dirRad": 1.57,
+        "typeRes": 215
+      },
+      {
+        "x": 973,
+        "y": 33046,
+        "dirRad": 3.1415,
+        "typeRes": 205
+      },
+      {
+        "x": 957,
+        "y": 33907,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 1501,
+        "y": 35330,
+        "dirRad": 0.0,
+        "typeRes": 167
+      },
+      {
+        "x": 1575,
+        "y": 35433,
+        "dirRad": 0.0,
+        "typeRes": 173
+      },
+      {
+        "x": 1432,
+        "y": 35436,
+        "dirRad": 0.0,
+        "typeRes": 167
+      },
+      {
+        "x": 927,
+        "y": 35758,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 1852,
+        "y": 37785,
+        "dirRad": 0.0,
+        "typeRes": 215
+      },
+      {
+        "x": 1023,
+        "y": 37984,
+        "dirRad": 1.57,
+        "typeRes": 205
+      },
+      {
+        "x": 1520,
+        "y": 38000,
+        "dirRad": 0.0,
+        "typeRes": 196
+      },
+      {
+        "x": 1307,
+        "y": 38000,
+        "dirRad": 0.0,
+        "typeRes": 197
+      }
+    ],
+    "roadSegmentCount": 20120,
+    "trackUpCount": 72,
+    "trackDownCount": 70
+  },
+  {
+    "levelNumber": 2,
+    "packId": 141,
+    "properties": {
+      "roadInfo": 130,
+      "timeLimitRaw": 150,
+      "timeLimitSec": 1.5,
+      "xStartPos": 70,
+      "levelEnd": 38832
+    },
+    "objectGroupRefs": [
+      {
+        "resID": 128,
+        "numObjs": 80
+      },
+      {
+        "resID": 129,
+        "numObjs": 7
+      },
+      {
+        "resID": 130,
+        "numObjs": 8
+      },
+      {
+        "resID": 134,
+        "numObjs": 1
+      },
+      {
+        "resID": 132,
+        "numObjs": 6
+      },
+      {
+        "resID": 139,
+        "numObjs": 1
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      },
+      {
+        "resID": 145,
+        "numObjs": 300
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      }
+    ],
+    "objectCount": 67,
+    "objects": [
+      {
+        "x": 6,
+        "y": 1848,
+        "dirRad": 0.0,
+        "typeRes": 232
+      },
+      {
+        "x": -2,
+        "y": 1895,
+        "dirRad": 0.0,
+        "typeRes": 190
+      },
+      {
+        "x": 118,
+        "y": 2285,
+        "dirRad": 0.0,
+        "typeRes": 174
+      },
+      {
+        "x": 65,
+        "y": 2980,
+        "dirRad": 0.0,
+        "typeRes": 191
+      },
+      {
+        "x": 12,
+        "y": 2980,
+        "dirRad": 0.0,
+        "typeRes": 193
+      },
+      {
+        "x": -41,
+        "y": 2980,
+        "dirRad": 0.0,
+        "typeRes": 192
+      },
+      {
+        "x": -94,
+        "y": 2980,
+        "dirRad": 0.0,
+        "typeRes": 193
+      },
+      {
+        "x": 276,
+        "y": 4023,
+        "dirRad": 0.0,
+        "typeRes": 224
+      },
+      {
+        "x": -138,
+        "y": 4026,
+        "dirRad": 0.0,
+        "typeRes": 168
+      },
+      {
+        "x": 7,
+        "y": 4529,
+        "dirRad": 0.0,
+        "typeRes": 233
+      },
+      {
+        "x": -1,
+        "y": 4569,
+        "dirRad": 0.0,
+        "typeRes": 189
+      },
+      {
+        "x": -348,
+        "y": 6042,
+        "dirRad": 0.0,
+        "typeRes": 225
+      },
+      {
+        "x": 4,
+        "y": 7971,
+        "dirRad": 0.0,
+        "typeRes": 173
+      },
+      {
+        "x": -136,
+        "y": 8056,
+        "dirRad": 0.0,
+        "typeRes": 167
+      },
+      {
+        "x": -19,
+        "y": 8988,
+        "dirRad": 0.0,
+        "typeRes": 225
+      },
+      {
+        "x": 201,
+        "y": 10217,
+        "dirRad": 0.0,
+        "typeRes": 165
+      },
+      {
+        "x": 273,
+        "y": 10856,
+        "dirRad": 0.0,
+        "typeRes": 224
+      },
+      {
+        "x": -66,
+        "y": 11276,
+        "dirRad": 0.0,
+        "typeRes": 168
+      },
+      {
+        "x": -79,
+        "y": 17756,
+        "dirRad": 0.0,
+        "typeRes": 169
+      },
+      {
+        "x": -82,
+        "y": 17837,
+        "dirRad": 1.0,
+        "typeRes": 176
+      },
+      {
+        "x": -128,
+        "y": 17882,
+        "dirRad": 1.0,
+        "typeRes": 176
+      },
+      {
+        "x": -172,
+        "y": 17933,
+        "dirRad": 1.0,
+        "typeRes": 176
+      },
+      {
+        "x": -259,
+        "y": 17963,
+        "dirRad": 0.0,
+        "typeRes": 173
+      },
+      {
+        "x": -79,
+        "y": 18095,
+        "dirRad": 0.0,
+        "typeRes": 179
+      },
+      {
+        "x": -171,
+        "y": 19229,
+        "dirRad": 0.0,
+        "typeRes": 180
+      },
+      {
+        "x": -115,
+        "y": 19536,
+        "dirRad": 0.0,
+        "typeRes": 188
+      },
+      {
+        "x": -57,
+        "y": 19832,
+        "dirRad": 0.0,
+        "typeRes": 225
+      },
+      {
+        "x": -116,
+        "y": 20866,
+        "dirRad": 0.0,
+        "typeRes": 158
+      },
+      {
+        "x": -121,
+        "y": 21792,
+        "dirRad": 0.0,
+        "typeRes": 188
+      },
+      {
+        "x": -414,
+        "y": 21812,
+        "dirRad": 0.0,
+        "typeRes": 166
+      },
+      {
+        "x": 287,
+        "y": 22427,
+        "dirRad": 0.0,
+        "typeRes": 165
+      },
+      {
+        "x": -433,
+        "y": 23621,
+        "dirRad": 0.0,
+        "typeRes": 224
+      },
+      {
+        "x": -53,
+        "y": 23688,
+        "dirRad": 0.0,
+        "typeRes": 180
+      },
+      {
+        "x": 343,
+        "y": 24148,
+        "dirRad": 0.0,
+        "typeRes": 174
+      },
+      {
+        "x": 103,
+        "y": 24153,
+        "dirRad": 1.0,
+        "typeRes": 176
+      },
+      {
+        "x": 69,
+        "y": 24208,
+        "dirRad": 1.0,
+        "typeRes": 176
+      },
+      {
+        "x": 18,
+        "y": 27081,
+        "dirRad": 5.75,
+        "typeRes": 188
+      },
+      {
+        "x": 133,
+        "y": 27600,
+        "dirRad": 0.0,
+        "typeRes": 224
+      },
+      {
+        "x": -125,
+        "y": 27661,
+        "dirRad": 0.0,
+        "typeRes": 158
+      },
+      {
+        "x": -194,
+        "y": 27781,
+        "dirRad": 0.0,
+        "typeRes": 158
+      },
+      {
+        "x": -145,
+        "y": 27869,
+        "dirRad": 0.0,
+        "typeRes": 158
+      },
+      {
+        "x": -279,
+        "y": 27890,
+        "dirRad": 0.0,
+        "typeRes": 158
+      },
+      {
+        "x": 579,
+        "y": 29019,
+        "dirRad": 0.0,
+        "typeRes": 165
+      },
+      {
+        "x": -126,
+        "y": 29059,
+        "dirRad": 0.0,
+        "typeRes": 188
+      },
+      {
+        "x": 290,
+        "y": 30496,
+        "dirRad": 0.0,
+        "typeRes": 225
+      },
+      {
+        "x": 48,
+        "y": 31863,
+        "dirRad": 0.0,
+        "typeRes": 167
+      },
+      {
+        "x": 188,
+        "y": 31901,
+        "dirRad": 0.0,
+        "typeRes": 173
+      },
+      {
+        "x": 47,
+        "y": 33498,
+        "dirRad": 0.0,
+        "typeRes": 168
+      },
+      {
+        "x": -157,
+        "y": 35065,
+        "dirRad": 0.0,
+        "typeRes": 172
+      },
+      {
+        "x": -159,
+        "y": 35144,
+        "dirRad": 0.0,
+        "typeRes": 169
+      },
+      {
+        "x": -200,
+        "y": 35307,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -258,
+        "y": 35310,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -260,
+        "y": 35564,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -203,
+        "y": 35565,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -19,
+        "y": 35782,
+        "dirRad": 0.0,
+        "typeRes": 225
+      },
+      {
+        "x": -381,
+        "y": 35828,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -387,
+        "y": 36015,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -276,
+        "y": 36103,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -212,
+        "y": 36104,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -191,
+        "y": 36210,
+        "dirRad": 0.0,
+        "typeRes": 181
+      },
+      {
+        "x": -290,
+        "y": 36302,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -239,
+        "y": 36305,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -195,
+        "y": 36325,
+        "dirRad": 5.0,
+        "typeRes": 179
+      },
+      {
+        "x": -396,
+        "y": 36493,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -397,
+        "y": 36706,
+        "dirRad": 0.0,
+        "typeRes": 176
+      },
+      {
+        "x": -436,
+        "y": 38814,
+        "dirRad": 0.0,
+        "typeRes": 224
+      },
+      {
+        "x": -38,
+        "y": 38832,
+        "dirRad": 0.0,
+        "typeRes": 234
+      }
+    ],
+    "roadSegmentCount": 20338,
+    "trackUpCount": 82,
+    "trackDownCount": 77
+  },
+  {
+    "levelNumber": 3,
+    "packId": 142,
+    "properties": {
+      "roadInfo": 129,
+      "timeLimitRaw": 180,
+      "timeLimitSec": 1.8,
+      "xStartPos": 50,
+      "levelEnd": 38767
+    },
+    "objectGroupRefs": [
+      {
+        "resID": 135,
+        "numObjs": 15
+      },
+      {
+        "resID": 136,
+        "numObjs": 150
+      },
+      {
+        "resID": 133,
+        "numObjs": 3
+      },
+      {
+        "resID": 134,
+        "numObjs": 1
+      },
+      {
+        "resID": 132,
+        "numObjs": 4
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      },
+      {
+        "resID": 0,
+        "numObjs": 0
+      }
+    ],
+    "objectCount": 10,
+    "objects": [
+      {
+        "x": -501,
+        "y": 6040,
+        "dirRad": 0.0,
+        "typeRes": 171
+      },
+      {
+        "x": 503,
+        "y": 6439,
+        "dirRad": 0.0,
+        "typeRes": 235
+      },
+      {
+        "x": -691,
+        "y": 11919,
+        "dirRad": 1.51,
+        "typeRes": 235
+      },
+      {
+        "x": -205,
+        "y": 12360,
+        "dirRad": 0.0,
+        "typeRes": 165
+      },
+      {
+        "x": -190,
+        "y": 12637,
+        "dirRad": 0.0,
+        "typeRes": 183
+      },
+      {
+        "x": 216,
+        "y": 14726,
+        "dirRad": 0.0,
+        "typeRes": 235
+      },
+      {
+        "x": -395,
+        "y": 23559,
+        "dirRad": 3.1415,
+        "typeRes": 235
+      },
+      {
+        "x": -1399,
+        "y": 31434,
+        "dirRad": 0.0,
+        "typeRes": 235
+      },
+      {
+        "x": 272,
+        "y": 38766,
+        "dirRad": 0.0,
+        "typeRes": 231
+      },
+      {
+        "x": 272,
+        "y": 38767,
+        "dirRad": 0.0,
+        "typeRes": 184
+      }
+    ],
+    "roadSegmentCount": 20632,
+    "trackUpCount": 162,
+    "trackDownCount": 173
+  }
+]
