@@ -487,6 +487,7 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  /** Valid field names: 'x' | 'y' | 'dir' | 'typeRes' */
   onObjFieldInput(field: string, event: Event): void {
     const val = parseFloat((event.target as HTMLInputElement).value);
     if (Number.isNaN(val)) return;
@@ -986,6 +987,7 @@ export class App implements OnInit, OnDestroy {
     this.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
   }
 
+  /** Valid field names: 'x1' | 'y1' | 'x2' | 'y2' */
   onMarkFieldInput(markIdx: number, field: string, event: Event): void {
     const val = Number.parseInt((event.target as HTMLInputElement).value, 10);
     if (Number.isNaN(val)) return;
