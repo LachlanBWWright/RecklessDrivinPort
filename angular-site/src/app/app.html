@@ -148,8 +148,7 @@
         <!-- Editor section tabs -->
         <div class="editor-section-tabs">
           <button type="button" class="section-tab" [class.active]="editorSection() === 'properties'" (click)="setSection('properties')">⚙️ Properties</button>
-          <button type="button" class="section-tab" [class.active]="editorSection() === 'objects'"    (click)="setSection('objects')">📦 Objects</button>
-          <button type="button" class="section-tab" [class.active]="editorSection() === 'road'"       (click)="setSection('road')">🛣️ Road &amp; Tracks</button>
+          <button type="button" class="section-tab" [class.active]="editorSection() === 'objects'"    (click)="setSection('objects')">📦 Objects &amp; Tracks</button>
           <button type="button" class="section-tab" [class.active]="editorSection() === 'sprites'"    (click)="setSection('sprites')">🎨 Sprites (PPic)</button>
         </div>
 
@@ -235,32 +234,37 @@
         <!-- ---- OBJECTS SECTION ---- -->
         @if (editorSection() === 'objects' && selectedLevel()) {
           <div class="editor-panel">
-            <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Object Placement
+            <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Scene Editor
               <span class="badge">{{ objects().length }} objects</span>
+              <span class="badge" style="background:#42a5f5;margin-left:4px">{{ selectedLevel()!.trackUp.length }} up</span>
+              <span class="badge" style="background:#ef5350;margin-left:4px">{{ selectedLevel()!.trackDown.length }} down</span>
             </h3>
 
             <!-- Canvas toolbar -->
             <div class="canvas-toolbar">
-              <span class="hint-text" title="Drag: move object · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate">
-                🖱 Drag to move · Dbl-click to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> duplicates
+              <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate">
+                🖱 Drag objects or track waypoints · Dbl-click to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> duplicates
               </span>
               <div class="canvas-controls">
                 <button class="btn btn-sm" (click)="addObject()">+ Add Object</button>
                 <button class="btn btn-sm" (click)="duplicateSelectedObject()" [disabled]="selectedObjIndex() === null">📋 Duplicate</button>
                 <button class="btn btn-sm" (click)="removeSelectedObject()" [disabled]="selectedObjIndex() === null">🗑 Remove</button>
                 <button class="btn btn-sm" (click)="frameAllObjects()">🧭 Frame All</button>
-                <button class="btn btn-sm" (click)="centerOnSelectedObject()" [disabled]="selectedObjIndex() === null">🎯 Center Selected</button>
+                <button class="btn btn-sm" (click)="centerOnSelectedObject()" [disabled]="selectedObjIndex() === null">🎯 Center</button>
+                <button class="btn btn-sm" [class.btn-active]="showTrackOverlay()" (click)="showTrackOverlay.set(!showTrackOverlay())">
+                  🛣 {{ showTrackOverlay() ? 'Hide' : 'Show' }} Tracks
+                </button>
                 <button class="btn btn-sm" (click)="zoomIn()">🔍+</button>
                 <button class="btn btn-sm" (click)="zoomOut()">🔍-</button>
-                <button class="btn btn-sm" (click)="resetView()">⟲ Reset View</button>
+                <button class="btn btn-sm" (click)="resetView()">⟲ Reset</button>
               </div>
             </div>
 
             <!-- Main layout: canvas left, form right -->
             <div class="object-canvas-layout">
               <div class="object-canvas-col">
-                <div class="subtle-section-title">Scene preview</div>
-                <canvas id="object-canvas" class="object-canvas" width="600" height="500"
+                <div class="subtle-section-title">Scene preview – drag objects &amp; track waypoints (blue/red dots)</div>
+                <canvas id="object-canvas" class="object-canvas" width="640" height="540"
                   tabindex="0"
                   (mousedown)="onCanvasMouseDown($event)"
                   (mousemove)="onCanvasMouseMove($event)"
@@ -268,15 +272,75 @@
                   (dblclick)="onCanvasDoubleClick($event)"
                   (keydown)="onCanvasKeyDown($event)"
                   (wheel)="onCanvasWheel($event)"
-                  [style.cursor]="isDragging() ? 'grabbing' : 'crosshair'"
+                  [style.cursor]="isDragging() || dragTrackWaypoint() ? 'grabbing' : 'crosshair'"
                 ></canvas>
-                <div class="canvas-zoom-label">Zoom: {{ (canvasZoom() * 100).toFixed(0) }}%</div>
+                <div class="canvas-zoom-label">Zoom: {{ (canvasZoom() * 100).toFixed(0) }}%
+                  &nbsp;·&nbsp; <span style="color:#42a5f5">■ Up track</span>
+                  &nbsp; <span style="color:#ef5350">■ Down track</span>
+                  &nbsp; <span style="color:#ffeb3b">■ Marks</span>
+                </div>
+
+                <!-- Marks editor panel, inline below canvas -->
+                <details class="marks-details" style="margin-top:8px">
+                  <summary>✏️ Checkpoint / Mark Segments <span class="badge">{{ marks().length }}</span></summary>
+                  <div class="mark-editor-inline">
+                    <div class="mark-controls">
+                      <button class="btn btn-sm" (click)="addMark()" [disabled]="workerBusy()">+ Add Mark</button>
+                      <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex() === null || workerBusy()" (click)="removeSelectedMark()">Remove</button>
+                      <button class="btn btn-primary btn-sm" (click)="saveMarks()" [disabled]="workerBusy()">
+                        @if (workerBusy()) { <span class="btn-spinner"></span> } 💾 Save Marks
+                      </button>
+                    </div>
+                    @if (selectedMarkIndex() !== null) {
+                      <div class="mark-form props-grid" style="margin-top:6px">
+                        <div class="prop-group"><label>P1 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x1', $event)" /></div>
+                        <div class="prop-group"><label>P1 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y1', $event)" /></div>
+                        <div class="prop-group"><label>P2 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x2', $event)" /></div>
+                        <div class="prop-group"><label>P2 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y2', $event)" /></div>
+                      </div>
+                    }
+                    <div class="table-scroll" style="max-height:120px;margin-top:6px">
+                      <table class="data-table">
+                        <thead><tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr></thead>
+                        <tbody>
+                          @for (mark of marks(); track $index) {
+                            <tr [class.selected]="selectedMarkIndex() === $index" (click)="selectedMarkIndex.set($index)" style="cursor:pointer">
+                              <td>{{ $index }}</td>
+                              <td>{{ mark.x1 }}</td><td>{{ mark.y1 }}</td>
+                              <td>{{ mark.x2 }}</td><td>{{ mark.y2 }}</td>
+                            </tr>
+                          }
+                          @if (marks().length === 0) {
+                            <tr><td colspan="5" class="muted">No mark segments.</td></tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+
+                <!-- Road stats inline -->
+                <details class="road-details" style="margin-top:8px">
+                  <summary>🛣️ Road &amp; Track Data</summary>
+                  <div class="road-stats" style="margin-top:8px">
+                    <div class="stat-card"><div class="stat-value">{{ selectedLevel()!.trackUp.length }}</div><div class="stat-label">Track Up segs</div></div>
+                    <div class="stat-card"><div class="stat-value">{{ selectedLevel()!.trackDown.length }}</div><div class="stat-label">Track Down segs</div></div>
+                    <div class="stat-card"><div class="stat-value">{{ selectedLevel()!.roadSegCount }}</div><div class="stat-label">Road segments</div></div>
+                    <div class="stat-card"><div class="stat-value">{{ marks().length }}</div><div class="stat-label">Mark segments</div></div>
+                  </div>
+                  <p class="field-hint" style="margin-top:4px">Track waypoints shown as blue (up) and red (down) dots. Drag them to reposition.</p>
+                </details>
               </div>
 
               <div class="object-form-col">
                 <div class="subtle-section-title">Inspector</div>
                 @if (selectedObjIndex() !== null) {
-                  <h4>Object #{{ selectedObjIndex() }}</h4>
+                  <div class="obj-inspector-header">
+                    @if (getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes); as url) {
+                      <img [src]="url" class="obj-inspector-sprite" alt="sprite preview" />
+                    }
+                    <h4 style="margin:0">Object #{{ selectedObjIndex() }}</h4>
+                  </div>
                   <div class="props-grid">
                     <div class="prop-group">
                       <label for="obj-x">X (pixels)</label>
@@ -294,7 +358,7 @@
                       <label for="obj-type">Type ID</label>
                       <input id="obj-type" type="number" [value]="editObjTypeRes()" (input)="onObjFieldInput('typeRes', $event)" />
                       <p class="field-hint">
-                        128 = player car. The canvas uses the matching object-type sprite when available.
+                        128 = player car.
                         @if (getObjTypeDimensionLabel(editObjTypeRes()); as dim) {
                           <span class="type-dim-badge">{{ dim }}</span>
                         }
@@ -319,18 +383,17 @@
                         </button>
                       }
                     </div>
-                    <p class="field-hint">Hide clutter on the canvas by color-group. Selected objects stay faintly visible even when filtered out.</p>
                   </div>
                   <div class="save-row">
                     <button type="button" class="btn btn-danger" (click)="removeSelectedObject()">🗑 Remove</button>
                     <span class="field-hint auto-apply-note">Changes apply automatically.</span>
                   </div>
                 } @else {
-                  <p class="muted">Click an object on the canvas to select it,<br>or double-click the canvas to add one.</p>
+                  <p class="muted">Click an object on the canvas to select it,<br>or double-click the canvas to add one.<br>Drag track waypoints (coloured dots) to reposition them.</p>
                 }
 
-                <!-- Object list panel -->
-                <div class="object-list-compact" style="margin-top:16px">
+                <!-- Object list panel with sprite thumbnails -->
+                <div class="object-list-compact" style="margin-top:12px">
                   <div class="object-list-header">
                     <span>All objects</span>
                     <span class="badge">{{ filteredObjectIndices().length }} / {{ objects().length }}</span>
@@ -348,6 +411,16 @@
                       <div class="object-item" [class.selected]="selectedObjIndex() === idx"
                         (click)="selectObject(idx, true)"
                         [title]="'Object #' + idx + ' · TypeRes ' + objects()[idx].typeRes + ' · (' + objects()[idx].x + ', ' + objects()[idx].y + ')'">
+                        <span class="obj-sprite-thumb">
+                          @if (getSpritePreviewDataUrl(objects()[idx].typeRes); as url) {
+                            <img [src]="url" class="obj-list-sprite" alt="" />
+                          } @else {
+                            <span class="obj-list-sprite-fallback"
+                              [style.background]="getObjFallbackColor(objects()[idx].typeRes)">
+                              T
+                            </span>
+                          }
+                        </span>
                         <span class="obj-idx">#{{ idx }}</span>
                         <span class="obj-type">T{{ objects()[idx].typeRes }}</span>
                         <span class="obj-pos">({{ objects()[idx].x }},{{ objects()[idx].y }})</span>
@@ -366,129 +439,6 @@
                 @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Objects to Pack }
               </button>
             </div>
-          </div>
-        }
-
-        <!-- ---- ROAD & TRACKS SECTION ---- -->
-        @if (editorSection() === 'road' && selectedLevel()) {
-          <div class="editor-panel">
-            <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Road &amp; Track Data</h3>
-
-            <div class="road-stats">
-              <div class="stat-card">
-                <div class="stat-value">{{ selectedLevel()!.trackUp.length }}</div>
-                <div class="stat-label">Track Up segments</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-value">{{ selectedLevel()!.trackDown.length }}</div>
-                <div class="stat-label">Track Down segments</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-value">{{ selectedLevel()!.roadSegCount }}</div>
-                <div class="stat-label">Road segments</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-value">{{ selectedLevel()!.marks.length }}</div>
-                <div class="stat-label">Mark segments</div>
-              </div>
-            </div>
-
-            <h4>Track Path Visualizer</h4>
-            <p class="field-hint">
-              Track segments define the AI/player path. Each segment is a point (x, y) with flags and velocity hint.
-              The up-track is for driving up-screen; down-track for driving down-screen.
-              Road segments (tRoadSeg = 4×SInt16) define the driveable surface geometry.
-            </p>
-            <canvas id="track-canvas" class="track-canvas" width="600" height="300"
-              [attr.title]="'Track Up (' + selectedLevel()!.trackUp.length + ' segs) + Track Down (' + selectedLevel()!.trackDown.length + ' segs)'">
-            </canvas>
-            <div class="track-legend">
-              <span class="legend-up">■ Track Up</span>
-              <span class="legend-down">■ Track Down</span>
-            </div>
-
-            <h4>Track Up segments <span class="badge">{{ selectedLevel()!.trackUp.length }}</span></h4>
-            <div class="table-scroll">
-              <table class="data-table">
-                <thead><tr><th>#</th><th>flags</th><th>x</th><th>y</th><th>velo</th></tr></thead>
-                <tbody>
-                  @for (seg of selectedLevel()!.trackUp.slice(0, 100); track $index) {
-                    <tr>
-                      <td>{{ $index }}</td>
-                      <td>0x{{ seg.flags.toString(16).padStart(4,'0') }}</td>
-                      <td>{{ seg.x }}</td>
-                      <td>{{ seg.y }}</td>
-                      <td>{{ seg.velo.toFixed(2) }}</td>
-                    </tr>
-                  }
-                  @if (selectedLevel()!.trackUp.length > 100) {
-                    <tr><td colspan="5" class="muted">… {{ selectedLevel()!.trackUp.length - 100 }} more rows</td></tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-
-            <h4>Mark Segments (finish line / checkpoints) <span class="badge">{{ selectedLevel()!.marks.length }}</span></h4>
-            <div class="table-scroll">
-              <table class="data-table">
-                <thead><tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr></thead>
-                <tbody>
-                  @for (mark of selectedLevel()!.marks; track $index) {
-                    <tr>
-                      <td>{{ $index }}</td>
-                      <td>{{ mark.x1 }}</td><td>{{ mark.y1 }}</td>
-                      <td>{{ mark.x2 }}</td><td>{{ mark.y2 }}</td>
-                    </tr>
-                  }
-                  @if (selectedLevel()!.marks.length === 0) {
-                    <tr><td colspan="5" class="muted">No mark segments.</td></tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-
-            <h4>Road Segments (tRoadSeg = 4×SInt16) <span class="badge">{{ selectedLevel()!.roadSegs.slice(0,50).length }} shown of {{ selectedLevel()!.roadSegCount }}</span></h4>
-            <div class="table-scroll">
-              <table class="data-table">
-                <thead><tr><th>#</th><th>v0</th><th>v1</th><th>v2</th><th>v3</th></tr></thead>
-                <tbody>
-                  @for (seg of selectedLevel()!.roadSegs.slice(0, 50); track $index) {
-                    <tr>
-                      <td>{{ $index }}</td>
-                      <td>{{ seg.v0 }}</td><td>{{ seg.v1 }}</td>
-                      <td>{{ seg.v2 }}</td><td>{{ seg.v3 }}</td>
-                    </tr>
-                  }
-                  @if (selectedLevel()!.roadSegCount > 50) {
-                    <tr><td colspan="5" class="muted">… {{ selectedLevel()!.roadSegCount - 50 }} more segments</td></tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-            <h4>✏️ Checkpoint / Mark Segment Editor <span class="badge">{{ marks().length }}</span></h4>
-            <p class="field-hint">Drag the endpoint dots on the canvas to reposition mark lines. Click a line to select it.</p>
-            <div class="mark-canvas-layout">
-              <canvas id="mark-canvas" class="mark-canvas" width="600" height="300"
-                (mousedown)="onMarkCanvasMouseDown($event)"
-                (mousemove)="onMarkCanvasMouseMove($event)"
-                (mouseup)="onMarkCanvasMouseUp($event)"
-              ></canvas>
-              <div class="mark-controls">
-                <button class="btn btn-sm" (click)="addMark()" [disabled]="workerBusy()">+ Add Mark</button>
-                <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex() === null || workerBusy()" (click)="removeSelectedMark()">Remove</button>
-                <button class="btn btn-primary" (click)="saveMarks()" [disabled]="workerBusy()">
-                  @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Marks }
-                </button>
-              </div>
-            </div>
-            @if (selectedMarkIndex() !== null) {
-              <div class="mark-form props-grid" style="margin-top:8px">
-                <div class="prop-group"><label>P1 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x1', $event)" /></div>
-                <div class="prop-group"><label>P1 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y1" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y1', $event)" /></div>
-                <div class="prop-group"><label>P2 X</label><input type="number" [value]="marks()[selectedMarkIndex()!].x2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'x2', $event)" /></div>
-                <div class="prop-group"><label>P2 Y</label><input type="number" [value]="marks()[selectedMarkIndex()!].y2" (input)="onMarkFieldInput(selectedMarkIndex()!, 'y2', $event)" /></div>
-              </div>
-            }
           </div>
         }
         @if (editorSection() === 'sprites') {

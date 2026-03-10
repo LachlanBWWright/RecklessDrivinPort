@@ -85,10 +85,10 @@ describe('App', () => {
     const app = TestBed.createComponent(App).componentInstance;
     app.setSection('objects');
     expect(app.editorSection()).toBe('objects');
-    app.setSection('road');
-    expect(app.editorSection()).toBe('road');
     app.setSection('sprites');
     expect(app.editorSection()).toBe('sprites');
+    app.setSection('properties');
+    expect(app.editorSection()).toBe('properties');
   });
 
   it('should start with no editor data', () => {

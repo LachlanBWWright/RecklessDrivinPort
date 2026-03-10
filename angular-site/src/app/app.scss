@@ -820,3 +820,69 @@ input[type='file'] { display: none; }
   .object-canvas-layout { grid-template-columns: 1fr; }
   .object-form-col { position: static; }
 }
+
+/* ---- Object list sprite thumbnails ---- */
+.object-item {
+  grid-template-columns: 28px 28px 60px 1fr;
+}
+.obj-sprite-thumb {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.obj-list-sprite {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border-radius: 2px;
+}
+.obj-list-sprite-fallback {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  color: #fff;
+  font-weight: bold;
+}
+
+/* ---- Object inspector sprite ---- */
+.obj-inspector-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.obj-inspector-sprite {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.4);
+}
+
+/* ---- Marks & road inline panels ---- */
+.marks-details summary,
+.road-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 4px 0;
+  user-select: none;
+  color: var(--accent2);
+}
+.mark-editor-inline { padding: 8px 0; }
+
+/* ---- Track toggle button active state ---- */
+.btn-active {
+  background: var(--accent2) !important;
+  color: #fff !important;
+}
