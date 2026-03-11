@@ -1796,6 +1796,28 @@ export class App implements OnInit, OnDestroy {
       ctx.fillRect(canvasW - 28, tickY - 0.5, 28, 1);
       ctx.fillText(`${wy}`, canvasW - 60, tickY - 2);
     }
+
+    // Vertical scrollbar-like position indicator (right edge)
+    if (level.roadSegs.length > 1) {
+      const totalWorldH = (level.roadSegs.length - 1) * 2;
+      const viewTop    = panY - canvasH / (2 * zoom);
+      const viewBottom = panY + canvasH / (2 * zoom);
+      const barX = canvasW - 8;
+      const barW = 6;
+      const barH = canvasH - 20;
+      const barY = 10;
+      // Track background
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(barX, barY, barW, barH);
+      // Thumb (visible portion)
+      const thumbTop    = Math.max(0, (viewTop    / totalWorldH)) * barH + barY;
+      const thumbBottom = Math.min(barH + barY, (viewBottom / totalWorldH) * barH + barY);
+      const thumbH = Math.max(12, thumbBottom - thumbTop);
+      ctx.fillStyle = 'rgba(66, 165, 245, 0.55)';
+      ctx.beginPath();
+      ctx.roundRect(barX, thumbTop, barW, thumbH, 3);
+      ctx.fill();
+    }
   }
 
   /**
