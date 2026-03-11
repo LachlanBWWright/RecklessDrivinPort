@@ -1659,10 +1659,11 @@ export class App implements OnInit, OnDestroy {
     /**
      * Create a tiled CanvasPattern from a decoded texture canvas, aligned to world space.
      * @param texId        – key into roadTextureCanvases
-     * @param texWorldSize – how many world units this texture covers per tile (128 for main
-     *                       road/grass textures; 16 for border/kerb textures). Combined with
-     *                       tc.width (pixel size of the texture canvas), this gives the correct
-     *                       scale factor: zoom * tc.width / texWorldSize canvas-pixels per pixel.
+     * @param texWorldSize – how many world units one tile of this texture covers
+     *                       (128 for main road/grass textures; 16 for border/kerb textures).
+     *                       Combined with tc.width (pixel size of the texture canvas), the
+     *                       scale factor is: zoom * tc.width / texWorldSize canvas-pixels per
+     *                       texture-pixel (NOT a 1:1 pixel=world-unit relationship).
      */
     const makePattern = (texId: number, texWorldSize: number): CanvasPattern | string | null => {
       const tc = this.roadTextureCanvases.get(texId);
@@ -1670,9 +1671,9 @@ export class App implements OnInit, OnDestroy {
       try {
         const pat = ctx.createPattern(tc, 'repeat');
         if (!pat) return null;
-        // Each texture pixel represents one world unit.
-        // At zoom pixels/world-unit, each texture pixel becomes zoom canvas pixels.
-        // Scale factor = zoom * tc.width / texWorldSize (accounts for non-1:1 textures)
+        // Scale: one world unit = zoom canvas pixels; one texture tile covers texWorldSize
+        // world units → texWorldSize * zoom canvas pixels for the full tile.
+        // tc.width texture pixels must fill that many canvas pixels → scale per pixel.
         const scale = zoom * tc.width / texWorldSize;
         // Tile size in canvas pixels
         const tileW = tc.width * scale;

@@ -128,8 +128,8 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'DECODE_ALL_SPRITE_FRAMES': {
         const frames = levelEditorSvc.decodeAllSpriteFrames(resources);
-        const transferables3: ArrayBuffer[] = frames.map((f) => f.pixels);
-        self.postMessage({ id, ok: true, cmd, result: { frames } }, transferables3);
+        const framePixelBuffers: ArrayBuffer[] = frames.map((f) => f.pixels);
+        self.postMessage({ id, ok: true, cmd, result: { frames } }, framePixelBuffers);
         break;
       }
 
