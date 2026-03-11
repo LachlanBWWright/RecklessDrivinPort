@@ -48,7 +48,7 @@
     <div class="game-header">
       <span>Game</span>
       <span class="status-label">{{ statusText() }}</span>
-      <button class="btn-fullscreen" (click)="toggleFullscreen()">&#x26F6; Fullscreen</button>
+          <button mat-button class="btn-fullscreen" (click)="toggleFullscreen()">&#x26F6; Fullscreen</button>
     </div>
     <div class="canvas-wrapper">
       <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
@@ -86,10 +86,12 @@
       <!-- Toolbar -->
       <div class="editor-toolbar">
         <div class="toolbar-left">
-          <button type="button" class="btn" (click)="loadDefaultResources()" [disabled]="workerBusy()">Load default resources.dat</button>
-          <label class="btn upload-btn" [class.btn--disabled]="workerBusy()" for="resource-file">Upload resources.dat</label>
-          <input id="resource-file" type="file" accept=".dat" (change)="onResourceFileSelected($event)" [disabled]="workerBusy()" />
-          <button type="button" class="btn btn-primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
+          <button mat-stroked-button (click)="loadDefaultResources()" [disabled]="workerBusy()">Load default resources.dat</button>
+          <label class="mat-upload-btn" [class.mat-upload-btn--disabled]="workerBusy()" for="resource-file">
+            <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy()">📂 Upload resources.dat</button>
+          </label>
+          <input #fileInput id="resource-file" type="file" accept=".dat" (change)="onResourceFileSelected($event)" [disabled]="workerBusy()" style="display:none" />
+          <button mat-raised-button color="primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
             ⬇ Download edited resources.dat
           </button>
         </div>
@@ -144,9 +146,9 @@
 
         <!-- Editor section tabs -->
         <div class="editor-section-tabs">
-          <button type="button" class="section-tab" [class.active]="editorSection() === 'properties'" (click)="setSection('properties')">⚙️ Properties</button>
-          <button type="button" class="section-tab" [class.active]="editorSection() === 'objects'"    (click)="setSection('objects')">📦 Objects &amp; Tracks</button>
-          <button type="button" class="section-tab" [class.active]="editorSection() === 'sprites'"    (click)="setSection('sprites')">🎨 Sprites (PPic)</button>
+          <button mat-button class="section-tab" [class.active]="editorSection() === 'properties'" (click)="setSection('properties')">⚙️ Properties</button>
+          <button mat-button class="section-tab" [class.active]="editorSection() === 'objects'"    (click)="setSection('objects')">📦 Objects &amp; Tracks</button>
+          <button mat-button class="section-tab" [class.active]="editorSection() === 'sprites'"    (click)="setSection('sprites')">🎨 Sprites (PPic)</button>
         </div>
 
         <!-- ---- PROPERTIES SECTION ---- -->
@@ -201,7 +203,7 @@
             </table>
 
             <div class="save-row">
-              <button type="button" class="btn btn-primary" (click)="saveLevelProperties()" [disabled]="!propertiesDirty() || workerBusy()">
+              <button mat-raised-button color="primary" (click)="saveLevelProperties()" [disabled]="!propertiesDirty() || workerBusy()">
                 @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Properties to Pack }
               </button>
               @if (!propertiesDirty()) {
@@ -298,7 +300,7 @@
             </div>
 
             <div class="save-row" style="margin-top:12px">
-              <button class="btn btn-primary" (click)="saveLevelObjects()" [disabled]="workerBusy()">
+              <button mat-raised-button color="primary" (click)="saveLevelObjects()" [disabled]="workerBusy()">
                 @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Objects to Pack }
               </button>
             </div>
@@ -336,7 +338,7 @@
                           · {{ selectedPackSpriteFrame()?.width ?? '?' }}×{{ selectedPackSpriteFrame()?.height ?? '?' }} px
                           · {{ getSpriteFormatLabel(selectedPackSpriteFrame()?.bitDepth) }}
                         </p>
-                        <button class="btn btn-sm" style="margin-top:6px" (click)="exportSpritePng()">⬇ Export PNG</button>
+                        <button mat-stroked-button style="margin-top:6px" (click)="exportSpritePng()">⬇ Export PNG</button>
                       </div>
                     }
                   }

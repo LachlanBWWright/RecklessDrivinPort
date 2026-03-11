@@ -58,8 +58,8 @@
     <div class="type-visibility-header">
       <span>Filter by color group (click to toggle):</span>
       <div class="type-visibility-actions">
-        <button type="button" class="btn btn-sm" (click)="showAll.emit()">All</button>
-        <button type="button" class="btn btn-sm" (click)="hideAll.emit()">None</button>
+        <button mat-button (click)="showAll.emit()">All</button>
+        <button mat-button (click)="hideAll.emit()">None</button>
       </div>
     </div>
     <div class="type-chip-list">
@@ -74,7 +74,7 @@
     </div>
   </div>
   <div class="save-row">
-    <button type="button" class="btn btn-danger" (click)="removeSelected.emit()">🗑 Remove</button>
+    <button mat-stroked-button color="warn" (click)="removeSelected.emit()">🗑 Remove</button>
     <span class="field-hint auto-apply-note">Changes apply automatically.</span>
   </div>
 } @else {

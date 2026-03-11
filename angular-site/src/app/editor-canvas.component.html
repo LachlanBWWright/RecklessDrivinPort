@@ -4,17 +4,17 @@
     🖱 Drag · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Space</kbd>+drag/middle-mouse pans · <kbd>↑↓←→</kbd> pan
   </span>
   <div class="canvas-controls">
-    <button class="btn btn-sm" (click)="addObject.emit()">+ Add Object</button>
-    <button class="btn btn-sm" (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null">📋 Duplicate</button>
-    <button class="btn btn-sm" (click)="removeObject.emit()" [disabled]="selectedObjIndex === null">🗑 Remove</button>
-    <button class="btn btn-sm" (click)="frameAll.emit()">🧭 Frame All</button>
-    <button class="btn btn-sm" (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null">🎯 Center</button>
-    <button class="btn btn-sm" [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()">
+    <button mat-stroked-button (click)="addObject.emit()">+ Add Object</button>
+    <button mat-stroked-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null">📋 Duplicate</button>
+    <button mat-stroked-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null">🗑 Remove</button>
+    <button mat-stroked-button (click)="frameAll.emit()">🧭 Frame All</button>
+    <button mat-stroked-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null">🎯 Center</button>
+    <button mat-stroked-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()">
       🛣 {{ showTrackOverlay ? 'Hide' : 'Show' }} Tracks
     </button>
-    <button class="btn btn-sm" (click)="zoomIn.emit()">🔍+</button>
-    <button class="btn btn-sm" (click)="zoomOut.emit()">🔍-</button>
-    <button class="btn btn-sm" (click)="resetView.emit()">⟲ Reset</button>
+    <button mat-stroked-button (click)="zoomIn.emit()">🔍+</button>
+    <button mat-stroked-button (click)="zoomOut.emit()">🔍-</button>
+    <button mat-stroked-button (click)="resetView.emit()">⟲ Reset</button>
   </div>
 </div>
 
@@ -60,9 +60,9 @@
     <summary>✏️ Checkpoint / Mark Segments <span class="badge">{{ marks.length }}</span></summary>
     <div class="mark-editor-inline">
       <div class="mark-controls">
-        <button class="btn btn-sm" (click)="addMark.emit()" [disabled]="workerBusy">+ Add Mark</button>
-        <button class="btn btn-sm btn-danger" [disabled]="selectedMarkIndex === null || workerBusy" (click)="removeMark.emit()">Remove</button>
-        <button class="btn btn-primary btn-sm" (click)="saveMarks.emit()" [disabled]="workerBusy">
+        <button mat-stroked-button (click)="addMark.emit()" [disabled]="workerBusy">+ Add Mark</button>
+        <button mat-stroked-button color="warn" [disabled]="selectedMarkIndex === null || workerBusy" (click)="removeMark.emit()">Remove</button>
+        <button mat-raised-button color="primary" (click)="saveMarks.emit()" [disabled]="workerBusy">
           @if (workerBusy) { <span class="btn-spinner"></span> } 💾 Save Marks
         </button>
       </div>
