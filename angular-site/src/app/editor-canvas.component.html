@@ -1,7 +1,7 @@
 <!-- Canvas toolbar -->
 <div class="canvas-toolbar">
-  <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate · Middle-mouse or Space+drag: pan">
-    🖱 Drag objects/waypoints · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> duplicates · <kbd>Space</kbd>+drag or middle-mouse to pan
+  <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate · Middle-mouse or Space+drag: pan · Arrow keys: pan">
+    🖱 Drag · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Space</kbd>+drag/middle-mouse pans · <kbd>↑↓←→</kbd> pan
   </span>
   <div class="canvas-controls">
     <button class="btn btn-sm" (click)="addObject.emit()">+ Add Object</button>
@@ -30,7 +30,7 @@
     (keyup)="canvasKeyUp.emit($event)"
     (wheel)="canvasWheel.emit($event)"
     (contextmenu)="$event.preventDefault()"
-    [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : 'crosshair'"
+    [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (spaceDown ? 'grab' : 'crosshair')"
   ></canvas>
   <div class="canvas-zoom-label">
     Zoom: {{ (zoom * 100).toFixed(0) }}%

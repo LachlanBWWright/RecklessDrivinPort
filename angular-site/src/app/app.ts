@@ -175,8 +175,10 @@ export class App implements OnInit, OnDestroy {
   private _prevPanMouseX = 0;
   private _prevPanMouseY = 0;
   private _isPanning = false;
-  private _spaceDown = false;
-
+  /** True while Space is held (enables Space+drag panning). */
+  readonly spaceDown = signal(false);
+  /** True while actively panning (middle-mouse or space+drag). */
+  readonly isPanning = signal(false);
   // ---- Track waypoint drag ----
   /** When non-null, the user is dragging a track waypoint. */
   dragTrackWaypoint = signal<{ track: 'up' | 'down'; segIdx: number } | null>(null);
@@ -631,9 +633,10 @@ export class App implements OnInit, OnDestroy {
 
   onCanvasMouseDown(event: MouseEvent): void {
     event.preventDefault();
-    if (event.button === 1 || (event.button === 0 && this._spaceDown)) {
+    if (event.button === 1 || (event.button === 0 && this.spaceDown())) {
       // Middle mouse button OR Space+left-drag: start panning
       this._isPanning = true;
+      this.isPanning.set(true);
       this._prevPanMouseX = event.offsetX;
       this._prevPanMouseY = event.offsetY;
       return;
@@ -725,6 +728,7 @@ export class App implements OnInit, OnDestroy {
   onCanvasMouseUp(event: MouseEvent): void {
     if (this._isPanning) {
       this._isPanning = false;
+      this.isPanning.set(false);
       return;
     }
     // Finish track waypoint drag (no save needed – editTrackUp/Down are live)
@@ -750,7 +754,7 @@ export class App implements OnInit, OnDestroy {
 
   onCanvasKeyDown(event: KeyboardEvent): void {
     if (event.key === ' ') {
-      this._spaceDown = true;
+      this.spaceDown.set(true);
       event.preventDefault(); // prevent page scroll
       return;
     }
@@ -762,13 +766,23 @@ export class App implements OnInit, OnDestroy {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       this.removeSelectedObject();
+      return;
     }
+    // Arrow key panning
+    const panStep = 50 / this.canvasZoom(); // world units per keystroke
+    if (event.key === 'ArrowUp')    { event.preventDefault(); this.canvasPanY.update((y) => y - panStep); }
+    if (event.key === 'ArrowDown')  { event.preventDefault(); this.canvasPanY.update((y) => y + panStep); }
+    if (event.key === 'ArrowLeft')  { event.preventDefault(); this.canvasPanX.update((x) => x - panStep); }
+    if (event.key === 'ArrowRight') { event.preventDefault(); this.canvasPanX.update((x) => x + panStep); }
   }
 
   onCanvasKeyUp(event: KeyboardEvent): void {
     if (event.key === ' ') {
-      this._spaceDown = false;
-      if (this._isPanning) this._isPanning = false;
+      this.spaceDown.set(false);
+      if (this._isPanning) {
+        this._isPanning = false;
+        this.isPanning.set(false);
+      }
     }
   }
 

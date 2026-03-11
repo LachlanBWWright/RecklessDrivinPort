@@ -257,6 +257,7 @@
                 [workerBusy]="workerBusy()"
                 [isDragging]="isDragging()"
                 [dragTrackWaypoint]="dragTrackWaypoint()"
+                [spaceDown]="spaceDown() || isPanning()"
                 (canvasMouseDown)="onCanvasMouseDown($event)"
                 (canvasMouseMove)="onCanvasMouseMove($event)"
                 (canvasMouseUp)="onCanvasMouseUp($event)"
