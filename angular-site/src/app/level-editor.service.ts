@@ -500,7 +500,9 @@ export class LevelEditorService {
         for (const e of entries) {
           result.push({ id: e.id, bitDepth });
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        console.warn(`[LevelEditor] getAllSpriteFrameIds: failed to parse Pack #${packId}:`, err);
+      }
     };
     getIds(SPRITE_PACK_16_ID, 16);
     getIds(SPRITE_PACK_8_ID, 8);

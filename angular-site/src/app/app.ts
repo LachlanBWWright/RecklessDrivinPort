@@ -633,7 +633,8 @@ export class App implements OnInit, OnDestroy {
 
   onCanvasMouseDown(event: MouseEvent): void {
     event.preventDefault();
-    if (event.button === 1 || (event.button === 0 && this.spaceDown())) {
+    const isPanningGesture = event.button === 1 || (event.button === 0 && this.spaceDown());
+    if (isPanningGesture) {
       // Middle mouse button OR Space+left-drag: start panning
       this._isPanning = true;
       this.isPanning.set(true);
@@ -1471,6 +1472,13 @@ export class App implements OnInit, OnDestroy {
     try { return canvas.toDataURL(); } catch { return null; }
   }
 
+  /** Return a human-readable pixel format label for a sprite pack bit depth. */
+  getSpriteFormatLabel(bitDepth: 8 | 16 | undefined): string {
+    if (bitDepth === 16) return 'RGB555';
+    if (bitDepth === 8) return '8-bit';
+    return '?';
+  }
+
   /** Apply fresh level list received from the worker after a save operation. */
   private applyLevelsResult(levels: ParsedLevel[]): void {
     this.parsedLevels.set(levels);
@@ -1650,7 +1658,11 @@ export class App implements OnInit, OnDestroy {
 
     /**
      * Create a tiled CanvasPattern from a decoded texture canvas, aligned to world space.
-     * texWorldSize: world units per tile (128 for main textures, 16 for border textures)
+     * @param texId        – key into roadTextureCanvases
+     * @param texWorldSize – how many world units this texture covers per tile (128 for main
+     *                       road/grass textures; 16 for border/kerb textures). Combined with
+     *                       tc.width (pixel size of the texture canvas), this gives the correct
+     *                       scale factor: zoom * tc.width / texWorldSize canvas-pixels per pixel.
      */
     const makePattern = (texId: number, texWorldSize: number): CanvasPattern | string | null => {
       const tc = this.roadTextureCanvases.get(texId);
