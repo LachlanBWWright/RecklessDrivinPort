@@ -32,7 +32,10 @@
 }
 
 .road-stats {
-  padding: 0 12px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px 12px;
 }
 
 /* Keep table scroll capped */

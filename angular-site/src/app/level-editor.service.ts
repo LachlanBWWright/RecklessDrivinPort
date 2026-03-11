@@ -199,21 +199,24 @@ function writeBigFloat32(view: DataView, offset: number, value: number): void {
   view.setFloat32(offset, value, false);
 }
 
+/** Scale factor for converting a 5-bit channel (0–31) to 8-bit (0–255). */
+const RGB5_SCALE = 255 / 31;
+
 /** Convert a packed big-endian RGB555 pixel into 8-bit RGBA for canvas previews.
  *  Mac OS 9 / PPC native 16-bit format: xRRRRRGGGGGBBBBB (bit 15 unused).
  */
 function rgb555ToRgba(value: number): [number, number, number, number] {
-  const r = ((value >> 10) & 0x1f) * 255 / 31;
-  const g = ((value >> 5)  & 0x1f) * 255 / 31;
-  const b = (value & 0x1f)          * 255 / 31;
+  const r = ((value >> 10) & 0x1f) * RGB5_SCALE;
+  const g = ((value >> 5)  & 0x1f) * RGB5_SCALE;
+  const b = (value & 0x1f)          * RGB5_SCALE;
   return [Math.round(r), Math.round(g), Math.round(b), 255];
 }
 
 /** Convert a packed big-endian RGB565 pixel into 8-bit RGBA for canvas previews. */
 function rgb565ToRgba(value: number): [number, number, number, number] {
-  const r = ((value >> 11) & 0x1f) * 255 / 31;
-  const g = ((value >> 5) & 0x3f) * 255 / 63;
-  const b = (value & 0x1f) * 255 / 31;
+  const r = ((value >> 11) & 0x1f) * RGB5_SCALE;
+  const g = ((value >> 5) & 0x3f) * (255 / 63);
+  const b = (value & 0x1f) * RGB5_SCALE;
   return [Math.round(r), Math.round(g), Math.round(b), 255];
 }
 

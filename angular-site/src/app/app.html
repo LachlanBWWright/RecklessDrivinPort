@@ -344,14 +344,13 @@
                   </div>
                   @if (selectedPackSpriteId() !== null) {
                     @if (getPackSpriteDataUrl(selectedPackSpriteId()!); as url) {
-                      @let selFrame = packSpriteFrames()[$any(packSpriteFrames().findIndex(f => f.id === selectedPackSpriteId()))];
                       <div class="pack-sprite-detail">
                         <img [src]="url" class="pack-sprite-large" alt="sprite preview" />
                         <p class="field-hint" style="margin-top:6px">
                           Frame #{{ selectedPackSpriteId() }}
-                          · {{ selFrame?.bitDepth ?? '?' }}-bit
-                          · {{ selFrame?.width ?? '?' }}×{{ selFrame?.height ?? '?' }} px
-                          · RGB{{ selFrame?.bitDepth === 16 ? '555' : '332' }}
+                          · {{ selectedPackSpriteFrame()?.bitDepth ?? '?' }}-bit
+                          · {{ selectedPackSpriteFrame()?.width ?? '?' }}×{{ selectedPackSpriteFrame()?.height ?? '?' }} px
+                          · RGB{{ selectedPackSpriteFrame()?.bitDepth === 16 ? '555' : '332' }}
                         </p>
                       </div>
                     }

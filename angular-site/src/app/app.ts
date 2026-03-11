@@ -215,6 +215,12 @@ export class App implements OnInit, OnDestroy {
   selectedPackSpriteId = signal<number | null>(null);
   /** Version bumped when pack sprite canvases are ready. */
   packSpritesVersion = signal(0);
+  /** Computed metadata for the currently selected pack sprite frame. */
+  readonly selectedPackSpriteFrame = computed(() => {
+    const id = this.selectedPackSpriteId();
+    if (id === null) return null;
+    return this.packSpriteFrames().find((f) => f.id === id) ?? null;
+  });
 
   readonly spriteHexRows = computed(() => {
     const bytes = this.currentSpriteBytes();
@@ -289,15 +295,7 @@ export class App implements OnInit, OnDestroy {
       }
     });
 
-    // Redraw sprite pixel canvas when sprite selection or page changes.
-    effect(() => {
-      this.selectedSpriteId();
-      this.spriteHexPage();
-      const section = this.editorSection();
-      if (section === 'sprites') {
-        scheduleAfterRender(() => this.redrawSpriteCanvas());
-      }
-    });
+    // Sprite pixel canvas effect removed — PPic raw preview replaced by pack sprite viewer.
   }
 
   /** Schedule a canvas redraw on the next animation frame, cancelling any pending redraw. */
@@ -1646,17 +1644,18 @@ export class App implements OnInit, OnDestroy {
       try {
         const pat = ctx.createPattern(tc, 'repeat');
         if (!pat) return null;
-        // Scale: one world unit = (zoom) canvas pixels
-        // Texture tile is texWorldSize world units → texCanvas.width pixels
-        // Scale factor = zoom * texCanvas.width / texWorldSize (but txCanvas is already texWorldSize px)
-        const scale = zoom;
-        // Translate so tile origin lines up with world (0,0) which is at canvas (W/2 - panX*zoom, H/2 - panY*zoom)
-        const tileW = tc.width * zoom;
-        const tileH = tc.height * zoom;
+        // Each texture pixel represents one world unit.
+        // At zoom pixels/world-unit, each texture pixel becomes zoom canvas pixels.
+        // Scale factor = zoom * tc.width / texWorldSize (accounts for non-1:1 textures)
+        const scale = zoom * tc.width / texWorldSize;
+        // Tile size in canvas pixels
+        const tileW = tc.width * scale;
+        const tileH = tc.height * scale;
+        // Translate so that world origin (0,0) aligns with a tile boundary
         const tx = ((W / 2 - panX * zoom) % tileW + tileW) % tileW;
         const ty = ((H / 2 - panY * zoom) % tileH + tileH) % tileH;
         // DOMMatrix: [a, b, c, d, e, f] = [scaleX, 0, 0, scaleY, translateX, translateY]
-        pat.setTransform(new DOMMatrix([scale, 0, 0, scale, tx - tileW, ty - tileH]));
+        pat.setTransform(new DOMMatrix([scale, 0, 0, scale, tx, ty]));
         return pat;
       } catch {
         return null;
@@ -1707,7 +1706,6 @@ export class App implements OnInit, OnDestroy {
     for (let index = firstSeg; index <= lastSeg; index += step) {
       const cur = level.roadSegs[index];
       const nxt = level.roadSegs[index + step];
-      if (!nxt) break;
       const y0  = index * 2;
       const y1  = (index + step) * 2;
 
@@ -1741,7 +1739,6 @@ export class App implements OnInit, OnDestroy {
     let dashStarted = false;
     for (let index = firstSeg; index <= lastSeg; index += 2) {
       const seg = level.roadSegs[index];
-      if (!seg) break;
       const midX = (seg.v1 + seg.v2) / 2;
       const [cx, cy] = this.worldToCanvas(midX, index * 2);
       if (!dashStarted) { ctx.moveTo(cx, cy); dashStarted = true; }
