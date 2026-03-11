@@ -132,12 +132,9 @@
               type="button"
               class="level-btn"
               [class.active]="selectedLevelId() === level.resourceId"
-              [class.encrypted]="level.encrypted"
               (click)="selectLevel(level.resourceId)"
-              [title]="level.encrypted ? 'Encrypted pack (level 4+)' : ''"
             >
               {{ level.resourceId - 139 }}
-              @if (level.encrypted) { 🔒 }
             </button>
           }
           @if (parsedLevels().length === 0) {
@@ -317,7 +314,7 @@
                 <summary>🎮 Decoded Game Sprites (Pack 129 / 137) <span class="badge">{{ packSpriteFrames().length }}</span></summary>
                 <div class="pack-sprite-viewer">
                   <div class="pack-sprite-grid">
-                    @for (frame of packSpriteFrames(); track frame.id) {
+                    @for (frame of packSpriteFrames(); track $index) {
                       @if (getPackSpriteDataUrl(frame.id); as url) {
                         <div class="pack-sprite-cell"
                           [class.selected]="selectedPackSpriteId() === frame.id"
@@ -339,6 +336,7 @@
                           · {{ selectedPackSpriteFrame()?.width ?? '?' }}×{{ selectedPackSpriteFrame()?.height ?? '?' }} px
                           · {{ getSpriteFormatLabel(selectedPackSpriteFrame()?.bitDepth) }}
                         </p>
+                        <button class="btn btn-sm" style="margin-top:6px" (click)="exportSpritePng()">⬇ Export PNG</button>
                       </div>
                     }
                   }

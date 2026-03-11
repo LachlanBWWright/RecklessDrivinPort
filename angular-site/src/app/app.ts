@@ -1454,6 +1454,20 @@ export class App implements OnInit, OnDestroy {
     try { return canvas.toDataURL(); } catch { return null; }
   }
 
+  exportSpritePng(): void {
+    const id = this.selectedPackSpriteId();
+    if (id === null) return;
+    const canvas = this.packSpriteCanvases.get(id);
+    if (!canvas) return;
+    try {
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sprite-${id}.png`;
+      a.click();
+    } catch { /* security error on cross-origin canvas */ }
+  }
+
   /** Return a human-readable pixel format label for a sprite pack bit depth. */
   getSpriteFormatLabel(bitDepth: 8 | 16 | undefined): string {
     if (bitDepth === 16) return 'RGB555';
@@ -1636,7 +1650,7 @@ export class App implements OnInit, OnDestroy {
     // Look up the road info for this level to get real texture IDs.
     const roadInfo  = level.properties.roadInfo;
     const ri        = this.roadInfoDataMap.get(roadInfo);
-    const KERB_WIDTH = 14; // world units
+    const KERB_WIDTH = 16; // world units (matches game's 16.0f/zoom borderWidth)
 
     /**
      * Create a tiled CanvasPattern from a decoded texture canvas, aligned to world space.
@@ -1711,7 +1725,8 @@ export class App implements OnInit, OnDestroy {
     const firstSeg = Math.max(0, Math.floor(visibleWorldMinY / 2));
     const lastSeg  = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
 
-    const step = 1;
+    // Skip segments when zoomed out far (performance optimisation)
+    const step = zoom < 0.3 ? 4 : zoom < 0.6 ? 2 : 1;
     // Compute world extents at canvas edges for background fill (extends beyond road edges)
     const worldMinX = panX - W / (2 * zoom) - 200;
     const worldMaxX = panX + W / (2 * zoom) + 200;
@@ -1727,14 +1742,26 @@ export class App implements OnInit, OnDestroy {
       // Left border/kerb
       fillQuad(cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1,  lbPat ?? theme.kerbA);
 
-      // Dirt shoulder left (v0 to v1)
-      fillQuad(cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1,  bgPat ?? theme.bg);
+      // Left road lane: v0 to v1 (road surface)
+      fillQuad(cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1,  fgPat ?? theme.road);
 
-      // Road surface (v1 to v2)
-      fillQuad(cur.v1, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v1, y1,  fgPat ?? theme.road);
+      // Median / center gap: v1 to v2 (background with kerbs on both edges)
+      // Only draw if there is actually space (v1 == v2 means single-road / no median)
+      const medianW = Math.min(cur.v2 - cur.v1, nxt.v2 - nxt.v1);
+      if (medianW > 0) {
+        const halfKerb = Math.min(KERB_WIDTH, medianW / 2);
+        // Right edge of left lane → left edge of median
+        fillQuad(cur.v1, y0,  cur.v1 + halfKerb, y0,  nxt.v1 + halfKerb, y1,  nxt.v1, y1,  rbPat ?? theme.kerbB);
+        // Center of median (background fill)
+        if (medianW > halfKerb * 2) {
+          fillQuad(cur.v1 + halfKerb, y0,  cur.v2 - halfKerb, y0,  nxt.v2 - halfKerb, y1,  nxt.v1 + halfKerb, y1,  bgPat ?? theme.bg);
+        }
+        // Right edge of median → left edge of right lane
+        fillQuad(cur.v2 - halfKerb, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v2 - halfKerb, y1,  lbPat ?? theme.kerbA);
+      }
 
-      // Dirt shoulder right (v2 to v3)
-      fillQuad(cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1,  bgPat ?? theme.bg);
+      // Right road lane: v2 to v3 (road surface)
+      fillQuad(cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1,  fgPat ?? theme.road);
 
       // Right border/kerb
       fillQuad(cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1,  rbPat ?? theme.kerbB);
