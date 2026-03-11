@@ -220,16 +220,17 @@ describe('LevelEditorService', () => {
     });
   });
 
-  it('decodeSpriteFrame decodes 16-bit sprite pixels from Pack #137', () => {
+  it('decodeSpriteFrame decodes 16-bit sprite pixels from Pack #137 (RGB555)', () => {
     const sprite = new Uint8Array(8 + 2 * 4);
     const view = new DataView(sprite.buffer);
     view.setUint16(0, 2, false); // width
     view.setUint16(2, 2, false); // height
     sprite[4] = 1; // log2xSize => stride 2
     view.setUint16(8, 0x0000, false); // mask / transparent
-    view.setUint16(10, 0xf800, false); // red
-    view.setUint16(12, 0x07e0, false); // green
-    view.setUint16(14, 0x001f, false); // blue
+    // RGB555 test values: bits [14-10]=R, [9-5]=G, [4-0]=B
+    view.setUint16(10, 0xf800, false); // r≈30, g=0, b=0 (red-dominant)
+    view.setUint16(12, 0x07e0, false); // r=1, g=31, b=0 (green-dominant)
+    view.setUint16(14, 0x001f, false); // r=0, g=0, b=31 (pure blue)
 
     const resources = [{
       type: 'Pack',

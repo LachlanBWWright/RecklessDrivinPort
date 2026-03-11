@@ -175,6 +175,7 @@ export class App implements OnInit, OnDestroy {
   private _prevPanMouseX = 0;
   private _prevPanMouseY = 0;
   private _isPanning = false;
+  private _spaceDown = false;
 
   // ---- Track waypoint drag ----
   /** When non-null, the user is dragging a track waypoint. */
@@ -204,6 +205,16 @@ export class App implements OnInit, OnDestroy {
   spriteHexPage = signal(0);
   /** Raw bytes of the currently selected sprite (loaded from worker). */
   currentSpriteBytes = signal<Uint8Array | null>(null);
+
+  // ---- Pack sprite viewer (decoded from Pack 129 & 137) ----
+  /** Decoded game sprite frames: id → HTMLCanvasElement. */
+  private packSpriteCanvases = new Map<number, HTMLCanvasElement>();
+  /** List of decoded sprite frame infos (id, bitDepth, w, h). */
+  packSpriteFrames = signal<{ id: number; bitDepth: 8 | 16; width: number; height: number }[]>([]);
+  /** Currently selected sprite frame in the pack sprite viewer. */
+  selectedPackSpriteId = signal<number | null>(null);
+  /** Version bumped when pack sprite canvases are ready. */
+  packSpritesVersion = signal(0);
 
   readonly spriteHexRows = computed(() => {
     const bytes = this.currentSpriteBytes();
@@ -254,6 +265,9 @@ export class App implements OnInit, OnDestroy {
   /** Bumped whenever sprite previews are updated; canvas effects depend on this. */
   spritePreviewsVersion = signal(0);
 
+  /** RAF token for debouncing canvas redraws (prevents multiple redraws per frame). */
+  private _pendingRedrawRaf: number | null = null;
+
   constructor() {
     // Redraw object canvas when objects, selection, zoom, pan, sprite previews, or track overlay changes.
     effect(() => {
@@ -271,7 +285,7 @@ export class App implements OnInit, OnDestroy {
       this.marks();
       const section = this.editorSection();
       if (section === 'objects') {
-        scheduleAfterRender(() => this.redrawObjectCanvas());
+        this.scheduleCanvasRedraw();
       }
     });
 
@@ -283,6 +297,21 @@ export class App implements OnInit, OnDestroy {
       if (section === 'sprites') {
         scheduleAfterRender(() => this.redrawSpriteCanvas());
       }
+    });
+  }
+
+  /** Schedule a canvas redraw on the next animation frame, cancelling any pending redraw. */
+  private scheduleCanvasRedraw(): void {
+    if (typeof window === 'undefined') {
+      setTimeout(() => this.redrawObjectCanvas(), 0);
+      return;
+    }
+    if (this._pendingRedrawRaf !== null) {
+      window.cancelAnimationFrame(this._pendingRedrawRaf);
+    }
+    this._pendingRedrawRaf = window.requestAnimationFrame(() => {
+      this._pendingRedrawRaf = null;
+      this.redrawObjectCanvas();
     });
   }
 
@@ -604,8 +633,8 @@ export class App implements OnInit, OnDestroy {
 
   onCanvasMouseDown(event: MouseEvent): void {
     event.preventDefault();
-    if (event.button === 1 || event.button === 2) {
-      // Middle or right click: start panning
+    if (event.button === 1 || (event.button === 0 && this._spaceDown)) {
+      // Middle mouse button OR Space+left-drag: start panning
       this._isPanning = true;
       this._prevPanMouseX = event.offsetX;
       this._prevPanMouseY = event.offsetY;
@@ -722,6 +751,11 @@ export class App implements OnInit, OnDestroy {
   }
 
   onCanvasKeyDown(event: KeyboardEvent): void {
+    if (event.key === ' ') {
+      this._spaceDown = true;
+      event.preventDefault(); // prevent page scroll
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
       event.preventDefault();
       this.duplicateSelectedObject();
@@ -730,6 +764,13 @@ export class App implements OnInit, OnDestroy {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       this.removeSelectedObject();
+    }
+  }
+
+  onCanvasKeyUp(event: KeyboardEvent): void {
+    if (event.key === ' ') {
+      this._spaceDown = false;
+      if (this._isPanning) this._isPanning = false;
     }
   }
 
@@ -1313,6 +1354,8 @@ export class App implements OnInit, OnDestroy {
       void this.decodeSpritePreviewsInBackground(result.objectTypesArr);
       // Kick off road texture decoding in the background.
       void this.decodeRoadTexturesInBackground();
+      // Kick off pack sprite frames decoding for the Sprites tab.
+      void this.decodePackSpritesInBackground();
     } catch (error) {
       this.editorError.set(error instanceof Error ? error.message : 'Failed to parse resources');
       this.resourcesStatus.set('Failed to parse resources.');
@@ -1378,6 +1421,42 @@ export class App implements OnInit, OnDestroy {
     } catch {
       // Non-fatal: road falls back to flat colours.
     }
+  }
+
+  /**
+   * Ask the worker to decode all sprite frames from Pack 129 (8-bit) and Pack 137 (16-bit)
+   * and store them as HTMLCanvasElement entries for the Sprites tab viewer.
+   */
+  private async decodePackSpritesInBackground(): Promise<void> {
+    try {
+      type AllSpritesResult = {
+        frames: { id: number; bitDepth: 8 | 16; width: number; height: number; pixels: ArrayBuffer }[];
+      };
+      const result = await this.dispatchWorker<AllSpritesResult>('DECODE_ALL_SPRITE_FRAMES');
+      this.packSpriteCanvases.clear();
+      const frameInfos: { id: number; bitDepth: 8 | 16; width: number; height: number }[] = [];
+      for (const { id, bitDepth, width, height, pixels } of result.frames) {
+        const clamped = new Uint8ClampedArray(pixels);
+        const canvas = this.renderSpritePixels(clamped, width, height);
+        if (canvas) this.packSpriteCanvases.set(id, canvas);
+        frameInfos.push({ id, bitDepth, width, height });
+      }
+      this.packSpriteFrames.set(frameInfos);
+      this.packSpritesVersion.update((v) => v + 1);
+      // Auto-select first frame if none selected
+      if (this.selectedPackSpriteId() === null && frameInfos.length > 0) {
+        this.selectedPackSpriteId.set(frameInfos[0].id);
+      }
+    } catch {
+      // Non-fatal: sprites tab falls back to PPic hex viewer only.
+    }
+  }
+
+  /** Return the pack sprite preview as a data URL for a given frame ID. */
+  getPackSpriteDataUrl(frameId: number): string | null {
+    const canvas = this.packSpriteCanvases.get(frameId) ?? null;
+    if (!canvas) return null;
+    try { return canvas.toDataURL(); } catch { return null; }
   }
 
   /** Apply fresh level list received from the worker after a save operation. */
@@ -1616,11 +1695,19 @@ export class App implements OnInit, OnDestroy {
       ctx.fill();
     };
 
-    // Draw road geometry using actual textures
+    // Draw road geometry using actual textures – only render segments visible in viewport.
+    // Each road segment at index i has world Y = i*2.  Cull segments outside the viewport
+    // with a generous margin (2 extra segment heights = 4 world units margin).
+    const visibleWorldMinY = panY - H / (2 * zoom) - 4;
+    const visibleWorldMaxY = panY + H / (2 * zoom) + 4;
+    const firstSeg = Math.max(0, Math.floor(visibleWorldMinY / 2));
+    const lastSeg  = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
+
     const step = 1;
-    for (let index = 0; index < level.roadSegs.length - step; index += step) {
+    for (let index = firstSeg; index <= lastSeg; index += step) {
       const cur = level.roadSegs[index];
       const nxt = level.roadSegs[index + step];
+      if (!nxt) break;
       const y0  = index * 2;
       const y1  = (index + step) * 2;
 
@@ -1646,14 +1733,15 @@ export class App implements OnInit, OnDestroy {
       fillQuad(cur.v3 + KERB_WIDTH, y0,  1500, y0,  1500, y1,  nxt.v3 + KERB_WIDTH, y1,  bgPat ?? theme.bg);
     }
 
-    // Centre dashed line (between lanes: midpoint of v1→v2)
+    // Centre dashed line (between lanes: midpoint of v1→v2) – only in viewport
     ctx.strokeStyle = CENTRE_COLOUR;
     ctx.lineWidth = Math.max(1, 1.5);
     ctx.setLineDash([12, 10]);
     ctx.beginPath();
     let dashStarted = false;
-    for (let index = 0; index < level.roadSegs.length; index += 2) {
+    for (let index = firstSeg; index <= lastSeg; index += 2) {
       const seg = level.roadSegs[index];
+      if (!seg) break;
       const midX = (seg.v1 + seg.v2) / 2;
       const [cx, cy] = this.worldToCanvas(midX, index * 2);
       if (!dashStarted) { ctx.moveTo(cx, cy); dashStarted = true; }

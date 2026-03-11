@@ -879,7 +879,91 @@ input[type='file'] { display: none; }
   user-select: none;
   color: var(--accent2);
 }
-.mark-editor-inline { padding: 8px 0; }
+.mark-editor-inline { padding: 8px 0; overflow: hidden; }
+
+/* ---- Pack sprite viewer (decoded game sprites) ---- */
+.pack-sprite-viewer {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 8px 12px 12px;
+  flex-wrap: wrap;
+}
+
+.pack-sprite-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  background: #0d0d0d;
+  flex: 1;
+  min-width: 200px;
+}
+
+.pack-sprite-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--surface2);
+  transition: border-color 0.1s;
+
+  &:hover { border-color: var(--accent2); }
+  &.selected { border-color: var(--accent); background: #1a1020; }
+}
+
+.pack-sprite-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+}
+
+.pack-sprite-label {
+  font-size: 0.62rem;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.pack-sprite-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 160px;
+}
+
+.pack-sprite-large {
+  max-width: 160px;
+  max-height: 160px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.5);
+}
+
+/* Object list sprite thumbnail sizing */
+.obj-list-sprite {
+  max-width: 48px;
+  max-height: 48px;
+}
+
+.obj-inspector-sprite {
+  max-width: 64px;
+  max-height: 64px;
+}
+
+
 
 /* ---- Track toggle button active state ---- */
 .btn-active {

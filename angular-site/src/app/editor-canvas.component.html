@@ -1,7 +1,7 @@
 <!-- Canvas toolbar -->
 <div class="canvas-toolbar">
-  <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate">
-    🖱 Drag objects or track waypoints · Dbl-click to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> duplicates
+  <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate · Middle-mouse or Space+drag: pan">
+    🖱 Drag objects/waypoints · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> duplicates · <kbd>Space</kbd>+drag or middle-mouse to pan
   </span>
   <div class="canvas-controls">
     <button class="btn btn-sm" (click)="addObject.emit()">+ Add Object</button>
@@ -27,10 +27,14 @@
     (mouseup)="canvasMouseUp.emit($event)"
     (dblclick)="canvasDblClick.emit($event)"
     (keydown)="canvasKeyDown.emit($event)"
+    (keyup)="canvasKeyUp.emit($event)"
     (wheel)="canvasWheel.emit($event)"
+    (contextmenu)="$event.preventDefault()"
     [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : 'crosshair'"
   ></canvas>
-  <div class="canvas-zoom-label">Zoom: {{ (zoom * 100).toFixed(0) }}%
+  <div class="canvas-zoom-label">
+    Zoom: {{ (zoom * 100).toFixed(0) }}%
+    &nbsp;·&nbsp; Pan: ({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})
     &nbsp;·&nbsp; <span style="color:#42a5f5">■ Up track</span>
     &nbsp; <span style="color:#ef5350">■ Down track</span>
     &nbsp; <span style="color:#ffeb3b">■ Marks</span>

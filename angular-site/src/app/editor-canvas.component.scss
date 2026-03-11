@@ -1,0 +1,43 @@
+/* ---- Marks & road collapsible panels ---- */
+.marks-details,
+.road-details {
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  background: var(--surface2, #252525);
+  overflow: hidden;
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    user-select: none;
+    color: var(--accent2, #42a5f5);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    &:hover { background: rgba(255,255,255,0.04); }
+    &::marker, &::-webkit-details-marker { display: none; }
+    &::before { content: '▶'; font-size: 0.65rem; transition: transform 0.15s; }
+  }
+
+  &[open] > summary::before { transform: rotate(90deg); }
+}
+
+.mark-editor-inline {
+  padding: 8px 12px 12px;
+  overflow: hidden;
+}
+
+.road-stats {
+  padding: 0 12px 12px;
+}
+
+/* Keep table scroll capped */
+.table-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 200px;
+}

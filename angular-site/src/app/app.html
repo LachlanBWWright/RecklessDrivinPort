@@ -251,6 +251,8 @@
                 [trackDownCount]="selectedLevel()!.trackDown.length"
                 [roadSegCount]="selectedLevel()!.roadSegCount"
                 [zoom]="canvasZoom()"
+                [panX]="canvasPanX()"
+                [panY]="canvasPanY()"
                 [levelNum]="selectedLevel()!.resourceId - 139"
                 [workerBusy]="workerBusy()"
                 [isDragging]="isDragging()"
@@ -260,6 +262,7 @@
                 (canvasMouseUp)="onCanvasMouseUp($event)"
                 (canvasDblClick)="onCanvasDoubleClick($event)"
                 (canvasKeyDown)="onCanvasKeyDown($event)"
+                (canvasKeyUp)="onCanvasKeyUp($event)"
                 (canvasWheel)="onCanvasWheel($event)"
                 (addObject)="addObject()"
                 (removeObject)="removeSelectedObject()"
@@ -319,9 +322,50 @@
         }
         @if (editorSection() === 'sprites') {
           <div class="editor-panel">
-            <h3>Sprite / PPic Asset Editor</h3>
+            <h3>Sprite Viewer &amp; PPic Asset Editor</h3>
+
+            <!-- ---- DECODED GAME SPRITES (Pack 129 / 137) ---- -->
+            @if (packSpriteFrames().length > 0) {
+              <details class="road-details" open style="margin-bottom:16px">
+                <summary>🎮 Decoded Game Sprites (Pack 129 / 137) <span class="badge">{{ packSpriteFrames().length }}</span></summary>
+                <div class="pack-sprite-viewer">
+                  <div class="pack-sprite-grid">
+                    @for (frame of packSpriteFrames(); track frame.id) {
+                      @if (getPackSpriteDataUrl(frame.id); as url) {
+                        <div class="pack-sprite-cell"
+                          [class.selected]="selectedPackSpriteId() === frame.id"
+                          (click)="selectedPackSpriteId.set(frame.id)"
+                          [title]="'Frame #' + frame.id + ' · ' + frame.bitDepth + '-bit · ' + frame.width + '×' + frame.height">
+                          <img [src]="url" class="pack-sprite-thumb" alt="" />
+                          <span class="pack-sprite-label">#{{ frame.id }}</span>
+                        </div>
+                      }
+                    }
+                  </div>
+                  @if (selectedPackSpriteId() !== null) {
+                    @if (getPackSpriteDataUrl(selectedPackSpriteId()!); as url) {
+                      @let selFrame = packSpriteFrames()[$any(packSpriteFrames().findIndex(f => f.id === selectedPackSpriteId()))];
+                      <div class="pack-sprite-detail">
+                        <img [src]="url" class="pack-sprite-large" alt="sprite preview" />
+                        <p class="field-hint" style="margin-top:6px">
+                          Frame #{{ selectedPackSpriteId() }}
+                          · {{ selFrame?.bitDepth ?? '?' }}-bit
+                          · {{ selFrame?.width ?? '?' }}×{{ selFrame?.height ?? '?' }} px
+                          · RGB{{ selFrame?.bitDepth === 16 ? '555' : '332' }}
+                        </p>
+                      </div>
+                    }
+                  }
+                </div>
+              </details>
+            } @else {
+              <p class="field-hint" style="margin-bottom:12px">Game sprite frames from Pack 129/137 will appear here once decoded. Load a resources.dat to begin.</p>
+            }
+
+            <!-- ---- PPIC HEX EDITOR ---- -->
+            <h4 style="margin-top:0">PPic Raw Asset Hex Editor</h4>
             <p class="field-hint">
-              PPic resources are raw sprite data referenced by the sprite pipeline.
+              PPic resources are raw Macintosh PICT/sprite data.
               Use the hex viewer to inspect bytes and the patch tool to modify individual bytes.
               Changes are incorporated when you download the edited resources.dat.
             </p>
@@ -378,12 +422,6 @@
                           </tbody>
                         </table>
                       </div>
-                    </div>
-
-                    <div class="sprite-preview-section">
-                      <h4>Pixel Preview</h4>
-                      <p class="field-hint">The raw bytes interpreted as a 16-column indexed-color bitmap (values 0–255 mapped to a grayscale palette).</p>
-                      <canvas id="sprite-pixel-canvas" class="sprite-pixel-canvas" width="256" height="256"></canvas>
                     </div>
 
                     <div class="sprite-patch">

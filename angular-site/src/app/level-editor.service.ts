@@ -199,6 +199,16 @@ function writeBigFloat32(view: DataView, offset: number, value: number): void {
   view.setFloat32(offset, value, false);
 }
 
+/** Convert a packed big-endian RGB555 pixel into 8-bit RGBA for canvas previews.
+ *  Mac OS 9 / PPC native 16-bit format: xRRRRRGGGGGBBBBB (bit 15 unused).
+ */
+function rgb555ToRgba(value: number): [number, number, number, number] {
+  const r = ((value >> 10) & 0x1f) * 255 / 31;
+  const g = ((value >> 5)  & 0x1f) * 255 / 31;
+  const b = (value & 0x1f)          * 255 / 31;
+  return [Math.round(r), Math.round(g), Math.round(b), 255];
+}
+
 /** Convert a packed big-endian RGB565 pixel into 8-bit RGBA for canvas previews. */
 function rgb565ToRgba(value: number): [number, number, number, number] {
   const r = ((value >> 11) & 0x1f) * 255 / 31;
@@ -473,6 +483,60 @@ export class LevelEditorService {
       .sort((a, b) => a.id - b.id);
   }
 
+  /**
+   * Return all entry IDs present in kPackSp16 (Pack 137) and kPackSprt (Pack 129).
+   * Used by the sprites tab to list available decoded sprite frames.
+   */
+  getAllSpriteFrameIds(resources: ResourceDatEntry[]): { id: number; bitDepth: 8 | 16 }[] {
+    const result: { id: number; bitDepth: 8 | 16 }[] = [];
+    const getIds = (packId: number, bitDepth: 8 | 16) => {
+      const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+      if (!pack) return;
+      try {
+        const entries = parsePackHandle(pack.data, pack.id);
+        for (const e of entries) {
+          result.push({ id: e.id, bitDepth });
+        }
+      } catch { /* ignore */ }
+    };
+    getIds(SPRITE_PACK_16_ID, 16);
+    getIds(SPRITE_PACK_8_ID, 8);
+    result.sort((a, b) => a.id - b.id);
+    return result;
+  }
+
+  /**
+   * Decode all sprite frames from Pack 129 (8-bit) and Pack 137 (16-bit) in a single pass.
+   * Returns decoded RGBA pixel data for each frame.
+   */
+  decodeAllSpriteFrames(
+    resources: ResourceDatEntry[],
+  ): { id: number; bitDepth: 8 | 16; width: number; height: number; pixels: ArrayBuffer }[] {
+    const result: { id: number; bitDepth: 8 | 16; width: number; height: number; pixels: ArrayBuffer }[] = [];
+    const decodeFromPack = (packId: number, bitDepth: 8 | 16) => {
+      const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+      if (!pack) return;
+      try {
+        const entries = parsePackHandle(pack.data, pack.id);
+        for (const entry of entries) {
+          if (entry.data.length < SPRITE_HEADER_SIZE) continue;
+          const decoded = bitDepth === 16
+            ? this.decode16BitSprite(entry.data, entry.id)
+            : this.decode8BitSprite(entry.data, entry.id);
+          if (!decoded) continue;
+          const buf = new ArrayBuffer(decoded.pixels.byteLength);
+          new Uint8Array(buf).set(decoded.pixels);
+          result.push({ id: entry.id, bitDepth, width: decoded.width, height: decoded.height, pixels: buf });
+        }
+      } catch (err) {
+        console.warn(`[LevelEditor] decodeAllSpriteFrames pack ${packId} error:`, err);
+      }
+    };
+    decodeFromPack(SPRITE_PACK_16_ID, 16);
+    decodeFromPack(SPRITE_PACK_8_ID, 8);
+    return result;
+  }
+
   extractObjectTypeDefinitions(resources: ResourceDatEntry[]): Map<number, ObjectTypeDefinition> {
     const pack = resources.find((e) => e.type === 'Pack' && e.id === OBJECT_TYPES_PACK_ID);
     const defs = new Map<number, ObjectTypeDefinition>();
@@ -661,7 +725,7 @@ export class LevelEditorService {
           pixels[dstOffset + 3] = 0;
           continue;
         }
-        const [r, g, b, a] = rgb565ToRgba(value);
+        const [r, g, b, a] = rgb555ToRgba(value);
         pixels[dstOffset] = r;
         pixels[dstOffset + 1] = g;
         pixels[dstOffset + 2] = b;

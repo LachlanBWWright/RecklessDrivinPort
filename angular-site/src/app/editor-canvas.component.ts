@@ -17,6 +17,8 @@ export class EditorCanvasComponent {
   @Input() trackDownCount = 0;
   @Input() roadSegCount = 0;
   @Input() zoom = 1;
+  @Input() panX = 0;
+  @Input() panY = 0;
   @Input() levelNum = 0;
   @Input() workerBusy = false;
   @Input() isDragging = false;
@@ -27,6 +29,7 @@ export class EditorCanvasComponent {
   @Output() canvasMouseUp = new EventEmitter<MouseEvent>();
   @Output() canvasDblClick = new EventEmitter<MouseEvent>();
   @Output() canvasKeyDown = new EventEmitter<KeyboardEvent>();
+  @Output() canvasKeyUp = new EventEmitter<KeyboardEvent>();
   @Output() canvasWheel = new EventEmitter<WheelEvent>();
   @Output() addObject = new EventEmitter<void>();
   @Output() removeObject = new EventEmitter<void>();
