@@ -78,6 +78,10 @@ const MIN_HIT_RADIUS = 10;
 const BASE_HIT_RADIUS = 8;
 /** Canvas hit radius (px) for mark segment endpoint dragging. */
 const MARK_ENDPOINT_HIT_RADIUS = 10;
+/** Min canvas hit radius (px) for player start marker drag. */
+const MIN_START_MARKER_HIT_RADIUS = 14;
+/** Base world-space hit radius for player start marker drag. */
+const BASE_START_MARKER_HIT_RADIUS = 10;
 /** Max storable UInt16 time value in the level pack. */
 const MAX_TIME_VALUE = 65535;
 
@@ -137,7 +141,6 @@ export class App implements OnInit, OnDestroy {
   // ---- Level properties editing ----
   editRoadInfo = signal(0);
   editTime = signal(0);
-  editTimeSeconds = signal(0);
   editXStartPos = signal(0);
   editLevelEnd = signal(0);
   propertiesDirty = signal(false);
@@ -192,6 +195,8 @@ export class App implements OnInit, OnDestroy {
   marks = signal<MarkSeg[]>([]);
   selectedMarkIndex = signal<number | null>(null);
   dragMarkEndpoint = signal<{ markIdx: number; endpoint: 'p1' | 'p2' } | null>(null);
+  /** True while user is dragging the player start X marker on the canvas. */
+  private _draggingStartMarker = false;
 
   // ---- Sprite pixel grid ----
   spriteGridZoom = signal(4);
@@ -202,9 +207,6 @@ export class App implements OnInit, OnDestroy {
   // ---- Sprite editor ----
   spriteAssets = signal<EditableSpriteAsset[]>([]);
   selectedSpriteId = signal<number | null>(null);
-  spriteByteOffset = signal(0);
-  spriteByteValue = signal(0);
-  spriteHexPage = signal(0);
   /** Raw bytes of the currently selected sprite (loaded from worker). */
   currentSpriteBytes = signal<Uint8Array | null>(null);
 
@@ -222,37 +224,6 @@ export class App implements OnInit, OnDestroy {
     const id = this.selectedPackSpriteId();
     if (id === null) return null;
     return this.packSpriteFrames().find((f) => f.id === id) ?? null;
-  });
-
-  readonly spriteHexRows = computed(() => {
-    const bytes = this.currentSpriteBytes();
-    if (!bytes) return [];
-    const page = this.spriteHexPage();
-    const pageSize = 256;
-    const start = page * pageSize;
-    const rows: { addr: string; hex: string[]; ascii: string }[] = [];
-    for (let r = 0; r < 16; r++) {
-      const rowStart = start + r * 16;
-      const hexCells: string[] = [];
-      let ascii = '';
-      for (let c = 0; c < 16; c++) {
-        const idx = rowStart + c;
-        const b = idx < bytes.length ? bytes[idx] : undefined;
-        hexCells.push(b !== undefined ? b.toString(16).padStart(2, '0') : '  ');
-        ascii += b !== undefined && b >= 32 && b < 127 ? String.fromCharCode(b) : '.';
-      }
-      rows.push({
-        addr: rowStart.toString(16).padStart(6, '0'),
-        hex: hexCells,
-        ascii,
-      });
-    }
-    return rows;
-  });
-
-  readonly spriteMaxPage = computed(() => {
-    const bytes = this.currentSpriteBytes();
-    return bytes ? Math.max(0, Math.ceil(bytes.length / 256) - 1) : 0;
   });
 
   private wasmScript: HTMLScriptElement | null = null;
@@ -400,7 +371,6 @@ export class App implements OnInit, OnDestroy {
     if (level) {
       this.editRoadInfo.set(level.properties.roadInfo);
       this.editTime.set(level.properties.time);
-      this.editTimeSeconds.set(Math.round(level.properties.time / 100));
       this.editXStartPos.set(level.properties.xStartPos);
       this.editLevelEnd.set(level.properties.levelEnd);
       this.propertiesDirty.set(false);
@@ -435,9 +405,10 @@ export class App implements OnInit, OnDestroy {
       this.canvasZoom.set(zoom);
       // Centre the road horizontally
       this.canvasPanX.set((minX + maxX) / 2);
-      // Show the first ~400 world units of road (start near top of canvas)
+      // With Y-axis flipped: Y=0 (start) is at canvas bottom, Y=levelEnd at top.
+      // Set panY so Y=0 appears near the bottom (show ~35% of visible height above start).
       const visibleH = H / zoom;
-      this.canvasPanY.set(visibleH * 0.15);
+      this.canvasPanY.set(visibleH * 0.35);
     } else {
       this.canvasZoom.set(1.5);
       this.canvasPanX.set(0);
@@ -453,23 +424,13 @@ export class App implements OnInit, OnDestroy {
     switch (field) {
       case 'roadInfo': this.editRoadInfo.set(val); break;
       case 'time': {
-        const nextTime = Math.max(0, val);
+        const nextTime = Math.max(0, Math.min(MAX_TIME_VALUE, val));
         this.editTime.set(nextTime);
-        this.editTimeSeconds.set(Math.round(nextTime / 100));
         break;
       }
       case 'xStartPos': this.editXStartPos.set(val); break;
       case 'levelEnd': this.editLevelEnd.set(Math.max(0, val)); break;
     }
-    this.propertiesDirty.set(true);
-  }
-
-  onTimeSecondsInput(event: Event): void {
-    const seconds = Number.parseInt((event.target as HTMLInputElement).value, 10);
-    if (Number.isNaN(seconds)) return;
-    const clampedSeconds = Math.max(0, seconds);
-    this.editTimeSeconds.set(clampedSeconds);
-    this.editTime.set(Math.min(MAX_TIME_VALUE, clampedSeconds * 100));
     this.propertiesDirty.set(true);
   }
 
@@ -517,7 +478,12 @@ export class App implements OnInit, OnDestroy {
     switch (field) {
       case 'x': this.editObjX.set(Math.round(val)); break;
       case 'y': this.editObjY.set(Math.round(val)); break;
-      case 'dir': this.editObjDir.set(val); break;
+      case 'dir': {
+        // Normalise to [-π, π] using atan2 of the unit vector – handles all edge cases.
+        const wrapped = Math.atan2(Math.sin(val), Math.cos(val));
+        this.editObjDir.set(wrapped);
+        break;
+      }
       case 'typeRes': this.editObjTypeRes.set(Math.round(val)); break;
     }
     // Auto-apply so the canvas reflects changes immediately without a separate button press.
@@ -616,7 +582,7 @@ export class App implements OnInit, OnDestroy {
     const W = canvas?.width ?? 600;
     const H = canvas?.height ?? 500;
     const cx = W / 2 + (wx - this.canvasPanX()) * this.canvasZoom();
-    const cy = H / 2 + (wy - this.canvasPanY()) * this.canvasZoom();
+    const cy = H / 2 - (wy - this.canvasPanY()) * this.canvasZoom(); // flip Y: world Y up = canvas up
     return [cx, cy];
   }
 
@@ -625,7 +591,7 @@ export class App implements OnInit, OnDestroy {
     const W = canvas?.width ?? 600;
     const H = canvas?.height ?? 500;
     const wx = (cx - W / 2) / this.canvasZoom() + this.canvasPanX();
-    const wy = (cy - H / 2) / this.canvasZoom() + this.canvasPanY();
+    const wy = -(cy - H / 2) / this.canvasZoom() + this.canvasPanY(); // flip Y
     return [wx, wy];
   }
 
@@ -668,6 +634,15 @@ export class App implements OnInit, OnDestroy {
           return;
         }
       }
+    }
+
+    // Check start marker (player start X at world Y=0)
+    const startHitR = Math.max(MIN_START_MARKER_HIT_RADIUS, BASE_START_MARKER_HIT_RADIUS / this.canvasZoom());
+    if (dist2d(this.editXStartPos(), 0, wx, wy) < startHitR) {
+      this._draggingStartMarker = true;
+      this.selectedObjIndex.set(null);
+      (event.target as HTMLCanvasElement).focus();
+      return;
     }
 
     // Check objects
@@ -714,6 +689,13 @@ export class App implements OnInit, OnDestroy {
       }
       return;
     }
+    // Start marker drag (X only)
+    if (this._draggingStartMarker) {
+      const [wx] = this.canvasToWorld(event.offsetX, event.offsetY);
+      this.editXStartPos.set(Math.round(wx));
+      this.propertiesDirty.set(true);
+      return;
+    }
     if (!this.isDragging()) return;
     const dragIdx = this.dragObjIndex();
     if (dragIdx === null) return;
@@ -735,6 +717,11 @@ export class App implements OnInit, OnDestroy {
     // Finish track waypoint drag (no save needed – editTrackUp/Down are live)
     if (this.dragTrackWaypoint()) {
       this.dragTrackWaypoint.set(null);
+      return;
+    }
+    // Finish start marker drag
+    if (this._draggingStartMarker) {
+      this._draggingStartMarker = false;
       return;
     }
     const wasDragging = this.isDragging();
@@ -769,10 +756,10 @@ export class App implements OnInit, OnDestroy {
       this.removeSelectedObject();
       return;
     }
-    // Arrow key panning
+    // Arrow key panning (Y flipped: ArrowUp → higher world Y)
     const panStep = 50 / this.canvasZoom(); // world units per keystroke
-    if (event.key === 'ArrowUp')    { event.preventDefault(); this.canvasPanY.update((y) => y - panStep); }
-    if (event.key === 'ArrowDown')  { event.preventDefault(); this.canvasPanY.update((y) => y + panStep); }
+    if (event.key === 'ArrowUp')    { event.preventDefault(); this.canvasPanY.update((y) => y + panStep); }
+    if (event.key === 'ArrowDown')  { event.preventDefault(); this.canvasPanY.update((y) => y - panStep); }
     if (event.key === 'ArrowLeft')  { event.preventDefault(); this.canvasPanX.update((x) => x - panStep); }
     if (event.key === 'ArrowRight') { event.preventDefault(); this.canvasPanX.update((x) => x + panStep); }
   }
@@ -927,9 +914,9 @@ export class App implements OnInit, OnDestroy {
       const objectType = this.objectTypeDefinitions.get(obj.typeRes) ?? null;
       const preview = this.getObjectSpritePreview(obj.typeRes);
 
-      // Scale object size with zoom, clamped to reasonable display range
-      const drawWidth  = objectType ? Math.max(16, Math.min(120, objectType.width  * zoom * 0.5)) : baseRadius * 2.5;
-      const drawHeight = objectType ? Math.max(16, Math.min(120, objectType.length * zoom * 0.5)) : baseRadius * 2.5;
+      // Scale object size with zoom
+      const drawWidth  = objectType ? Math.max(8, objectType.width  * zoom) : baseRadius * 2.5;
+      const drawHeight = objectType ? Math.max(8, objectType.length * zoom) : baseRadius * 2.5;
 
       const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
       const isSel = i === selIdx;
@@ -992,12 +979,47 @@ export class App implements OnInit, OnDestroy {
       ctx.globalAlpha = 1.0;
     }
 
-    // Origin marker + start position marker
+    // Origin marker at world (0,0)
     const [ox, oy] = this.worldToCanvas(0, 0);
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.beginPath();
     ctx.arc(ox, oy, 3, 0, Math.PI * 2);
     ctx.fill();
+
+    // Player Start X marker – draggable flag at (xStartPos, 0)
+    if (level) {
+      const startX = this.editXStartPos();
+      const [smx, smy] = this.worldToCanvas(startX, 0);
+      if (smx > -20 && smx < W + 20 && smy > -20 && smy < H + 20) {
+        const isDraggingStart = this._draggingStartMarker;
+        const zf = Math.min(zoom, 2); // zoom factor capped at 2×
+        const POLE_H   = 20 * zf;
+        const FLAG_TIP = 10 * zf;
+        const FLAG_MID = 14 * zf;
+        const FLAG_BOT = 8  * zf;
+        ctx.strokeStyle = isDraggingStart ? '#ffffff' : '#00e5ff';
+        ctx.fillStyle   = isDraggingStart ? '#ffffff' : '#00e5ff';
+        ctx.lineWidth = 2;
+        // Vertical pole
+        ctx.beginPath();
+        ctx.moveTo(smx, smy);
+        ctx.lineTo(smx, smy - POLE_H);
+        ctx.stroke();
+        // Flag triangle
+        ctx.beginPath();
+        ctx.moveTo(smx, smy - POLE_H);
+        ctx.lineTo(smx + FLAG_TIP, smy - FLAG_MID);
+        ctx.lineTo(smx, smy - FLAG_BOT);
+        ctx.closePath();
+        ctx.fill();
+        // Label
+        if (zoom > 0.4) {
+          ctx.font = `${Math.max(9, 10 * zoom)}px monospace`;
+          ctx.fillStyle = isDraggingStart ? '#ffffff' : '#00e5ff';
+          ctx.fillText(`START X=${startX}`, smx + 6, smy - POLE_H - 2);
+        }
+      }
+    }
 
     // Finish line at levelEnd Y
     if (level && level.properties.levelEnd > 0) {
@@ -1213,54 +1235,14 @@ export class App implements OnInit, OnDestroy {
 
   async selectSprite(spriteId: number): Promise<void> {
     this.selectedSpriteId.set(spriteId);
-    this.spriteByteOffset.set(0);
-    this.spriteHexPage.set(0);
     this.currentSpriteBytes.set(null);
     try {
       const result = await this.dispatchWorker<{ bytes: Uint8Array | null }>('GET_SPRITE_BYTES', { spriteId });
       const bytes = result.bytes;
       this.currentSpriteBytes.set(bytes);
-      this.spriteByteValue.set(bytes && bytes.length > 0 ? bytes[0] : 0);
     } catch {
-      // non-fatal: hex viewer just stays empty
+      // non-fatal: pixel canvas just stays empty
     }
-  }
-
-  onSpriteOffsetInput(event: Event): void {
-    const val = Number.parseInt((event.target as HTMLInputElement).value, 10);
-    if (!Number.isNaN(val)) this.spriteByteOffset.set(Math.max(0, val));
-  }
-
-  onSpriteValueInput(event: Event): void {
-    const val = Number.parseInt((event.target as HTMLInputElement).value, 10);
-    if (!Number.isNaN(val)) this.spriteByteValue.set(Math.max(0, Math.min(255, val)));
-  }
-
-  async applySpriteByteEdit(): Promise<void> {
-    const id = this.selectedSpriteId();
-    if (id === null) return;
-    try {
-      this.workerBusy.set(true);
-      const result = await this.dispatchWorker<{ bytes: Uint8Array | null }>('APPLY_SPRITE_BYTE', {
-        spriteId: id,
-        offset: this.spriteByteOffset(),
-        value: this.spriteByteValue(),
-      });
-      this.currentSpriteBytes.set(result.bytes);
-      this.resourcesStatus.set(`Patched PPic #${id} offset ${this.spriteByteOffset()}.`);
-    } catch (error) {
-      this.editorError.set(error instanceof Error ? error.message : 'Patch failed');
-    } finally {
-      this.workerBusy.set(false);
-    }
-  }
-
-  prevSpritePage(): void {
-    this.spriteHexPage.set(Math.max(0, this.spriteHexPage() - 1));
-  }
-
-  nextSpritePage(): void {
-    this.spriteHexPage.set(Math.min(this.spriteMaxPage(), this.spriteHexPage() + 1));
   }
 
   // ---- Sprite pixel canvas ----
@@ -1730,14 +1712,17 @@ export class App implements OnInit, OnDestroy {
     const lastSeg  = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
 
     const step = 1;
+    // Compute world extents at canvas edges for background fill (extends beyond road edges)
+    const worldMinX = panX - W / (2 * zoom) - 200;
+    const worldMaxX = panX + W / (2 * zoom) + 200;
     for (let index = firstSeg; index <= lastSeg; index += step) {
       const cur = level.roadSegs[index];
       const nxt = level.roadSegs[index + step];
       const y0  = index * 2;
       const y1  = (index + step) * 2;
 
-      // Off-road (background texture)
-      fillQuad(-1500, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  -1500, y1,  bgPat ?? theme.bg);
+      // Off-road (background texture) – extend to canvas edges
+      fillQuad(worldMinX, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  worldMinX, y1,  bgPat ?? theme.bg);
 
       // Left border/kerb
       fillQuad(cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1,  lbPat ?? theme.kerbA);
@@ -1754,8 +1739,8 @@ export class App implements OnInit, OnDestroy {
       // Right border/kerb
       fillQuad(cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1,  rbPat ?? theme.kerbB);
 
-      // Off-road far right
-      fillQuad(cur.v3 + KERB_WIDTH, y0,  1500, y0,  1500, y1,  nxt.v3 + KERB_WIDTH, y1,  bgPat ?? theme.bg);
+      // Off-road far right – extend to canvas edges
+      fillQuad(cur.v3 + KERB_WIDTH, y0,  worldMaxX, y0,  worldMaxX, y1,  nxt.v3 + KERB_WIDTH, y1,  bgPat ?? theme.bg);
     }
 
     // Centre dashed line (between lanes: midpoint of v1→v2) – only in viewport
@@ -1813,8 +1798,10 @@ export class App implements OnInit, OnDestroy {
     // Vertical scrollbar-like position indicator (right edge)
     if (level.roadSegs.length > 1) {
       const totalWorldH = (level.roadSegs.length - 1) * 2;
-      const viewTop    = panY - canvasH / (2 * zoom);
-      const viewBottom = panY + canvasH / (2 * zoom);
+      // With Y flipped, world Y 0 (start) is at canvas bottom, levelEnd at top.
+      // viewWorldMin = lowest Y visible, viewWorldMax = highest Y visible
+      const viewWorldMin = panY - canvasH / (2 * zoom);
+      const viewWorldMax = panY + canvasH / (2 * zoom);
       const barX = canvasW - 8;
       const barW = 6;
       const barH = canvasH - 20;
@@ -1822,9 +1809,9 @@ export class App implements OnInit, OnDestroy {
       // Track background
       ctx.fillStyle = 'rgba(255,255,255,0.08)';
       ctx.fillRect(barX, barY, barW, barH);
-      // Thumb (visible portion)
-      const thumbTop    = Math.max(0, (viewTop    / totalWorldH)) * barH + barY;
-      const thumbBottom = Math.min(barH + barY, (viewBottom / totalWorldH) * barH + barY);
+      // Thumb: top of bar = finish (high Y), bottom = start (Y=0)
+      const thumbTop    = Math.max(barY,       (1 - Math.min(1, viewWorldMax / totalWorldH)) * barH + barY);
+      const thumbBottom = Math.min(barH + barY, (1 - Math.max(0, viewWorldMin / totalWorldH)) * barH + barY);
       const thumbH = Math.max(12, thumbBottom - thumbTop);
       ctx.fillStyle = 'rgba(66, 165, 245, 0.55)';
       ctx.beginPath();

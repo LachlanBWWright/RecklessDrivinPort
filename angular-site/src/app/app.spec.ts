@@ -108,13 +108,12 @@ describe('App', () => {
     expect(app.selectedObjIndex()).toBe(1);
   });
 
-  it('should update raw time when editing friendly seconds', () => {
+  it('should update time when editing time directly (seconds stored as-is)', () => {
     const app = TestBed.createComponent(App).componentInstance;
 
-    app.onTimeSecondsInput({ target: { value: '45' } } as unknown as Event);
+    app.onPropsInput('time', { target: { value: '45' } } as unknown as Event);
 
-    expect(app.editTimeSeconds()).toBe(45);
-    expect(app.editTime()).toBe(4500);
+    expect(app.editTime()).toBe(45);
     expect(app.propertiesDirty()).toBe(true);
   });
 

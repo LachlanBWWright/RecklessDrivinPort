@@ -329,10 +329,10 @@ export function parseMarkSegs(data: Uint8Array): MarkSeg[] {
   for (let i = 0; i < count; i++) {
     const o = i * MARK_SEG_SIZE;
     marks.push({
-      x1: view.getInt32(o,                    false),
-      y1: view.getInt32(o + 4,                false),
-      x2: view.getInt32(o + T2D_POINT_SIZE,   false),
-      y2: view.getInt32(o + T2D_POINT_SIZE + 4, false),
+      x1: view.getFloat32(o,                    false),
+      y1: view.getFloat32(o + 4,                false),
+      x2: view.getFloat32(o + T2D_POINT_SIZE,   false),
+      y2: view.getFloat32(o + T2D_POINT_SIZE + 4, false),
     });
   }
   return marks;
@@ -830,11 +830,11 @@ export function serializeMarkSegs(marks: MarkSeg[]): Uint8Array {
   const view = new DataView(buf.buffer);
   for (let i = 0; i < marks.length; i++) {
     const o = i * 16;
-    // false = big-endian, matching parseMarkSegs deserialization
-    view.setInt32(o,      marks[i].x1, false);
-    view.setInt32(o + 4,  marks[i].y1, false);
-    view.setInt32(o + 8,  marks[i].x2, false);
-    view.setInt32(o + 12, marks[i].y2, false);
+    // false = big-endian, matching parseMarkSegs deserialization (float x + float y)
+    view.setFloat32(o,      marks[i].x1, false);
+    view.setFloat32(o + 4,  marks[i].y1, false);
+    view.setFloat32(o + 8,  marks[i].x2, false);
+    view.setFloat32(o + 12, marks[i].y2, false);
   }
   return buf;
 }

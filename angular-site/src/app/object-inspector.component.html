@@ -17,11 +17,35 @@
     </div>
     <div class="prop-group">
       <label for="obj-dir">Direction (rad)</label>
-      <input id="obj-dir" type="number" step="0.1" [value]="editDir" (input)="fieldInput.emit({field: 'dir', event: $event})" />
+      <input id="obj-dir" type="number" step="0.01" min="-3.14159" max="3.14159"
+        [value]="editDir" (input)="fieldInput.emit({field: 'dir', event: $event})" />
     </div>
     <div class="prop-group">
       <label for="obj-type">Type ID</label>
-      <input id="obj-type" type="number" [value]="editTypeRes" (input)="fieldInput.emit({field: 'typeRes', event: $event})" />
+      <input id="obj-type" type="number" list="type-id-list" [value]="editTypeRes"
+        (input)="fieldInput.emit({field: 'typeRes', event: $event})" />
+      <datalist id="type-id-list">
+        <option value="128">Player Car</option>
+        <option value="129">Police Car</option>
+        <option value="130">NPC Car 1</option>
+        <option value="131">NPC Car 2</option>
+        <option value="132">Truck</option>
+        <option value="133">Obstacle A</option>
+        <option value="134">Obstacle B</option>
+        <option value="135">Obstacle C</option>
+        <option value="136">Obstacle D</option>
+        <option value="137">Obstacle E</option>
+        <option value="138">Obstacle F</option>
+        <option value="139">Obstacle G</option>
+        <option value="140">Object A</option>
+        <option value="141">Object B</option>
+        <option value="142">Object C</option>
+        <option value="143">Object D</option>
+        <option value="144">Object E</option>
+        <option value="145">Object F</option>
+        <option value="146">Object G</option>
+        <option value="147">Object H</option>
+      </datalist>
       <p class="field-hint">
         128 = player car.
         @if (typeDimLabel; as dim) {
@@ -32,7 +56,7 @@
   </div>
   <div class="type-visibility-filter">
     <div class="type-visibility-header">
-      <span>Visible color groups</span>
+      <span>Filter by color group (click to toggle):</span>
       <div class="type-visibility-actions">
         <button type="button" class="btn btn-sm" (click)="showAll.emit()">All</button>
         <button type="button" class="btn btn-sm" (click)="hideAll.emit()">None</button>
@@ -42,9 +66,9 @@
       @for (type of typePalette; track type.typeId) {
         <button type="button" class="type-chip"
           [class.type-chip--inactive]="!visibleTypeFilter.has(type.typeId)"
+          [title]="'Color group ' + type.typeId"
           (click)="typeVisibilityToggle.emit(type.typeId)">
           <span class="type-chip-swatch" [style.background]="type.hex"></span>
-          T{{ type.typeId }}
         </button>
       }
     </div>

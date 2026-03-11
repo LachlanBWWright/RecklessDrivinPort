@@ -19,6 +19,7 @@ export class EditorCanvasComponent {
   @Input() zoom = 1;
   @Input() panX = 0;
   @Input() panY = 0;
+  @Input() scrollYMax = 5000;
   @Input() levelNum = 0;
   @Input() workerBusy = false;
   @Input() isDragging = false;
@@ -46,4 +47,6 @@ export class EditorCanvasComponent {
   @Output() removeMark = new EventEmitter<void>();
   @Output() saveMarks = new EventEmitter<void>();
   @Output() markFieldInput = new EventEmitter<{idx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event}>();
+  @Output() panXChange = new EventEmitter<number>();
+  @Output() panYChange = new EventEmitter<number>();
 }

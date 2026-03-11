@@ -20,24 +20,39 @@
 
 <div class="object-canvas-col">
   <div class="subtle-section-title">Scene preview – drag objects &amp; track waypoints (blue/red dots)</div>
-  <canvas id="object-canvas" class="object-canvas" width="640" height="540"
-    tabindex="0"
-    (mousedown)="canvasMouseDown.emit($event)"
-    (mousemove)="canvasMouseMove.emit($event)"
-    (mouseup)="canvasMouseUp.emit($event)"
-    (dblclick)="canvasDblClick.emit($event)"
-    (keydown)="canvasKeyDown.emit($event)"
-    (keyup)="canvasKeyUp.emit($event)"
-    (wheel)="canvasWheel.emit($event)"
-    (contextmenu)="$event.preventDefault()"
-    [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (spaceDown ? 'grab' : 'crosshair')"
-  ></canvas>
+  <div class="canvas-with-scrollbars">
+    <canvas id="object-canvas" class="object-canvas" width="640" height="540"
+      tabindex="0"
+      (mousedown)="canvasMouseDown.emit($event)"
+      (mousemove)="canvasMouseMove.emit($event)"
+      (mouseup)="canvasMouseUp.emit($event)"
+      (dblclick)="canvasDblClick.emit($event)"
+      (keydown)="canvasKeyDown.emit($event)"
+      (keyup)="canvasKeyUp.emit($event)"
+      (wheel)="canvasWheel.emit($event)"
+      (contextmenu)="$event.preventDefault()"
+      [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (spaceDown ? 'grab' : 'crosshair')"
+    ></canvas>
+    <!-- Vertical scrollbar: top=finish(high Y), bottom=start(Y=0) with Y-flipped coords -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
+      [min]="0" [max]="scrollYMax" [step]="10"
+      [value]="panY"
+      (input)="panYChange.emit(+$any($event.target).value)"
+    />
+    <!-- Horizontal scrollbar -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
+      [min]="-500" [max]="500" [step]="5"
+      [value]="panX"
+      (input)="panXChange.emit(+$any($event.target).value)"
+    />
+  </div>
   <div class="canvas-zoom-label">
     Zoom: {{ (zoom * 100).toFixed(0) }}%
     &nbsp;·&nbsp; Pan: ({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})
     &nbsp;·&nbsp; <span style="color:#42a5f5">■ Up track</span>
     &nbsp; <span style="color:#ef5350">■ Down track</span>
     &nbsp; <span style="color:#ffeb3b">■ Marks</span>
+    &nbsp;·&nbsp; <span style="color:#00e5ff">▲ drag cyan flag = player start X</span>
   </div>
 
   <!-- Marks editor panel, inline below canvas -->

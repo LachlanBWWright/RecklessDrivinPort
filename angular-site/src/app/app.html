@@ -174,27 +174,10 @@
                 <p class="field-hint">Index of the tRoadInfo entry in the Road pack (Pack #135). Controls friction, textures, borders, drift, sounds.</p>
               </div>
               <div class="prop-group">
-                <label for="prop-time">Time Limit</label>
-                <div class="time-input-dual">
-                  <div class="time-input-col">
-                    <input id="prop-time-seconds" type="number" min="0" [value]="editTimeSeconds()"
-                      (input)="onTimeSecondsInput($event)" />
-                    <span class="time-input-hint">sec</span>
-                  </div>
-                  <span class="time-input-sep">≡</span>
-                  <div class="time-input-col">
-                    <input id="prop-time" type="number" min="0" [value]="editTime()"
-                      (input)="onPropsInput('time', $event)" />
-                    <span class="time-input-hint">raw (÷100)</span>
-                  </div>
-                </div>
-                <p class="field-hint">Set in seconds for convenience, or edit the raw UInt16 (stored value ÷ 100 = seconds).</p>
-              </div>
-              <div class="prop-group">
-                <label for="prop-xstart">Player Start X (SInt16, pixels)</label>
-                <input id="prop-xstart" type="number" [value]="editXStartPos()"
-                  (input)="onPropsInput('xStartPos', $event)" />
-                <p class="field-hint">Horizontal start position of the player car. Y is fixed at 500 by the runtime.</p>
+                <label for="prop-time">Time Limit (seconds)</label>
+                <input id="prop-time" type="number" min="0" max="65535" [value]="editTime()"
+                  (input)="onPropsInput('time', $event)" />
+                <p class="field-hint">Duration in seconds. Stored as UInt16 (max 65535 s ≈ 18 h).</p>
               </div>
               <div class="prop-group">
                 <label for="prop-levelend">Level End Y (UInt16, pixels)</label>
@@ -253,6 +236,7 @@
                 [zoom]="canvasZoom()"
                 [panX]="canvasPanX()"
                 [panY]="canvasPanY()"
+                [scrollYMax]="(selectedLevel()!.roadSegs.length - 1) * 2 + 500"
                 [levelNum]="selectedLevel()!.resourceId - 139"
                 [workerBusy]="workerBusy()"
                 [isDragging]="isDragging()"
@@ -279,6 +263,8 @@
                 (removeMark)="removeSelectedMark()"
                 (saveMarks)="saveMarks()"
                 (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
+                (panXChange)="canvasPanX.set($event)"
+                (panYChange)="canvasPanY.set($event)"
               ></app-editor-canvas>
 
               <div class="object-form-col">
@@ -362,92 +348,7 @@
               <p class="field-hint" style="margin-bottom:12px">Game sprite frames from Pack 129/137 will appear here once decoded. Load a resources.dat to begin.</p>
             }
 
-            <!-- ---- PPIC HEX EDITOR ---- -->
-            <h4 style="margin-top:0">PPic Raw Asset Hex Editor</h4>
-            <p class="field-hint">
-              PPic resources are raw Macintosh PICT/sprite data.
-              Use the hex viewer to inspect bytes and the patch tool to modify individual bytes.
-              Changes are incorporated when you download the edited resources.dat.
-            </p>
-
-            @if (spriteAssets().length === 0) {
-              <p class="muted">No PPic resources found in the loaded file.</p>
-            } @else {
-              <div class="sprite-layout">
-                <div class="sprite-list-col">
-                  <h4>Assets</h4>
-                  <div class="sprite-list">
-                    @for (asset of spriteAssets(); track asset.id) {
-                      <div
-                        class="sprite-item"
-                        [class.selected]="selectedSpriteId() === asset.id"
-                        (click)="selectSprite(asset.id)"
-                      >
-                        <span class="sprite-id">PPic #{{ asset.id }}</span>
-                        <span class="sprite-size">{{ asset.size }} B</span>
-                      </div>
-                    }
-                  </div>
-                </div>
-
-                <div class="sprite-editor-col">
-                  @if (selectedSpriteId() !== null) {
-                    <div class="hex-viewer">
-                      <div class="hex-nav">
-                        <button type="button" class="btn btn-sm" (click)="prevSpritePage()" [disabled]="spriteHexPage() === 0">‹ Prev</button>
-                        <span>Page {{ spriteHexPage() + 1 }} / {{ spriteMaxPage() + 1 }} (256 bytes/page)</span>
-                        <button type="button" class="btn btn-sm" (click)="nextSpritePage()" [disabled]="spriteHexPage() >= spriteMaxPage()">Next ›</button>
-                      </div>
-                      <div class="hex-table-wrapper">
-                        <table class="hex-table">
-                          <thead>
-                            <tr>
-                              <th class="hex-addr">Addr</th>
-                              @for (col of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]; track col) {
-                                <th class="hex-byte">{{ col.toString(16).padStart(2,'0') }}</th>
-                              }
-                              <th class="hex-ascii">ASCII</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            @for (row of spriteHexRows(); track row.addr) {
-                              <tr>
-                                <td class="hex-addr">{{ row.addr }}</td>
-                                @for (cell of row.hex; track $index) {
-                                  <td class="hex-byte" [class.hex-byte--empty]="cell === '  '">{{ cell }}</td>
-                                }
-                                <td class="hex-ascii">{{ row.ascii }}</td>
-                              </tr>
-                            }
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div class="sprite-patch">
-                      <h4>Byte Patch</h4>
-                      <div class="props-grid">
-                        <div class="prop-group">
-                          <label for="sprite-offset">Byte offset (decimal)</label>
-                          <input id="sprite-offset" type="number" min="0"
-                            [value]="spriteByteOffset()" (input)="onSpriteOffsetInput($event)" />
-                        </div>
-                        <div class="prop-group">
-                          <label for="sprite-value">New byte value (0–255)</label>
-                          <input id="sprite-value" type="number" min="0" max="255"
-                            [value]="spriteByteValue()" (input)="onSpriteValueInput($event)" />
-                        </div>
-                      </div>
-                      <button type="button" class="btn btn-primary" (click)="applySpriteByteEdit()" [disabled]="workerBusy()">
-                        @if (workerBusy()) { <span class="btn-spinner"></span> Patching… } @else { Apply Byte Patch }
-                      </button>
-                    </div>
-                  } @else {
-                    <p class="muted">Select an asset to inspect and edit.</p>
-                  }
-                </div>
-              </div>
-            }
+            <!-- End of sprite section -->
           </div>
         }
       }
