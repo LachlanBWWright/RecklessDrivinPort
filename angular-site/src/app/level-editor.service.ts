@@ -805,12 +805,9 @@ export class LevelEditorService {
         const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
         for (let i = 0; i < w * h; i++) {
           const pv = view.getUint16(i * 2, false); // big-endian RGB555
-          const r  = Math.round(((pv >> 10) & 0x1f) * (255 / 31));
-          const g  = Math.round(((pv >> 5)  & 0x1f) * (255 / 31));
-          const b  = Math.round((pv & 0x1f)          * (255 / 31));
-          pixels[i * 4]     = r;
-          pixels[i * 4 + 1] = g;
-          pixels[i * 4 + 2] = b;
+          pixels[i * 4]     = Math.round(((pv >> 10) & 0x1f) * RGB5_SCALE);
+          pixels[i * 4 + 1] = Math.round(((pv >> 5)  & 0x1f) * RGB5_SCALE);
+          pixels[i * 4 + 2] = Math.round((pv & 0x1f)          * RGB5_SCALE);
           pixels[i * 4 + 3] = 255;
         }
         const buf = new ArrayBuffer(pixels.byteLength);
