@@ -396,6 +396,7 @@ export class App implements OnInit, OnDestroy {
 
   selectLevel(id: number): void {
     this.selectedLevelId.set(id);
+    this._roadOffscreenKey = ''; // invalidate road bitmap cache
     const level = this.parsedLevels().find((l) => l.resourceId === id);
     if (level) {
       this.editRoadInfo.set(level.properties.roadInfo);
@@ -788,6 +789,59 @@ export class App implements OnInit, OnDestroy {
     this.selectObject(objs.length - 1);
   }
 
+  /**
+   * Right-click on the canvas:
+   *  - When track overlay visible, right-click near an existing waypoint removes it.
+   *  - Right-click away from waypoints inserts a new waypoint into the nearest track
+   *    at the correct position (sorted by Y-coordinate so the path remains ordered).
+   */
+  onCanvasContextMenu(event: MouseEvent): void {
+    if (!this.showTrackOverlay()) return;
+    const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
+    const trackUp   = this.editTrackUp();
+    const trackDown = this.editTrackDown();
+    const trackHitR = Math.max(20, 14 / this.canvasZoom());
+
+    // 1. Check removal – right-click on existing waypoint
+    for (let i = 0; i < trackUp.length; i++) {
+      if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
+        const arr = trackUp.filter((_, j) => j !== i);
+        this.editTrackUp.set(arr);
+        this._roadOffscreenKey = '';
+        return;
+      }
+    }
+    for (let i = 0; i < trackDown.length; i++) {
+      if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
+        const arr = trackDown.filter((_, j) => j !== i);
+        this.editTrackDown.set(arr);
+        this._roadOffscreenKey = '';
+        return;
+      }
+    }
+
+    // 2. Insert new waypoint – choose track by X offset (negative=up, positive=down convention)
+    const level = this.selectedLevel();
+    if (!level) return;
+    const insertWp = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
+    // Insert into both tracks, sorted ascending by Y
+    const insertSorted = (arr: typeof trackUp, wp: typeof insertWp) => {
+      const idx = arr.findIndex((s) => s.y >= wp.y);
+      const copy = arr.slice();
+      if (idx === -1) copy.push(wp); else copy.splice(idx, 0, wp);
+      return copy;
+    };
+    // Determine which track to insert into based on proximity
+    const distToUp   = trackUp.length   > 0 ? Math.min(...trackUp.map((s)   => dist2d(s.x, s.y, wx, wy))) : Infinity;
+    const distToDown = trackDown.length > 0 ? Math.min(...trackDown.map((s) => dist2d(s.x, s.y, wx, wy))) : Infinity;
+    if (distToUp <= distToDown) {
+      this.editTrackUp.set(insertSorted(trackUp, insertWp));
+    } else {
+      this.editTrackDown.set(insertSorted(trackDown, insertWp));
+    }
+    this._roadOffscreenKey = '';
+  }
+
   onCanvasKeyDown(event: KeyboardEvent): void {
     if (event.key === ' ') {
       this.spaceDown.set(true);
@@ -922,7 +976,7 @@ export class App implements OnInit, OnDestroy {
     }
 
     if (level) {
-      this.drawObjectRoadPreview(ctx, level, theme);
+      this.drawObjectRoadPreviewCached(ctx, level, theme, W, H, zoom, panX, panY);
     }
 
     if (!level || level.roadSegs.length === 0) {
@@ -1711,6 +1765,50 @@ export class App implements OnInit, OnDestroy {
     this.canvasZoom.set(zoom);
     this.canvasPanX.set((minX + maxX) / 2);
     this.canvasPanY.set((minY + maxY) / 2);
+  }
+
+    /** Offscreen canvas used to cache road rendering between frames. */
+  private _roadOffscreen: HTMLCanvasElement | null = null;
+  private _roadOffscreenKey = '';
+
+  /**
+   * Draw road via an offscreen bitmap cache.  The cache is only invalidated when the
+   * viewport key (zoom, panX, panY, levelId, textureVersion) changes.  Object drags and
+   * selection changes do NOT invalidate the cache, giving a significant speedup during
+   * interactive editing.
+   */
+  private drawObjectRoadPreviewCached(
+    ctx: CanvasRenderingContext2D,
+    level: ParsedLevel,
+    theme: RoadTheme,
+    W: number,
+    H: number,
+    zoom: number,
+    panX: number,
+    panY: number,
+  ): void {
+    // Cache key: quantize pan to 2-world-unit granularity for stability while panning
+    const key = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${(panX).toFixed(0)}|${(panY).toFixed(0)}|${this.roadTexturesVersion()}`;
+    if (this._roadOffscreenKey !== key) {
+      // Render to offscreen canvas
+      if (!this._roadOffscreen || this._roadOffscreen.width !== W || this._roadOffscreen.height !== H) {
+        this._roadOffscreen = document.createElement('canvas');
+        this._roadOffscreen.width  = W;
+        this._roadOffscreen.height = H;
+      }
+      const offCtx = this._roadOffscreen.getContext('2d');
+      if (offCtx) {
+        offCtx.clearRect(0, 0, W, H);
+        this.drawObjectRoadPreview(offCtx, level, theme);
+        this._roadOffscreenKey = key;
+      }
+    }
+    // Blit cached bitmap to main canvas
+    if (this._roadOffscreen) {
+      ctx.drawImage(this._roadOffscreen, 0, 0);
+    } else {
+      this.drawObjectRoadPreview(ctx, level, theme);
+    }
   }
 
   private drawObjectRoadPreview(ctx: CanvasRenderingContext2D, level: ParsedLevel, theme: RoadTheme): void {

@@ -33,7 +33,7 @@
       (keydown)="canvasKeyDown.emit($event)"
       (keyup)="canvasKeyUp.emit($event)"
       (wheel)="canvasWheel.emit($event)"
-      (contextmenu)="$event.preventDefault()"
+      (contextmenu)="canvasContextMenu.emit($event); $event.preventDefault()"
       [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (spaceDown ? 'grab' : 'crosshair')"
     ></canvas>
     <!-- Vertical scrollbar: value = scrollYMax - panY so that thumb-top = road end, thumb-bottom = road start -->

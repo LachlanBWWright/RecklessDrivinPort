@@ -32,6 +32,7 @@ export class EditorCanvasComponent {
   @Output() canvasMouseMove = new EventEmitter<MouseEvent>();
   @Output() canvasMouseUp = new EventEmitter<MouseEvent>();
   @Output() canvasDblClick = new EventEmitter<MouseEvent>();
+  @Output() canvasContextMenu = new EventEmitter<MouseEvent>();
   @Output() canvasKeyDown = new EventEmitter<KeyboardEvent>();
   @Output() canvasKeyUp = new EventEmitter<KeyboardEvent>();
   @Output() canvasWheel = new EventEmitter<WheelEvent>();
