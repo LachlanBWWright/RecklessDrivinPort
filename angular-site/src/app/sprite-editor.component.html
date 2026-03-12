@@ -3,10 +3,14 @@
     <div class="sprite-editor-dialog" (click)="$event.stopPropagation()">
 
       <!-- Header -->
-      <div class="se-header">
-        <span class="se-title">🎨 Sprite Editor – Frame #{{ frame.frameId }} ({{ frame.width }}×{{ frame.height }} px · {{ frame.bitDepth }}-bit)</span>
-        <button class="se-close-btn" (click)="close()" aria-label="Close editor">✕</button>
-      </div>
+      <mat-toolbar class="se-toolbar" color="primary">
+        <mat-icon>brush</mat-icon>
+        <span class="se-title">Sprite Editor – Frame #{{ frame.frameId }} ({{ frame.width }}×{{ frame.height }} px · {{ frame.bitDepth }}-bit)</span>
+        <span class="flex-spacer"></span>
+        <button mat-icon-button (click)="close()" aria-label="Close editor" matTooltip="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-toolbar>
 
       <!-- Body -->
       <div class="se-body">
@@ -24,9 +28,11 @@
             ></canvas>
           </div>
           <div class="se-canvas-info">
-            Zoom {{ zoom }}× · {{ frame.width }}×{{ frame.height }} px
-            <button class="se-mini-btn" (click)="zoomOut()">−</button>
-            <button class="se-mini-btn" (click)="zoomIn()">+</button>
+            <span>{{ zoom }}× — {{ frame.width }}×{{ frame.height }} px</span>
+            <div class="se-zoom-btns">
+              <button mat-icon-button (click)="zoomOut()" matTooltip="Zoom out"><mat-icon>zoom_out</mat-icon></button>
+              <button mat-icon-button (click)="zoomIn()" matTooltip="Zoom in"><mat-icon>zoom_in</mat-icon></button>
+            </div>
           </div>
         </div>
 
@@ -37,21 +43,26 @@
           <div class="se-section-title">Tool</div>
           <div class="se-tool-row">
             @for (t of tools; track t) {
-              <button class="se-tool-btn"
+              <button mat-icon-button class="se-tool-btn"
                 [class.active]="tool === t"
                 (click)="tool = t"
-                [title]="t">
-                {{ toolIcons[t] }}
+                [matTooltip]="t">
+                <mat-icon>{{ toolIcons[t] }}</mat-icon>
               </button>
             }
-            <button class="se-tool-btn" (click)="undo()" title="Undo (Ctrl+Z)">↩</button>
+            <button mat-icon-button (click)="undo()" matTooltip="Undo (Ctrl+Z)">
+              <mat-icon>undo</mat-icon>
+            </button>
           </div>
 
           <!-- Brush size -->
           <div class="se-section-title">Brush size</div>
           <div class="se-tool-row">
             @for (s of [1,2,4,8]; track s) {
-              <button class="se-size-btn" [class.active]="brushSize === s" (click)="brushSize = s">{{ s }}</button>
+              <button mat-mini-fab class="se-size-btn"
+                [class.active]="brushSize === s"
+                [color]="brushSize === s ? 'primary' : undefined"
+                (click)="brushSize = s">{{ s }}</button>
             }
           </div>
 
@@ -75,7 +86,7 @@
             @for (c of palette; track $index) {
               <div class="se-palette-cell"
                 [style.background]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
-                [title]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
+                [matTooltip]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
                 (click)="selectPaletteColor(c)"
               ></div>
             }
@@ -86,8 +97,10 @@
 
           <!-- Actions -->
           <div class="se-actions">
-            <button class="se-btn se-btn-primary" (click)="save()">💾 Save to file</button>
-            <button class="se-btn" (click)="close()">Cancel</button>
+            <button mat-raised-button color="primary" (click)="save()">
+              <mat-icon>save</mat-icon> Save to file
+            </button>
+            <button mat-stroked-button (click)="close()">Cancel</button>
           </div>
         </div>
 

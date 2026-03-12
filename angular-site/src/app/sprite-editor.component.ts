@@ -53,12 +53,12 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   private undoStack: Uint8ClampedArray[] = [];
   private readonly MAX_UNDO = 20;
 
-  // ---- Tool icons for display ----
+  // ---- Tool icons for display (Material icon names) ----
   toolIcons: Record<SpriteEditorTool, string> = {
-    pencil: '✏️',
-    fill: '🪣',
-    eyedropper: '💉',
-    eraser: '◻️',
+    pencil: 'edit',
+    fill: 'format_color_fill',
+    eyedropper: 'colorize',
+    eraser: 'auto_fix_normal',
   };
 
   tools: SpriteEditorTool[] = ['pencil', 'fill', 'eyedropper', 'eraser'];

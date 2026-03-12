@@ -2,58 +2,50 @@
 .sprite-editor-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.80);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(4px);
 }
 
 .sprite-editor-dialog {
   background: #1a1a1a;
-  border: 1px solid #444;
+  border: 1px solid #383838;
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   max-width: 96vw;
   max-height: 94vh;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8);
   min-width: 600px;
 }
 
-/* ---- Header ---- */
-.se-header {
+/* ---- Toolbar header ---- */
+.se-toolbar {
+  background: #0d0d0d !important;
+  border-bottom: 1px solid #333;
+  height: 48px !important;
+  min-height: 48px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  border-bottom: 1px solid #333;
-  background: #111;
+  gap: 8px;
+  padding: 0 12px !important;
   flex-shrink: 0;
+
+  mat-icon:first-child { color: #e53935; }
 }
 
 .se-title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: #e0e0e0;
+  flex: 1;
 }
 
-.se-close-btn {
-  background: none;
-  border: 1px solid #444;
-  color: #ccc;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  &:hover { background: #333; }
-}
+.flex-spacer { flex: 1; }
 
 /* ---- Body ---- */
 .se-body {
@@ -124,28 +116,18 @@
   gap: 4px;
 }
 
-.se-tool-btn, .se-size-btn {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #444;
-  background: #222;
-  color: #ccc;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.1s, border-color 0.1s;
-
-  &:hover  { background: #333; }
-  &.active { background: #1a3a5c; border-color: #42a5f5; color: #fff; }
+.se-tool-btn.active, .se-tool-btn[class*="active"] {
+  color: #42a5f5 !important;
+  background: rgba(66,165,245,0.12) !important;
 }
 
 .se-size-btn {
-  font-size: 0.75rem;
-  font-weight: 600;
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
 }
+.se-size-btn.active { background: #e53935 !important; color: #fff !important; }
 
 /* ---- Colour controls ---- */
 .se-color-row {
@@ -209,42 +191,19 @@
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding-top: 12px;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    mat-icon { font-size: 16px !important; height: 16px !important; width: 16px !important; }
+  }
 }
 
-.se-btn {
-  padding: 7px 12px;
-  border: 1px solid #444;
-  border-radius: 5px;
-  background: #222;
-  color: #ccc;
-  cursor: pointer;
-  font-size: 0.82rem;
-  text-align: center;
-  transition: background 0.1s;
-  &:hover { background: #333; }
+.se-zoom-btns {
+  display: flex;
+  gap: 2px;
 }
 
-.se-btn-primary {
-  background: #1a4a8c;
-  border-color: #42a5f5;
-  color: #fff;
-  &:hover { background: #1e5bad; }
-}
-
-/* ---- Mini buttons ---- */
-.se-mini-btn {
-  width: 24px;
-  height: 24px;
-  border: 1px solid #444;
-  background: #222;
-  color: #ccc;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  &:hover { background: #333; }
-}
