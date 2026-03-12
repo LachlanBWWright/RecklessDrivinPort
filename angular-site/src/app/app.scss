@@ -857,26 +857,29 @@ select {
 
 /* ---- Object list sprite thumbnails ---- */
 .object-item {
-  grid-template-columns: 28px 28px 60px 1fr;
+  grid-template-columns: 36px 36px 60px 1fr;
 }
 .obj-sprite-thumb {
-  width: 24px;
-  height: 24px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .obj-list-sprite {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
   image-rendering: pixelated;
   border-radius: 2px;
+  display: block;
+  flex-shrink: 0;
 }
 .obj-list-sprite-fallback {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 3px;
   display: flex;
   align-items: center;
@@ -894,8 +897,8 @@ select {
   margin-bottom: 8px;
 }
 .obj-inspector-sprite {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
   image-rendering: pixelated;
   border: 1px solid var(--border);
@@ -955,8 +958,8 @@ select {
 }
 
 .pack-sprite-thumb {
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
   image-rendering: pixelated;
   background: rgba(255,255,255,0.05);
@@ -973,12 +976,12 @@ select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 160px;
+  min-width: 200px;
 }
 
 .pack-sprite-large {
-  max-width: 160px;
-  max-height: 160px;
+  max-width: 220px;
+  max-height: 220px;
   object-fit: contain;
   image-rendering: pixelated;
   border: 1px solid var(--border);

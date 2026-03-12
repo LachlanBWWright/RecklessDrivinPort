@@ -18,7 +18,7 @@
         [title]="'Object #' + idx + ' · TypeRes ' + objects[idx].typeRes + ' · (' + objects[idx].x + ', ' + objects[idx].y + ')'">
         <span class="obj-sprite-thumb">
           @if (getSpriteUrl(objects[idx].typeRes); as url) {
-            <img [src]="url" class="obj-list-sprite" width="32" height="32" alt="" />
+            <img [src]="url" class="obj-list-sprite" width="36" height="36" alt="" />
           } @else {
             <span class="obj-list-sprite-fallback"
               [style.background]="getFallbackColor(objects[idx].typeRes)">

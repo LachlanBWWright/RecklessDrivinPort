@@ -1013,9 +1013,10 @@ export class App implements OnInit, OnDestroy {
       const objectType = this.objectTypeDefinitions.get(obj.typeRes) ?? null;
       const preview = this.getObjectSpritePreview(obj.typeRes);
 
-      // Scale object size with zoom
-      const drawWidth  = objectType ? Math.max(12, objectType.width  * GAME_KSCALE * zoom) : baseRadius * 2.5;
-      const drawHeight = objectType ? Math.max(12, objectType.length * GAME_KSCALE * zoom) : baseRadius * 2.5;
+      // Scale object size with zoom: type dimensions (metres) × kScale (9 px/m) × canvasZoom
+      // Minimum of 16px ensures objects are always visible regardless of zoom level
+      const drawWidth  = objectType ? Math.max(16, objectType.width  * GAME_KSCALE * zoom) : baseRadius * 2.5;
+      const drawHeight = objectType ? Math.max(16, objectType.length * GAME_KSCALE * zoom) : baseRadius * 2.5;
 
       const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
       const isSel = i === selIdx;
