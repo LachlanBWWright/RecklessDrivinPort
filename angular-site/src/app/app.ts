@@ -7,6 +7,7 @@ import type {
   MarkSeg,
   ObjectTypeDefinition,
   RoadInfoData,
+  DecodedSpriteFrame,
 } from './level-editor.service';
 
 /** Worker response envelope sent from pack.worker.ts */
@@ -232,6 +233,8 @@ export class App implements OnInit, OnDestroy {
   // ---- Pack sprite viewer (decoded from Pack 129 & 137) ----
   /** Decoded game sprite frames: id → HTMLCanvasElement. */
   private packSpriteCanvases = new Map<number, HTMLCanvasElement>();
+  /** Full decoded frames for the sprite editor – includes pixel data. */
+  private packSpriteDecodedFrames = new Map<number, DecodedSpriteFrame>();
   /** List of decoded sprite frame infos (id, bitDepth, w, h). */
   packSpriteFrames = signal<{ id: number; bitDepth: 8 | 16; width: number; height: number }[]>([]);
   /** Currently selected sprite frame in the pack sprite viewer. */
@@ -244,6 +247,11 @@ export class App implements OnInit, OnDestroy {
     if (id === null) return null;
     return this.packSpriteFrames().find((f) => f.id === id) ?? null;
   });
+
+  /** Whether the sprite pixel editor popup is open. */
+  spriteEditorOpen = signal(false);
+  /** The decoded frame currently being edited in the popup. */
+  spriteEditorFrame = signal<DecodedSpriteFrame | null>(null);
 
   private wasmScript: HTMLScriptElement | null = null;
   private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
@@ -265,6 +273,8 @@ export class App implements OnInit, OnDestroy {
 
   /** RAF token for debouncing canvas redraws (prevents multiple redraws per frame). */
   private _pendingRedrawRaf: number | null = null;
+  /** Cached offscreen road bitmap – invalidated when pan/zoom/level/textures change. */
+  private _roadBitmapCache: { key: string; bitmap: ImageBitmap } | null = null;
 
   constructor() {
     // Redraw object canvas when objects, selection, zoom, pan, sprite previews, or track overlay changes.
@@ -885,7 +895,7 @@ export class App implements OnInit, OnDestroy {
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, W, H);
 
-    // Draw grid (subtle, over the background)
+    // Draw grid (subtle, over the background) — all lines in a single path for performance
     ctx.strokeStyle = 'rgba(0,0,0,0.18)';
     ctx.lineWidth = 1;
     const gridStep = 100; // world units
@@ -897,27 +907,24 @@ export class App implements OnInit, OnDestroy {
       const endWorldY = panY + H / (2 * zoom);
       const firstX = Math.floor(startWorldX / gridStep) * gridStep;
       const firstY = Math.floor(startWorldY / gridStep) * gridStep;
+      ctx.beginPath();
       for (let gx = firstX; gx <= endWorldX; gx += gridStep) {
         const [cx] = this.worldToCanvas(gx, 0);
-        ctx.beginPath();
         ctx.moveTo(cx, 0);
         ctx.lineTo(cx, H);
-        ctx.stroke();
       }
       for (let gy = firstY; gy <= endWorldY; gy += gridStep) {
         const [, cy] = this.worldToCanvas(0, gy);
-        ctx.beginPath();
         ctx.moveTo(0, cy);
         ctx.lineTo(W, cy);
-        ctx.stroke();
       }
+      ctx.stroke();
     }
 
     if (level) {
       this.drawObjectRoadPreview(ctx, level, theme);
     }
 
-    // Draw axes (faint, only if road not drawn)
     if (!level || level.roadSegs.length === 0) {
       const [ox2, oy2] = this.worldToCanvas(0, 0);
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -1467,11 +1474,13 @@ export class App implements OnInit, OnDestroy {
       };
       const result = await this.dispatchWorker<AllSpritesResult>('DECODE_ALL_SPRITE_FRAMES');
       this.packSpriteCanvases.clear();
+      this.packSpriteDecodedFrames.clear();
       const frameInfos: { id: number; bitDepth: 8 | 16; width: number; height: number }[] = [];
       for (const { id, bitDepth, width, height, pixels } of result.frames) {
         const clamped = new Uint8ClampedArray(pixels);
         const canvas = this.renderSpritePixels(clamped, width, height);
         if (canvas) this.packSpriteCanvases.set(id, canvas);
+        this.packSpriteDecodedFrames.set(id, { frameId: id, width, height, pixels: clamped, bitDepth });
         frameInfos.push({ id, bitDepth, width, height });
       }
       this.packSpriteFrames.set(frameInfos);
@@ -1511,6 +1520,34 @@ export class App implements OnInit, OnDestroy {
     if (bitDepth === 16) return 'RGB555';
     if (bitDepth === 8) return '8-bit';
     return '?';
+  }
+
+  /** Open the sprite pixel editor for the given frame ID. */
+  openSpriteEditor(frameId: number): void {
+    const frame = this.packSpriteDecodedFrames.get(frameId) ?? null;
+    if (!frame) return;
+    this.spriteEditorFrame.set({ ...frame, pixels: frame.pixels.slice() as Uint8ClampedArray });
+    this.spriteEditorOpen.set(true);
+  }
+
+  /** Handle save event from sprite editor – write pixels back to the pack. */
+  async onSpriteEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
+    this.spriteEditorOpen.set(false);
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>(
+        'APPLY_SPRITE_PACK_PIXELS',
+        { frameId: event.frameId, pixels: event.pixels },
+      );
+      this.applyLevelsResult(result.levels);
+      // Refresh sprite canvases to reflect edited pixels
+      this.decodePackSpritesInBackground();
+      this.resourcesStatus.set(`Sprite frame #${event.frameId} saved.`);
+    } catch (err) {
+      this.editorError.set(err instanceof Error ? err.message : 'Sprite save failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
   }
 
   /** Apply fresh level list received from the worker after a save operation. */

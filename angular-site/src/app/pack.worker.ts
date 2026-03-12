@@ -19,6 +19,7 @@
  *   APPLY_TRACK            payload: { resourceId, trackUp, trackDown }
  *   APPLY_MARKS            payload: { resourceId, marks }
  *   APPLY_SPRITE_BYTE      payload: { spriteId, offset, value }
+ *   APPLY_SPRITE_PACK_PIXELS payload: { frameId, pixels: Uint8ClampedArray }
  *   GET_SPRITE_BYTES       payload: { spriteId }
  *   SERIALIZE              (no payload)
  */
@@ -176,6 +177,15 @@ self.addEventListener('message', (event: MessageEvent) => {
         const raw = levelEditorSvc.getSpriteBytes(resources, spriteId);
         const bytes = raw ? raw.slice() : null;
         self.postMessage({ id, ok: true, cmd, result: { bytes } });
+        break;
+      }
+
+      case 'APPLY_SPRITE_PACK_PIXELS': {
+        const { frameId, pixels } = payload as { frameId: number; pixels: Uint8ClampedArray };
+        resources = levelEditorSvc.applySpritePack16Pixels(resources, frameId, pixels);
+        // Return updated levels so canvas previews refresh
+        const { levels } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { levels } });
         break;
       }
 

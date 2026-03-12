@@ -221,6 +221,14 @@ function rgb565ToRgba(value: number): [number, number, number, number] {
   return [Math.round(r), Math.round(g), Math.round(b), 255];
 }
 
+/** Convert RGBA8888 to packed RGB555 big-endian word (Mac OS 9 / PPC format). */
+export function rgbaToRgb555(r: number, g: number, b: number): number {
+  const r5 = Math.round(r * 31 / 255) & 0x1f;
+  const g5 = Math.round(g * 31 / 255) & 0x1f;
+  const b5 = Math.round(b * 31 / 255) & 0x1f;
+  return (r5 << 10) | (g5 << 5) | b5;
+}
+
 /** Approximate the legacy 8-bit indexed sprite format as 3:3:2 RGB for previews. */
 /** Mac OS System 8-bit colour table (256 entries).
  *  Indices 0-215 form the 6×6×6 RGB cube (values: 0, 51, 102, 153, 204, 255).
@@ -752,6 +760,58 @@ export class LevelEditorService {
   getSpriteBytes(resources: ResourceDatEntry[], spriteId: number): Uint8Array | null {
     const entry = resources.find((e) => e.type === 'PPic' && e.id === spriteId);
     return entry ? entry.data : null;
+  }
+
+  /**
+   * Write edited RGBA8888 pixels back into the sprite pack (Pack 137, 16-bit RGB555).
+   * Only writes to 16-bit sprite pack entries; 8-bit PPic PPic entries are not modified.
+   */
+  applySpritePack16Pixels(
+    resources: ResourceDatEntry[],
+    frameId: number,
+    pixels: Uint8ClampedArray,
+  ): ResourceDatEntry[] {
+    const packId = SPRITE_PACK_16_ID;
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== packId) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, packId);
+        const entry = packEntries.find((e) => e.id === frameId);
+        if (!entry || entry.data.length < SPRITE_HEADER_SIZE) return res;
+        const view = new DataView(entry.data.buffer, entry.data.byteOffset, entry.data.byteLength);
+        const width  = view.getUint16(0, false);
+        const height = view.getUint16(2, false);
+        const log2xSize = entry.data[4];
+        const stride = 1 << log2xSize;
+        if (width <= 0 || height <= 0 || stride <= 0) return res;
+        // Write edited pixels back (convert RGBA8888 → RGB555 BE)
+        const newData = entry.data.slice();
+        const newView = new DataView(newData.buffer, newData.byteOffset, newData.byteLength);
+        const maskValue = view.getUint16(SPRITE_HEADER_SIZE, false); // transparent colour unchanged
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const srcI = (y * width + x) * 4;
+            const dstOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
+            if (dstOffset + 2 > newData.length) continue;
+            const a = pixels[srcI + 3];
+            if (a === 0) {
+              // transparent – restore mask value
+              newView.setUint16(dstOffset, maskValue, false);
+            } else {
+              const rgb = rgbaToRgb555(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
+              // Avoid accidentally writing the mask value with an opaque pixel
+              const safe = rgb === maskValue ? (rgb ^ 1) : rgb;
+              newView.setUint16(dstOffset, safe, false);
+            }
+          }
+        }
+        const newEntries = packEntries.map((e) => e.id === frameId ? { ...e, data: newData } : e);
+        return { ...res, data: encodePackHandle(newEntries, packId) };
+      } catch (err) {
+        console.warn('[LevelEditor] applySpritePack16Pixels error:', err);
+        return res;
+      }
+    });
   }
 
   applyLevelMarks(

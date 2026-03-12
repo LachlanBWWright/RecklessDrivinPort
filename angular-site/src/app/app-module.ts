@@ -10,9 +10,10 @@ import { App } from './app';
 import { EditorCanvasComponent } from './editor-canvas.component';
 import { ObjectInspectorComponent } from './object-inspector.component';
 import { ObjectListComponent } from './object-list.component';
+import { SpriteEditorComponent } from './sprite-editor.component';
 
 @NgModule({
-  declarations: [App, EditorCanvasComponent, ObjectInspectorComponent, ObjectListComponent],
+  declarations: [App, EditorCanvasComponent, ObjectInspectorComponent, ObjectListComponent, SpriteEditorComponent],
   imports: [
     BrowserModule,
     CommonModule,

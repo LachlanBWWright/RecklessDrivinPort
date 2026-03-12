@@ -337,6 +337,13 @@
                           · {{ selectedPackSpriteFrame()?.width ?? '?' }}×{{ selectedPackSpriteFrame()?.height ?? '?' }} px
                           · {{ getSpriteFormatLabel(selectedPackSpriteFrame()?.bitDepth) }}
                         </p>
+                        @if (selectedPackSpriteFrame()?.bitDepth === 16) {
+                          <button mat-raised-button color="primary" style="margin-top:6px"
+                            (click)="openSpriteEditor(selectedPackSpriteId()!)"
+                            [disabled]="workerBusy()">
+                            🎨 Edit Pixels
+                          </button>
+                        }
                         <button mat-stroked-button style="margin-top:6px" (click)="exportSpritePng()">⬇ Export PNG</button>
                       </div>
                     }
@@ -354,3 +361,11 @@
     </section>
   }
 </main>
+
+<!-- ---- Sprite pixel editor popup ---- -->
+<app-sprite-editor
+  [frame]="spriteEditorFrame()"
+  [open]="spriteEditorOpen()"
+  (closed)="spriteEditorOpen.set(false)"
+  (saved)="onSpriteEditorSaved($event)"
+></app-sprite-editor>

@@ -534,7 +534,7 @@ select {
   color: var(--muted);
 }
 .object-list {
-  max-height: 320px;
+  max-height: min(320px, 40vh);
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 6px;
