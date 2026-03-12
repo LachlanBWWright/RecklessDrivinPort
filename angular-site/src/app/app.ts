@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, signal, computed, effect } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal, computed, effect } from '@angular/core';
 import type {
   ParsedLevel,
   LevelProperties,
@@ -9,6 +9,7 @@ import type {
   RoadInfoData,
   DecodedSpriteFrame,
 } from './level-editor.service';
+import { KonvaEditorService } from './konva-editor.service';
 
 /** Worker response envelope sent from pack.worker.ts */
 interface WorkerResponse {
@@ -114,6 +115,8 @@ export class App implements OnInit, OnDestroy {
   readonly typePalette = OBJ_PALETTE.map((hex, index) => ({ hex, typeId: index }));
   readonly getSpritePreviewDataUrlBound = this.getSpritePreviewDataUrl.bind(this);
   readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
+
+  private readonly konva = inject(KonvaEditorService);
 
   // ---- Navigation ----
   activeTab = signal<AppTab>('game');
@@ -323,12 +326,147 @@ export class App implements OnInit, OnDestroy {
     this.loadWasmScript();
   }
 
+  /** True once the Konva stage has been initialized on the canvas DOM element. */
+  private _konvaInitialized = false;
+
+  /**
+   * Initialise (or re-initialise) the Konva overlay.
+   * Called after each redrawObjectCanvas() once the canvas is in the DOM.
+   */
+  private initKonvaIfNeeded(): void {
+    if (typeof window === 'undefined') return;
+    const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+    if (!canvas || this._konvaInitialized) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    // Create a container div for Konva OVER the canvas
+    let konvaContainer = document.getElementById('konva-container');
+    if (!konvaContainer) {
+      konvaContainer = document.createElement('div');
+      konvaContainer.id = 'konva-container';
+      konvaContainer.style.cssText = `
+        position:absolute; top:0; left:0;
+        width:${canvas.width}px; height:${canvas.height}px;
+        pointer-events:none;
+      `;
+      // Insert after canvas (grid cell 1,1)
+      canvas.style.position = 'relative';
+      parent.style.position = 'relative';
+      canvas.insertAdjacentElement('afterend', konvaContainer);
+    }
+
+    this.konva.init('konva-container', canvas.width, canvas.height);
+    this._konvaInitialized = true;
+
+    // Wire up Konva drag callbacks
+    this.konva.onObjectDragEnd = (e) => {
+      const objs = [...this.objects()];
+      if (e.index < objs.length) {
+        objs[e.index] = { ...objs[e.index], x: e.worldX, y: e.worldY };
+        this.objects.set(objs);
+        if (this.selectedObjIndex() === e.index) {
+          this.editObjX.set(e.worldX);
+          this.editObjY.set(e.worldY);
+        }
+        this.applyObjEdit();
+      }
+    };
+
+    this.konva.onObjectClick = (index) => {
+      this.selectObject(index);
+    };
+
+    this.konva.onStageDblClick = (wx, wy) => {
+      const objs = [...this.objects()];
+      objs.push({ x: wx, y: wy, dir: 0, typeRes: 128 });
+      this.objects.set(objs);
+      this.selectObject(objs.length - 1);
+    };
+
+    this.konva.onStageRightClick = (wx, wy) => {
+      if (!this.showTrackOverlay()) return;
+      // Simulate the context menu logic
+      this._handleTrackContextMenuAtWorld(wx, wy);
+    };
+
+    this.konva.onWaypointDragEnd = (e) => {
+      if (e.track === 'up') {
+        const arr = [...this.editTrackUp()];
+        if (e.segIdx < arr.length) {
+          arr[e.segIdx] = { ...arr[e.segIdx], x: e.worldX, y: e.worldY };
+          this.editTrackUp.set(arr);
+        }
+      } else {
+        const arr = [...this.editTrackDown()];
+        if (e.segIdx < arr.length) {
+          arr[e.segIdx] = { ...arr[e.segIdx], x: e.worldX, y: e.worldY };
+          this.editTrackDown.set(arr);
+        }
+      }
+    };
+
+    this.konva.onWaypointRightClick = (track, segIdx, _wx, _wy) => {
+      // Remove the clicked waypoint
+      if (track === 'up') {
+        const arr = [...this.editTrackUp()];
+        arr.splice(segIdx, 1);
+        this.editTrackUp.set(arr);
+      } else {
+        const arr = [...this.editTrackDown()];
+        arr.splice(segIdx, 1);
+        this.editTrackDown.set(arr);
+      }
+    };
+  }
+
+  /** Handle track context menu at given world coordinates (extracted for re-use). */
+  private _handleTrackContextMenuAtWorld(wx: number, wy: number): void {
+    const trackUp   = this.editTrackUp();
+    const trackDown = this.editTrackDown();
+    const trackHitR = Math.max(20, 14 / this.canvasZoom());
+
+    // Check if clicking near an existing waypoint to remove it
+    for (let i = 0; i < trackUp.length; i++) {
+      if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
+        const arr = [...trackUp]; arr.splice(i, 1);
+        this.editTrackUp.set(arr);
+        return;
+      }
+    }
+    for (let i = 0; i < trackDown.length; i++) {
+      if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
+        const arr = [...trackDown]; arr.splice(i, 1);
+        this.editTrackDown.set(arr);
+        return;
+      }
+    }
+
+    // Insert into nearest track, sorted by Y
+    const level = this.selectedLevel();
+    if (!level) return;
+
+    const nearestUp   = trackUp.reduce((best, pt) => dist2d(pt.x, pt.y, wx, wy) < best ? dist2d(pt.x, pt.y, wx, wy) : best, Infinity);
+    const nearestDown = trackDown.reduce((best, pt) => dist2d(pt.x, pt.y, wx, wy) < best ? dist2d(pt.x, pt.y, wx, wy) : best, Infinity);
+
+    const newPt = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
+    if (nearestUp <= nearestDown || trackDown.length === 0) {
+      const arr = [...trackUp, newPt].sort((a, b) => a.y - b.y);
+      this.editTrackUp.set(arr);
+    } else {
+      const arr = [...trackDown, newPt].sort((a, b) => a.y - b.y);
+      this.editTrackDown.set(arr);
+    }
+  }
+
   ngOnDestroy(): void {
     if (this.wasmScript?.parentNode) {
       (this.wasmScript.parentNode as HTMLElement).removeChild(this.wasmScript);
     }
     this.packWorker?.terminate();
     this.packWorker = null;
+    this.konva.destroy();
+    this._konvaInitialized = false;
   }
 
   // ---- Tab / section navigation ----
@@ -1200,6 +1338,28 @@ export class App implements OnInit, OnDestroy {
         ctx.font = `${Math.max(9, 11 * zoom)}px monospace`;
         ctx.fillText('FINISH', 6, finishY - 4);
       }
+    }
+
+    // ── Konva overlay update ──────────────────────────────────────────────────
+    // Initialise Konva on first render; thereafter update transforms + nodes.
+    this.initKonvaIfNeeded();
+    this.konva.setTransform(zoom, panX, panY);
+
+    // Update Konva objects layer
+    const getImgForType = (typeRes: number): CanvasImageSource | null => {
+      return this.getObjectSpritePreview(typeRes);
+    };
+    this.konva.setObjects(objs, selIdx, visibleTypes, OBJ_PALETTE, getImgForType, zoom, panX, panY);
+
+    // Update Konva track layer
+    if (level && this.showTrackOverlay()) {
+      this.konva.setTrackWaypoints(
+        this.editTrackUp() as {x:number,y:number}[],
+        this.editTrackDown() as {x:number,y:number}[],
+        zoom, panX, panY,
+      );
+    } else {
+      this.konva.clearTrackWaypoints();
     }
   }
 
