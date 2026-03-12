@@ -480,76 +480,46 @@ main {
 .object-canvas-layout {
   display: flex;
   gap: 0;
-  align-items: flex-start;
+  align-items: stretch;
   width: 100%;
+  min-height: 500px;
 
   app-editor-canvas {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .object-form-col {
     display: flex;
     flex-direction: column;
-    width: 280px;
-    min-width: 260px;
+    width: 290px;
+    min-width: 270px;
     flex-shrink: 0;
-    max-height: calc(100vh - 200px);
+    max-height: min(calc(100vh - 180px), 780px);
     overflow-y: auto;
     border-left: 1px solid var(--border);
     background: var(--surface2);
+
+    &::-webkit-scrollbar { width: 6px; }
+    &::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 3px; }
   }
 }
 
 /* ======================================================
    CANVAS TOOLBAR & CANVAS (editor-canvas component)
+   The styles below supplement editor-canvas.component.scss
+   for any global/theme overrides needed.
    ====================================================== */
-.canvas-toolbar {
-  background: var(--surface2);
-  border-bottom: 1px solid var(--border);
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
 
-.hint-text {
-  font-size: 0.75rem;
-  color: var(--muted);
-  line-height: 1.4;
-  kbd {
-    background: var(--surface3);
-    border: 1px solid var(--surface4);
-    border-radius: 3px;
-    padding: 0 4px;
-    font-family: monospace;
-    font-size: 0.72rem;
-    color: var(--on-surface);
-  }
-}
-
-.canvas-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-
-  button {
-    height: 30px !important;
-    font-size: 0.78rem !important;
-    padding: 0 10px !important;
-    min-width: unset !important;
-    color: var(--on-surface) !important;
-    border-color: var(--border) !important;
-    &.btn-active { color: var(--accent) !important; border-color: var(--accent) !important; }
-  }
-}
-
+/* Object canvas column wrapper (used in app layout) */
 .object-canvas-col {
   display: flex;
   flex-direction: column;
 }
 
+/* Subtle section title (used in app layout) */
 .subtle-section-title {
   font-size: 0.73rem;
   font-weight: 600;
@@ -559,83 +529,6 @@ main {
   padding: 4px 12px;
   background: var(--surface3);
   border-bottom: 1px solid var(--border);
-}
-
-.canvas-with-scrollbars {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 14px;
-  grid-template-rows: 1fr 14px;
-
-  canvas.object-canvas {
-    grid-column: 1;
-    grid-row: 1;
-    display: block;
-    cursor: crosshair;
-    background: #1a2a1a;
-  }
-}
-
-/* Custom range-input scrollbars */
-.canvas-scrollbar {
-  appearance: none;
-  background: var(--surface3);
-  &::-webkit-scrollbar { display: none; }
-
-  &--vert {
-    grid-column: 2;
-    grid-row: 1;
-    writing-mode: vertical-lr;
-    direction: rtl;
-    width: 14px;
-    height: 100%;
-    background: var(--surface3);
-    border-left: 1px solid var(--border);
-
-    &::-webkit-slider-runnable-track { background: transparent; }
-    &::-webkit-slider-thumb {
-      appearance: none;
-      width: 10px;
-      height: 40px;
-      background: var(--surface4);
-      border-radius: 5px;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      &:hover { background: var(--accent2); }
-    }
-  }
-
-  &--horiz {
-    grid-column: 1;
-    grid-row: 2;
-    width: 100%;
-    height: 14px;
-    background: var(--surface3);
-    border-top: 1px solid var(--border);
-
-    &::-webkit-slider-runnable-track { background: transparent; }
-    &::-webkit-slider-thumb {
-      appearance: none;
-      width: 40px;
-      height: 10px;
-      background: var(--surface4);
-      border-radius: 5px;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      &:hover { background: var(--accent2); }
-    }
-  }
-}
-
-.canvas-zoom-label {
-  font-size: 0.73rem;
-  color: var(--muted);
-  padding: 4px 12px;
-  background: var(--surface2);
-  border-top: 1px solid var(--border);
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
 }
 
 /* ======================================================
@@ -1053,3 +946,22 @@ code {
 ::-webkit-scrollbar-track { background: var(--surface); }
 ::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ======================================================
+   SITE FOOTER
+   ====================================================== */
+.site-footer {
+  background: #0a0a0a;
+  border-top: 1px solid #1e1e1e;
+  padding: 12px 24px;
+  text-align: center;
+  flex-shrink: 0;
+
+  .footer-text {
+    font-size: 0.75rem;
+    color: #555;
+    line-height: 1.6;
+
+    a { color: #666; text-decoration: none; &:hover { color: #999; text-decoration: underline; } }
+  }
+}

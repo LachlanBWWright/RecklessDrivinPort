@@ -426,6 +426,19 @@
   }
 </main>
 
+<!-- ---- Page footer ---- -->
+<footer class="site-footer">
+  <span class="footer-text">
+    Reckless Drivin' WebAssembly Port by
+    <a href="https://github.com/LachlanBWWright" target="_blank" rel="noopener">LachlanBWWright</a>
+    &mdash;
+    Original game by <a href="https://github.com/jechter/RecklessDrivin" target="_blank" rel="noopener">Jonas Echterhoff</a>
+    &mdash;
+    Built on <a href="https://github.com/natecraddock/open-reckless-drivin" target="_blank" rel="noopener">Nathan Craddock's port</a>
+    and <a href="https://github.com/jorio/Pomme" target="_blank" rel="noopener">Pomme</a>
+  </span>
+</footer>
+
 <!-- ---- Sprite pixel editor popup ---- -->
 <app-sprite-editor
   [frame]="spriteEditorFrame()"
@@ -433,3 +446,4 @@
   (closed)="spriteEditorOpen.set(false)"
   (saved)="onSpriteEditorSaved($event)"
 ></app-sprite-editor>
+

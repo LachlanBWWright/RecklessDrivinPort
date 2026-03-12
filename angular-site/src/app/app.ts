@@ -348,12 +348,18 @@ export class App implements OnInit, OnDestroy {
       konvaContainer.style.cssText = `
         position:absolute; top:0; left:0;
         width:${canvas.width}px; height:${canvas.height}px;
-        pointer-events:none;
+        pointer-events:all;
       `;
-      // Insert after canvas (grid cell 1,1)
+      // The Konva container sits in the same grid cell as the canvas
       canvas.style.position = 'relative';
       parent.style.position = 'relative';
       canvas.insertAdjacentElement('afterend', konvaContainer);
+
+      // Forward wheel events from Konva container to the canvas for zoom/pan
+      konvaContainer.addEventListener('wheel', (e) => {
+        const fwd = new WheelEvent('wheel', e);
+        canvas.dispatchEvent(fwd);
+      }, { passive: false });
     }
 
     this.konva.init('konva-container', canvas.width, canvas.height);
