@@ -594,6 +594,25 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async saveTrack(): Promise<void> {
+    const id = this.selectedLevelId();
+    if (id === null) return;
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_TRACK', {
+        resourceId: id,
+        trackUp:   this.editTrackUp(),
+        trackDown: this.editTrackDown(),
+      });
+      this.applyLevelsResult(result.levels);
+      this.resourcesStatus.set(`Saved track waypoints for level ${id - 139}.`);
+    } catch (error) {
+      this.editorError.set(error instanceof Error ? error.message : 'Track save failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
   // ---- Canvas coordinate transforms ----
 
   worldToCanvas(wx: number, wy: number): [number, number] {
@@ -1744,16 +1763,19 @@ export class App implements OnInit, OnDestroy {
     const firstSeg = Math.max(0, Math.floor(visibleWorldMinY / 2));
     const lastSeg  = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
 
-    // Always step 1 for correct curved road rendering (each segment connects to next)
-    const step = 1;
+    // Adaptive step: merge adjacent segments when zoom is very small to keep rendering fast.
+    // Each segment occupies 2 world-Y units; at zoom < 0.25 one segment = < 0.5 canvas px,
+    // so merging 4 at a time is visually indistinguishable and 4× faster.
+    const step = Math.max(1, Math.ceil(1.5 / zoom));
     // Compute world extents at canvas edges for background fill (extends beyond road edges)
     const worldMinX = panX - W / (2 * zoom) - 200;
     const worldMaxX = panX + W / (2 * zoom) + 200;
     for (let index = firstSeg; index <= lastSeg; index += step) {
       const cur = level.roadSegs[index];
-      const nxt = level.roadSegs[index + step];
+      const nxtIdx = Math.min(index + step, level.roadSegs.length - 1);
+      const nxt = level.roadSegs[nxtIdx];
       const y0  = index * 2;
-      const y1  = (index + step) * 2;
+      const y1  = nxtIdx * 2;
 
       // Off-road (background texture) – extend to canvas edges
       fillQuad(worldMinX, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  worldMinX, y1,  bgPat ?? theme.bg);

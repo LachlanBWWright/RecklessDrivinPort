@@ -402,6 +402,51 @@ export function serializeLevelProperties(rawEntry1: Uint8Array, props: LevelProp
   return out;
 }
 
+export function serializeLevelTrack(
+  rawEntry1: Uint8Array,
+  trackUp: { x: number; y: number; flags: number; velo: number }[],
+  trackDown: { x: number; y: number; flags: number; velo: number }[],
+): Uint8Array {
+  const view = new DataView(rawEntry1.buffer, rawEntry1.byteOffset, rawEntry1.byteLength);
+  let pos = LEVEL_DATA_SIZE;
+
+  const oldUpCount   = view.getUint32(pos, false);
+  const upStart      = pos + 4;
+  pos = upStart + oldUpCount * TRACK_SEG_SIZE;
+  const oldDownCount = view.getUint32(pos, false);
+  const downStart    = pos + 4;
+  pos = downStart + oldDownCount * TRACK_SEG_SIZE;
+
+  // Keep the bytes before track data unchanged (tLevelData)
+  const before = rawEntry1.slice(0, LEVEL_DATA_SIZE);
+  // Keep everything after both track arrays unchanged (objects + road)
+  const after  = rawEntry1.slice(pos);
+
+  const writeTrack = (segs: { x: number; y: number; flags: number; velo: number }[]): Uint8Array => {
+    const buf = new Uint8Array(4 + segs.length * TRACK_SEG_SIZE);
+    const bv  = new DataView(buf.buffer);
+    bv.setUint32(0, segs.length, false);
+    for (let i = 0; i < segs.length; i++) {
+      const o = 4 + i * TRACK_SEG_SIZE;
+      bv.setUint16(o,     segs[i].flags, false);
+      bv.setInt16(o + 2,  segs[i].x,     false);
+      bv.setInt32(o + 4,  segs[i].y,     false);
+      writeBigFloat32(bv, o + 8, segs[i].velo);
+    }
+    return buf;
+  };
+
+  const upBuf   = writeTrack(trackUp);
+  const downBuf = writeTrack(trackDown);
+
+  const result = new Uint8Array(before.length + upBuf.length + downBuf.length + after.length);
+  result.set(before, 0);
+  result.set(upBuf,   before.length);
+  result.set(downBuf, before.length + upBuf.length);
+  result.set(after,   before.length + upBuf.length + downBuf.length);
+  return result;
+}
+
 export function serializeLevelObjects(rawEntry1: Uint8Array, objects: ObjectPos[]): Uint8Array {
   const view = new DataView(rawEntry1.buffer, rawEntry1.byteOffset, rawEntry1.byteLength);
   let pos = LEVEL_DATA_SIZE;
@@ -504,6 +549,28 @@ export class LevelEditorService {
         return { ...res, data: encodePackHandle(newEntries, resourceId) };
       } catch (err) {
         console.error(`[LevelEditor] applyLevelObjects error id=${resourceId}:`, err);
+        return res;
+      }
+    });
+  }
+
+  applyLevelTrack(
+    resources: ResourceDatEntry[],
+    resourceId: number,
+    trackUp: { x: number; y: number; flags: number; velo: number }[],
+    trackDown: { x: number; y: number; flags: number; velo: number }[],
+  ): ResourceDatEntry[] {
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== resourceId) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, res.id);
+        const e1 = packEntries.find((e) => e.id === 1);
+        if (!e1) return res;
+        const newData    = serializeLevelTrack(e1.data, trackUp, trackDown);
+        const newEntries = packEntries.map((e) => e.id === 1 ? { ...e, data: newData } : e);
+        return { ...res, data: encodePackHandle(newEntries, resourceId) };
+      } catch (err) {
+        console.error(`[LevelEditor] applyLevelTrack error id=${resourceId}:`, err);
         return res;
       }
     });

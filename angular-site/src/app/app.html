@@ -154,15 +154,11 @@
         <!-- ---- PROPERTIES SECTION ---- -->
         @if (editorSection() === 'properties' && selectedLevel()) {
           <div class="editor-panel">
-            @if (selectedLevel()!.encrypted) {
-              <div class="info-box info-box--warn">
-                🔒 This level pack is encrypted (Level {{ selectedLevel()!.resourceId - 139 }}).
-                The editor reads and can write it back using the known open-source registration key,
-                but changes require care – saving with incorrect encryption may cause the game to reject the pack.
-              </div>
-            }
             <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Properties
               <span class="badge">Pack ID {{ selectedLevel()!.resourceId }}</span>
+              @if (selectedLevel()!.encrypted) {
+                <span class="badge" style="background:#664400;color:#ffcc66;font-size:0.7rem" title="Level 4-10 packs are XOR-encrypted; the editor handles this automatically.">🔒 encrypted</span>
+              }
             </h3>
 
             <div class="props-grid">
@@ -256,6 +252,7 @@
                 (frameAll)="frameAllObjects()"
                 (centerSelected)="centerOnSelectedObject()"
                 (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
+                (saveTrack)="saveTrack()"
                 (zoomIn)="zoomIn()"
                 (zoomOut)="zoomOut()"
                 (resetView)="resetView()"

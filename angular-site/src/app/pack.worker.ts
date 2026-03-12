@@ -16,6 +16,7 @@
  *   DECODE_SPRITE_PREVIEWS payload: { objectTypesArr: [number, ObjectTypeDefinition?][] }
  *   APPLY_PROPS            payload: { resourceId, props }
  *   APPLY_OBJECTS          payload: { resourceId, objects }
+ *   APPLY_TRACK            payload: { resourceId, trackUp, trackDown }
  *   APPLY_MARKS            payload: { resourceId, marks }
  *   APPLY_SPRITE_BYTE      payload: { spriteId, offset, value }
  *   GET_SPRITE_BYTES       payload: { spriteId }
@@ -144,6 +145,18 @@ self.addEventListener('message', (event: MessageEvent) => {
       case 'APPLY_OBJECTS': {
         const { resourceId, objects } = payload as { resourceId: number; objects: ObjectPos[] };
         resources = levelEditorSvc.applyLevelObjects(resources, resourceId, objects);
+        const { levels } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { levels } });
+        break;
+      }
+
+      case 'APPLY_TRACK': {
+        const { resourceId, trackUp, trackDown } = payload as {
+          resourceId: number;
+          trackUp: { x: number; y: number; flags: number; velo: number }[];
+          trackDown: { x: number; y: number; flags: number; velo: number }[];
+        };
+        resources = levelEditorSvc.applyLevelTrack(resources, resourceId, trackUp, trackDown);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
         break;

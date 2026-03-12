@@ -41,6 +41,7 @@ export class EditorCanvasComponent {
   @Output() frameAll = new EventEmitter<void>();
   @Output() centerSelected = new EventEmitter<void>();
   @Output() toggleTracks = new EventEmitter<void>();
+  @Output() saveTrack = new EventEmitter<void>();
   @Output() zoomIn = new EventEmitter<void>();
   @Output() zoomOut = new EventEmitter<void>();
   @Output() resetView = new EventEmitter<void>();

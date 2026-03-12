@@ -12,6 +12,9 @@
     <button mat-stroked-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()">
       🛣 {{ showTrackOverlay ? 'Hide' : 'Show' }} Tracks
     </button>
+    @if (showTrackOverlay) {
+      <button mat-stroked-button [disabled]="workerBusy" (click)="saveTrack.emit()" aria-label="Save track waypoints">💾 Save Tracks</button>
+    }
     <button mat-stroked-button (click)="zoomIn.emit()">🔍+</button>
     <button mat-stroked-button (click)="zoomOut.emit()">🔍-</button>
     <button mat-stroked-button (click)="resetView.emit()">⟲ Reset</button>
@@ -33,6 +36,13 @@
       (contextmenu)="$event.preventDefault()"
       [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (spaceDown ? 'grab' : 'crosshair')"
     ></canvas>
+    <!-- Vertical scrollbar: value = scrollYMax - panY so that thumb-top = road end, thumb-bottom = road start -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
+      aria-label="Vertical scroll position"
+      [min]="0" [max]="scrollYMax" [step]="10"
+      [value]="scrollYMax - panY"
+      (input)="panYChange.emit(scrollYMax - +$any($event.target).value)"
+    />
     <!-- Horizontal scrollbar -->
     <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
       [min]="scrollXMin" [max]="scrollXMax" [step]="5"

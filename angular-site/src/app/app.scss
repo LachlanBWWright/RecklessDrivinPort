@@ -720,6 +720,8 @@ select {
   padding: 14px;
   position: sticky;
   top: 72px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
 }
 
 .type-visibility-filter {
@@ -982,17 +984,6 @@ select {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: rgba(0,0,0,0.5);
-}
-
-/* Object list sprite thumbnail sizing */
-.obj-list-sprite {
-  max-width: 48px;
-  max-height: 48px;
-}
-
-.obj-inspector-sprite {
-  max-width: 64px;
-  max-height: 64px;
 }
 
 
