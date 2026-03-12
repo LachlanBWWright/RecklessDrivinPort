@@ -37,14 +37,11 @@
   <section id="panel-game" role="tabpanel" class="game-section" [class.tab-panel--hidden]="activeTab() !== 'game'">
     <mat-card class="game-card">
       <mat-card-header>
-        <mat-card-title-group>
-          <mat-card-title>Game</mat-card-title>
-          <mat-card-subtitle>{{ statusText() }}</mat-card-subtitle>
-          <span class="flex-spacer"></span>
-          <button mat-icon-button (click)="toggleFullscreen()" matTooltip="Fullscreen">
-            <mat-icon>fullscreen</mat-icon>
-          </button>
-        </mat-card-title-group>
+        <mat-card-title>Game</mat-card-title>
+        <mat-card-subtitle>{{ statusText() }}</mat-card-subtitle>
+        <button mat-icon-button class="fullscreen-btn" (click)="toggleFullscreen()" matTooltip="Fullscreen">
+          <mat-icon>fullscreen</mat-icon>
+        </button>
       </mat-card-header>
       <mat-card-content>
         <div class="canvas-wrapper">
@@ -70,7 +67,7 @@
         <div class="volume-row">
           <mat-icon class="volume-icon">volume_up</mat-icon>
           <mat-slider min="0" max="100" step="1" discrete class="volume-slider">
-            <input matSliderThumb [value]="masterVolume()" (valueChange)="masterVolume.set($event); applyVolume()" />
+            <input matSliderThumb [value]="masterVolume()" (valueChange)="onVolumeSliderChange($event)" />
           </mat-slider>
           <span class="volume-value">{{ masterVolume() }}%</span>
         </div>
@@ -151,8 +148,8 @@
                   class="level-btn"
                   [class.level-btn--active]="selectedLevelId() === level.resourceId"
                   (click)="selectLevel(level.resourceId)"
-                  [matTooltip]="'Level ' + (level.resourceId - 139) + (level.encrypted ? ' (encrypted)' : '')">
-                  {{ level.resourceId - 139 }}
+                  [matTooltip]="'Level ' + levelDisplayNum(level.resourceId) + (level.encrypted ? ' (encrypted)' : '')">
+                  {{ levelDisplayNum(level.resourceId) }}
                 </button>
               }
               @if (parsedLevels().length === 0) {
@@ -174,7 +171,7 @@
               <mat-card class="tab-panel-card">
                 <mat-card-header>
                   <mat-card-title>
-                    Level {{ selectedLevel()!.resourceId - 139 }} – Properties
+                    Level {{ levelDisplayNum(selectedLevel()!.resourceId) }} – Properties
                     <span class="badge">Pack {{ selectedLevel()!.resourceId }}</span>
                     @if (selectedLevel()!.encrypted) {
                       <span class="badge badge--warn" matTooltip="XOR-encrypted; handled automatically">🔒 encrypted</span>
@@ -245,7 +242,7 @@
               <mat-card class="tab-panel-card objects-panel-card">
                 <mat-card-header>
                   <mat-card-title>
-                    Level {{ selectedLevel()!.resourceId - 139 }} – Scene Editor
+                    Level {{ levelDisplayNum(selectedLevel()!.resourceId) }} – Scene Editor
                     <span class="badge">{{ objects().length }} objects</span>
                     <span class="badge badge--blue">{{ selectedLevel()!.trackUp.length }} up</span>
                     <span class="badge badge--red">{{ selectedLevel()!.trackDown.length }} down</span>
@@ -268,7 +265,7 @@
                       [scrollYMax]="(selectedLevel()!.roadSegs.length - 1) * 2 + 500"
                       [scrollXMin]="roadXMin()"
                       [scrollXMax]="roadXMax()"
-                      [levelNum]="selectedLevel()!.resourceId - 139"
+                      [levelNum]="levelDisplayNum(selectedLevel()!.resourceId)"
                       [workerBusy]="workerBusy()"
                       [isDragging]="isDragging()"
                       [dragTrackWaypoint]="dragTrackWaypoint()"

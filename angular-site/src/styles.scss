@@ -123,3 +123,16 @@ a {
   &:hover { text-decoration: underline; }
 }
 
+
+/* ---- Snackbar custom classes ---- */
+.snack-success .mdc-snackbar__surface {
+  background: #1b3a1b !important;
+  border: 1px solid #2e6b2e !important;
+  color: #a5d6a7 !important;
+}
+
+.snack-error .mdc-snackbar__surface {
+  background: #3a1b1b !important;
+  border: 1px solid #7c2626 !important;
+  color: #ef9a9a !important;
+}

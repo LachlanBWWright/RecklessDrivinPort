@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal, computed, effect } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import type {
   ParsedLevel,
   LevelProperties,
@@ -116,7 +117,11 @@ export class App implements OnInit, OnDestroy {
   readonly getSpritePreviewDataUrlBound = this.getSpritePreviewDataUrl.bind(this);
   readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
 
+  /** Convert a level resource ID (140-149) to a human-readable level number (1-10). */
+  levelDisplayNum(resourceId: number): number { return resourceId - 139; }
+
   private readonly konva = inject(KonvaEditorService);
+  private readonly snackBar = inject(MatSnackBar);
 
   // ---- Navigation ----
   activeTab = signal<AppTab>('game');
@@ -495,6 +500,12 @@ export class App implements OnInit, OnDestroy {
     if (section) this.setSection(section);
   }
 
+  /** Called when the volume slider value changes. Updates the signal and applies to WASM. */
+  onVolumeSliderChange(pct: number): void {
+    this.masterVolume.set(pct);
+    this.applyVolumeToWasm(pct);
+  }
+
   /** Alias so the template can call applyVolume() from the mat-slider. */
   applyVolume(): void {
     this.applyVolumeToWasm(this.masterVolume());
@@ -546,8 +557,11 @@ export class App implements OnInit, OnDestroy {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       this.resourcesStatus.set('Downloaded updated resources.dat.');
+      this.snackBar.open('✓ Downloaded resources.dat', 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (error) {
-      this.editorError.set(error instanceof Error ? error.message : 'Failed to serialize resources');
+      const msg = error instanceof Error ? error.message : 'Failed to serialize resources';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
       this.workerBusy.set(false);
     }
@@ -640,8 +654,11 @@ export class App implements OnInit, OnDestroy {
       this.applyLevelsResult(result.levels);
       this.propertiesDirty.set(false);
       this.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
+      this.snackBar.open(`✓ Level ${id - 139} properties saved`, 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (error) {
-      this.editorError.set(error instanceof Error ? error.message : 'Save failed');
+      const msg = error instanceof Error ? error.message : 'Save failed';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
       this.workerBusy.set(false);
     }
@@ -758,9 +775,13 @@ export class App implements OnInit, OnDestroy {
         objects: this.objects(),
       });
       this.applyLevelsResult(result.levels);
-      this.resourcesStatus.set(`Saved objects for level ${id - 139} (${this.objects().length} objects).`);
+      const msg = `Saved ${this.objects().length} objects for level ${id - 139}.`;
+      this.resourcesStatus.set(msg);
+      this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (error) {
-      this.editorError.set(error instanceof Error ? error.message : 'Save failed');
+      const msg = error instanceof Error ? error.message : 'Save failed';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
       this.workerBusy.set(false);
     }
@@ -777,9 +798,13 @@ export class App implements OnInit, OnDestroy {
         trackDown: this.editTrackDown(),
       });
       this.applyLevelsResult(result.levels);
-      this.resourcesStatus.set(`Saved track waypoints for level ${id - 139}.`);
+      const msg = `Saved track waypoints for level ${id - 139}.`;
+      this.resourcesStatus.set(msg);
+      this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (error) {
-      this.editorError.set(error instanceof Error ? error.message : 'Track save failed');
+      const msg = error instanceof Error ? error.message : 'Track save failed';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
       this.workerBusy.set(false);
     }
@@ -798,9 +823,16 @@ export class App implements OnInit, OnDestroy {
 
   /**
    * Returns the CSS→canvas pixel scale ratio for the object-canvas element.
-   * When the canvas is scaled via CSS (e.g. width:100%), offsetX/Y from mouse events
-   * are in CSS pixels but the canvas coordinate space is in logical pixels. We must
-   * multiply mouse coords by this ratio before passing them to canvasToWorld.
+   *
+   * When the canvas is scaled via CSS (e.g. `width: 100%`) the element may render
+   * at a different CSS pixel size than its logical pixel dimensions (`canvas.width`).
+   * Mouse events report coordinates in CSS pixels (`event.offsetX/Y`), so before
+   * passing those coordinates to the canvas coordinate transform we must multiply by
+   * this ratio to convert them to the canvas's own logical pixel space.
+   *
+   * Example: a 900×700 canvas rendered at 700px CSS width → scale = 900/700 ≈ 1.286.
+   * Without this correction, click/drag positions would be significantly offset from
+   * the objects' actual painted positions.
    */
   private getCanvasScale(): number {
     const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
@@ -1405,9 +1437,13 @@ export class App implements OnInit, OnDestroy {
         marks: this.marks(),
       });
       this.applyLevelsResult(result.levels);
-      this.resourcesStatus.set(`Saved ${this.marks().length} mark segments for level ${id - 139}.`);
+      const msg = `Saved ${this.marks().length} mark segments for level ${id - 139}.`;
+      this.resourcesStatus.set(msg);
+      this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (error) {
-      this.editorError.set(error instanceof Error ? error.message : 'Save failed');
+      const msg = error instanceof Error ? error.message : 'Save failed';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
       this.workerBusy.set(false);
     }
@@ -1656,9 +1692,9 @@ export class App implements OnInit, OnDestroy {
       this.parsedLevels.set(result.levels);
       this.spriteAssets.set(result.sprites);
       this.hasEditorData.set(true);
-      this.resourcesStatus.set(
-        `Loaded ${result.levels.length} level(s) and ${result.sprites.length} sprite(s) from ${sourceName}.`,
-      );
+      const statusMsg = `Loaded ${result.levels.length} level(s) and ${result.sprites.length} sprite(s) from ${sourceName}.`;
+      this.resourcesStatus.set(statusMsg);
+      this.snackBar.open(`✓ ${statusMsg}`, 'OK', { duration: 4000, panelClass: 'snack-success' });
 
       // Auto-select first level
       const curId = this.selectedLevelId();

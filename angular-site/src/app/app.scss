@@ -157,14 +157,21 @@ main {
   border: 1px solid var(--border) !important;
   width: 100%;
 
-  mat-card-title-group {
+  mat-card-header {
+    position: relative;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
+    align-items: flex-start;
+    padding: 12px 16px !important;
   }
+
   mat-card-title { font-size: 1rem !important; font-weight: 700; color: var(--on-surface); }
   mat-card-subtitle { color: var(--muted); font-size: 0.82rem !important; }
+
+  .fullscreen-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
 
   mat-card-footer {
     padding: 8px 16px 16px;

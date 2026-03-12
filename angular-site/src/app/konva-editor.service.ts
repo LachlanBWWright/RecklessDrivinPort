@@ -169,7 +169,9 @@ export class KonvaEditorService implements OnDestroy {
         });
 
         const imgNode = new Konva.Image({
-          image: img as HTMLImageElement,  // Konva accepts HTMLCanvasElement too
+          // Konva.Image accepts any CanvasImageSource (HTMLImageElement, HTMLCanvasElement, etc.)
+          // but the Konva type definitions require HTMLImageElement; cast is safe here.
+          image: img as HTMLImageElement,
           width: SIZE,
           height: SIZE,
           offsetX: SIZE / 2,

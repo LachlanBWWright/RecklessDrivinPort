@@ -280,3 +280,21 @@
     margin-top: 4px;
   }
 }
+
+.marks-table-container {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  margin-top: 8px;
+
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+}
+
+.marks-empty {
+  color: #555;
+  font-size: 0.78rem;
+  padding: 12px;
+  text-align: center;
+}
