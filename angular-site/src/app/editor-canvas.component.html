@@ -33,15 +33,9 @@
       (contextmenu)="$event.preventDefault()"
       [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (spaceDown ? 'grab' : 'crosshair')"
     ></canvas>
-    <!-- Vertical scrollbar: top=finish(high Y), bottom=start(Y=0) with Y-flipped coords -->
-    <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
-      [min]="0" [max]="scrollYMax" [step]="10"
-      [value]="panY"
-      (input)="panYChange.emit(+$any($event.target).value)"
-    />
     <!-- Horizontal scrollbar -->
     <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
-      [min]="-500" [max]="500" [step]="5"
+      [min]="scrollXMin" [max]="scrollXMax" [step]="5"
       [value]="panX"
       (input)="panXChange.emit(+$any($event.target).value)"
     />

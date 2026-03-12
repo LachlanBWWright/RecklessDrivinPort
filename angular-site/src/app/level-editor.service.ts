@@ -589,7 +589,8 @@ export class LevelEditorService {
       }
     };
     decodeFromPack(SPRITE_PACK_16_ID, 16);
-    decodeFromPack(SPRITE_PACK_8_ID, 8);
+    // Pack 129 (8-bit) uses a custom game palette that doesn't match MAC_SYSTEM_PALETTE.
+    // Only decode 16-bit sprites to avoid visual noise.
     return result;
   }
 
@@ -774,7 +775,7 @@ export class LevelEditorService {
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const srcOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
-        if (srcOffset + 1 >= data.length) continue;
+        if (srcOffset + 2 > data.length) continue;
         const value = view.getUint16(srcOffset, false);
         const dstOffset = (y * width + x) * 4;
         if (value === mask) {

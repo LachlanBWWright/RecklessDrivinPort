@@ -236,6 +236,8 @@
                 [panX]="canvasPanX()"
                 [panY]="canvasPanY()"
                 [scrollYMax]="(selectedLevel()!.roadSegs.length - 1) * 2 + 500"
+                [scrollXMin]="roadXMin()"
+                [scrollXMax]="roadXMax()"
                 [levelNum]="selectedLevel()!.resourceId - 139"
                 [workerBusy]="workerBusy()"
                 [isDragging]="isDragging()"

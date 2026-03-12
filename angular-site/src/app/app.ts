@@ -27,6 +27,9 @@ const OBJ_PALETTE = [
   '#8d6e63', '#78909c', '#ec407a', '#29b6f6',
 ];
 
+/** kScale = 9.0 pixels per meter (from objects.h) – converts object type dimensions from metres to world pixels. */
+const GAME_KSCALE = 9.0;
+
 /** typeRes value that identifies the player car object. */
 const PLAYER_CAR_TYPE_RES = 128;
 
@@ -77,7 +80,7 @@ const MIN_HIT_RADIUS = 10;
 /** Base world-space hit radius before zoom scaling for object click detection. */
 const BASE_HIT_RADIUS = 8;
 /** Canvas hit radius (px) for mark segment endpoint dragging. */
-const MARK_ENDPOINT_HIT_RADIUS = 10;
+const MARK_ENDPOINT_HIT_RADIUS = 14;
 /** Min canvas hit radius (px) for player start marker drag. */
 const MIN_START_MARKER_HIT_RADIUS = 14;
 /** Base world-space hit radius for player start marker drag. */
@@ -174,6 +177,22 @@ export class App implements OnInit, OnDestroy {
   canvasPanY = signal(0);
   isDragging = signal(false);
   dragObjIndex = signal<number | null>(null);
+
+  // Computed signals for horizontal scrollbar range based on full road data
+  roadXMin = computed(() => {
+    const level = this.selectedLevel();
+    if (!level || level.roadSegs.length === 0) return -600;
+    let minX = 0;
+    for (const seg of level.roadSegs) if (seg.v0 < minX) minX = seg.v0;
+    return Math.floor(minX - 300);
+  });
+  roadXMax = computed(() => {
+    const level = this.selectedLevel();
+    if (!level || level.roadSegs.length === 0) return 600;
+    let maxX = 0;
+    for (const seg of level.roadSegs) if (seg.v3 > maxX) maxX = seg.v3;
+    return Math.ceil(maxX + 300);
+  });
 
   private _prevPanMouseX = 0;
   private _prevPanMouseY = 0;
@@ -915,8 +934,8 @@ export class App implements OnInit, OnDestroy {
       const preview = this.getObjectSpritePreview(obj.typeRes);
 
       // Scale object size with zoom
-      const drawWidth  = objectType ? Math.max(8, objectType.width  * zoom) : baseRadius * 2.5;
-      const drawHeight = objectType ? Math.max(8, objectType.length * zoom) : baseRadius * 2.5;
+      const drawWidth  = objectType ? Math.max(12, objectType.width  * GAME_KSCALE * zoom) : baseRadius * 2.5;
+      const drawHeight = objectType ? Math.max(12, objectType.length * GAME_KSCALE * zoom) : baseRadius * 2.5;
 
       const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
       const isSel = i === selIdx;
@@ -1203,8 +1222,8 @@ export class App implements OnInit, OnDestroy {
     const canvas = event.target as HTMLCanvasElement;
     const ms = this.marks();
     const { minX, minY, rangeX: rawRangeX, rangeY: rawRangeY } = this.markBounds(ms);
-    const rangeX = rawRangeX || 1;
-    const rangeY = rawRangeY || 1;
+    const rangeX = Math.max(rawRangeX, 100);
+    const rangeY = Math.max(rawRangeY, 100);
     const pad = 24;
     const W = canvas.width; const H = canvas.height;
     // Invert the canvas-to-world mapping
@@ -1725,8 +1744,8 @@ export class App implements OnInit, OnDestroy {
     const firstSeg = Math.max(0, Math.floor(visibleWorldMinY / 2));
     const lastSeg  = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
 
-    // Skip segments when zoomed out far (performance optimisation)
-    const step = zoom < 0.3 ? 4 : zoom < 0.6 ? 2 : 1;
+    // Always step 1 for correct curved road rendering (each segment connects to next)
+    const step = 1;
     // Compute world extents at canvas edges for background fill (extends beyond road edges)
     const worldMinX = panX - W / (2 * zoom) - 200;
     const worldMaxX = panX + W / (2 * zoom) + 200;
@@ -1949,7 +1968,7 @@ export class App implements OnInit, OnDestroy {
         else acc[acc.length - 1][1] = v;
         return acc;
       }, []).forEach(([px, py]) => {
-        ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(px, py, isSel ? 12 : 8, 0, Math.PI * 2); ctx.fill();
       });
     });
   }

@@ -1,17 +1,18 @@
 /* ---- Canvas with scrollbars layout ---- */
 .canvas-with-scrollbars {
   position: relative;
-  display: inline-grid;
-  grid-template-columns: 1fr 16px;
+  display: grid;
+  grid-template-columns: 1fr;
   grid-template-rows: 1fr 16px;
   gap: 2px;
+  width: 100%;
 }
 
 .object-canvas {
   grid-column: 1;
   grid-row: 1;
   display: block;
-  max-width: 100%;
+  width: 100%;
 }
 
 .canvas-scrollbar {
@@ -31,25 +32,6 @@
     border-radius: 4px;
     border: none;
     cursor: pointer;
-  }
-}
-
-.canvas-scrollbar--vert {
-  grid-column: 2;
-  grid-row: 1;
-  width: 14px;
-  height: 100%;
-  writing-mode: vertical-rl;
-  direction: rtl;
-
-  &::-webkit-slider-thumb {
-    width: 12px;
-    height: 32px;
-  }
-
-  &::-moz-range-thumb {
-    width: 12px;
-    height: 32px;
   }
 }
 

@@ -20,6 +20,8 @@ export class EditorCanvasComponent {
   @Input() panX = 0;
   @Input() panY = 0;
   @Input() scrollYMax = 5000;
+  @Input() scrollXMin: number = -600;
+  @Input() scrollXMax: number = 600;
   @Input() levelNum = 0;
   @Input() workerBusy = false;
   @Input() isDragging = false;
