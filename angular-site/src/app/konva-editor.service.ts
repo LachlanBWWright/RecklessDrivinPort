@@ -32,6 +32,19 @@ export interface KonvaWaypointDragEndEvent {
 /** Union of the layer-child types accepted by Konva.Layer.add() */
 type KonvaLayerChild = Konva.Group | Konva.Circle;
 
+/** Minimum rendered size (CSS px) for object icons at any zoom level. */
+const MIN_OBJECT_SIZE    = 14;
+/** Base multiplier for object icon size at zoom=1 and scale=1. */
+const BASE_OBJECT_SIZE   = 32;
+/** Minimum rendered radius (CSS px) for fallback circles when no sprite is available. */
+const MIN_CIRCLE_RADIUS  = 7;
+/** Base multiplier for fallback circle radius. */
+const BASE_CIRCLE_RADIUS = 11;
+/** Minimum rendered radius (CSS px) for track waypoint circles. */
+const MIN_WAYPOINT_RADIUS  = 5;
+/** Base multiplier for waypoint circle radius. */
+const BASE_WAYPOINT_RADIUS = 7;
+
 @Injectable({ providedIn: 'root' })
 export class KonvaEditorService implements OnDestroy {
   private stage: Konva.Stage | null = null;
@@ -147,7 +160,7 @@ export class KonvaEditorService implements OnDestroy {
       if (!visible && i !== selectedIndex) return;
 
       const [sx, sy] = this.worldToStage(obj.x, obj.y);
-      const SIZE = Math.max(14, 32 * zoom * scaleX);
+      const SIZE = Math.max(MIN_OBJECT_SIZE, BASE_OBJECT_SIZE * zoom * scaleX);
       const isSel = i === selectedIndex;
       const img = getImageForType(obj.typeRes);
 
@@ -183,7 +196,7 @@ export class KonvaEditorService implements OnDestroy {
         node = new Konva.Circle({
           x: sx,
           y: sy,
-          radius: Math.max(7, 11 * zoom * scaleX),
+          radius: Math.max(MIN_CIRCLE_RADIUS, BASE_CIRCLE_RADIUS * zoom * scaleX),
           fill: isSel ? '#ffe082' : color,
           stroke: isSel ? '#fff' : 'rgba(0,0,0,0.3)',
           strokeWidth: isSel ? 2 : 1,
@@ -228,7 +241,7 @@ export class KonvaEditorService implements OnDestroy {
     this.trackLayer.destroyChildren();
 
     const scaleX = this._cssW / this._logicalW;
-    const R = Math.max(5, 7 * zoom * scaleX);
+    const R = Math.max(MIN_WAYPOINT_RADIUS, BASE_WAYPOINT_RADIUS * zoom * scaleX);
 
     const addWaypoints = (pts: { x: number; y: number }[], track: 'up' | 'down', color: string): void => {
       pts.forEach((pt, i) => {

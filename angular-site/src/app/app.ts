@@ -107,6 +107,8 @@ const MIN_HIT_RADIUS = 10;
 const BASE_HIT_RADIUS = 8;
 /** Canvas hit radius (px) for mark segment endpoint dragging. */
 const MARK_ENDPOINT_HIT_RADIUS = 14;
+/** Distance threshold (px) for clicking on a mark line segment to select it. */
+const MARK_SEGMENT_HIT_THRESHOLD = 8;
 /** Min canvas hit radius (px) for player start marker drag. */
 const MIN_START_MARKER_HIT_RADIUS = 14;
 /** Base world-space hit radius for player start marker drag. */
@@ -1608,7 +1610,7 @@ export class App implements OnInit, OnDestroy {
       const [ax, ay] = this.markWorldToCanvas(m.x1, m.y1, canvas, minX, minY, rangeX, rangeY);
       const [bx, by] = this.markWorldToCanvas(m.x2, m.y2, canvas, minX, minY, rangeX, rangeY);
       const dist = this.pointToSegmentDist(ox, oy, ax, ay, bx, by);
-      if (dist < 8) {
+      if (dist < MARK_SEGMENT_HIT_THRESHOLD) {
         this.selectedMarkIndex.set(i);
         return;
       }
