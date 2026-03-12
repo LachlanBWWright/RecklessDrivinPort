@@ -853,9 +853,17 @@ export class App implements OnInit, OnDestroy {
       if (idx === -1) copy.push(wp); else copy.splice(idx, 0, wp);
       return copy;
     };
-    // Determine which track to insert into based on proximity
-    const distToUp   = trackUp.length   > 0 ? Math.min(...trackUp.map((s)   => dist2d(s.x, s.y, wx, wy))) : Infinity;
-    const distToDown = trackDown.length > 0 ? Math.min(...trackDown.map((s) => dist2d(s.x, s.y, wx, wy))) : Infinity;
+    // Determine which track to insert into based on minimum distance to any existing waypoint
+    let distToUp = Infinity;
+    for (const s of trackUp) {
+      const d = dist2d(s.x, s.y, wx, wy);
+      if (d < distToUp) distToUp = d;
+    }
+    let distToDown = Infinity;
+    for (const s of trackDown) {
+      const d = dist2d(s.x, s.y, wx, wy);
+      if (d < distToDown) distToDown = d;
+    }
     if (distToUp <= distToDown) {
       this.editTrackUp.set(insertSorted(trackUp, insertWp));
     } else {
@@ -1036,7 +1044,7 @@ export class App implements OnInit, OnDestroy {
       const preview = this.getObjectSpritePreview(obj.typeRes);
 
       // Scale object size with zoom: type dimensions (metres) × kScale (9 px/m) × canvasZoom
-      // Minimum of 16px ensures objects are always visible regardless of zoom level
+      // Minimum 16px ensures objects remain clickable and visible at low zoom levels
       const drawWidth  = objectType ? Math.max(16, objectType.width  * GAME_KSCALE * zoom) : baseRadius * 2.5;
       const drawHeight = objectType ? Math.max(16, objectType.length * GAME_KSCALE * zoom) : baseRadius * 2.5;
 
@@ -1811,7 +1819,7 @@ export class App implements OnInit, OnDestroy {
     panY: number,
   ): void {
     // Cache key: quantize pan to 2-world-unit granularity for stability while panning
-    const key = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${(panX).toFixed(0)}|${(panY).toFixed(0)}|${this.roadTexturesVersion()}`;
+    const key = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${panX.toFixed(0)}|${panY.toFixed(0)}|${this.roadTexturesVersion()}`;
     if (this._roadOffscreenKey !== key) {
       // Render to offscreen canvas
       if (!this._roadOffscreen || this._roadOffscreen.width !== W || this._roadOffscreen.height !== H) {

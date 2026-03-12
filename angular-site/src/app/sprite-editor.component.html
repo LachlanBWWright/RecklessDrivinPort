@@ -1,5 +1,5 @@
 @if (open && frame) {
-  <div class="sprite-editor-overlay" (click)="close()" (keydown.escape)="close()" tabindex="-1" aria-modal="true" role="dialog" aria-label="Sprite pixel editor">
+  <div #overlayEl class="sprite-editor-overlay" (click)="close()" (keydown.escape)="close()" tabindex="-1" aria-modal="true" role="dialog" aria-label="Sprite pixel editor">
     <div class="sprite-editor-dialog" (click)="$event.stopPropagation()">
 
       <!-- Header -->

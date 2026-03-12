@@ -799,7 +799,8 @@ export class LevelEditorService {
               newView.setUint16(dstOffset, maskValue, false);
             } else {
               const rgb = rgbaToRgb555(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
-              // Avoid accidentally writing the mask value with an opaque pixel
+              // Flip the LSB to create a visually similar but distinct RGB555 value so it won't
+              // be misidentified as the transparent mask colour by the game renderer.
               const safe = rgb === maskValue ? (rgb ^ 1) : rgb;
               newView.setUint16(dstOffset, safe, false);
             }

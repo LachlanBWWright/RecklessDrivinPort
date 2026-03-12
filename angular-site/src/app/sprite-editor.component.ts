@@ -29,6 +29,7 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   @ViewChild('editorCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('paletteCanvas') paletteCanvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('overlayEl') overlayElRef?: ElementRef<HTMLDivElement>;
 
   tool: SpriteEditorTool = 'pencil';
   brushSize = 1;
@@ -66,6 +67,8 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     if (changes['frame'] || changes['open']) {
       if (this.open && this.frame) {
         this.loadFrame(this.frame);
+        // Focus the overlay for keyboard events
+        setTimeout(() => this.overlayElRef?.nativeElement?.focus(), 0);
       }
     }
   }
@@ -73,6 +76,8 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   ngAfterViewInit(): void {
     if (this.open && this.frame) {
       this.loadFrame(this.frame);
+      // Ensure overlay gets focus for keyboard events (Escape to close)
+      setTimeout(() => this.overlayElRef?.nativeElement?.focus(), 0);
     }
   }
 
@@ -148,16 +153,18 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
       }
     }
 
-    // Grid lines when zoom >= 4
+    // Grid lines when zoom >= 4 – all lines in a single path for performance
     if (z >= 4) {
       ctx.strokeStyle = 'rgba(0,0,0,0.2)';
       ctx.lineWidth = 0.5;
+      ctx.beginPath();
       for (let px = 0; px <= w; px++) {
-        ctx.beginPath(); ctx.moveTo(px * z, 0); ctx.lineTo(px * z, h * z); ctx.stroke();
+        ctx.moveTo(px * z, 0); ctx.lineTo(px * z, h * z);
       }
       for (let py = 0; py <= h; py++) {
-        ctx.beginPath(); ctx.moveTo(0, py * z); ctx.lineTo(w * z, py * z); ctx.stroke();
+        ctx.moveTo(0, py * z); ctx.lineTo(w * z, py * z);
       }
+      ctx.stroke();
     }
   }
 
