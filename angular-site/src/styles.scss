@@ -4,12 +4,36 @@ html {
   @include mat.theme((
     color: (
       theme-type: dark,
-      primary: mat.$azure-palette,
-      tertiary: mat.$blue-palette,
+      primary: mat.$red-palette,
+      tertiary: mat.$azure-palette,
     ),
     typography: Roboto,
-    density: 0,
+    density: -1,
   ));
+}
+
+/* Material overrides for dark theme */
+.mat-mdc-form-field {
+  --mdc-filled-text-field-container-color: #252525;
+  --mdc-outlined-text-field-outline-color: #444;
+}
+
+.mat-mdc-card {
+  --mdc-elevated-card-container-color: #1e1e1e;
+}
+
+.mat-mdc-tab-group {
+  --mat-tab-header-active-label-text-color: #e53935;
+  --mat-tab-header-active-indicator-color: #e53935;
+}
+
+/* Compact mat-form-field for editor panels */
+.form-field-compact {
+  .mat-mdc-form-field-infix {
+    min-height: 40px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
 }
 
 /* Global styles */

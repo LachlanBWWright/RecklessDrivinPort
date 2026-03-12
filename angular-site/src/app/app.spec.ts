@@ -164,7 +164,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.site-nav')).toBeTruthy();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.site-toolbar, .site-nav, mat-toolbar')).toBeTruthy();
   });
 
   it('should have nav tabs for game and editor', async () => {

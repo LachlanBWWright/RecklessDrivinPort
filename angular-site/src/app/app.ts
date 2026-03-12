@@ -341,6 +341,21 @@ export class App implements OnInit, OnDestroy {
     this.editorSection.set(section);
   }
 
+  /** Maps EditorSection → mat-tab index for [(selectedIndex)] binding. */
+  private readonly SECTION_ORDER: EditorSection[] = ['properties', 'objects', 'sprites'];
+  get editorSectionIndex(): number {
+    return this.SECTION_ORDER.indexOf(this.editorSection());
+  }
+  set editorSectionIndex(idx: number) {
+    const section = this.SECTION_ORDER[idx];
+    if (section) this.setSection(section);
+  }
+
+  /** Alias so the template can call applyVolume() from the mat-slider. */
+  applyVolume(): void {
+    this.applyVolumeToWasm(this.masterVolume());
+  }
+
   // ---- Resources loading ----
 
   async loadDefaultResources(): Promise<void> {
@@ -637,12 +652,30 @@ export class App implements OnInit, OnDestroy {
     return [cx, cy];
   }
 
+  /**
+   * Returns the CSS→canvas pixel scale ratio for the object-canvas element.
+   * When the canvas is scaled via CSS (e.g. width:100%), offsetX/Y from mouse events
+   * are in CSS pixels but the canvas coordinate space is in logical pixels. We must
+   * multiply mouse coords by this ratio before passing them to canvasToWorld.
+   */
+  private getCanvasScale(): number {
+    const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return 1;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0) return 1;
+    return canvas.width / rect.width;
+  }
+
   canvasToWorld(cx: number, cy: number): [number, number] {
     const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
     const W = canvas?.width ?? 600;
     const H = canvas?.height ?? 500;
-    const wx = (cx - W / 2) / this.canvasZoom() + this.canvasPanX();
-    const wy = -(cy - H / 2) / this.canvasZoom() + this.canvasPanY(); // flip Y
+    // cx/cy are CSS pixels from offsetX/Y; scale to logical canvas pixels
+    const scale = this.getCanvasScale();
+    const lx = cx * scale;
+    const ly = cy * scale;
+    const wx = (lx - W / 2) / this.canvasZoom() + this.canvasPanX();
+    const wy = -(ly - H / 2) / this.canvasZoom() + this.canvasPanY(); // flip Y
     return [wx, wy];
   }
 

@@ -1,364 +1,426 @@
-<!-- Site navigation header with tab selector -->
-<header class="site-nav">
+<!-- Site navigation toolbar -->
+<mat-toolbar class="site-toolbar" color="primary">
+  <span class="site-logo">🏎</span>
   <span class="site-title">Reckless Drivin'</span>
+  <span class="toolbar-spacer"></span>
   <nav class="nav-tabs" role="tablist" aria-label="Site sections">
-    <button
-      type="button"
-      role="tab"
-      class="nav-tab"
-      [class.active]="activeTab() === 'game'"
-      [attr.aria-selected]="activeTab() === 'game'"
-      (click)="setTab('game')"
-    >🎮 Play Game</button>
-    <button
-      type="button"
-      role="tab"
-      class="nav-tab"
-      [class.active]="activeTab() === 'editor'"
-      [attr.aria-selected]="activeTab() === 'editor'"
-      (click)="setTab('editor')"
-    >🗺️ Level Editor</button>
+    <button mat-button class="nav-tab" [class.active]="activeTab() === 'game'"
+      [attr.aria-selected]="activeTab() === 'game'" (click)="setTab('game')">
+      <mat-icon>sports_esports</mat-icon> Play Game
+    </button>
+    <button mat-button class="nav-tab" [class.active]="activeTab() === 'editor'"
+      [attr.aria-selected]="activeTab() === 'editor'" (click)="setTab('editor')">
+      <mat-icon>map</mat-icon> Level Editor
+    </button>
   </nav>
-</header>
+</mat-toolbar>
 
 <main>
   <!-- =================== GAME TAB =================== -->
   @if (activeTab() === 'game') {
-    <div class="hero-card">
-      <h1>Reckless Drivin' — WebAssembly Port</h1>
-      <p>
-        A fan-made SDL2 / Emscripten port of the classic Mac OS&nbsp;9 racing game
-        <em>Reckless Drivin'</em> by Jonas Echterhoff. Hold a number key when clicking Start to skip
-        directly to that level. Source at
-        <a href="https://github.com/jechter/RecklessDrivin" target="_blank" rel="noopener">github.com/jechter/RecklessDrivin</a>.
-        Builds on <a href="https://github.com/natecraddock/open-reckless-drivin" target="_blank" rel="noopener">Nathan Craddock's</a>
-        work and <a href="https://github.com/jorio/Pomme" target="_blank" rel="noopener">Pomme by Jorio</a>.
-        <a href="https://github.com/LachlanBWWright/RecklessDrivinPort" target="_blank" rel="noopener">View port repository</a>.
-      </p>
-    </div>
+    <mat-card class="hero-card">
+      <mat-card-header>
+        <mat-card-title>Reckless Drivin' — WebAssembly Port</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>
+          A fan-made SDL2 / Emscripten port of the classic Mac OS&nbsp;9 racing game
+          <em>Reckless Drivin'</em> by Jonas Echterhoff. Hold a number key when clicking Start to skip
+          directly to that level.
+          <a href="https://github.com/LachlanBWWright/RecklessDrivinPort" target="_blank" rel="noopener">View port repository</a>.
+        </p>
+      </mat-card-content>
+    </mat-card>
   }
 
   <!-- Game panel – always in DOM so WASM survives tab switches -->
-  <section
-    id="panel-game"
-    role="tabpanel"
-    class="game-section"
-    [class.tab-panel--hidden]="activeTab() !== 'game'"
-  >
-    <div class="game-header">
-      <span>Game</span>
-      <span class="status-label">{{ statusText() }}</span>
-          <button mat-button class="btn-fullscreen" (click)="toggleFullscreen()">&#x26F6; Fullscreen</button>
-    </div>
-    <div class="canvas-wrapper">
-      <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
-      <div class="loading-overlay" [class.hidden]="!overlayVisible()">
-        <div class="spinner"></div>
-        <p class="loading-msg">{{ statusText() }}</p>
-        <div class="progress-track">
-          <div class="progress-fill" [style.width.%]="progressPct()"></div>
+  <section id="panel-game" role="tabpanel" class="game-section" [class.tab-panel--hidden]="activeTab() !== 'game'">
+    <mat-card class="game-card">
+      <mat-card-header>
+        <mat-card-title-group>
+          <mat-card-title>Game</mat-card-title>
+          <mat-card-subtitle>{{ statusText() }}</mat-card-subtitle>
+          <span class="flex-spacer"></span>
+          <button mat-icon-button (click)="toggleFullscreen()" matTooltip="Fullscreen">
+            <mat-icon>fullscreen</mat-icon>
+          </button>
+        </mat-card-title-group>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="canvas-wrapper">
+          <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
+          <div class="loading-overlay" [class.hidden]="!overlayVisible()">
+            <mat-spinner diameter="48"></mat-spinner>
+            <p class="loading-msg">{{ statusText() }}</p>
+            <mat-progress-bar mode="determinate" [value]="progressPct()" class="loading-progress"></mat-progress-bar>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="controls-bar">
-      <span class="controls-label">Controls:</span>
-      <kbd>Up</kbd> Gas &nbsp;
-      <kbd>Down</kbd> Brake &nbsp;
-      <kbd>Left</kbd><kbd>Right</kbd> Steer &nbsp;
-      <kbd>Space</kbd> Handbrake &nbsp;
-      <kbd>Z</kbd> Mine &nbsp;
-      <kbd>X</kbd> Missile &nbsp;
-      <kbd>Esc</kbd> Menu
-    </div>
-    <div class="volume-bar">
-      <label class="volume-label" for="volume-slider">🔊 Volume</label>
-      <input id="volume-slider" type="range" min="0" max="100"
-        [value]="masterVolume()" (input)="onVolumeChange($event)"
-        class="volume-slider" aria-label="Master volume" />
-      <span class="volume-value">{{ masterVolume() }}%</span>
-    </div>
+      </mat-card-content>
+      <mat-card-footer>
+        <div class="controls-bar">
+          <span class="controls-label">Controls:</span>
+          <kbd>↑</kbd> Gas &nbsp;
+          <kbd>↓</kbd> Brake &nbsp;
+          <kbd>←</kbd><kbd>→</kbd> Steer &nbsp;
+          <kbd>Space</kbd> Handbrake &nbsp;
+          <kbd>Z</kbd> Mine &nbsp;
+          <kbd>X</kbd> Missile &nbsp;
+          <kbd>Esc</kbd> Menu
+        </div>
+        <div class="volume-row">
+          <mat-icon class="volume-icon">volume_up</mat-icon>
+          <mat-slider min="0" max="100" step="1" discrete class="volume-slider">
+            <input matSliderThumb [value]="masterVolume()" (valueChange)="masterVolume.set($event); applyVolume()" />
+          </mat-slider>
+          <span class="volume-value">{{ masterVolume() }}%</span>
+        </div>
+      </mat-card-footer>
+    </mat-card>
   </section>
 
   <!-- =================== EDITOR TAB =================== -->
   @if (activeTab() === 'editor') {
     <section id="panel-editor" role="tabpanel" class="editor-section">
 
-      <!-- Toolbar -->
-      <div class="editor-toolbar">
-        <div class="toolbar-left">
-          <button mat-stroked-button (click)="loadDefaultResources()" [disabled]="workerBusy()">Load default resources.dat</button>
-          <label class="mat-upload-btn" [class.mat-upload-btn--disabled]="workerBusy()" for="resource-file">
-            <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy()">📂 Upload resources.dat</button>
-          </label>
-          <input #fileInput id="resource-file" type="file" accept=".dat" (change)="onResourceFileSelected($event)" [disabled]="workerBusy()" style="display:none" />
-          <button mat-raised-button color="primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
-            ⬇ Download edited resources.dat
-          </button>
-        </div>
-        <div class="toolbar-right">
-          @if (workerBusy()) {
-            <span class="worker-busy-indicator">
-              <span class="worker-spinner"></span>
-              Processing…
-            </span>
-          }
-          <span class="resources-status" [class.has-data]="hasEditorData()">{{ resourcesStatus() }}</span>
-          @if (editorError()) {
-            <span class="editor-error">⚠ {{ editorError() }}</span>
-          }
-        </div>
-      </div>
+      <!-- Toolbar row -->
+      <mat-card class="editor-toolbar-card">
+        <mat-card-content>
+          <div class="editor-toolbar-row">
+            <div class="toolbar-actions">
+              <button mat-stroked-button (click)="loadDefaultResources()" [disabled]="workerBusy()">
+                <mat-icon>cloud_download</mat-icon> Load Default
+              </button>
+              <input #fileInput type="file" accept=".dat" (change)="onResourceFileSelected($event)" [disabled]="workerBusy()" style="display:none" />
+              <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy()">
+                <mat-icon>folder_open</mat-icon> Upload resources.dat
+              </button>
+              <button mat-raised-button color="primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
+                <mat-icon>download</mat-icon> Download Edited
+              </button>
+            </div>
+            <div class="toolbar-status">
+              @if (workerBusy()) {
+                <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
+                <span class="muted">Processing…</span>
+              }
+              <span class="resources-status" [class.has-data]="hasEditorData()">{{ resourcesStatus() }}</span>
+              @if (editorError()) {
+                <span class="editor-error">
+                  <mat-icon>warning</mat-icon> {{ editorError() }}
+                </span>
+              }
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
 
       @if (!hasEditorData() && !workerBusy()) {
-        <div class="no-data-hint">
-          <p>Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
-          <p class="muted">All LZRW3-A decompression runs in a <strong>background web worker</strong> so the page stays responsive while large packs are parsed.</p>
-          <p class="muted">If you are on the Angular dev server, run <code>cd angular-site &amp;&amp; npm start</code> again first — it now syncs <code>port/resources/resources.dat</code> automatically before launch.</p>
-        </div>
+        <mat-card class="no-data-card">
+          <mat-card-content>
+            <div class="no-data-content">
+              <mat-icon class="no-data-icon">folder_open</mat-icon>
+              <h3>No data loaded</h3>
+              <p>Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
+              <p class="muted">All LZRW3-A decompression runs in a <strong>background web worker</strong> so the page stays responsive while large packs are parsed.</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
       }
 
       @if (workerBusy() && !hasEditorData()) {
-        <div class="worker-loading-panel">
-          <div class="worker-loading-spinner"></div>
-          <p>{{ resourcesStatus() }}</p>
-          <p class="muted">Decompressing LZRW3-A level packs in background worker…</p>
-        </div>
+        <mat-card class="loading-card">
+          <mat-card-content>
+            <div class="loading-content">
+              <mat-spinner diameter="40"></mat-spinner>
+              <p>{{ resourcesStatus() }}</p>
+              <p class="muted">Decompressing LZRW3-A level packs in background worker…</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
       }
 
       @if (hasEditorData()) {
         <!-- Level selector -->
-        <div class="level-selector-bar">
-          <span class="label-text">Level:</span>
-          @for (level of parsedLevels(); track level.resourceId) {
-            <button
-              type="button"
-              class="level-btn"
-              [class.active]="selectedLevelId() === level.resourceId"
-              (click)="selectLevel(level.resourceId)"
-            >
-              {{ level.resourceId - 139 }}
-            </button>
-          }
-          @if (parsedLevels().length === 0) {
-            <span class="muted">No Pack #140-149 entries found.</span>
-          }
-        </div>
-
-        <!-- Editor section tabs -->
-        <div class="editor-section-tabs">
-          <button mat-button class="section-tab" [class.active]="editorSection() === 'properties'" (click)="setSection('properties')">⚙️ Properties</button>
-          <button mat-button class="section-tab" [class.active]="editorSection() === 'objects'"    (click)="setSection('objects')">📦 Objects &amp; Tracks</button>
-          <button mat-button class="section-tab" [class.active]="editorSection() === 'sprites'"    (click)="setSection('sprites')">🎨 Sprites (PPic)</button>
-        </div>
-
-        <!-- ---- PROPERTIES SECTION ---- -->
-        @if (editorSection() === 'properties' && selectedLevel()) {
-          <div class="editor-panel">
-            <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Properties
-              <span class="badge">Pack ID {{ selectedLevel()!.resourceId }}</span>
-              @if (selectedLevel()!.encrypted) {
-                <span class="badge" style="background:#664400;color:#ffcc66;font-size:0.7rem" title="Level 4-10 packs are XOR-encrypted; the editor handles this automatically.">🔒 encrypted</span>
+        <mat-card class="level-selector-card">
+          <mat-card-content>
+            <div class="level-selector-row">
+              <span class="level-label">Level:</span>
+              @for (level of parsedLevels(); track level.resourceId) {
+                <button mat-mini-fab
+                  [color]="selectedLevelId() === level.resourceId ? 'primary' : undefined"
+                  class="level-btn"
+                  [class.level-btn--active]="selectedLevelId() === level.resourceId"
+                  (click)="selectLevel(level.resourceId)"
+                  [matTooltip]="'Level ' + (level.resourceId - 139) + (level.encrypted ? ' (encrypted)' : '')">
+                  {{ level.resourceId - 139 }}
+                </button>
               }
-            </h3>
-
-            <div class="props-grid">
-              <div class="prop-group">
-                <label for="prop-roadinfo">Road Info (kPackRoad entry index)</label>
-                <input id="prop-roadinfo" type="number" [value]="editRoadInfo()"
-                  (input)="onPropsInput('roadInfo', $event)" />
-                <p class="field-hint">Index of the tRoadInfo entry in the Road pack (Pack #135). Controls friction, textures, borders, drift, sounds.</p>
-              </div>
-              <div class="prop-group">
-                <label for="prop-time">Time Limit (seconds)</label>
-                <input id="prop-time" type="number" min="0" max="65535" [value]="editTime()"
-                  (input)="onPropsInput('time', $event)" />
-                <p class="field-hint">Duration in seconds. Stored as UInt16 (max 65535 s ≈ 18 h).</p>
-              </div>
-              <div class="prop-group">
-                <label for="prop-levelend">Level End Y (UInt16, pixels)</label>
-                <input id="prop-levelend" type="number" min="0" [value]="editLevelEnd()"
-                  (input)="onPropsInput('levelEnd', $event)" />
-                <p class="field-hint">The Y coordinate of the finish line. The player wins when they cross this Y threshold.</p>
-              </div>
-            </div>
-
-            <h4>Object Group References (10 slots)</h4>
-            <table class="data-table">
-              <thead>
-                <tr><th>#</th><th>resID (kPackOgrp entry)</th><th>numObjs</th></tr>
-              </thead>
-              <tbody>
-                @for (grp of selectedLevel()!.objectGroups; track $index) {
-                  <tr [class.inactive]="grp.resID === 0">
-                    <td>{{ $index }}</td>
-                    <td>{{ grp.resID }}</td>
-                    <td>{{ grp.numObjs }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-
-            <div class="save-row">
-              <button mat-raised-button color="primary" (click)="saveLevelProperties()" [disabled]="!propertiesDirty() || workerBusy()">
-                @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Properties to Pack }
-              </button>
-              @if (!propertiesDirty()) {
-                <span class="muted">No unsaved changes.</span>
+              @if (parsedLevels().length === 0) {
+                <span class="muted">No Pack #140-149 entries found.</span>
               }
             </div>
-          </div>
-        }
+          </mat-card-content>
+        </mat-card>
 
-        <!-- ---- OBJECTS SECTION ---- -->
-        @if (editorSection() === 'objects' && selectedLevel()) {
-          <div class="editor-panel">
-            <h3>Level {{ selectedLevel()!.resourceId - 139 }} – Scene Editor
-              <span class="badge">{{ objects().length }} objects</span>
-              <span class="badge" style="background:#42a5f5;margin-left:4px">{{ selectedLevel()!.trackUp.length }} up</span>
-              <span class="badge" style="background:#ef5350;margin-left:4px">{{ selectedLevel()!.trackDown.length }} down</span>
-            </h3>
+        <!-- Editor section tabs using mat-tab-group -->
+        <mat-tab-group class="editor-tabs" [(selectedIndex)]="editorSectionIndex" animationDuration="150ms">
 
-            <div class="object-canvas-layout">
-              <app-editor-canvas
-                [objects]="objects()"
-                [selectedObjIndex]="selectedObjIndex()"
-                [marks]="marks()"
-                [selectedMarkIndex]="selectedMarkIndex()"
-                [showTrackOverlay]="showTrackOverlay()"
-                [trackUpCount]="selectedLevel()!.trackUp.length"
-                [trackDownCount]="selectedLevel()!.trackDown.length"
-                [roadSegCount]="selectedLevel()!.roadSegCount"
-                [zoom]="canvasZoom()"
-                [panX]="canvasPanX()"
-                [panY]="canvasPanY()"
-                [scrollYMax]="(selectedLevel()!.roadSegs.length - 1) * 2 + 500"
-                [scrollXMin]="roadXMin()"
-                [scrollXMax]="roadXMax()"
-                [levelNum]="selectedLevel()!.resourceId - 139"
-                [workerBusy]="workerBusy()"
-                [isDragging]="isDragging()"
-                [dragTrackWaypoint]="dragTrackWaypoint()"
-                [hoverTrackWaypoint]="hoverTrackWaypoint()"
-                [spaceDown]="spaceDown() || isPanning()"
-                (canvasMouseDown)="onCanvasMouseDown($event)"
-                (canvasMouseMove)="onCanvasMouseMove($event)"
-                (canvasMouseUp)="onCanvasMouseUp($event)"
-                (canvasDblClick)="onCanvasDoubleClick($event)"
-                (canvasContextMenu)="onCanvasContextMenu($event)"
-                (canvasKeyDown)="onCanvasKeyDown($event)"
-                (canvasKeyUp)="onCanvasKeyUp($event)"
-                (canvasWheel)="onCanvasWheel($event)"
-                (addObject)="addObject()"
-                (removeObject)="removeSelectedObject()"
-                (duplicateObject)="duplicateSelectedObject()"
-                (frameAll)="frameAllObjects()"
-                (centerSelected)="centerOnSelectedObject()"
-                (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
-                (saveTrack)="saveTrack()"
-                (zoomIn)="zoomIn()"
-                (zoomOut)="zoomOut()"
-                (resetView)="resetView()"
-                (markSelected)="selectedMarkIndex.set($event)"
-                (addMark)="addMark()"
-                (removeMark)="removeSelectedMark()"
-                (saveMarks)="saveMarks()"
-                (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
-                (panXChange)="canvasPanX.set($event)"
-                (panYChange)="canvasPanY.set($event)"
-              ></app-editor-canvas>
-
-              <div class="object-form-col">
-                <app-object-inspector
-                  [selectedIndex]="selectedObjIndex()"
-                  [editX]="editObjX()"
-                  [editY]="editObjY()"
-                  [editDir]="editObjDir()"
-                  [editTypeRes]="editObjTypeRes()"
-                  [spriteUrl]="selectedObjIndex() !== null ? getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes) : null"
-                  [typePalette]="typePalette"
-                  [visibleTypeFilter]="visibleTypeFilter()"
-                  [workerBusy]="workerBusy()"
-                  [typeDimLabel]="getObjTypeDimensionLabel(editObjTypeRes())"
-                  (fieldInput)="onObjFieldInput($event.field, $event.event)"
-                  (typeVisibilityToggle)="toggleTypeVisibility($event)"
-                  (showAll)="showAllObjectTypes()"
-                  (hideAll)="hideAllObjectTypes()"
-                  (removeSelected)="removeSelectedObject()"
-                ></app-object-inspector>
-
-                <app-object-list
-                  style="margin-top:12px; display:block"
-                  [objects]="objects()"
-                  [filteredIndices]="filteredObjectIndices()"
-                  [selectedIndex]="selectedObjIndex()"
-                  [searchTerm]="objectSearchTerm()"
-                  [getSpriteUrl]="getSpritePreviewDataUrlBound"
-                  [getFallbackColor]="getObjFallbackColorBound"
-                  (objectSelected)="selectObject($event, true)"
-                  (searchTermChange)="objectSearchTerm.set($event)"
-                ></app-object-list>
-              </div>
-            </div>
-
-            <div class="save-row" style="margin-top:12px">
-              <button mat-raised-button color="primary" (click)="saveLevelObjects()" [disabled]="workerBusy()">
-                @if (workerBusy()) { <span class="btn-spinner"></span> Saving… } @else { 💾 Save Objects to Pack }
-              </button>
-            </div>
-          </div>
-        }
-        @if (editorSection() === 'sprites') {
-          <div class="editor-panel">
-            <h3>Sprite Viewer &amp; PPic Asset Editor</h3>
-
-            <!-- ---- DECODED GAME SPRITES (Pack 129 / 137) ---- -->
-            @if (packSpriteFrames().length > 0) {
-              <details class="road-details" open style="margin-bottom:16px">
-                <summary>🎮 Decoded Game Sprites (Pack 129 / 137) <span class="badge">{{ packSpriteFrames().length }}</span></summary>
-                <div class="pack-sprite-viewer">
-                  <div class="pack-sprite-grid">
-                    @for (frame of packSpriteFrames(); track $index) {
-                      @if (getPackSpriteDataUrl(frame.id); as url) {
-                        <div class="pack-sprite-cell"
-                          [class.selected]="selectedPackSpriteId() === frame.id"
-                          (click)="selectedPackSpriteId.set(frame.id)"
-                          [title]="'Frame #' + frame.id + ' · ' + frame.bitDepth + '-bit · ' + frame.width + '×' + frame.height">
-                          <img [src]="url" class="pack-sprite-thumb" alt="" />
-                          <span class="pack-sprite-label">#{{ frame.id }}</span>
-                        </div>
-                      }
+          <!-- ===== PROPERTIES TAB ===== -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>settings</mat-icon>&nbsp;Properties
+            </ng-template>
+            @if (selectedLevel()) {
+              <mat-card class="tab-panel-card">
+                <mat-card-header>
+                  <mat-card-title>
+                    Level {{ selectedLevel()!.resourceId - 139 }} – Properties
+                    <span class="badge">Pack {{ selectedLevel()!.resourceId }}</span>
+                    @if (selectedLevel()!.encrypted) {
+                      <span class="badge badge--warn" matTooltip="XOR-encrypted; handled automatically">🔒 encrypted</span>
                     }
+                  </mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="props-form-grid">
+                    <mat-form-field appearance="outline" class="prop-field">
+                      <mat-label>Road Info</mat-label>
+                      <input matInput type="number" [value]="editRoadInfo()" (input)="onPropsInput('roadInfo', $event)" />
+                      <mat-hint>tRoadInfo entry index in Pack #135 (controls textures, friction, sounds)</mat-hint>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="prop-field">
+                      <mat-label>Time Limit (seconds)</mat-label>
+                      <input matInput type="number" min="0" max="65535" [value]="editTime()" (input)="onPropsInput('time', $event)" />
+                      <mat-hint>UInt16, max 65535 s ≈ 18 h</mat-hint>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="prop-field">
+                      <mat-label>Level End Y (pixels)</mat-label>
+                      <input matInput type="number" min="0" [value]="editLevelEnd()" (input)="onPropsInput('levelEnd', $event)" />
+                      <mat-hint>Y coordinate of the finish line</mat-hint>
+                    </mat-form-field>
                   </div>
-                  @if (selectedPackSpriteId() !== null) {
-                    @if (getPackSpriteDataUrl(selectedPackSpriteId()!); as url) {
-                      <div class="pack-sprite-detail">
-                        <img [src]="url" class="pack-sprite-large" alt="sprite preview" />
-                        <p class="field-hint" style="margin-top:6px">
-                          Frame #{{ selectedPackSpriteId() }}
-                          · {{ selectedPackSpriteFrame()?.bitDepth ?? '?' }}-bit
-                          · {{ selectedPackSpriteFrame()?.width ?? '?' }}×{{ selectedPackSpriteFrame()?.height ?? '?' }} px
-                          · {{ getSpriteFormatLabel(selectedPackSpriteFrame()?.bitDepth) }}
-                        </p>
-                        @if (selectedPackSpriteFrame()?.bitDepth === 16) {
-                          <button mat-raised-button color="primary" style="margin-top:6px"
-                            (click)="openSpriteEditor(selectedPackSpriteId()!)"
-                            [disabled]="workerBusy()">
-                            🎨 Edit Pixels
-                          </button>
-                        }
-                        <button mat-stroked-button style="margin-top:6px" (click)="exportSpritePng()">⬇ Export PNG</button>
-                      </div>
-                    }
-                  }
-                </div>
-              </details>
-            } @else {
-              <p class="field-hint" style="margin-bottom:12px">Game sprite frames from Pack 129/137 will appear here once decoded. Load a resources.dat to begin.</p>
-            }
 
-            <!-- End of sprite section -->
-          </div>
-        }
+                  <mat-divider class="section-divider"></mat-divider>
+                  <h4 class="section-subtitle">Object Group References <span class="badge">10 slots</span></h4>
+
+                  <table mat-table [dataSource]="selectedLevel()!.objectGroups" class="data-table mat-elevation-z2">
+                    <ng-container matColumnDef="index">
+                      <th mat-header-cell *matHeaderCellDef>#</th>
+                      <td mat-cell *matCellDef="let grp; let i = index">{{ i }}</td>
+                    </ng-container>
+                    <ng-container matColumnDef="resID">
+                      <th mat-header-cell *matHeaderCellDef>ResID (kPackOgrp)</th>
+                      <td mat-cell *matCellDef="let grp" [class.inactive-cell]="grp.resID === 0">{{ grp.resID }}</td>
+                    </ng-container>
+                    <ng-container matColumnDef="numObjs">
+                      <th mat-header-cell *matHeaderCellDef>numObjs</th>
+                      <td mat-cell *matCellDef="let grp" [class.inactive-cell]="grp.resID === 0">{{ grp.numObjs }}</td>
+                    </ng-container>
+                    <tr mat-header-row *matHeaderRowDef="['index','resID','numObjs']"></tr>
+                    <tr mat-row *matRowDef="let row; columns: ['index','resID','numObjs'];"
+                      [class.row-inactive]="row.resID === 0"></tr>
+                  </table>
+                </mat-card-content>
+                <mat-card-actions>
+                  <button mat-raised-button color="primary" (click)="saveLevelProperties()" [disabled]="!propertiesDirty() || workerBusy()">
+                    <mat-icon>save</mat-icon>
+                    {{ workerBusy() ? 'Saving…' : 'Save Properties' }}
+                  </button>
+                  @if (!propertiesDirty()) {
+                    <span class="muted">No unsaved changes.</span>
+                  }
+                </mat-card-actions>
+              </mat-card>
+            }
+          </mat-tab>
+
+          <!-- ===== OBJECTS TAB ===== -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>view_in_ar</mat-icon>&nbsp;Objects &amp; Tracks
+            </ng-template>
+            @if (selectedLevel()) {
+              <mat-card class="tab-panel-card objects-panel-card">
+                <mat-card-header>
+                  <mat-card-title>
+                    Level {{ selectedLevel()!.resourceId - 139 }} – Scene Editor
+                    <span class="badge">{{ objects().length }} objects</span>
+                    <span class="badge badge--blue">{{ selectedLevel()!.trackUp.length }} up</span>
+                    <span class="badge badge--red">{{ selectedLevel()!.trackDown.length }} down</span>
+                  </mat-card-title>
+                </mat-card-header>
+                <mat-card-content class="objects-card-content">
+                  <div class="object-canvas-layout">
+                    <app-editor-canvas
+                      [objects]="objects()"
+                      [selectedObjIndex]="selectedObjIndex()"
+                      [marks]="marks()"
+                      [selectedMarkIndex]="selectedMarkIndex()"
+                      [showTrackOverlay]="showTrackOverlay()"
+                      [trackUpCount]="selectedLevel()!.trackUp.length"
+                      [trackDownCount]="selectedLevel()!.trackDown.length"
+                      [roadSegCount]="selectedLevel()!.roadSegCount"
+                      [zoom]="canvasZoom()"
+                      [panX]="canvasPanX()"
+                      [panY]="canvasPanY()"
+                      [scrollYMax]="(selectedLevel()!.roadSegs.length - 1) * 2 + 500"
+                      [scrollXMin]="roadXMin()"
+                      [scrollXMax]="roadXMax()"
+                      [levelNum]="selectedLevel()!.resourceId - 139"
+                      [workerBusy]="workerBusy()"
+                      [isDragging]="isDragging()"
+                      [dragTrackWaypoint]="dragTrackWaypoint()"
+                      [hoverTrackWaypoint]="hoverTrackWaypoint()"
+                      [spaceDown]="spaceDown() || isPanning()"
+                      (canvasMouseDown)="onCanvasMouseDown($event)"
+                      (canvasMouseMove)="onCanvasMouseMove($event)"
+                      (canvasMouseUp)="onCanvasMouseUp($event)"
+                      (canvasDblClick)="onCanvasDoubleClick($event)"
+                      (canvasContextMenu)="onCanvasContextMenu($event)"
+                      (canvasKeyDown)="onCanvasKeyDown($event)"
+                      (canvasKeyUp)="onCanvasKeyUp($event)"
+                      (canvasWheel)="onCanvasWheel($event)"
+                      (addObject)="addObject()"
+                      (removeObject)="removeSelectedObject()"
+                      (duplicateObject)="duplicateSelectedObject()"
+                      (frameAll)="frameAllObjects()"
+                      (centerSelected)="centerOnSelectedObject()"
+                      (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
+                      (saveTrack)="saveTrack()"
+                      (zoomIn)="zoomIn()"
+                      (zoomOut)="zoomOut()"
+                      (resetView)="resetView()"
+                      (markSelected)="selectedMarkIndex.set($event)"
+                      (addMark)="addMark()"
+                      (removeMark)="removeSelectedMark()"
+                      (saveMarks)="saveMarks()"
+                      (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
+                      (panXChange)="canvasPanX.set($event)"
+                      (panYChange)="canvasPanY.set($event)"
+                    ></app-editor-canvas>
+
+                    <div class="object-form-col">
+                      <app-object-inspector
+                        [selectedIndex]="selectedObjIndex()"
+                        [editX]="editObjX()"
+                        [editY]="editObjY()"
+                        [editDir]="editObjDir()"
+                        [editTypeRes]="editObjTypeRes()"
+                        [spriteUrl]="selectedObjIndex() !== null ? getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes) : null"
+                        [typePalette]="typePalette"
+                        [visibleTypeFilter]="visibleTypeFilter()"
+                        [workerBusy]="workerBusy()"
+                        [typeDimLabel]="getObjTypeDimensionLabel(editObjTypeRes())"
+                        (fieldInput)="onObjFieldInput($event.field, $event.event)"
+                        (typeVisibilityToggle)="toggleTypeVisibility($event)"
+                        (showAll)="showAllObjectTypes()"
+                        (hideAll)="hideAllObjectTypes()"
+                        (removeSelected)="removeSelectedObject()"
+                      ></app-object-inspector>
+
+                      <app-object-list
+                        [objects]="objects()"
+                        [filteredIndices]="filteredObjectIndices()"
+                        [selectedIndex]="selectedObjIndex()"
+                        [searchTerm]="objectSearchTerm()"
+                        [getSpriteUrl]="getSpritePreviewDataUrlBound"
+                        [getFallbackColor]="getObjFallbackColorBound"
+                        (objectSelected)="selectObject($event, true)"
+                        (searchTermChange)="objectSearchTerm.set($event)"
+                      ></app-object-list>
+                    </div>
+                  </div>
+                </mat-card-content>
+                <mat-card-actions>
+                  <button mat-raised-button color="primary" (click)="saveLevelObjects()" [disabled]="workerBusy()">
+                    <mat-icon>save</mat-icon>
+                    {{ workerBusy() ? 'Saving…' : 'Save Objects to Pack' }}
+                  </button>
+                </mat-card-actions>
+              </mat-card>
+            }
+          </mat-tab>
+
+          <!-- ===== SPRITES TAB ===== -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>palette</mat-icon>&nbsp;Sprites
+            </ng-template>
+            <mat-card class="tab-panel-card">
+              <mat-card-header>
+                <mat-card-title>Sprite Viewer &amp; PPic Asset Editor</mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                @if (packSpriteFrames().length > 0) {
+                  <mat-expansion-panel [expanded]="true" class="sprite-panel">
+                    <mat-expansion-panel-header>
+                      <mat-panel-title>
+                        <mat-icon>image</mat-icon>&nbsp;Game Sprites (Pack 129/137)
+                      </mat-panel-title>
+                      <mat-panel-description>
+                        <span class="badge">{{ packSpriteFrames().length }} frames</span>
+                      </mat-panel-description>
+                    </mat-expansion-panel-header>
+
+                    <div class="pack-sprite-viewer">
+                      <div class="pack-sprite-grid">
+                        @for (frame of packSpriteFrames(); track $index) {
+                          @if (getPackSpriteDataUrl(frame.id); as url) {
+                            <div class="pack-sprite-cell"
+                              [class.selected]="selectedPackSpriteId() === frame.id"
+                              (click)="selectedPackSpriteId.set(frame.id)"
+                              [matTooltip]="'Frame #' + frame.id + ' · ' + frame.bitDepth + '-bit · ' + frame.width + '×' + frame.height">
+                              <img [src]="url" class="pack-sprite-thumb" alt="" />
+                              <span class="pack-sprite-label">#{{ frame.id }}</span>
+                            </div>
+                          }
+                        }
+                      </div>
+
+                      @if (selectedPackSpriteId() !== null) {
+                        @if (getPackSpriteDataUrl(selectedPackSpriteId()!); as url) {
+                          <div class="pack-sprite-detail">
+                            <img [src]="url" class="pack-sprite-large" alt="sprite preview" />
+                            <mat-card class="sprite-meta-card">
+                              <mat-card-content>
+                                <p class="sprite-meta">
+                                  <strong>Frame</strong> #{{ selectedPackSpriteId() }}<br>
+                                  <strong>Depth</strong> {{ selectedPackSpriteFrame()?.bitDepth ?? '?' }}-bit
+                                  ({{ getSpriteFormatLabel(selectedPackSpriteFrame()?.bitDepth) }})<br>
+                                  <strong>Size</strong> {{ selectedPackSpriteFrame()?.width ?? '?' }}×{{ selectedPackSpriteFrame()?.height ?? '?' }} px
+                                </p>
+                              </mat-card-content>
+                            </mat-card>
+                            <div class="sprite-actions">
+                              @if (selectedPackSpriteFrame()?.bitDepth === 16) {
+                                <button mat-raised-button color="primary"
+                                  (click)="openSpriteEditor(selectedPackSpriteId()!)"
+                                  [disabled]="workerBusy()">
+                                  <mat-icon>brush</mat-icon> Edit Pixels
+                                </button>
+                              }
+                              <button mat-stroked-button (click)="exportSpritePng()">
+                                <mat-icon>download</mat-icon> Export PNG
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      }
+                    </div>
+                  </mat-expansion-panel>
+                } @else {
+                  <div class="no-data-content">
+                    <mat-icon class="no-data-icon">image_not_supported</mat-icon>
+                    <p>Game sprite frames from Pack 129/137 will appear here once decoded. Load a resources.dat to begin.</p>
+                  </div>
+                }
+              </mat-card-content>
+            </mat-card>
+          </mat-tab>
+
+        </mat-tab-group>
       }
     </section>
   }

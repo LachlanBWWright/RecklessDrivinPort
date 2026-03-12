@@ -1,28 +1,47 @@
 <!-- Canvas toolbar -->
 <div class="canvas-toolbar">
-  <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate · Middle-mouse or Space+drag: pan · Arrow keys: pan · Right-click on track: add/remove waypoint">
-    🖱 Drag objects &amp; track dots · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Space</kbd>+drag pans · <kbd>↑↓←→</kbd> pan · <kbd>Right-click</kbd> track: add/remove waypoint
+  <span class="hint-text">
+    <mat-icon class="hint-icon">mouse</mat-icon>
+    Drag objects &amp; track dots · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Space</kbd>+drag pans · <kbd>↑↓←→</kbd> pan · <kbd>Right-click</kbd> on track: add/remove waypoint
   </span>
   <div class="canvas-controls">
-    <button mat-stroked-button (click)="addObject.emit()">+ Add Object</button>
-    <button mat-stroked-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null">📋 Duplicate</button>
-    <button mat-stroked-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null">🗑 Remove</button>
-    <button mat-stroked-button (click)="frameAll.emit()">🧭 Frame All</button>
-    <button mat-stroked-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null">🎯 Center</button>
-    <button mat-stroked-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()">
-      🛣 {{ showTrackOverlay ? 'Hide' : 'Show' }} Tracks
+    <button mat-stroked-button (click)="addObject.emit()" matTooltip="Add new object">
+      <mat-icon>add</mat-icon> Object
+    </button>
+    <button mat-stroked-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+    <button mat-stroked-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected">
+      <mat-icon>delete</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <button mat-stroked-button (click)="frameAll.emit()" matTooltip="Frame all objects">
+      <mat-icon>fit_screen</mat-icon>
+    </button>
+    <button mat-stroked-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
+      <mat-icon>center_focus_strong</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <button mat-stroked-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()" matTooltip="Toggle track overlay">
+      <mat-icon>route</mat-icon> {{ showTrackOverlay ? 'Hide' : 'Show' }} Tracks
     </button>
     @if (showTrackOverlay) {
-      <button mat-stroked-button [disabled]="workerBusy" (click)="saveTrack.emit()" aria-label="Save track waypoints">💾 Save Tracks</button>
+      <button mat-stroked-button [disabled]="workerBusy" (click)="saveTrack.emit()" matTooltip="Save track waypoints">
+        <mat-icon>save</mat-icon> Save Tracks
+      </button>
     }
-    <button mat-stroked-button (click)="zoomIn.emit()">🔍+</button>
-    <button mat-stroked-button (click)="zoomOut.emit()">🔍-</button>
-    <button mat-stroked-button (click)="resetView.emit()">⟲ Reset</button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <button mat-icon-button (click)="zoomIn.emit()" matTooltip="Zoom in"><mat-icon>zoom_in</mat-icon></button>
+    <button mat-icon-button (click)="zoomOut.emit()" matTooltip="Zoom out"><mat-icon>zoom_out</mat-icon></button>
+    <button mat-icon-button (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
   </div>
 </div>
 
 <div class="object-canvas-col">
-  <div class="subtle-section-title">Scene preview – drag objects &amp; track waypoints (blue/red dots)</div>
+  <div class="canvas-subtitle">
+    <mat-icon class="canvas-subtitle-icon">map</mat-icon>
+    Scene Preview — drag objects &amp; track waypoints
+  </div>
   <div class="canvas-with-scrollbars">
     <canvas id="object-canvas" class="object-canvas" width="900" height="700"
       tabindex="0"
@@ -36,7 +55,7 @@
       (contextmenu)="canvasContextMenu.emit($event); $event.preventDefault()"
       [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'crosshair'))"
     ></canvas>
-    <!-- Vertical scrollbar: value = scrollYMax - panY so that thumb-top = road end, thumb-bottom = road start -->
+    <!-- Vertical scrollbar: value = scrollYMax - panY so thumb-top = road end, thumb-bottom = road start -->
     <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
       aria-label="Vertical scroll position"
       [min]="0" [max]="scrollYMax" [step]="10"
@@ -50,63 +69,114 @@
       (input)="panXChange.emit(+$any($event.target).value)"
     />
   </div>
-  <div class="canvas-zoom-label">
-    Zoom: {{ (zoom * 100).toFixed(0) }}%
-    &nbsp;·&nbsp; Pan: ({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})
-    &nbsp;·&nbsp; <span style="color:#42a5f5">■ Up track</span>
-    &nbsp; <span style="color:#ef5350">■ Down track</span>
-    &nbsp; <span style="color:#ffeb3b">■ Marks</span>
-    &nbsp;·&nbsp; <span style="color:#00e5ff">▲ drag cyan flag = player start X</span>
+  <div class="canvas-status-bar">
+    <span class="zoom-info">{{ (zoom * 100).toFixed(0) }}%</span>
+    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
+    <span class="pan-info">({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})</span>
+    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
+    <span class="legend-item" style="color:#42a5f5">■ Up</span>
+    <span class="legend-item" style="color:#ef5350">■ Down</span>
+    <span class="legend-item" style="color:#ffeb3b">■ Marks</span>
+    <span class="legend-item" style="color:#00e5ff">▲ Start X</span>
   </div>
 
-  <!-- Marks editor panel, inline below canvas -->
-  <details class="marks-details" style="margin-top:8px">
-    <summary>✏️ Checkpoint / Mark Segments <span class="badge">{{ marks.length }}</span></summary>
-    <div class="mark-editor-inline">
-      <div class="mark-controls">
-        <button mat-stroked-button (click)="addMark.emit()" [disabled]="workerBusy">+ Add Mark</button>
-        <button mat-stroked-button color="warn" [disabled]="selectedMarkIndex === null || workerBusy" (click)="removeMark.emit()">Remove</button>
-        <button mat-raised-button color="primary" (click)="saveMarks.emit()" [disabled]="workerBusy">
-          @if (workerBusy) { <span class="btn-spinner"></span> } 💾 Save Marks
-        </button>
-      </div>
-      @if (selectedMarkIndex !== null) {
-        <div class="mark-form props-grid" style="margin-top:6px">
-          <div class="prop-group"><label>P1 X</label><input type="number" [value]="marks[selectedMarkIndex!].x1" (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x1', event: $event})" /></div>
-          <div class="prop-group"><label>P1 Y</label><input type="number" [value]="marks[selectedMarkIndex!].y1" (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y1', event: $event})" /></div>
-          <div class="prop-group"><label>P2 X</label><input type="number" [value]="marks[selectedMarkIndex!].x2" (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x2', event: $event})" /></div>
-          <div class="prop-group"><label>P2 Y</label><input type="number" [value]="marks[selectedMarkIndex!].y2" (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y2', event: $event})" /></div>
-        </div>
-      }
-      <div class="table-scroll" style="max-height:120px;margin-top:6px">
-        <table class="data-table">
-          <thead><tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr></thead>
-          <tbody>
-            @for (mark of marks; track $index) {
-              <tr [class.selected]="selectedMarkIndex === $index" (click)="markSelected.emit($index)" style="cursor:pointer">
-                <td>{{ $index }}</td>
-                <td>{{ mark.x1 }}</td><td>{{ mark.y1 }}</td>
-                <td>{{ mark.x2 }}</td><td>{{ mark.y2 }}</td>
-              </tr>
-            }
-            @if (marks.length === 0) {
-              <tr><td colspan="5" class="muted">No mark segments.</td></tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </details>
+  <!-- Marks editor panel -->
+  <mat-expansion-panel class="marks-panel" [expanded]="false">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        <mat-icon>edit_location</mat-icon>&nbsp;Checkpoint / Mark Segments
+      </mat-panel-title>
+      <mat-panel-description><span class="badge">{{ marks.length }}</span></mat-panel-description>
+    </mat-expansion-panel-header>
 
-  <!-- Road stats inline -->
-  <details class="road-details" style="margin-top:8px">
-    <summary>🛣️ Road &amp; Track Data</summary>
-    <div class="road-stats">
-      <div class="stat-card"><div class="stat-value">{{ trackUpCount }}</div><div class="stat-label">Track Up segs</div></div>
-      <div class="stat-card"><div class="stat-value">{{ trackDownCount }}</div><div class="stat-label">Track Down segs</div></div>
-      <div class="stat-card"><div class="stat-value">{{ roadSegCount }}</div><div class="stat-label">Road segments</div></div>
-      <div class="stat-card"><div class="stat-value">{{ marks.length }}</div><div class="stat-label">Mark segments</div></div>
+    <div class="marks-controls">
+      <button mat-stroked-button (click)="addMark.emit()" [disabled]="workerBusy">
+        <mat-icon>add</mat-icon> Add Mark
+      </button>
+      <button mat-stroked-button color="warn" [disabled]="selectedMarkIndex === null || workerBusy" (click)="removeMark.emit()">
+        <mat-icon>remove</mat-icon> Remove
+      </button>
+      <button mat-raised-button color="primary" (click)="saveMarks.emit()" [disabled]="workerBusy">
+        <mat-icon>save</mat-icon> Save Marks
+      </button>
     </div>
-    <p class="field-hint" style="margin-top:4px">Track waypoints shown as blue (up) and red (down) dots. Drag them to reposition.</p>
-  </details>
+
+    @if (selectedMarkIndex !== null) {
+      <div class="mark-fields-row">
+        <mat-form-field appearance="outline" class="mark-field">
+          <mat-label>P1 X</mat-label>
+          <input matInput type="number" [value]="marks[selectedMarkIndex!].x1"
+            (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x1', event: $event})" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="mark-field">
+          <mat-label>P1 Y</mat-label>
+          <input matInput type="number" [value]="marks[selectedMarkIndex!].y1"
+            (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y1', event: $event})" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="mark-field">
+          <mat-label>P2 X</mat-label>
+          <input matInput type="number" [value]="marks[selectedMarkIndex!].x2"
+            (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x2', event: $event})" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="mark-field">
+          <mat-label>P2 Y</mat-label>
+          <input matInput type="number" [value]="marks[selectedMarkIndex!].y2"
+            (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y2', event: $event})" />
+        </mat-form-field>
+      </div>
+    }
+
+    <table mat-table [dataSource]="marks" class="marks-table" *ngIf="marks.length > 0">
+      <ng-container matColumnDef="idx">
+        <th mat-header-cell *matHeaderCellDef>#</th>
+        <td mat-cell *matCellDef="let mark; let i = index">{{ i }}</td>
+      </ng-container>
+      <ng-container matColumnDef="x1">
+        <th mat-header-cell *matHeaderCellDef>x1</th>
+        <td mat-cell *matCellDef="let mark">{{ mark.x1 }}</td>
+      </ng-container>
+      <ng-container matColumnDef="y1">
+        <th mat-header-cell *matHeaderCellDef>y1</th>
+        <td mat-cell *matCellDef="let mark">{{ mark.y1 }}</td>
+      </ng-container>
+      <ng-container matColumnDef="x2">
+        <th mat-header-cell *matHeaderCellDef>x2</th>
+        <td mat-cell *matCellDef="let mark">{{ mark.x2 }}</td>
+      </ng-container>
+      <ng-container matColumnDef="y2">
+        <th mat-header-cell *matHeaderCellDef>y2</th>
+        <td mat-cell *matCellDef="let mark">{{ mark.y2 }}</td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="['idx','x1','y1','x2','y2']"></tr>
+      <tr mat-row *matRowDef="let row; columns: ['idx','x1','y1','x2','y2'];"
+        [class.selected-row]="selectedMarkIndex === marks.indexOf(row)"
+        (click)="markSelected.emit(marks.indexOf(row))" style="cursor:pointer"></tr>
+    </table>
+  </mat-expansion-panel>
+
+  <!-- Road stats -->
+  <mat-expansion-panel class="road-stats-panel" [expanded]="false">
+    <mat-expansion-panel-header>
+      <mat-panel-title><mat-icon>timeline</mat-icon>&nbsp;Road &amp; Track Stats</mat-panel-title>
+    </mat-expansion-panel-header>
+    <div class="road-stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" style="color:#42a5f5">{{ trackUpCount }}</div>
+        <div class="stat-label">Track Up</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#ef5350">{{ trackDownCount }}</div>
+        <div class="stat-label">Track Down</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ roadSegCount }}</div>
+        <div class="stat-label">Road Segs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#ffeb3b">{{ marks.length }}</div>
+        <div class="stat-label">Marks</div>
+      </div>
+    </div>
+  </mat-expansion-panel>
 </div>
+
