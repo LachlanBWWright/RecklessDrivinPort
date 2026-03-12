@@ -294,6 +294,9 @@
                       (removeMark)="removeSelectedMark()"
                       (saveMarks)="saveMarks()"
                       (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
+                      (markCanvasMouseDown)="onMarkCanvasMouseDown($event)"
+                      (markCanvasMouseMove)="onMarkCanvasMouseMove($event)"
+                      (markCanvasMouseUp)="onMarkCanvasMouseUp($event)"
                       (panXChange)="canvasPanX.set($event)"
                       (panYChange)="canvasPanY.set($event)"
                     ></app-editor-canvas>

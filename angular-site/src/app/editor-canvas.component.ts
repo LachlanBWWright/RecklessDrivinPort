@@ -53,6 +53,9 @@ export class EditorCanvasComponent {
   @Output() removeMark = new EventEmitter<void>();
   @Output() saveMarks = new EventEmitter<void>();
   @Output() markFieldInput = new EventEmitter<{idx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event}>();
+  @Output() markCanvasMouseDown = new EventEmitter<MouseEvent>();
+  @Output() markCanvasMouseMove = new EventEmitter<MouseEvent>();
+  @Output() markCanvasMouseUp = new EventEmitter<MouseEvent>();
   @Output() panXChange = new EventEmitter<number>();
   @Output() panYChange = new EventEmitter<number>();
 }

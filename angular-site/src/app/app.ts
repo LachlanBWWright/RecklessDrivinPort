@@ -323,7 +323,14 @@ export class App implements OnInit, OnDestroy {
       }
     });
 
-    // Sprite pixel canvas effect removed — PPic raw preview replaced by pack sprite viewer.
+    // Redraw mark canvas when marks or selected mark changes.
+    effect(() => {
+      this.marks();
+      this.selectedMarkIndex();
+      if (typeof window !== 'undefined') {
+        window.requestAnimationFrame(() => this.redrawMarkCanvas());
+      }
+    });
   }
 
   /** Schedule a canvas redraw on the next animation frame, cancelling any pending redraw. */
@@ -1565,9 +1572,17 @@ export class App implements OnInit, OnDestroy {
   }
 
   onMarkCanvasMouseDown(event: MouseEvent): void {
-    const canvas = event.target as HTMLCanvasElement;
+    const canvas = event.target;
+    if (!(canvas instanceof HTMLCanvasElement)) return;
     const ms = this.marks();
     if (ms.length === 0) return;
+
+    // Scale CSS offset pixels to logical canvas pixels
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
+    const ox = event.offsetX * scaleX;
+    const oy = event.offsetY * scaleY;
 
     const { minX, minY, rangeX, rangeY } = this.markBounds(ms);
 
@@ -1576,12 +1591,12 @@ export class App implements OnInit, OnDestroy {
       const m = ms[i];
       const [ax, ay] = this.markWorldToCanvas(m.x1, m.y1, canvas, minX, minY, rangeX, rangeY);
       const [bx, by] = this.markWorldToCanvas(m.x2, m.y2, canvas, minX, minY, rangeX, rangeY);
-      if (dist2d(event.offsetX, event.offsetY, ax, ay) < hitR) {
+      if (dist2d(ox, oy, ax, ay) < hitR) {
         this.selectedMarkIndex.set(i);
         this.dragMarkEndpoint.set({ markIdx: i, endpoint: 'p1' });
         return;
       }
-      if (dist2d(event.offsetX, event.offsetY, bx, by) < hitR) {
+      if (dist2d(ox, oy, bx, by) < hitR) {
         this.selectedMarkIndex.set(i);
         this.dragMarkEndpoint.set({ markIdx: i, endpoint: 'p2' });
         return;
@@ -1592,7 +1607,7 @@ export class App implements OnInit, OnDestroy {
       const m = ms[i];
       const [ax, ay] = this.markWorldToCanvas(m.x1, m.y1, canvas, minX, minY, rangeX, rangeY);
       const [bx, by] = this.markWorldToCanvas(m.x2, m.y2, canvas, minX, minY, rangeX, rangeY);
-      const dist = this.pointToSegmentDist(event.offsetX, event.offsetY, ax, ay, bx, by);
+      const dist = this.pointToSegmentDist(ox, oy, ax, ay, bx, by);
       if (dist < 8) {
         this.selectedMarkIndex.set(i);
         return;
@@ -1603,16 +1618,26 @@ export class App implements OnInit, OnDestroy {
   onMarkCanvasMouseMove(event: MouseEvent): void {
     const drag = this.dragMarkEndpoint();
     if (!drag) return;
-    const canvas = event.target as HTMLCanvasElement;
+    const canvas = event.target;
+    if (!(canvas instanceof HTMLCanvasElement)) return;
     const ms = this.marks();
     const { minX, minY, rangeX: rawRangeX, rangeY: rawRangeY } = this.markBounds(ms);
     const rangeX = Math.max(rawRangeX, 100);
     const rangeY = Math.max(rawRangeY, 100);
     const pad = 24;
-    const W = canvas.width; const H = canvas.height;
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Scale CSS offset pixels to logical canvas pixels
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
+    const ox = event.offsetX * scaleX;
+    const oy = event.offsetY * scaleY;
+
     // Invert the canvas-to-world mapping
-    const wx = Math.round(minX + ((event.offsetX - pad) / (W - 2 * pad)) * rangeX);
-    const wy = Math.round(minY + ((H - pad - event.offsetY) / (H - 2 * pad)) * rangeY);
+    const wx = Math.round(minX + ((ox - pad) / (W - 2 * pad)) * rangeX);
+    const wy = Math.round(minY + ((H - pad - oy) / (H - 2 * pad)) * rangeY);
     const newMs = [...ms];
     if (drag.endpoint === 'p1') {
       newMs[drag.markIdx] = { ...newMs[drag.markIdx], x1: wx, y1: wy };

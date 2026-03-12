@@ -127,6 +127,13 @@
     }
 
     <div class="marks-table-container">
+      <!-- Visual drag editor for mark segments -->
+      <canvas id="mark-canvas" class="mark-canvas" width="500" height="200"
+        (mousedown)="markCanvasMouseDown.emit($event)"
+        (mousemove)="markCanvasMouseMove.emit($event)"
+        (mouseup)="markCanvasMouseUp.emit($event)"
+        (mouseleave)="markCanvasMouseUp.emit($event)"
+      ></canvas>
       <table mat-table [dataSource]="marks" class="marks-table">
         <ng-container matColumnDef="idx">
           <th mat-header-cell *matHeaderCellDef>#</th>
