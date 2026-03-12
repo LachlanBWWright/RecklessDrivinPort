@@ -1,10 +1,11 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import type { ObjectPos } from './level-editor.service';
 
 @Component({
   selector: 'app-object-list',
   templateUrl: './object-list.component.html',
   standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ObjectListComponent {
   @Input() objects: ObjectPos[] = [];
@@ -16,4 +17,12 @@ export class ObjectListComponent {
 
   @Output() objectSelected = new EventEmitter<number>();
   @Output() searchTermChange = new EventEmitter<string>();
+
+  /** Typed handler for the search input event – avoids $any() in the template. */
+  onSearchInput(event: Event): void {
+    const input = event.target;
+    if (input instanceof HTMLInputElement) {
+      this.searchTermChange.emit(input.value);
+    }
+  }
 }

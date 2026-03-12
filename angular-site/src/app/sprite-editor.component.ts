@@ -254,7 +254,9 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     const stack: [number, number][] = [[sx, sy]];
     const visited = new Uint8Array(w * h);
     while (stack.length > 0) {
-      const [x, y] = stack.pop()!;
+      const top = stack.pop();
+      if (!top) break;
+      const [x, y] = top;
       if (x < 0 || y < 0 || x >= w || y >= h) continue;
       const idx = y * w + x;
       if (visited[idx]) continue;
@@ -280,7 +282,8 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   undo(): void {
     if (this.undoStack.length === 0) return;
-    this.pixels = this.undoStack.pop()!;
+    const prev = this.undoStack.pop();
+    if (prev) this.pixels = prev;
     this.draw();
   }
 

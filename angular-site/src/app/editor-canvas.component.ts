@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import type { ObjectPos, MarkSeg } from './level-editor.service';
 
 @Component({
@@ -6,6 +6,7 @@ import type { ObjectPos, MarkSeg } from './level-editor.service';
   templateUrl: './editor-canvas.component.html',
   styleUrl: './editor-canvas.component.scss',
   standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorCanvasComponent {
   @Input() objects: ObjectPos[] = [];

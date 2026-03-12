@@ -151,10 +151,11 @@ const RI_OFFSET_FG_TEX     = 20;
 const RI_OFFSET_LEFT_BORD  = 22;
 const RI_OFFSET_RIGHT_BORD = 24;
 const RI_OFFSET_WATER      = 57;
-const ROAD_INFO_SIZE       = 64;  // sizeof(tRoadInfo)
+/** sizeof(tRoadInfo) – reserved for future reference. */
+// const ROAD_INFO_SIZE = 64;
 
 /** Texture dimensions (pixels) for tiles in kPackTx16. */
-const BIG_TEX_SIZE   = 128;  // background + road surface textures: 128×128 px
+// const BIG_TEX_SIZE = 128;   // background + road surface textures: 128×128 px
 const BORDER_TEX_W   = 16;   // kerb border textures: 16 px wide
 const BORDER_TEX_H   = 128;  // kerb border textures: 128 px tall
 
@@ -213,7 +214,9 @@ function rgb555ToRgba(value: number): [number, number, number, number] {
   return [Math.round(r), Math.round(g), Math.round(b), 255];
 }
 
-/** Convert a packed big-endian RGB565 pixel into 8-bit RGBA for canvas previews. */
+/** Convert a packed big-endian RGB565 pixel into 8-bit RGBA for canvas previews.
+ *  Kept for future use (RGB565 texture format support). */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function rgb565ToRgba(value: number): [number, number, number, number] {
   const r = ((value >> 11) & 0x1f) * RGB5_SCALE;
   const g = ((value >> 5) & 0x3f) * RGB6_SCALE;

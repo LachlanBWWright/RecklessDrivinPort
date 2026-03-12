@@ -745,14 +745,39 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 14px;
+  padding: 6px 14px 6px 12px;
   cursor: pointer;
   border-bottom: 1px solid rgba(255,255,255,0.04);
-  transition: background 0.1s;
+  border-left: 3px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
   font-size: 0.82rem;
+  user-select: none;
+  position: relative;
 
-  &:hover { background: var(--surface3); }
-  &.selected { background: rgba(229,57,53,0.15); border-left: 3px solid var(--accent); padding-left: 11px; }
+  &:hover {
+    background: rgba(255,255,255,0.06);
+    border-left-color: rgba(239,83,80,0.4);
+    .obj-chevron { opacity: 1; transform: translateX(2px); }
+  }
+
+  &.selected {
+    background: rgba(229,57,53,0.18);
+    border-left-color: var(--accent);
+    .obj-chevron { opacity: 1; color: var(--accent); }
+  }
+
+  &:active { background: rgba(239,83,80,0.12); }
+}
+
+.obj-chevron {
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.12s, transform 0.12s;
+  font-size: 16px !important;
+  height: 16px !important;
+  width: 16px !important;
+  color: var(--muted);
+  flex-shrink: 0;
 }
 
 .obj-sprite-thumb {
@@ -765,6 +790,7 @@ main {
   border-radius: 4px;
   overflow: hidden;
   background: var(--surface3);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
 .obj-list-sprite { object-fit: contain; image-rendering: pixelated; }
@@ -783,7 +809,7 @@ main {
 
 .obj-idx { font-weight: 700; color: var(--muted); min-width: 28px; }
 .obj-type { color: var(--accent2); min-width: 36px; }
-.obj-pos { color: var(--muted); font-size: 0.73rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.obj-pos { color: var(--muted); font-size: 0.73rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 
 .empty-search {
   display: flex;

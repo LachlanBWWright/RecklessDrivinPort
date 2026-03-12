@@ -21,6 +21,29 @@ interface WorkerResponse {
   error?: string;
 }
 
+/**
+ * Subset of the Emscripten runtime module attached to window.Module.
+ * Allows typed access without `window as any`.
+ */
+interface EmscriptenModuleInterface {
+  canvas: HTMLCanvasElement;
+  print: (text: string) => void;
+  printErr: (text: string) => void;
+  setStatus: (status: string) => void;
+  monitorRunDependencies: (left: number) => void;
+  onRuntimeInitialized: () => void;
+  preRun: (() => void)[];
+  postRun: (() => void)[];
+  _set_wasm_master_volume?: (vol: number) => void;
+}
+
+declare global {
+  interface Window {
+    /** Emscripten-compiled WASM module. Attached by the generated .js loader. */
+    Module?: EmscriptenModuleInterface;
+  }
+}
+
 export type AppTab = 'game' | 'editor';
 export type EditorSection = 'properties' | 'objects' | 'sprites';
 
@@ -98,13 +121,6 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function scheduleAfterRender(callback: () => void): void {
-  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-    window.requestAnimationFrame(() => callback());
-    return;
-  }
-  setTimeout(callback, 0);
-}
 
 @Component({
   selector: 'app-root',
@@ -345,18 +361,17 @@ export class App implements OnInit, OnDestroy {
     const parent = canvas.parentElement;
     if (!parent) return;
 
-    // Create a container div for Konva OVER the canvas
+    // Create a container div for Konva OVER the canvas.
+    // IMPORTANT: size the container to the CSS display dimensions (not logical pixels)
+    // so the Konva stage coordinate space matches what the canvas visually renders at.
+    const rect = canvas.getBoundingClientRect();
+    const cssW = Math.max(1, Math.round(rect.width));
+    const cssH = Math.max(1, Math.round(rect.height));
+
     let konvaContainer = document.getElementById('konva-container');
     if (!konvaContainer) {
       konvaContainer = document.createElement('div');
       konvaContainer.id = 'konva-container';
-      konvaContainer.style.cssText = `
-        position:absolute; top:0; left:0;
-        width:${canvas.width}px; height:${canvas.height}px;
-        pointer-events:all;
-      `;
-      // The Konva container sits in the same grid cell as the canvas
-      canvas.style.position = 'relative';
       parent.style.position = 'relative';
       canvas.insertAdjacentElement('afterend', konvaContainer);
 
@@ -366,9 +381,29 @@ export class App implements OnInit, OnDestroy {
         canvas.dispatchEvent(fwd);
       }, { passive: false });
     }
+    // Always update the container CSS to match the current canvas display size
+    konvaContainer.style.cssText = `
+      position:absolute; top:0; left:0;
+      width:${cssW}px; height:${cssH}px;
+      pointer-events:all;
+    `;
 
-    this.konva.init('konva-container', canvas.width, canvas.height);
+    this.konva.init('konva-container', canvas.width, canvas.height, cssW, cssH);
     this._konvaInitialized = true;
+
+    // Keep the Konva container + stage in sync if the canvas CSS display size changes
+    const resizeObserver = new ResizeObserver(() => {
+      const r = canvas.getBoundingClientRect();
+      const w = Math.max(1, Math.round(r.width));
+      const h = Math.max(1, Math.round(r.height));
+      if (konvaContainer) {
+        konvaContainer.style.width = `${w}px`;
+        konvaContainer.style.height = `${h}px`;
+      }
+      this.konva.resize(w, h);
+      this.scheduleCanvasRedraw();
+    });
+    resizeObserver.observe(canvas);
 
     // Wire up Konva drag callbacks
     this.konva.onObjectDragEnd = (e) => {
@@ -527,8 +562,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   async onResourceFileSelected(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+    const input = event.target as EventTarget & { files?: FileList };
+    const file = input?.files?.[0];
     if (!file) return;
     this.editorError.set('');
     try {
@@ -624,7 +659,8 @@ export class App implements OnInit, OnDestroy {
   // ---- Level properties ----
 
   onPropsInput(field: keyof LevelProperties, event: Event): void {
-    const val = Number.parseInt((event.target as HTMLInputElement).value, 10);
+    const target = event.target as EventTarget & { value?: string };
+    const val = Number.parseInt(target?.value ?? '', 10);
     if (Number.isNaN(val)) return;
     switch (field) {
       case 'roadInfo': this.editRoadInfo.set(val); break;
@@ -681,7 +717,8 @@ export class App implements OnInit, OnDestroy {
 
   /** Valid field names: 'x' | 'y' | 'dir' | 'typeRes' */
   onObjFieldInput(field: 'x' | 'y' | 'dir' | 'typeRes', event: Event): void {
-    const val = parseFloat((event.target as HTMLInputElement).value);
+    const target = event.target as EventTarget & { value?: string };
+    const val = parseFloat(target?.value ?? '');
     if (Number.isNaN(val)) return;
     switch (field) {
       case 'x': this.editObjX.set(Math.round(val)); break;
@@ -988,7 +1025,7 @@ export class App implements OnInit, OnDestroy {
     this.editObjY.set(Math.round(wy));
   }
 
-  onCanvasMouseUp(event: MouseEvent): void {
+  onCanvasMouseUp(_event: MouseEvent): void {
     if (this._isPanning) {
       this._isPanning = false;
       this.isPanning.set(false);
@@ -1420,7 +1457,8 @@ export class App implements OnInit, OnDestroy {
 
   /** Valid field names: 'x1' | 'y1' | 'x2' | 'y2' */
   onMarkFieldInput(markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event): void {
-    const val = Number.parseInt((event.target as HTMLInputElement).value, 10);
+    const target = event.target as EventTarget & { value?: string };
+    const val = Number.parseInt(target?.value ?? '', 10);
     if (Number.isNaN(val)) return;
     const ms = [...this.marks()];
     ms[markIdx] = { ...ms[markIdx], [field]: val };
@@ -1945,19 +1983,30 @@ export class App implements OnInit, OnDestroy {
   }
 
   private setupEmscriptenModule(): void {
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    const canvasEl = document.getElementById('canvas');
+    if (!(canvasEl instanceof HTMLCanvasElement)) return;
+    const canvas = canvasEl;
     const origOpen = XMLHttpRequest.prototype.open;
     const self = this;
-    XMLHttpRequest.prototype.open = function (this: XMLHttpRequest, method: string, url: string, ...rest: any[]) {
+    // Monkey-patch XHR to track .data file download progress for the loading bar.
+    // The XMLHttpRequest.open signature is (method, url, async?, user?, password?).
+    XMLHttpRequest.prototype.open = function (
+      this: XMLHttpRequest,
+      method: string,
+      url: string,
+      asyncFlag: boolean = true,
+      user?: string,
+      password?: string,
+    ): void {
       if (url && url.indexOf('.data') !== -1) {
         this.addEventListener('progress', (e: ProgressEvent) => {
           if (e.lengthComputable) self.progressPct.set(Math.round((e.loaded / e.total) * 100));
         });
       }
-      origOpen.apply(this, [method, url, ...rest] as any);
+      origOpen.call(this, method, url, asyncFlag, user, password);
     } as typeof XMLHttpRequest.prototype.open;
 
-    (window as any)['Module'] = {
+    window.Module = {
       canvas,
       print: (t: string) => console.log('[WASM]', t),
       printErr: (t: string) => console.warn('[WASM ERR]', t),
@@ -2437,7 +2486,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private applyVolumeToWasm(pct: number): void {
-    const mod = (window as any)['Module'];
+    const mod = window.Module;
     if (mod && typeof mod._set_wasm_master_volume === 'function') {
       mod._set_wasm_master_volume(pct / 100.0);
     }

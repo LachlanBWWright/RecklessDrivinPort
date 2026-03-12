@@ -10,7 +10,7 @@
     <input matInput type="search"
       placeholder="Filter by #index or Ttype…"
       [value]="searchTerm"
-      (input)="searchTermChange.emit($any($event.target).value)" />
+      (input)="onSearchInput($event)" />
     @if (searchTerm) {
       <button matSuffix mat-icon-button aria-label="Clear" (click)="searchTermChange.emit('')">
         <mat-icon>close</mat-icon>
@@ -36,6 +36,7 @@
         <span class="obj-idx">#{{ idx }}</span>
         <span class="obj-type">T{{ objects[idx].typeRes }}</span>
         <span class="obj-pos">({{ objects[idx].x }},{{ objects[idx].y }})</span>
+        <mat-icon class="obj-chevron">chevron_right</mat-icon>
       </div>
     }
     @if (filteredIndices.length === 0 && searchTerm) {
