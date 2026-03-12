@@ -205,6 +205,8 @@ export class App implements OnInit, OnDestroy {
   // ---- Track waypoint drag ----
   /** When non-null, the user is dragging a track waypoint. */
   dragTrackWaypoint = signal<{ track: 'up' | 'down'; segIdx: number } | null>(null);
+  /** Hovered track waypoint (for cursor change and highlight). */
+  hoverTrackWaypoint = signal<{ track: 'up' | 'down'; segIdx: number } | null>(null);
   /** Editable copies of track waypoints (only populated when user drags a point). */
   editTrackUp = signal<{ x: number; y: number; flags: number; velo: number }[]>([]);
   editTrackDown = signal<{ x: number; y: number; flags: number; velo: number }[]>([]);
@@ -745,7 +747,27 @@ export class App implements OnInit, OnDestroy {
       this.propertiesDirty.set(true);
       return;
     }
-    if (!this.isDragging()) return;
+    if (!this.isDragging()) {
+      // Update hover state for track waypoints (for cursor feedback)
+      if (this.showTrackOverlay()) {
+        const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
+        const trackHitR = Math.max(12, 10 / this.canvasZoom());
+        let found: { track: 'up' | 'down'; segIdx: number } | null = null;
+        for (let i = 0; i < this.editTrackUp().length && !found; i++) {
+          const s = this.editTrackUp()[i];
+          if (dist2d(s.x, s.y, wx, wy) < trackHitR) found = { track: 'up', segIdx: i };
+        }
+        for (let i = 0; i < this.editTrackDown().length && !found; i++) {
+          const s = this.editTrackDown()[i];
+          if (dist2d(s.x, s.y, wx, wy) < trackHitR) found = { track: 'down', segIdx: i };
+        }
+        const prev = this.hoverTrackWaypoint();
+        if (found?.track !== prev?.track || found?.segIdx !== prev?.segIdx) {
+          this.hoverTrackWaypoint.set(found);
+        }
+      }
+      return;
+    }
     const dragIdx = this.dragObjIndex();
     if (dragIdx === null) return;
     const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
@@ -2033,7 +2055,8 @@ export class App implements OnInit, OnDestroy {
     const W = canvas.width;
     const H = canvas.height;
     const zoom = this.canvasZoom();
-    const dragWp = this.dragTrackWaypoint();
+    const dragWp  = this.dragTrackWaypoint();
+    const hoverWp = this.hoverTrackWaypoint();
 
     const drawPath = (
       segs: { x: number; y: number }[],
@@ -2081,10 +2104,16 @@ export class App implements OnInit, OnDestroy {
         const [cx, cy] = this.worldToCanvas(segs[i].x, segs[i].y);
         if (cx < -10 || cx > W + 10 || cy < -10 || cy > H + 10) continue;
         const isDragged = dragWp?.track === track && dragWp.segIdx === i;
-        ctx.fillStyle = isDragged ? '#ffffff' : dotColor;
+        const isHovered = !isDragged && hoverWp?.track === track && hoverWp.segIdx === i;
+        ctx.fillStyle = isDragged ? '#ffffff' : (isHovered ? '#ffdd00' : dotColor);
         ctx.beginPath();
-        ctx.arc(cx, cy, isDragged ? dotR + 3 : dotR, 0, Math.PI * 2);
+        ctx.arc(cx, cy, isDragged ? dotR + 3 : (isHovered ? dotR + 2 : dotR), 0, Math.PI * 2);
         ctx.fill();
+        if (isHovered) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
       }
 
       // Start dot with label

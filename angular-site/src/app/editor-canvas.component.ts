@@ -26,6 +26,7 @@ export class EditorCanvasComponent {
   @Input() workerBusy = false;
   @Input() isDragging = false;
   @Input() dragTrackWaypoint: unknown = null;
+  @Input() hoverTrackWaypoint: unknown = null;
   @Input() spaceDown = false;
 
   @Output() canvasMouseDown = new EventEmitter<MouseEvent>();

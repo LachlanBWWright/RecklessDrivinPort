@@ -1,7 +1,7 @@
 <!-- Canvas toolbar -->
 <div class="canvas-toolbar">
-  <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate · Middle-mouse or Space+drag: pan · Arrow keys: pan">
-    🖱 Drag · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Space</kbd>+drag/middle-mouse pans · <kbd>↑↓←→</kbd> pan
+  <span class="hint-text" title="Drag: move object or track waypoint · Dbl-click: add object · Del/Backspace: remove · Ctrl/Cmd+D: duplicate · Middle-mouse or Space+drag: pan · Arrow keys: pan · Right-click on track: add/remove waypoint">
+    🖱 Drag objects &amp; track dots · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Space</kbd>+drag pans · <kbd>↑↓←→</kbd> pan · <kbd>Right-click</kbd> track: add/remove waypoint
   </span>
   <div class="canvas-controls">
     <button mat-stroked-button (click)="addObject.emit()">+ Add Object</button>
@@ -34,7 +34,7 @@
       (keyup)="canvasKeyUp.emit($event)"
       (wheel)="canvasWheel.emit($event)"
       (contextmenu)="canvasContextMenu.emit($event); $event.preventDefault()"
-      [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (spaceDown ? 'grab' : 'crosshair')"
+      [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'crosshair'))"
     ></canvas>
     <!-- Vertical scrollbar: value = scrollYMax - panY so that thumb-top = road end, thumb-bottom = road start -->
     <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
