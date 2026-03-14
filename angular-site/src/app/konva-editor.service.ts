@@ -43,6 +43,13 @@ const MIN_WAYPOINT_RADIUS  = 5;
 /** Base multiplier for waypoint circle radius. */
 const BASE_WAYPOINT_RADIUS = 7;
 
+/** Helper: returns true if two Sets contain the same elements. */
+function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const item of a) { if (!b.has(item)) return false; }
+  return true;
+}
+
 @Injectable({ providedIn: 'root' })
 export class KonvaEditorService implements OnDestroy {
   private stage: Konva.Stage | null = null;
@@ -68,6 +75,13 @@ export class KonvaEditorService implements OnDestroy {
   /** CSS display pixel dimensions (from getBoundingClientRect on the canvas). */
   private _cssW = 900;
   private _cssH = 700;
+
+  // ── Object-layer cache (avoids full rebuild on zoom/pan) ────────────────
+  private _lastObjects: readonly ObjectPos[] | null = null;
+  private _lastSelectedIndex: number | null | undefined = undefined;
+  private _lastVisibleTypes: Set<number> | null = null;
+  /** Stable references to object nodes in insertion order, indexed by object index. */
+  private _konvaObjNodes: KonvaLayerChild[] = [];
 
   /**
    * Initialise or re-initialise the Konva stage.
@@ -147,11 +161,53 @@ export class KonvaEditorService implements OnDestroy {
     this._panX = panX;
     this._panY = panY;
 
-    this.objectsLayer.destroyChildren();
-
-    const PALETTE_LEN = paletteColors.length;
     const scaleX = this._cssW / this._logicalW;
     const scaleY = this._cssH / this._logicalH;
+    const PALETTE_LEN = paletteColors.length;
+
+    // ── Fast path: only zoom/pan changed ─────────────────────────────────────
+    // If objects reference, selection, and visibility are unchanged, avoid the
+    // expensive destroyChildren() + full node rebuild by only updating positions
+    // and sizes in-place.
+    const objsUnchanged  = objects === this._lastObjects;
+    const selUnchanged   = selectedIndex === this._lastSelectedIndex;
+    const visUnchanged   = setsEqual(visibleTypes, this._lastVisibleTypes ?? new Set<number>());
+
+    if (objsUnchanged && selUnchanged && visUnchanged && this._konvaObjNodes.length > 0) {
+      for (const node of this._konvaObjNodes) {
+        const idStr = node.id();
+        const idx = parseInt(idStr.replace('obj-', ''), 10);
+        if (isNaN(idx) || idx >= objects.length) continue;
+        const obj = objects[idx];
+        const [sx, sy] = this.worldToStage(obj.x, obj.y);
+        node.position({ x: sx, y: sy });
+        if (node instanceof Konva.Group) {
+          const img = getImageForType(obj.typeRes);
+          if (img instanceof HTMLCanvasElement || img instanceof HTMLImageElement) {
+            const W = Math.max(MIN_OBJECT_SIZE, img.width  * zoom * scaleX);
+            const H = Math.max(MIN_OBJECT_SIZE, img.height * zoom * scaleY);
+            const imgNode = node.findOne('Image') as Konva.Image | undefined;
+            if (imgNode) {
+              imgNode.width(W); imgNode.height(H);
+              imgNode.offsetX(W / 2); imgNode.offsetY(H / 2);
+            }
+            const selCircle = node.findOne('Circle') as Konva.Circle | undefined;
+            if (selCircle) selCircle.radius(Math.max(W, H) / 2 + 5);
+          }
+        } else if (node instanceof Konva.Circle) {
+          node.radius(Math.max(MIN_CIRCLE_RADIUS, BASE_CIRCLE_RADIUS * zoom * scaleX));
+        }
+      }
+      this.objectsLayer.batchDraw();
+      return;
+    }
+
+    // ── Full rebuild ──────────────────────────────────────────────────────────
+    this._lastObjects       = objects;
+    this._lastSelectedIndex = selectedIndex;
+    this._lastVisibleTypes  = new Set(visibleTypes);
+    this.objectsLayer.destroyChildren();
+    this._konvaObjNodes = [];
 
     objects.forEach((obj, i) => {
       const typeIdx = ((obj.typeRes % PALETTE_LEN) + PALETTE_LEN) % PALETTE_LEN;
@@ -223,6 +279,7 @@ export class KonvaEditorService implements OnDestroy {
       });
 
       this.objectsLayer?.add(node);
+      this._konvaObjNodes.push(node);
     });
 
     this.objectsLayer.batchDraw();
@@ -231,6 +288,10 @@ export class KonvaEditorService implements OnDestroy {
   // ──────────────────────────────────────────────
   // TRACK WAYPOINTS
   // ──────────────────────────────────────────────
+
+  // ── Track-layer cache ────────────────────────────────────────────────────
+  private _lastTrackUp: readonly { x: number; y: number }[] | null = null;
+  private _lastTrackDown: readonly { x: number; y: number }[] | null = null;
 
   setTrackWaypoints(
     trackUp: { x: number; y: number }[],
@@ -244,10 +305,32 @@ export class KonvaEditorService implements OnDestroy {
     this._panX = panX;
     this._panY = panY;
 
-    this.trackLayer.destroyChildren();
-
     const scaleX = this._cssW / this._logicalW;
     const R = Math.max(MIN_WAYPOINT_RADIUS, BASE_WAYPOINT_RADIUS * zoom * scaleX);
+
+    // Fast path: only zoom/pan changed, update waypoint positions and radii in-place.
+    if (trackUp === this._lastTrackUp && trackDown === this._lastTrackDown &&
+        this.trackLayer.children.length > 0) {
+      for (const node of this.trackLayer.children as Konva.Circle[]) {
+        const id = node.id();
+        const parts = id.split('-');
+        const track = parts[1] as 'up' | 'down';
+        const segIdx = parseInt(parts[2], 10);
+        const pts = track === 'up' ? trackUp : trackDown;
+        if (!isNaN(segIdx) && segIdx < pts.length) {
+          const [sx, sy] = this.worldToStage(pts[segIdx].x, pts[segIdx].y);
+          node.position({ x: sx, y: sy });
+          node.radius(R);
+        }
+      }
+      this.trackLayer.batchDraw();
+      return;
+    }
+
+    // Full rebuild.
+    this._lastTrackUp   = trackUp;
+    this._lastTrackDown = trackDown;
+    this.trackLayer.destroyChildren();
 
     const addWaypoints = (pts: { x: number; y: number }[], track: 'up' | 'down', color: string): void => {
       pts.forEach((pt, i) => {
@@ -301,6 +384,8 @@ export class KonvaEditorService implements OnDestroy {
   }
 
   clearTrackWaypoints(): void {
+    this._lastTrackUp = null;
+    this._lastTrackDown = null;
     this.trackLayer?.destroyChildren();
     this.trackLayer?.batchDraw();
   }
@@ -347,6 +432,14 @@ export class KonvaEditorService implements OnDestroy {
     this.stage = null;
     this.objectsLayer = null;
     this.trackLayer = null;
+    // Reset object-layer cache
+    this._lastObjects = null;
+    this._lastSelectedIndex = undefined;
+    this._lastVisibleTypes = null;
+    this._konvaObjNodes = [];
+    // Reset track-layer cache
+    this._lastTrackUp   = null;
+    this._lastTrackDown = null;
   }
 
   ngOnDestroy(): void {

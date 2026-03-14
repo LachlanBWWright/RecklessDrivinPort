@@ -495,11 +495,88 @@
                                 [value]="s"
                                 (input)="updateResString($index, $any($event.target).value)"
                               />
+                              <button mat-icon-button color="warn" (click)="removeResString($index)" matTooltip="Remove">
+                                <mat-icon>remove_circle_outline</mat-icon>
+                              </button>
                             </div>
                           }
-                          <button mat-raised-button color="primary" (click)="saveStrList()">
-                            <mat-icon>save</mat-icon> Save Strings
-                          </button>
+                          <div class="str-editor-actions">
+                            <button mat-stroked-button (click)="addResString()">
+                              <mat-icon>add</mat-icon> Add String
+                            </button>
+                            <button mat-raised-button color="primary" (click)="saveStrList()">
+                              <mat-icon>save</mat-icon> Save
+                            </button>
+                          </div>
+                        </div>
+                      }
+
+                      <!-- STR / TEXT text editor -->
+                      @if (selectedResText() !== null) {
+                        <div class="text-editor">
+                          <h5 class="field-editor-title">Text Content</h5>
+                          <textarea
+                            class="text-editor-area"
+                            rows="8"
+                            [value]="selectedResText()!"
+                            (input)="selectedResText.set($any($event.target).value)"
+                          ></textarea>
+                          <div class="field-editor-actions">
+                            <button mat-raised-button color="primary" (click)="saveResText()">
+                              <mat-icon>save</mat-icon> Save
+                            </button>
+                          </div>
+                        </div>
+                      }
+
+                      <!-- Icon preview (ICN#, ics#) -->
+                      @if (selectedResIsIcon() && selectedResBytes()) {
+                        <div class="icon-preview">
+                          <h5 class="field-editor-title">Icon Preview</h5>
+                          @if (getIconResourceDataUrl(selectedResBytes()); as url) {
+                            <img [src]="url" class="icon-preview-img" [style.imageRendering]="'pixelated'"
+                                 [style.width.px]="64" [style.height.px]="64" alt="Icon preview">
+                          }
+                          <p class="muted">{{ selectedResBytes()!.length }} bytes &mdash; replace via Upload to edit</p>
+                        </div>
+                      }
+
+                      <!-- Binary field editor for structured resources -->
+                      @if (selectedResFields().length > 0) {
+                        <div class="field-editor">
+                          <h5 class="field-editor-title">
+                            {{ selectedResBytes()!.length }} bytes
+                            @if (selectedResType() && selectedResType()! in {'ALRT':1,'DLOG':1,'WIND':1,'CNTL':1,'RECT':1}) {
+                              &mdash; known struct
+                            } @else {
+                              &mdash; auto-detected fields
+                            }
+                          </h5>
+                          <table class="field-table">
+                            <thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Value</th></tr></thead>
+                            <tbody>
+                              @for (f of selectedResFields(); track f.offset) {
+                                <tr>
+                                  <td class="field-name">{{ f.name }}</td>
+                                  <td class="field-offset">{{ f.offset }}</td>
+                                  <td class="field-type">{{ f.type }}</td>
+                                  <td>
+                                    <input
+                                      class="field-input"
+                                      type="number"
+                                      [value]="f.value"
+                                      (input)="onResFieldInput($index, $event)"
+                                    />
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                          <div class="field-editor-actions">
+                            <button mat-raised-button color="primary" (click)="saveResFields()">
+                              <mat-icon>save</mat-icon> Save Changes
+                            </button>
+                          </div>
                         </div>
                       }
 
@@ -529,18 +606,49 @@
                                     <mat-icon>upload</mat-icon> Replace entry
                                   </button>
                                 </div>
-                                <pre class="hex-view">{{ selectedPackEntryHex() }}</pre>
+                                <!-- Pack entry field editor -->
+                                @if (selectedPackEntryFields().length > 0) {
+                                  <div class="field-editor">
+                                    <h5 class="field-editor-title">
+                                      {{ selectedPackEntryBytes()!.length }} bytes
+                                    </h5>
+                                    <table class="field-table">
+                                      <thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Value</th></tr></thead>
+                                      <tbody>
+                                        @for (f of selectedPackEntryFields(); track f.offset) {
+                                          <tr>
+                                            <td class="field-name">{{ f.name }}</td>
+                                            <td class="field-offset">{{ f.offset }}</td>
+                                            <td class="field-type">{{ f.type }}</td>
+                                            <td>
+                                              <input
+                                                class="field-input"
+                                                type="number"
+                                                [value]="f.value"
+                                                (input)="onPackEntryFieldInput($index, $event)"
+                                              />
+                                            </td>
+                                          </tr>
+                                        }
+                                      </tbody>
+                                    </table>
+                                    <div class="field-editor-actions">
+                                      <button mat-raised-button color="primary" (click)="savePackEntryFields()">
+                                        <mat-icon>save</mat-icon> Save Entry
+                                      </button>
+                                    </div>
+                                  </div>
+                                } @else if (resBrowserBusy()) {
+                                  <mat-spinner diameter="24"></mat-spinner>
+                                } @else {
+                                  <p class="muted">Loading entry data…</p>
+                                }
                               </div>
                             }
                           } @else {
                             <p class="muted">Could not parse pack entries.</p>
                           }
                         </div>
-                      }
-
-                      <!-- Raw hex view for non-Pack resources -->
-                      @if (selectedResType() !== 'Pack') {
-                        <pre class="hex-view">{{ selectedResHex() }}</pre>
                       }
 
                     } @else {

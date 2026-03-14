@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnDestroy, OnInit, AfterViewInit, inject, signal, computed, effect } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type {
   ParsedLevel,
@@ -121,6 +121,164 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+// ── Resource editor types ─────────────────────────────────────────────────────
+
+/** A single editable field in a binary resource struct. */
+export interface ResField {
+  name: string;
+  offset: number;
+  type: 'u8' | 'u16' | 's16' | 'u32' | 's32';
+  value: number;
+}
+
+type ResFieldSchema = Omit<ResField, 'value'>;
+
+/** Known struct schemas for Mac OS resource types. */
+const RESOURCE_SCHEMAS: Record<string, ResFieldSchema[]> = {
+  'ALRT': [
+    { name: 'bounds.top',    offset: 0,  type: 's16' },
+    { name: 'bounds.left',   offset: 2,  type: 's16' },
+    { name: 'bounds.bottom', offset: 4,  type: 's16' },
+    { name: 'bounds.right',  offset: 6,  type: 's16' },
+    { name: 'itemsId',       offset: 8,  type: 's16' },
+    { name: 'stages',        offset: 10, type: 'u16' },
+  ],
+  'DLOG': [
+    { name: 'bounds.top',    offset: 0,  type: 's16' },
+    { name: 'bounds.left',   offset: 2,  type: 's16' },
+    { name: 'bounds.bottom', offset: 4,  type: 's16' },
+    { name: 'bounds.right',  offset: 6,  type: 's16' },
+    { name: 'procId',        offset: 8,  type: 'u16' },
+    { name: 'visible',       offset: 10, type: 'u8'  },
+    { name: 'goAway',        offset: 12, type: 'u8'  },
+    { name: 'refCon',        offset: 14, type: 'u32' },
+    { name: 'itemsId',       offset: 18, type: 's16' },
+  ],
+  'WIND': [
+    { name: 'bounds.top',    offset: 0,  type: 's16' },
+    { name: 'bounds.left',   offset: 2,  type: 's16' },
+    { name: 'bounds.bottom', offset: 4,  type: 's16' },
+    { name: 'bounds.right',  offset: 6,  type: 's16' },
+    { name: 'procId',        offset: 8,  type: 'u16' },
+    { name: 'visible',       offset: 10, type: 'u8'  },
+    { name: 'goAway',        offset: 12, type: 'u8'  },
+    { name: 'refCon',        offset: 14, type: 'u32' },
+    { name: 'zoomState',     offset: 18, type: 'u16' },
+  ],
+  'CNTL': [
+    { name: 'bounds.top',    offset: 0,  type: 's16' },
+    { name: 'bounds.left',   offset: 2,  type: 's16' },
+    { name: 'bounds.bottom', offset: 4,  type: 's16' },
+    { name: 'bounds.right',  offset: 6,  type: 's16' },
+    { name: 'value',         offset: 8,  type: 's16' },
+    { name: 'visible',       offset: 10, type: 'u16' },
+    { name: 'max',           offset: 12, type: 's16' },
+    { name: 'min',           offset: 14, type: 's16' },
+    { name: 'procId',        offset: 16, type: 'u16' },
+    { name: 'refCon',        offset: 18, type: 'u32' },
+  ],
+  'RECT': [
+    { name: 'top',    offset: 0, type: 's16' },
+    { name: 'left',   offset: 2, type: 's16' },
+    { name: 'bottom', offset: 4, type: 's16' },
+    { name: 'right',  offset: 6, type: 's16' },
+  ],
+};
+
+/** Known struct schemas for Pack entry types (by Pack resource ID). */
+const PACK_ENTRY_SCHEMAS: Record<number, ResFieldSchema[]> = {
+  // Pack 128: Object group reference (OGRP)
+  128: [
+    { name: 'typeRes',  offset: 0, type: 's16' },
+    { name: 'numObjs',  offset: 2, type: 'u16' },
+  ],
+  // Pack 135: Road info record
+  135: [
+    { name: 'flags',         offset: 0,  type: 'u16' },
+    { name: 'roadWidth',     offset: 2,  type: 'u16' },
+    { name: 'field_4',       offset: 4,  type: 'u16' },
+    { name: 'field_6',       offset: 6,  type: 'u16' },
+    { name: 'field_8',       offset: 8,  type: 'u16' },
+    { name: 'field_10',      offset: 10, type: 'u16' },
+    { name: 'field_12',      offset: 12, type: 'u16' },
+    { name: 'field_14',      offset: 14, type: 'u16' },
+    { name: 'field_16',      offset: 16, type: 'u16' },
+    { name: 'bgTex',         offset: 18, type: 'u16' },
+    { name: 'fgTex',         offset: 20, type: 'u16' },
+    { name: 'lBorder',       offset: 22, type: 'u16' },
+    { name: 'rBorder',       offset: 24, type: 'u16' },
+  ],
+};
+
+// Pack IDs 140-149 are level packs – generate their schema dynamically.
+for (let pid = 140; pid <= 149; pid++) {
+  PACK_ENTRY_SCHEMAS[pid] = [
+    { name: 'roadInfo',    offset: 0,  type: 's16' },
+    { name: 'time',        offset: 2,  type: 'u16' },
+    // tObjectGroupReference[10] – each 4 bytes (typeRes s16 + count u16)
+    ...Array.from({ length: 10 }, (_, i) => [
+      { name: `objGroup[${i}].typeRes`, offset: 4 + i * 4,     type: 's16' as const },
+      { name: `objGroup[${i}].count`,  offset: 4 + i * 4 + 2, type: 'u16' as const },
+    ]).flat(),
+    { name: 'xStartPos', offset: 44, type: 's16' },
+    { name: 'levelEnd',  offset: 46, type: 'u16' },
+  ];
+}
+
+/** Read a typed value from a DataView. */
+function readResField(view: DataView, f: ResFieldSchema): number {
+  const le = false; // big-endian (Mac OS)
+  switch (f.type) {
+    case 'u8':  return view.getUint8(f.offset);
+    case 'u16': return view.getUint16(f.offset, le);
+    case 's16': return view.getInt16(f.offset, le);
+    case 'u32': return view.getUint32(f.offset, le);
+    case 's32': return view.getInt32(f.offset, le);
+  }
+}
+
+/** Write a typed value to a DataView. */
+function writeResField(view: DataView, f: ResFieldSchema, value: number): void {
+  const le = false; // big-endian (Mac OS)
+  switch (f.type) {
+    case 'u8':  view.setUint8(f.offset, value); break;
+    case 'u16': view.setUint16(f.offset, value, le); break;
+    case 's16': view.setInt16(f.offset, value, le); break;
+    case 'u32': view.setUint32(f.offset, value, le); break;
+    case 's32': view.setInt32(f.offset, value, le); break;
+  }
+}
+
+/**
+ * Build a ResField[] from bytes, using a known schema if available, or
+ * auto-generating u16 fields at every 2-byte offset otherwise.
+ */
+function buildResFields(bytes: Uint8Array, schema: ResFieldSchema[] | null): ResField[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (schema) {
+    return schema
+      .filter(f => f.offset + fieldByteSize(f.type) <= bytes.byteLength)
+      .map(f => ({ ...f, value: readResField(view, f) }));
+  }
+  // Auto-generate: u16 at every 2 bytes
+  const fields: ResField[] = [];
+  for (let offset = 0; offset + 1 < bytes.byteLength; offset += 2) {
+    fields.push({ name: `field_${offset}`, offset, type: 'u16', value: view.getUint16(offset, false) });
+  }
+  return fields;
+}
+
+function fieldByteSize(type: ResField['type']): number {
+  if (type === 'u32' || type === 's32') return 4;
+  if (type === 'u8') return 1;
+  return 2; // u16, s16
+}
+
+/** Resource types that contain human-readable text (shown as textarea). */
+const TEXT_RESOURCE_TYPES = new Set(['TEXT', 'STR ']);
+/** Resource types that contain an icon (shown as a canvas). */
+const ICON_RESOURCE_TYPES = new Set(['ICN#', 'ics#', 'icl8', 'ics8']);
+
 
 @Component({
   selector: 'app-root',
@@ -128,7 +286,7 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
   standalone: false,
   styleUrl: './app.scss',
 })
-export class App implements OnInit, OnDestroy {
+export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly typePalette = OBJ_PALETTE.map((hex, index) => ({ hex, typeId: index }));
   readonly getSpritePreviewDataUrlBound = this.getSpritePreviewDataUrl.bind(this);
   readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
@@ -290,6 +448,8 @@ export class App implements OnInit, OnDestroy {
   selectedResBytes = signal<Uint8Array | null>(null);
   /** If the selected resource is STR#, holds the decoded string list for editing. */
   selectedResStrings = signal<string[] | null>(null);
+  /** If the selected resource is STR or TEXT, holds the decoded text for editing. */
+  selectedResText = signal<string | null>(null);
   /** If the selected resource is a Pack, holds its entry list. */
   selectedPackEntries = signal<{ id: number; size: number }[] | null>(null);
   /** Currently selected pack entry id. */
@@ -306,31 +466,37 @@ export class App implements OnInit, OnDestroy {
     const map = new Map<string, { type: string; id: number; size: number }[]>();
     for (const entry of this.allResourceEntries()) {
       if (!map.has(entry.type)) map.set(entry.type, []);
-      map.get(entry.type)!.push(entry);
+      const bucket = map.get(entry.type);
+      if (bucket) bucket.push(entry);
     }
     return [...map.entries()].map(([type, entries]) => ({ type, entries }))
       .sort((a, b) => a.type.localeCompare(b.type));
   });
 
-  /** Hex string (formatted) for the currently selected resource bytes. */
-  readonly selectedResHex = computed(() => this.bytesToHexView(this.selectedResBytes()));
-  /** Hex string (formatted) for the currently selected pack entry bytes. */
-  readonly selectedPackEntryHex = computed(() => this.bytesToHexView(this.selectedPackEntryBytes()));
+  /** Structured editable fields for the currently selected binary resource. */
+  readonly selectedResFields = computed<ResField[]>(() => {
+    const bytes = this.selectedResBytes();
+    const type = this.selectedResType();
+    if (!bytes || bytes.length === 0) return [];
+    if (type && TEXT_RESOURCE_TYPES.has(type)) return [];
+    if (type === 'STR#') return [];
+    if (type === 'Pack') return [];
+    return buildResFields(bytes, type ? (RESOURCE_SCHEMAS[type] ?? null) : null);
+  });
 
-  /** Format up to 512 bytes as a hex dump (16 bytes per line). */
-  bytesToHexView(bytes: Uint8Array | null): string {
-    if (!bytes || bytes.length === 0) return '';
-    const lines: string[] = [];
-    const preview = bytes.slice(0, 512);
-    for (let i = 0; i < preview.length; i += 16) {
-      const row = preview.slice(i, i + 16);
-      const hex = [...row].map((b) => b.toString(16).padStart(2, '0')).join(' ');
-      const ascii = [...row].map((b) => (b >= 32 && b < 127) ? String.fromCharCode(b) : '.').join('');
-      lines.push(`${i.toString(16).padStart(4, '0')}  ${hex.padEnd(47)}  ${ascii}`);
-    }
-    if (bytes.length > 512) lines.push(`… (${bytes.length} bytes total, showing first 512)`);
-    return lines.join('\n');
-  }
+  /** Structured editable fields for the currently selected pack entry. */
+  readonly selectedPackEntryFields = computed<ResField[]>(() => {
+    const bytes = this.selectedPackEntryBytes();
+    const packId = this.selectedResId();
+    if (!bytes || bytes.length === 0) return [];
+    return buildResFields(bytes, packId !== null ? (PACK_ENTRY_SCHEMAS[packId] ?? null) : null);
+  });
+
+  /** True if the selected resource is an icon type that can be previewed as a canvas. */
+  readonly selectedResIsIcon = computed(() => {
+    const t = this.selectedResType();
+    return t !== null && ICON_RESOURCE_TYPES.has(t);
+  });
 
   private wasmScript: HTMLScriptElement | null = null;
   private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
@@ -403,6 +569,9 @@ export class App implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.initPackWorker();
+  }
+
+  ngAfterViewInit(): void {
     this.setupEmscriptenModule();
     this.loadWasmScript();
   }
@@ -683,6 +852,7 @@ export class App implements OnInit, OnDestroy {
     this.selectedResId.set(id);
     this.selectedResBytes.set(null);
     this.selectedResStrings.set(null);
+    this.selectedResText.set(null);
     this.selectedPackEntries.set(null);
     this.selectedPackEntryId.set(null);
     this.selectedPackEntryBytes.set(null);
@@ -700,11 +870,26 @@ export class App implements OnInit, OnDestroy {
         type StrResult = { strings: string[] };
         const r = await this.dispatchWorker<StrResult>('GET_STR_LIST', { id });
         this.selectedResStrings.set(r.strings);
-        // Also load raw bytes for hex view
-        const rawR = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
-        if (rawR.bytes) this.selectedResBytes.set(new Uint8Array(rawR.bytes));
+      } else if (TEXT_RESOURCE_TYPES.has(type)) {
+        // For text resources (STR, TEXT), load as decoded string
+        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
+        if (r.bytes) {
+          const bytes = new Uint8Array(r.bytes);
+          this.selectedResBytes.set(bytes);
+          // STR is a Pascal string (1-byte length prefix); TEXT is raw bytes
+          if (type === 'STR ') {
+            const len = bytes[0] ?? 0;
+            let s = '';
+            for (let i = 1; i <= len && i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+            this.selectedResText.set(s);
+          } else {
+            let s = '';
+            for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+            this.selectedResText.set(s);
+          }
+        }
       } else {
-        // Load raw bytes for hex view
+        // Load raw bytes for structured field editor (and icon preview)
         const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
         if (r.bytes) this.selectedResBytes.set(new Uint8Array(r.bytes));
       }
@@ -824,8 +1009,6 @@ export class App implements OnInit, OnDestroy {
       this.resBrowserBusy.set(true);
       await this.dispatchWorker('PUT_STR_LIST', { id, strings });
       await this.loadResourceList();
-      const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type: 'STR#', id });
-      if (r.bytes) this.selectedResBytes.set(new Uint8Array(r.bytes));
       this.snackBar.open(`✓ Saved STR#${id}`, 'OK', { duration: 3000 });
     } catch (err) {
       this.snackBar.open(`✗ Save failed: ${err}`, 'Dismiss', { duration: 5000 });
@@ -841,6 +1024,158 @@ export class App implements OnInit, OnDestroy {
     const updated = strings.slice();
     updated[index] = value;
     this.selectedResStrings.set(updated);
+  }
+
+  /** Add a new empty string to the STR# list. */
+  addResString(): void {
+    const strings = this.selectedResStrings();
+    if (!strings) return;
+    this.selectedResStrings.set([...strings, '']);
+  }
+
+  /** Remove a string from the STR# list. */
+  removeResString(index: number): void {
+    const strings = this.selectedResStrings();
+    if (!strings) return;
+    this.selectedResStrings.set(strings.filter((_, i) => i !== index));
+  }
+
+  /** Save edited text (STR / TEXT) resource back to the worker. */
+  async saveResText(): Promise<void> {
+    const type = this.selectedResType();
+    const id = this.selectedResId();
+    const text = this.selectedResText();
+    if (!type || id === null || text === null) return;
+    try {
+      this.resBrowserBusy.set(true);
+      let bytes: Uint8Array;
+      if (type === 'STR ') {
+        // Pascal string: 1-byte length prefix
+        const encoded = new Uint8Array(Math.min(255, text.length) + 1);
+        encoded[0] = Math.min(255, text.length);
+        for (let i = 0; i < encoded[0]; i++) encoded[i + 1] = text.charCodeAt(i) & 0xFF;
+        bytes = encoded;
+      } else {
+        // TEXT: raw bytes
+        bytes = new Uint8Array(text.length);
+        for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 0xFF;
+      }
+      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      await this.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
+      this.selectedResBytes.set(bytes);
+      await this.loadResourceList();
+      this.snackBar.open(`✓ Saved ${type}#${id}`, 'OK', { duration: 3000 });
+    } catch (err) {
+      this.snackBar.open(`✗ Save failed: ${err}`, 'Dismiss', { duration: 5000 });
+    } finally {
+      this.resBrowserBusy.set(false);
+    }
+  }
+
+  /** Update a binary field value in the current resource. */
+  onResFieldInput(fieldIdx: number, event: Event): void {
+    const target = event.target as EventTarget & { value?: string };
+    const val = Number.parseInt(target?.value ?? '', 10);
+    if (Number.isNaN(val)) return;
+    const fields = this.selectedResFields();
+    const bytes = this.selectedResBytes();
+    if (!bytes || fieldIdx >= fields.length) return;
+    const field = fields[fieldIdx];
+    // Write back to a mutable copy of the bytes
+    const copy = new Uint8Array(bytes);
+    const view = new DataView(copy.buffer);
+    const schema: ResFieldSchema = { name: field.name, offset: field.offset, type: field.type };
+    writeResField(view, schema, val);
+    this.selectedResBytes.set(copy);
+  }
+
+  /** Save binary field edits for the currently selected resource. */
+  async saveResFields(): Promise<void> {
+    const type = this.selectedResType();
+    const id = this.selectedResId();
+    const bytes = this.selectedResBytes();
+    if (!type || id === null || !bytes) return;
+    try {
+      this.resBrowserBusy.set(true);
+      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      await this.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
+      await this.loadResourceList();
+      this.snackBar.open(`✓ Saved ${type}#${id}`, 'OK', { duration: 3000 });
+    } catch (err) {
+      this.snackBar.open(`✗ Save failed: ${err}`, 'Dismiss', { duration: 5000 });
+    } finally {
+      this.resBrowserBusy.set(false);
+    }
+  }
+
+  /** Update a binary field value in the selected pack entry. */
+  onPackEntryFieldInput(fieldIdx: number, event: Event): void {
+    const target = event.target as EventTarget & { value?: string };
+    const val = Number.parseInt(target?.value ?? '', 10);
+    if (Number.isNaN(val)) return;
+    const fields = this.selectedPackEntryFields();
+    const bytes = this.selectedPackEntryBytes();
+    if (!bytes || fieldIdx >= fields.length) return;
+    const field = fields[fieldIdx];
+    const copy = new Uint8Array(bytes);
+    const view = new DataView(copy.buffer);
+    const schema: ResFieldSchema = { name: field.name, offset: field.offset, type: field.type };
+    writeResField(view, schema, val);
+    this.selectedPackEntryBytes.set(copy);
+  }
+
+  /** Save binary field edits for the selected pack entry. */
+  async savePackEntryFields(): Promise<void> {
+    const packId = this.selectedResId();
+    const entryId = this.selectedPackEntryId();
+    const bytes = this.selectedPackEntryBytes();
+    if (packId === null || entryId === null || !bytes) return;
+    try {
+      this.resBrowserBusy.set(true);
+      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      await this.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId, entryId, bytes: buf }, [buf]);
+      // Refresh entry list size
+      type ListPackResult = { entries: { id: number; size: number }[] | null };
+      const listR = await this.dispatchWorker<ListPackResult>('LIST_PACK_ENTRIES', { packId });
+      this.selectedPackEntries.set(listR.entries);
+      this.snackBar.open(`✓ Saved Pack#${packId} entry #${entryId}`, 'OK', { duration: 3000 });
+    } catch (err) {
+      this.snackBar.open(`✗ Save failed: ${err}`, 'Dismiss', { duration: 5000 });
+    } finally {
+      this.resBrowserBusy.set(false);
+    }
+  }
+
+  /** Render an ICN# resource (32×32 1-bit) as an RGBA canvas for preview. */
+  renderIconResource(bytes: Uint8Array | null): HTMLCanvasElement | null {
+    if (typeof document === 'undefined' || !bytes || bytes.length < 128) return null;
+    const SIZE = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const imgData = ctx.createImageData(SIZE, SIZE);
+    for (let row = 0; row < SIZE; row++) {
+      for (let col = 0; col < SIZE; col++) {
+        const byteIdx = row * 4 + Math.floor(col / 8);
+        const bit = (bytes[byteIdx] >> (7 - (col % 8))) & 1;
+        const pixIdx = (row * SIZE + col) * 4;
+        imgData.data[pixIdx]     = bit ? 0 : 255;
+        imgData.data[pixIdx + 1] = bit ? 0 : 255;
+        imgData.data[pixIdx + 2] = bit ? 0 : 255;
+        imgData.data[pixIdx + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+  }
+
+  /** Return a data URL for the icon resource (for display in <img>). */
+  getIconResourceDataUrl(bytes: Uint8Array | null): string | null {
+    const canvas = this.renderIconResource(bytes);
+    if (!canvas) return null;
+    try { return canvas.toDataURL(); } catch { return null; }
   }
 
   /** Trigger a browser download of the given bytes. */
