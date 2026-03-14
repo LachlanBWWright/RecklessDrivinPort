@@ -2180,8 +2180,8 @@ export class App implements OnInit, OnDestroy {
 
     // Blit the slice of the oversized offscreen that corresponds to the current viewport.
     if (this._roadOffscreen) {
-      const bySrcY = offscreenCentreCanvasY - (panY - this._roadOffscreenPanY) * zoom - H / 2;
-      ctx.drawImage(this._roadOffscreen, 0, bySrcY, W, H, 0, 0, W, H);
+      const offscreenSrcY = offscreenCentreCanvasY - (panY - this._roadOffscreenPanY) * zoom - H / 2;
+      ctx.drawImage(this._roadOffscreen, 0, offscreenSrcY, W, H, 0, 0, W, H);
     }
   }
 
@@ -2237,7 +2237,7 @@ export class App implements OnInit, OnDestroy {
         const tileW = tc.width * scale;
         const tileH = tc.height * scale;
         // Translate so that world origin (0,0) aligns with a tile boundary.
-        // Canvas-Y of world Y=0: cy = (H/2 + yOverhang) - (0 - panY)*zoom = H/2+yOverhang+panY*zoom
+        // Canvas-Y of world Y=0: cy = (H/2 + yOverhang) - (0 - panY)*zoom = H/2 + yOverhang + panY*zoom
         const tx = ((W / 2 - panX * zoom) % tileW + tileW) % tileW;
         const ty = (((H / 2 + yOverhang) + panY * zoom) % tileH + tileH) % tileH;
         // DOMMatrix: [a, b, c, d, e, f] = [scaleX, 0, 0, scaleY, translateX, translateY]
@@ -2374,7 +2374,8 @@ export class App implements OnInit, OnDestroy {
     }
 
     // Y-axis ruler tick marks (every 1000 world units)
-    // canvasH (= H + 2*yOverhang) was declared at the top of the function.
+    // canvasH (= H + 2*yOverhang, declared near the top of the function) is the full
+    // height of the canvas being rendered (viewport height + above/below overhang).
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = '9px monospace';
     const startY = Math.floor((panY - canvasH / (2 * zoom)) / 1000) * 1000;
