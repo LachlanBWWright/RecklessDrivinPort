@@ -2867,13 +2867,23 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Centre line: cyan for water, yellow for asphalt
     const CENTRE_COLOUR = theme.water ? 'rgba(80, 255, 180, 0.85)' : 'rgba(255, 248, 140, 0.85)';
 
-    /** Fill a screen-space quad given four world-space corners */
-    const fillQuad = (
-      x0: number, y0: number,
-      x1: number, y1: number,
-      x2: number, y2: number,
-      x3: number, y3: number,
-      fill: CanvasPattern | string,
+    // Batch fill quads by pattern to minimise Canvas API calls.
+    // Instead of calling fill() for every quad, we accumulate subpaths per fill style
+    // and flush with a single fill() per style after all segments are processed.
+    // This reduces fill() calls from O(6 × segments) to O(4) per frame.
+    const batchQuads: [CanvasPattern | string, number[]][] = [
+      [bgPat, []], [fgPat, []], [lbPat, []], [rbPat, []],
+    ];
+    const bgBatch = batchQuads[0][1];
+    const fgBatch = batchQuads[1][1];
+    const lbBatch = batchQuads[2][1];
+    const rbBatch = batchQuads[3][1];
+
+    /** Append quad canvas coords to a batch array. Returns false if fully off-screen. */
+    const addQuad = (
+      batch: number[],
+      x0: number, y0: number, x1: number, y1: number,
+      x2: number, y2: number, x3: number, y3: number,
     ): void => {
       const [ax0, ay0] = wtc(x0, y0);
       const [ax1, ay1] = wtc(x1, y1);
@@ -2881,13 +2891,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const [ax3, ay3] = wtc(x3, y3);
       if (ay0 < -H && ay1 < -H && ay2 < -H && ay3 < -H) return;
       if (ay0 > canvasH + H && ay1 > canvasH + H && ay2 > canvasH + H && ay3 > canvasH + H) return;
-      ctx.fillStyle = fill as string; // CanvasPattern is assignable here
+      batch.push(ax0, ay0, ax1, ay1, ax2, ay2, ax3, ay3);
+    };
+
+    /** Draw accumulated quad batch using a single fill() call. */
+    const flushBatch = (fill: CanvasPattern | string, batch: number[]): void => {
+      if (batch.length === 0) return;
+      ctx.fillStyle = fill as string;
       ctx.beginPath();
-      ctx.moveTo(ax0, ay0);
-      ctx.lineTo(ax1, ay1);
-      ctx.lineTo(ax2, ay2);
-      ctx.lineTo(ax3, ay3);
-      ctx.closePath();
+      for (let j = 0; j < batch.length; j += 8) {
+        ctx.moveTo(batch[j],     batch[j + 1]);
+        ctx.lineTo(batch[j + 2], batch[j + 3]);
+        ctx.lineTo(batch[j + 4], batch[j + 5]);
+        ctx.lineTo(batch[j + 6], batch[j + 7]);
+        ctx.closePath();
+      }
       ctx.fill();
     };
 
@@ -2914,13 +2932,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const y1  = nxtIdx * 2;
 
       // Off-road (background texture) – extend to canvas edges
-      fillQuad(worldMinX, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  worldMinX, y1,  bgPat ?? theme.bg);
+      addQuad(bgBatch, worldMinX, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  worldMinX, y1);
 
       // Left border/kerb
-      fillQuad(cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1,  lbPat ?? theme.kerbA);
+      addQuad(lbBatch, cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1);
 
       // Left road lane: v0 to v1 (road surface)
-      fillQuad(cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1,  fgPat ?? theme.road);
+      addQuad(fgBatch, cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1);
 
       // Median / center gap: v1 to v2 (background with kerbs on both edges)
       // Only draw if there is actually space (v1 == v2 means single-road / no median)
@@ -2928,24 +2946,27 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (medianW > 0) {
         const halfKerb = Math.min(KERB_WIDTH, medianW / 2);
         // Right edge of left lane → left edge of median
-        fillQuad(cur.v1, y0,  cur.v1 + halfKerb, y0,  nxt.v1 + halfKerb, y1,  nxt.v1, y1,  rbPat ?? theme.kerbB);
+        addQuad(rbBatch, cur.v1, y0,  cur.v1 + halfKerb, y0,  nxt.v1 + halfKerb, y1,  nxt.v1, y1);
         // Center of median (background fill)
         if (medianW > halfKerb * 2) {
-          fillQuad(cur.v1 + halfKerb, y0,  cur.v2 - halfKerb, y0,  nxt.v2 - halfKerb, y1,  nxt.v1 + halfKerb, y1,  bgPat ?? theme.bg);
+          addQuad(bgBatch, cur.v1 + halfKerb, y0,  cur.v2 - halfKerb, y0,  nxt.v2 - halfKerb, y1,  nxt.v1 + halfKerb, y1);
         }
         // Right edge of median → left edge of right lane
-        fillQuad(cur.v2 - halfKerb, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v2 - halfKerb, y1,  lbPat ?? theme.kerbA);
+        addQuad(lbBatch, cur.v2 - halfKerb, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v2 - halfKerb, y1);
       }
 
       // Right road lane: v2 to v3 (road surface)
-      fillQuad(cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1,  fgPat ?? theme.road);
+      addQuad(fgBatch, cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1);
 
       // Right border/kerb
-      fillQuad(cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1,  rbPat ?? theme.kerbB);
+      addQuad(rbBatch, cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1);
 
       // Off-road far right – extend to canvas edges
-      fillQuad(cur.v3 + KERB_WIDTH, y0,  worldMaxX, y0,  worldMaxX, y1,  nxt.v3 + KERB_WIDTH, y1,  bgPat ?? theme.bg);
+      addQuad(bgBatch, cur.v3 + KERB_WIDTH, y0,  worldMaxX, y0,  worldMaxX, y1,  nxt.v3 + KERB_WIDTH, y1);
     }
+
+    // Flush all batches (4 fill() calls for up to thousands of quads)
+    for (const [fill, batch] of batchQuads) flushBatch(fill, batch);
 
     // Centre dashed line (between lanes: midpoint of v1→v2) – only in viewport
     ctx.strokeStyle = CENTRE_COLOUR;
