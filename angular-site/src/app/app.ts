@@ -317,7 +317,7 @@ export class App implements OnInit, OnDestroy {
   /** Hex string (formatted) for the currently selected pack entry bytes. */
   readonly selectedPackEntryHex = computed(() => this.bytesToHexView(this.selectedPackEntryBytes()));
 
-  /** Format up to 256 bytes as a hex dump (16 bytes per line). */
+  /** Format up to 512 bytes as a hex dump (16 bytes per line). */
   bytesToHexView(bytes: Uint8Array | null): string {
     if (!bytes || bytes.length === 0) return '';
     const lines: string[] = [];

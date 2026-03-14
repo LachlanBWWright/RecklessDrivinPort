@@ -1069,8 +1069,10 @@ export function parseStrList(data: Uint8Array): string[] {
     if (offset >= data.length) break;
     const len = data[offset++];
     const bytes = data.slice(offset, offset + len);
-    // Decode as Latin-1 (Mac Roman)
-    strings.push(String.fromCharCode(...bytes));
+    // Decode as Latin-1 (Mac Roman) — iterate to avoid spread stack overflow on large strings
+    let s = '';
+    for (let j = 0; j < bytes.length; j++) s += String.fromCharCode(bytes[j]);
+    strings.push(s);
     offset += len;
   }
   return strings;
