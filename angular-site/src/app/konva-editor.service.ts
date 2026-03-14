@@ -43,6 +43,9 @@ const MIN_WAYPOINT_RADIUS  = 5;
 /** Base multiplier for waypoint circle radius. */
 const BASE_WAYPOINT_RADIUS = 7;
 
+/** Reusable empty set sentinel to avoid allocating a new Set on every `setsEqual` call. */
+const EMPTY_SET = new Set<number>();
+
 /** Helper: returns true if two Sets contain the same elements. */
 function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   if (a.size !== b.size) return false;
@@ -172,7 +175,7 @@ export class KonvaEditorService implements OnDestroy {
     // and sizes in-place.
     const objsUnchanged  = objects === this._lastObjects;
     const selUnchanged   = selectedIndex === this._lastSelectedIndex;
-    const visUnchanged   = setsEqual(visibleTypes, this._lastVisibleTypes ?? new Set<number>());
+    const visUnchanged   = setsEqual(visibleTypes, this._lastVisibleTypes ?? EMPTY_SET);
 
     if (objsUnchanged && selUnchanged && visUnchanged && this._konvaObjNodes.length > 0) {
       for (const node of this._konvaObjNodes) {

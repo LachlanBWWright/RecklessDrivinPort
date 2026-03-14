@@ -551,7 +551,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.showTrackOverlay();
       this.editTrackUp();
       this.editTrackDown();
+      this.hoverTrackWaypoint();
       this.marks();
+      this.selectedMarkIndex();
       const section = this.editorSection();
       if (section === 'objects') {
         this.scheduleCanvasRedraw();
@@ -899,10 +901,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           // STR is a Pascal string (1-byte length prefix); TEXT is raw bytes
           if (type === 'STR ') {
             const len = bytes[0] ?? 0;
-            const chars: string[] = [];
-            for (let i = 1; i <= len && i < bytes.length; i++) chars.push(String.fromCharCode(bytes[i]));
-            this.selectedResText.set(chars.join(''));
+            this.selectedResText.set(String.fromCharCode(...bytes.subarray(1, 1 + len)));
           } else {
+            // TEXT may be large; build via array join to avoid spread stack overflow
             const chars: string[] = [];
             for (let i = 0; i < bytes.length; i++) chars.push(String.fromCharCode(bytes[i]));
             this.selectedResText.set(chars.join(''));
