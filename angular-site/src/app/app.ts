@@ -536,8 +536,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** RAF token for debouncing canvas redraws (prevents multiple redraws per frame). */
   private _pendingRedrawRaf: number | null = null;
-  /** Cached offscreen road bitmap – invalidated when pan/zoom/level/textures change. */
-  private _roadBitmapCache: { key: string; bitmap: ImageBitmap } | null = null;
 
   constructor() {
     // Redraw object canvas when objects, selection, zoom, pan, sprite previews, or track overlay changes.
@@ -884,10 +882,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const r = await this.dispatchWorker<ListPackResult>('LIST_PACK_ENTRIES', { packId: id });
         this.selectedPackEntries.set(r.entries);
       } else if (type === 'STR#') {
-        // For string lists, load decoded strings
+        // For string lists, load decoded strings and also raw bytes (needed for Download button)
         type StrResult = { strings: string[] };
-        const r = await this.dispatchWorker<StrResult>('GET_STR_LIST', { id });
-        this.selectedResStrings.set(r.strings);
+        const [strR, rawR] = await Promise.all([
+          this.dispatchWorker<StrResult>('GET_STR_LIST', { id }),
+          this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id }),
+        ]);
+        this.selectedResStrings.set(strR.strings);
+        if (rawR.bytes) this.selectedResBytes.set(new Uint8Array(rawR.bytes));
       } else if (TEXT_RESOURCE_TYPES.has(type)) {
         // For text resources (STR, TEXT), load as decoded string
         const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
@@ -1027,6 +1029,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.resBrowserBusy.set(true);
       await this.dispatchWorker('PUT_STR_LIST', { id, strings });
       await this.loadResourceList();
+      // Refresh raw bytes so the Download button stays current
+      const rawR = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type: 'STR#', id });
+      if (rawR.bytes) this.selectedResBytes.set(new Uint8Array(rawR.bytes));
       this.snackBar.open(`✓ Saved STR#${id}`, 'OK', { duration: 3000 });
     } catch (err) {
       this.snackBar.open(`✗ Save failed: ${err}`, 'Dismiss', { duration: 5000 });
