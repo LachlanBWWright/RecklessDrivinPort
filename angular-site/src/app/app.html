@@ -420,6 +420,147 @@
             </mat-card>
           </mat-tab>
 
+          <!-- ──────────────────────────────────────────────────────── -->
+          <!-- Resources tab – browse and edit ALL resources.dat entries -->
+          <!-- ──────────────────────────────────────────────────────── -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>folder</mat-icon>&nbsp;Resources
+            </ng-template>
+
+            @if (hasEditorData()) {
+              <mat-card class="tab-panel-card resources-panel-card">
+                <mat-card-header>
+                  <mat-card-title>Resource Browser</mat-card-title>
+                  <mat-card-subtitle>All {{ allResourceEntries().length }} entries from resources.dat</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content class="resources-content">
+
+                  <!-- Left: type+id selector tree -->
+                  <div class="res-tree">
+                    @for (group of allResourceTypes(); track group.type) {
+                      <div class="res-type-group">
+                        <div class="res-type-header">
+                          <mat-icon class="res-type-icon">category</mat-icon>
+                          <span class="res-type-name">{{ group.type }}</span>
+                          <span class="badge">{{ group.entries.length }}</span>
+                        </div>
+                        @for (entry of group.entries; track entry.id) {
+                          <button
+                            class="res-entry-btn"
+                            [class.res-entry-btn--active]="selectedResType() === group.type && selectedResId() === entry.id"
+                            (click)="selectResource(group.type, entry.id)"
+                          >
+                            #{{ entry.id }}&nbsp;<span class="res-size-badge">{{ entry.size | number }} B</span>
+                          </button>
+                        }
+                      </div>
+                    }
+                    @if (allResourceTypes().length === 0) {
+                      <p class="muted">Loading resource list…</p>
+                    }
+                  </div>
+
+                  <!-- Right: detail panel -->
+                  <div class="res-detail">
+                    @if (resBrowserBusy()) {
+                      <mat-spinner diameter="32"></mat-spinner>
+                    } @else if (selectedResId() !== null && selectedResType() !== null) {
+                      <div class="res-detail-header">
+                        <h4 class="res-detail-title">
+                          {{ selectedResType() }}&#35;{{ selectedResId() }}
+                        </h4>
+                        <div class="res-detail-actions">
+                          @if (selectedResType() !== 'Pack') {
+                            <button mat-stroked-button (click)="downloadSelectedResource()" [disabled]="!selectedResBytes()">
+                              <mat-icon>download</mat-icon> Download
+                            </button>
+                            <button mat-stroked-button (click)="triggerUploadResource()">
+                              <mat-icon>upload</mat-icon> Replace
+                            </button>
+                          }
+                        </div>
+                      </div>
+
+                      <!-- STR# string editor -->
+                      @if (selectedResType() === 'STR#' && selectedResStrings() !== null) {
+                        <div class="str-editor">
+                          <h5 class="str-editor-title">String List ({{ selectedResStrings()!.length }} entries)</h5>
+                          @for (s of selectedResStrings()!; track $index) {
+                            <div class="str-row">
+                              <span class="str-idx">{{ $index }}</span>
+                              <input
+                                class="str-input"
+                                type="text"
+                                [value]="s"
+                                (input)="updateResString($index, $any($event.target).value)"
+                              />
+                            </div>
+                          }
+                          <button mat-raised-button color="primary" (click)="saveStrList()">
+                            <mat-icon>save</mat-icon> Save Strings
+                          </button>
+                        </div>
+                      }
+
+                      <!-- Pack entry browser -->
+                      @if (selectedResType() === 'Pack') {
+                        <div class="pack-entry-browser">
+                          @if (selectedPackEntries() !== null) {
+                            <div class="pack-entry-list">
+                              <h5 class="pack-entries-title">{{ selectedPackEntries()!.length }} entries</h5>
+                              @for (e of selectedPackEntries()!; track e.id) {
+                                <button
+                                  class="pack-entry-btn"
+                                  [class.pack-entry-btn--active]="selectedPackEntryId() === e.id"
+                                  (click)="selectPackEntry(selectedResId()!, e.id)"
+                                >
+                                  Entry #{{ e.id }} &nbsp;<span class="res-size-badge">{{ e.size | number }} B</span>
+                                </button>
+                              }
+                            </div>
+                            @if (selectedPackEntryId() !== null) {
+                              <div class="pack-entry-detail">
+                                <div class="res-detail-actions" style="margin-bottom:8px">
+                                  <button mat-stroked-button (click)="downloadSelectedPackEntry()" [disabled]="!selectedPackEntryBytes()">
+                                    <mat-icon>download</mat-icon> Download entry
+                                  </button>
+                                  <button mat-stroked-button (click)="triggerUploadPackEntry()">
+                                    <mat-icon>upload</mat-icon> Replace entry
+                                  </button>
+                                </div>
+                                <pre class="hex-view">{{ selectedPackEntryHex() }}</pre>
+                              </div>
+                            }
+                          } @else {
+                            <p class="muted">Could not parse pack entries.</p>
+                          }
+                        </div>
+                      }
+
+                      <!-- Raw hex view for non-Pack resources -->
+                      @if (selectedResType() !== 'Pack') {
+                        <pre class="hex-view">{{ selectedResHex() }}</pre>
+                      }
+
+                    } @else {
+                      <div class="res-placeholder">
+                        <mat-icon class="res-placeholder-icon">folder_open</mat-icon>
+                        <p>Select a resource from the list to inspect it.</p>
+                      </div>
+                    }
+                  </div>
+
+                </mat-card-content>
+              </mat-card>
+            } @else {
+              <div class="tab-empty-state">
+                <mat-icon class="no-data-icon">folder</mat-icon>
+                <p>Load a resources.dat file to browse all resources.</p>
+              </div>
+            }
+          </mat-tab>
+
         </mat-tab-group>
       }
     </section>

@@ -22,10 +22,23 @@
  *   APPLY_SPRITE_PACK_PIXELS payload: { frameId, pixels: Uint8ClampedArray }
  *   GET_SPRITE_BYTES       payload: { spriteId }
  *   SERIALIZE              (no payload)
+ *   LIST_RESOURCES         (no payload) → { entries: {type,id,size}[] }
+ *   GET_RESOURCE_RAW       payload: { type, id } → { bytes: ArrayBuffer | null }
+ *   PUT_RESOURCE_RAW       payload: { type, id, bytes: ArrayBuffer }
+ *   GET_STR_LIST           payload: { id } → { strings: string[] }
+ *   PUT_STR_LIST           payload: { id, strings: string[] }
+ *   LIST_PACK_ENTRIES      payload: { packId } → { entries: {id,size}[] | null }
+ *   GET_PACK_ENTRY_RAW     payload: { packId, entryId } → { bytes: ArrayBuffer | null }
+ *   PUT_PACK_ENTRY_RAW     payload: { packId, entryId, bytes: ArrayBuffer }
  */
 
 import { ResourceDatService } from './resource-dat.service';
 import { LevelEditorService } from './level-editor.service';
+import {
+  getRawResource, putRawResource, listResources,
+  parseStrList, encodeStrList,
+  listPackEntries, getPackEntryRaw, putPackEntryRaw,
+} from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
 import type { LevelProperties, ObjectPos, MarkSeg, ObjectTypeDefinition, DecodedRoadTexture } from './level-editor.service';
 
@@ -202,6 +215,73 @@ self.addEventListener('message', (event: MessageEvent) => {
         const transferBuf = new ArrayBuffer(serialized.byteLength);
         new Uint8Array(transferBuf).set(serialized);
         self.postMessage({ id, ok: true, cmd, result: transferBuf }, [transferBuf]);
+        break;
+      }
+
+      case 'LIST_RESOURCES': {
+        const entries = listResources(resources);
+        self.postMessage({ id, ok: true, cmd, result: { entries } });
+        break;
+      }
+
+      case 'GET_RESOURCE_RAW': {
+        const { type, id: resId } = payload as { type: string; id: number };
+        const raw = getRawResource(resources, type, resId);
+        if (raw) {
+          const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength);
+          self.postMessage({ id, ok: true, cmd, result: { bytes: buf } }, [buf]);
+        } else {
+          self.postMessage({ id, ok: true, cmd, result: { bytes: null } });
+        }
+        break;
+      }
+
+      case 'PUT_RESOURCE_RAW': {
+        const { type, id: resId, bytes } = payload as { type: string; id: number; bytes: ArrayBuffer };
+        resources = putRawResource(resources, type, resId, new Uint8Array(bytes));
+        self.postMessage({ id, ok: true, cmd, result: {} });
+        break;
+      }
+
+      case 'GET_STR_LIST': {
+        const { id: strId } = payload as { id: number };
+        const raw = getRawResource(resources, 'STR#', strId);
+        const strings = raw ? parseStrList(raw) : [];
+        self.postMessage({ id, ok: true, cmd, result: { strings } });
+        break;
+      }
+
+      case 'PUT_STR_LIST': {
+        const { id: strId, strings } = payload as { id: number; strings: string[] };
+        const encoded = encodeStrList(strings);
+        resources = putRawResource(resources, 'STR#', strId, encoded);
+        self.postMessage({ id, ok: true, cmd, result: {} });
+        break;
+      }
+
+      case 'LIST_PACK_ENTRIES': {
+        const { packId } = payload as { packId: number };
+        const entries = listPackEntries(resources, packId);
+        self.postMessage({ id, ok: true, cmd, result: { entries } });
+        break;
+      }
+
+      case 'GET_PACK_ENTRY_RAW': {
+        const { packId, entryId } = payload as { packId: number; entryId: number };
+        const raw = getPackEntryRaw(resources, packId, entryId);
+        if (raw) {
+          const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength);
+          self.postMessage({ id, ok: true, cmd, result: { bytes: buf } }, [buf]);
+        } else {
+          self.postMessage({ id, ok: true, cmd, result: { bytes: null } });
+        }
+        break;
+      }
+
+      case 'PUT_PACK_ENTRY_RAW': {
+        const { packId, entryId, bytes } = payload as { packId: number; entryId: number; bytes: ArrayBuffer };
+        resources = putPackEntryRaw(resources, packId, entryId, new Uint8Array(bytes));
+        self.postMessage({ id, ok: true, cmd, result: {} });
         break;
       }
 

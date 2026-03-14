@@ -1012,6 +1012,154 @@ export class LevelEditorService {
   }
 }
 
+// ------------------------------------------------------------------
+// Raw resource accessor helpers (used by the resource browser tab)
+// ------------------------------------------------------------------
+
+/**
+ * Return raw byte payload for the given resource (type + id), or null if not found.
+ * The returned slice is a copy so mutations don't affect the live state.
+ */
+export function getRawResource(
+  resources: ResourceDatEntry[],
+  type: string,
+  id: number,
+): Uint8Array | null {
+  const entry = resources.find((e) => e.type === type && e.id === id);
+  return entry ? entry.data.slice() : null;
+}
+
+/**
+ * Replace the raw byte payload for the given resource (type + id).
+ * If the entry doesn't exist, it is appended at the end.
+ * Returns a new resources array (immutable update pattern).
+ */
+export function putRawResource(
+  resources: ResourceDatEntry[],
+  type: string,
+  id: number,
+  data: Uint8Array,
+): ResourceDatEntry[] {
+  const idx = resources.findIndex((e) => e.type === type && e.id === id);
+  const newEntry: ResourceDatEntry = { type, id, data: data.slice() };
+  if (idx === -1) {
+    return [...resources, newEntry];
+  }
+  return resources.map((e, i) => (i === idx ? newEntry : e));
+}
+
+/** Return a summary list of all resources (no payloads – just metadata). */
+export function listResources(
+  resources: ResourceDatEntry[],
+): { type: string; id: number; size: number }[] {
+  return resources.map((e) => ({ type: e.type, id: e.id, size: e.data.byteLength }));
+}
+
+/**
+ * Parse a Mac OS 'STR#' resource into an array of Pascal strings.
+ * Format: UInt16BE count, then `count` Pascal strings (UInt8 length prefix + bytes).
+ */
+export function parseStrList(data: Uint8Array): string[] {
+  if (data.length < 2) return [];
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const count = view.getUint16(0, false); // big-endian
+  const strings: string[] = [];
+  let offset = 2;
+  for (let i = 0; i < count; i++) {
+    if (offset >= data.length) break;
+    const len = data[offset++];
+    const bytes = data.slice(offset, offset + len);
+    // Decode as Latin-1 (Mac Roman)
+    strings.push(String.fromCharCode(...bytes));
+    offset += len;
+  }
+  return strings;
+}
+
+/**
+ * Encode an array of strings back into Mac OS 'STR#' binary format.
+ */
+export function encodeStrList(strings: string[]): Uint8Array {
+  let totalBytes = 2; // UInt16 count
+  for (const s of strings) totalBytes += 1 + Math.min(255, s.length);
+  const buf = new Uint8Array(totalBytes);
+  const view = new DataView(buf.buffer);
+  view.setUint16(0, strings.length, false);
+  let offset = 2;
+  for (const s of strings) {
+    const len = Math.min(255, s.length);
+    buf[offset++] = len;
+    for (let i = 0; i < len; i++) {
+      buf[offset++] = s.charCodeAt(i) & 0xff;
+    }
+  }
+  return buf;
+}
+
+/**
+ * List the entry IDs within a single Pack resource.
+ * Returns null if the pack doesn't exist or can't be parsed.
+ */
+export function listPackEntries(
+  resources: ResourceDatEntry[],
+  packId: number,
+): { id: number; size: number }[] | null {
+  const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+  if (!pack) return null;
+  try {
+    const entries = parsePackHandle(pack.data, packId);
+    return entries.map((e) => ({ id: e.id, size: e.data.byteLength }));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return raw bytes for a single entry within a Pack resource.
+ */
+export function getPackEntryRaw(
+  resources: ResourceDatEntry[],
+  packId: number,
+  entryId: number,
+): Uint8Array | null {
+  const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+  if (!pack) return null;
+  try {
+    const entries = parsePackHandle(pack.data, packId);
+    const entry = entries.find((e) => e.id === entryId);
+    return entry ? entry.data.slice() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Replace a single entry inside a Pack resource with new raw bytes.
+ * If the entry doesn't exist it is appended.
+ * Returns a new resources array.
+ */
+export function putPackEntryRaw(
+  resources: ResourceDatEntry[],
+  packId: number,
+  entryId: number,
+  data: Uint8Array,
+): ResourceDatEntry[] {
+  const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+  if (!pack) return resources;
+  try {
+    const entries = parsePackHandle(pack.data, packId);
+    const newEntries = entries.some((e) => e.id === entryId)
+      ? entries.map((e) => (e.id === entryId ? { ...e, data: data.slice() } : e))
+      : [...entries, { id: entryId, data: data.slice() }];
+    const newPackData = encodePackHandle(newEntries, packId);
+    return resources.map((e) =>
+      e.type === 'Pack' && e.id === packId ? { ...e, data: newPackData } : e,
+    );
+  } catch {
+    return resources;
+  }
+}
+
 /** Serialize mark segments back to binary */
 export function serializeMarkSegs(marks: MarkSeg[]): Uint8Array {
   const buf = new Uint8Array(marks.length * 16);

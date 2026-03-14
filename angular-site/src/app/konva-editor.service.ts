@@ -211,12 +211,13 @@ export class KonvaEditorService implements OnDestroy {
         });
       }
 
-      node.on('dragend', () => {
+      const eventNode = node as Konva.Node;
+      eventNode.on('dragend', () => {
         const pos = node.getAbsolutePosition();
         const [wx, wy] = this.stageToWorld(pos.x, pos.y);
         this.onObjectDragEnd?.({ index: i, worldX: Math.round(wx), worldY: Math.round(wy) });
       });
-      node.on('click', (e) => {
+      eventNode.on('click', (e: Konva.KonvaEventObject<MouseEvent>) => {
         e.cancelBubble = true;
         this.onObjectClick?.(i);
       });

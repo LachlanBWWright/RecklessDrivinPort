@@ -46,7 +46,7 @@ declare global {
 }
 
 export type AppTab = 'game' | 'editor';
-export type EditorSection = 'properties' | 'objects' | 'sprites';
+export type EditorSection = 'properties' | 'objects' | 'sprites' | 'resources';
 
 const OBJ_PALETTE = [
   '#e53935', '#42a5f5', '#66bb6a', '#ffa726',
@@ -278,6 +278,59 @@ export class App implements OnInit, OnDestroy {
   spriteEditorOpen = signal(false);
   /** The decoded frame currently being edited in the popup. */
   spriteEditorFrame = signal<DecodedSpriteFrame | null>(null);
+
+  // ---- Raw resource browser ----
+  /** Summary list of all resources from resources.dat (type, id, size). Populated on load. */
+  allResourceEntries = signal<{ type: string; id: number; size: number }[]>([]);
+  /** Currently selected resource type in the resource browser. */
+  selectedResType = signal<string | null>(null);
+  /** Currently selected resource id in the resource browser. */
+  selectedResId = signal<number | null>(null);
+  /** Raw bytes of the currently selected resource (lazily loaded). */
+  selectedResBytes = signal<Uint8Array | null>(null);
+  /** If the selected resource is STR#, holds the decoded string list for editing. */
+  selectedResStrings = signal<string[] | null>(null);
+  /** If the selected resource is a Pack, holds its entry list. */
+  selectedPackEntries = signal<{ id: number; size: number }[] | null>(null);
+  /** Currently selected pack entry id. */
+  selectedPackEntryId = signal<number | null>(null);
+  /** Raw bytes of the currently selected pack entry (lazily loaded). */
+  selectedPackEntryBytes = signal<Uint8Array | null>(null);
+  /** Resource browser loading status. */
+  resBrowserStatus = signal('');
+  /** Whether resource browser is loading. */
+  resBrowserBusy = signal(false);
+
+  /** Resource types grouped for the browser UI. */
+  readonly allResourceTypes = computed(() => {
+    const map = new Map<string, { type: string; id: number; size: number }[]>();
+    for (const entry of this.allResourceEntries()) {
+      if (!map.has(entry.type)) map.set(entry.type, []);
+      map.get(entry.type)!.push(entry);
+    }
+    return [...map.entries()].map(([type, entries]) => ({ type, entries }))
+      .sort((a, b) => a.type.localeCompare(b.type));
+  });
+
+  /** Hex string (formatted) for the currently selected resource bytes. */
+  readonly selectedResHex = computed(() => this.bytesToHexView(this.selectedResBytes()));
+  /** Hex string (formatted) for the currently selected pack entry bytes. */
+  readonly selectedPackEntryHex = computed(() => this.bytesToHexView(this.selectedPackEntryBytes()));
+
+  /** Format up to 256 bytes as a hex dump (16 bytes per line). */
+  bytesToHexView(bytes: Uint8Array | null): string {
+    if (!bytes || bytes.length === 0) return '';
+    const lines: string[] = [];
+    const preview = bytes.slice(0, 512);
+    for (let i = 0; i < preview.length; i += 16) {
+      const row = preview.slice(i, i + 16);
+      const hex = [...row].map((b) => b.toString(16).padStart(2, '0')).join(' ');
+      const ascii = [...row].map((b) => (b >= 32 && b < 127) ? String.fromCharCode(b) : '.').join('');
+      lines.push(`${i.toString(16).padStart(4, '0')}  ${hex.padEnd(47)}  ${ascii}`);
+    }
+    if (bytes.length > 512) lines.push(`… (${bytes.length} bytes total, showing first 512)`);
+    return lines.join('\n');
+  }
 
   private wasmScript: HTMLScriptElement | null = null;
   private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
@@ -533,7 +586,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   /** Maps EditorSection → mat-tab index for [(selectedIndex)] binding. */
-  private readonly SECTION_ORDER: EditorSection[] = ['properties', 'objects', 'sprites'];
+  private readonly SECTION_ORDER: EditorSection[] = ['properties', 'objects', 'sprites', 'resources'];
   get editorSectionIndex(): number {
     return this.SECTION_ORDER.indexOf(this.editorSection());
   }
@@ -610,6 +663,201 @@ export class App implements OnInit, OnDestroy {
   }
 
   // ---- Level selection ----
+
+  // ---- Resource browser methods ----
+
+  /** Fetch the complete resource list from the worker and populate allResourceEntries. */
+  private async loadResourceList(): Promise<void> {
+    try {
+      type ListResult = { entries: { type: string; id: number; size: number }[] };
+      const result = await this.dispatchWorker<ListResult>('LIST_RESOURCES');
+      this.allResourceEntries.set(result.entries);
+    } catch (err) {
+      console.warn('[App] loadResourceList failed:', err);
+    }
+  }
+
+  /** Select a resource in the browser and lazily load its bytes. */
+  async selectResource(type: string, id: number): Promise<void> {
+    this.selectedResType.set(type);
+    this.selectedResId.set(id);
+    this.selectedResBytes.set(null);
+    this.selectedResStrings.set(null);
+    this.selectedPackEntries.set(null);
+    this.selectedPackEntryId.set(null);
+    this.selectedPackEntryBytes.set(null);
+    this.resBrowserStatus.set('');
+
+    try {
+      this.resBrowserBusy.set(true);
+      if (type === 'Pack') {
+        // For packs, load the entry list instead of raw bytes
+        type ListPackResult = { entries: { id: number; size: number }[] | null };
+        const r = await this.dispatchWorker<ListPackResult>('LIST_PACK_ENTRIES', { packId: id });
+        this.selectedPackEntries.set(r.entries);
+      } else if (type === 'STR#') {
+        // For string lists, load decoded strings
+        type StrResult = { strings: string[] };
+        const r = await this.dispatchWorker<StrResult>('GET_STR_LIST', { id });
+        this.selectedResStrings.set(r.strings);
+        // Also load raw bytes for hex view
+        const rawR = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
+        if (rawR.bytes) this.selectedResBytes.set(new Uint8Array(rawR.bytes));
+      } else {
+        // Load raw bytes for hex view
+        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
+        if (r.bytes) this.selectedResBytes.set(new Uint8Array(r.bytes));
+      }
+    } catch (err) {
+      this.resBrowserStatus.set(`Error loading resource: ${err}`);
+    } finally {
+      this.resBrowserBusy.set(false);
+    }
+  }
+
+  /** Select a pack entry and load its raw bytes. */
+  async selectPackEntry(packId: number, entryId: number): Promise<void> {
+    this.selectedPackEntryId.set(entryId);
+    this.selectedPackEntryBytes.set(null);
+    try {
+      this.resBrowserBusy.set(true);
+      const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>(
+        'GET_PACK_ENTRY_RAW', { packId, entryId },
+      );
+      if (r.bytes) this.selectedPackEntryBytes.set(new Uint8Array(r.bytes));
+    } catch (err) {
+      this.resBrowserStatus.set(`Error loading pack entry: ${err}`);
+    } finally {
+      this.resBrowserBusy.set(false);
+    }
+  }
+
+  /** Download raw bytes for the currently selected resource. */
+  downloadSelectedResource(): void {
+    const bytes = this.selectedResBytes();
+    const type = this.selectedResType();
+    const id = this.selectedResId();
+    if (!bytes || !type || id === null) return;
+    this.triggerBytesDownload(bytes, `${type}_${id}.bin`);
+  }
+
+  /** Download raw bytes for the currently selected pack entry. */
+  downloadSelectedPackEntry(): void {
+    const bytes = this.selectedPackEntryBytes();
+    const id = this.selectedResId();
+    const entryId = this.selectedPackEntryId();
+    if (!bytes || id === null || entryId === null) return;
+    this.triggerBytesDownload(bytes, `Pack_${id}_entry_${entryId}.bin`);
+  }
+
+  /** Trigger a file upload dialog to replace a resource, then save it. */
+  triggerUploadResource(): void {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.bin,*/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const type = this.selectedResType();
+      const id = this.selectedResId();
+      if (!type || id === null) return;
+      try {
+        this.resBrowserBusy.set(true);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        await this.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
+        await this.loadResourceList();
+        // Reload raw bytes
+        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
+        if (r.bytes) this.selectedResBytes.set(new Uint8Array(r.bytes));
+        this.snackBar.open(`✓ Replaced ${type}#${id} (${bytes.length} bytes)`, 'OK', { duration: 3000 });
+      } catch (err) {
+        this.snackBar.open(`✗ Upload failed: ${err}`, 'Dismiss', { duration: 5000 });
+      } finally {
+        this.resBrowserBusy.set(false);
+      }
+    };
+    input.click();
+  }
+
+  /** Trigger a file upload dialog to replace a pack entry's raw bytes. */
+  triggerUploadPackEntry(): void {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.bin,*/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const packId = this.selectedResId();
+      const entryId = this.selectedPackEntryId();
+      if (packId === null || entryId === null) return;
+      try {
+        this.resBrowserBusy.set(true);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        await this.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId, entryId, bytes: buf }, [buf]);
+        // Refresh entry list + bytes
+        type ListPackResult = { entries: { id: number; size: number }[] | null };
+        const listR = await this.dispatchWorker<ListPackResult>('LIST_PACK_ENTRIES', { packId });
+        this.selectedPackEntries.set(listR.entries);
+        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>(
+          'GET_PACK_ENTRY_RAW', { packId, entryId },
+        );
+        if (r.bytes) this.selectedPackEntryBytes.set(new Uint8Array(r.bytes));
+        await this.loadResourceList();
+        this.snackBar.open(`✓ Replaced Pack#${packId} entry #${entryId} (${bytes.length} bytes)`, 'OK', { duration: 3000 });
+      } catch (err) {
+        this.snackBar.open(`✗ Upload failed: ${err}`, 'Dismiss', { duration: 5000 });
+      } finally {
+        this.resBrowserBusy.set(false);
+      }
+    };
+    input.click();
+  }
+
+  /** Save edited STR# strings back to the worker. */
+  async saveStrList(): Promise<void> {
+    const id = this.selectedResId();
+    const strings = this.selectedResStrings();
+    if (id === null || strings === null) return;
+    try {
+      this.resBrowserBusy.set(true);
+      await this.dispatchWorker('PUT_STR_LIST', { id, strings });
+      await this.loadResourceList();
+      const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type: 'STR#', id });
+      if (r.bytes) this.selectedResBytes.set(new Uint8Array(r.bytes));
+      this.snackBar.open(`✓ Saved STR#${id}`, 'OK', { duration: 3000 });
+    } catch (err) {
+      this.snackBar.open(`✗ Save failed: ${err}`, 'Dismiss', { duration: 5000 });
+    } finally {
+      this.resBrowserBusy.set(false);
+    }
+  }
+
+  /** Update a single string in the STR# editor. */
+  updateResString(index: number, value: string): void {
+    const strings = this.selectedResStrings();
+    if (!strings) return;
+    const updated = strings.slice();
+    updated[index] = value;
+    this.selectedResStrings.set(updated);
+  }
+
+  /** Trigger a browser download of the given bytes. */
+  private triggerBytesDownload(bytes: Uint8Array, filename: string): void {
+    // Copy into a plain ArrayBuffer to satisfy strict BlobPart type check.
+    const plain = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(plain).set(bytes);
+    const blob = new Blob([plain], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   selectLevel(id: number): void {
     this.selectedLevelId.set(id);
@@ -1781,6 +2029,8 @@ export class App implements OnInit, OnDestroy {
       void this.decodeRoadTexturesInBackground();
       // Kick off pack sprite frames decoding for the Sprites tab.
       void this.decodePackSpritesInBackground();
+      // Populate resource browser entry list.
+      void this.loadResourceList();
     } catch (error) {
       this.editorError.set(error instanceof Error ? error.message : 'Failed to parse resources');
       this.resourcesStatus.set('Failed to parse resources.');
