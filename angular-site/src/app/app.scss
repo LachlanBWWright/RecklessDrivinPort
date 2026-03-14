@@ -399,6 +399,12 @@ main {
   }
 
   ::ng-deep .mat-mdc-tab-body-wrapper { border-radius: 0 0 8px 8px; }
+
+  /* Prevent Angular Material tab body from adding a second native scrollbar.
+     The canvas uses its own custom range-input scrollbars. */
+  ::ng-deep .mat-mdc-tab-body-content {
+    overflow: hidden !important;
+  }
 }
 
 /* Tab panel card */

@@ -9,6 +9,7 @@ import type {
   ObjectTypeDefinition,
   RoadInfoData,
   DecodedSpriteFrame,
+  TrackWaypointRef,
 } from './level-editor.service';
 import { KonvaEditorService } from './konva-editor.service';
 
@@ -52,9 +53,6 @@ const OBJ_PALETTE = [
   '#ab47bc', '#26c6da', '#d4e157', '#ff7043',
   '#8d6e63', '#78909c', '#ec407a', '#29b6f6',
 ];
-
-/** kScale = 9.0 pixels per meter (from objects.h) – converts object type dimensions from metres to world pixels. */
-const GAME_KSCALE = 9.0;
 
 /** typeRes value that identifies the player car object. */
 const PLAYER_CAR_TYPE_RES = 128;
@@ -230,9 +228,9 @@ export class App implements OnInit, OnDestroy {
   readonly isPanning = signal(false);
   // ---- Track waypoint drag ----
   /** When non-null, the user is dragging a track waypoint. */
-  dragTrackWaypoint = signal<{ track: 'up' | 'down'; segIdx: number } | null>(null);
+  dragTrackWaypoint = signal<TrackWaypointRef | null>(null);
   /** Hovered track waypoint (for cursor change and highlight). */
-  hoverTrackWaypoint = signal<{ track: 'up' | 'down'; segIdx: number } | null>(null);
+  hoverTrackWaypoint = signal<TrackWaypointRef | null>(null);
   /** Editable copies of track waypoints (only populated when user drags a point). */
   editTrackUp = signal<{ x: number; y: number; flags: number; velo: number }[]>([]);
   editTrackDown = signal<{ x: number; y: number; flags: number; velo: number }[]>([]);
@@ -794,13 +792,11 @@ export class App implements OnInit, OnDestroy {
     this.visibleTypeFilter.set(new Set());
   }
 
-  /** Return a short human-readable dimension string for a type resource ID (e.g. "32×64 px"). */
+  /** Return a short human-readable physics-dimension string for a type resource ID (e.g. "1.5×3.0 m"). */
   getObjTypeDimensionLabel(typeRes: number): string {
     const def = this.objectTypeDefinitions.get(typeRes);
     if (!def) return '';
-    const w = Math.round(def.width);
-    const l = Math.round(def.length);
-    return `${w}×${l} px`;
+    return `${def.width.toFixed(1)}×${def.length.toFixed(1)} m`;
   }
 
   removeSelectedObject(): void {
@@ -1295,13 +1291,17 @@ export class App implements OnInit, OnDestroy {
 
       ctx.globalAlpha = isFilteredOut ? 0.3 : 1.0;
       const color = OBJ_PALETTE[typeIdx];
-      const objectType = this.objectTypeDefinitions.get(obj.typeRes) ?? null;
       const preview = this.getObjectSpritePreview(obj.typeRes);
 
-      // Scale object size with zoom: type dimensions (metres) × kScale (9 px/m) × canvasZoom
-      // Minimum 16px ensures objects remain clickable and visible at low zoom levels
-      const drawWidth  = objectType ? Math.max(16, objectType.width  * GAME_KSCALE * zoom) : baseRadius * 2.5;
-      const drawHeight = objectType ? Math.max(16, objectType.length * GAME_KSCALE * zoom) : baseRadius * 2.5;
+      // Use native sprite pixel dimensions (xSize × ySize from tSpriteHeader) scaled by
+      // canvasZoom (canvas pixels per world unit).  The game's DrawSprite() renders:
+      //   screen_width = xSize / roadZoom  (where roadZoom = world_units / screen_pixel)
+      // which is equivalent to  xSize * (1/roadZoom) = xSize * canvasZoom.
+      // objectType.width/length are PHYSICS metres only – never use them for rendering.
+      const drawWidth  = preview ? Math.max(MIN_HIT_RADIUS * 2, preview.width  * zoom)
+                                 : baseRadius * 2.5;
+      const drawHeight = preview ? Math.max(MIN_HIT_RADIUS * 2, preview.height * zoom)
+                                 : baseRadius * 2.5;
 
       const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
       const isSel = i === selIdx;
@@ -2112,12 +2112,23 @@ export class App implements OnInit, OnDestroy {
     /** Offscreen canvas used to cache road rendering between frames. */
   private _roadOffscreen: HTMLCanvasElement | null = null;
   private _roadOffscreenKey = '';
+  /** panY (world units) at which the offscreen was last rendered – used for fast-blit panning. */
+  private _roadOffscreenPanY = 0;
+  /** Canvas-pixel overhang above and below the viewport in the oversized offscreen canvas. */
+  private static readonly ROAD_OVERHANG_PX = 700;
 
   /**
-   * Draw road via an offscreen bitmap cache.  The cache is only invalidated when the
-   * viewport key (zoom, panX, panY, levelId, textureVersion) changes.  Object drags and
-   * selection changes do NOT invalidate the cache, giving a significant speedup during
-   * interactive editing.
+   * Draw road via an oversized offscreen bitmap cache.
+   *
+   * The offscreen canvas is `W × (H + 2*OVERHANG)` tall.  Its vertical centre corresponds to
+   * `_roadOffscreenPanY` in world space.  When the user pans vertically the cached bitmap is
+   * simply blitted with a Y offset, avoiding an expensive re-render every frame.
+   *
+   * The cache is re-rendered only when:
+   *  • zoom, panX, level ID, or texture version changes, OR
+   *  • the visible area moves outside the pre-rendered overhang.
+   *
+   * Object drags and selection changes do NOT invalidate the cache.
    */
   private drawObjectRoadPreviewCached(
     ctx: CanvasRenderingContext2D,
@@ -2129,38 +2140,74 @@ export class App implements OnInit, OnDestroy {
     panX: number,
     panY: number,
   ): void {
-    // Cache key: quantize pan to 2-world-unit granularity for stability while panning
-    const key = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${panX.toFixed(0)}|${panY.toFixed(0)}|${this.roadTexturesVersion()}`;
-    if (this._roadOffscreenKey !== key) {
-      // Render to offscreen canvas
-      if (!this._roadOffscreen || this._roadOffscreen.width !== W || this._roadOffscreen.height !== H) {
+    const OVERHANG = App.ROAD_OVERHANG_PX;
+    const offH = H + 2 * OVERHANG;
+
+    // Key excludes panY so vertical panning doesn't cause re-renders.
+    // Instead we re-render only when panY moves outside the pre-rendered overhang.
+    const staticKey = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${panX.toFixed(0)}|${this.roadTexturesVersion()}`;
+
+    // How far (in canvas pixels) has panY moved from the offscreen centre?
+    const offscreenCentreCanvasY = OVERHANG + H / 2;
+    const panYDeltaPx = (panY - this._roadOffscreenPanY) * zoom;
+    const srcY = offscreenCentreCanvasY - panYDeltaPx - H / 2;
+
+    const needsRender =
+      this._roadOffscreenKey !== staticKey ||         // zoom/pan-x/level changed
+      !this._roadOffscreen ||
+      this._roadOffscreen.width !== W ||
+      this._roadOffscreen.height !== offH ||
+      srcY < 0 ||                                    // panned beyond top overhang
+      srcY + H > offH;                               // panned beyond bottom overhang
+
+    if (needsRender) {
+      // (Re-)render into oversized offscreen canvas centred at current panY.
+      this._roadOffscreenPanY = panY;
+      if (!this._roadOffscreen || this._roadOffscreen.width !== W || this._roadOffscreen.height !== offH) {
         this._roadOffscreen = document.createElement('canvas');
         this._roadOffscreen.width  = W;
-        this._roadOffscreen.height = H;
+        this._roadOffscreen.height = offH;
       }
       const offCtx = this._roadOffscreen.getContext('2d');
       if (offCtx) {
-        offCtx.clearRect(0, 0, W, H);
-        this.drawObjectRoadPreview(offCtx, level, theme);
-        this._roadOffscreenKey = key;
+        offCtx.clearRect(0, 0, W, offH);
+        // Render using the viewport H and an explicit yOverhang so the road extends
+        // above and below the viewport into the cache overhang region.
+        this.drawObjectRoadPreview(offCtx, level, theme, panX, panY, zoom, W, H, OVERHANG);
+        this._roadOffscreenKey = staticKey;
       }
     }
-    // Blit cached bitmap to main canvas
+
+    // Blit the slice of the oversized offscreen that corresponds to the current viewport.
     if (this._roadOffscreen) {
-      ctx.drawImage(this._roadOffscreen, 0, 0);
-    } else {
-      this.drawObjectRoadPreview(ctx, level, theme);
+      const bySrcY = offscreenCentreCanvasY - (panY - this._roadOffscreenPanY) * zoom - H / 2;
+      ctx.drawImage(this._roadOffscreen, 0, bySrcY, W, H, 0, 0, W, H);
     }
   }
 
-  private drawObjectRoadPreview(ctx: CanvasRenderingContext2D, level: ParsedLevel, theme: RoadTheme): void {
+  private drawObjectRoadPreview(
+    ctx: CanvasRenderingContext2D,
+    level: ParsedLevel,
+    theme: RoadTheme,
+    panX: number,
+    panY: number,
+    zoom: number,
+    W: number,
+    H: number,
+    /** Extra vertical canvas-pixel padding above and below the viewport centre (for oversized cache). */
+    yOverhang = 0,
+  ): void {
     if (level.roadSegs.length < 2) return;
 
-    const W = (ctx.canvas as HTMLCanvasElement).width;
-    const H = (ctx.canvas as HTMLCanvasElement).height;
-    const zoom  = this.canvasZoom();
-    const panX  = this.canvasPanX();
-    const panY  = this.canvasPanY();
+    /** Local worldToCanvas that respects the explicit pan/zoom and optional yOverhang. */
+    const wtc = (wx: number, wy: number): [number, number] => {
+      const cx = W / 2 + (wx - panX) * zoom;
+      const cy = (H / 2 + yOverhang) - (wy - panY) * zoom;
+      return [cx, cy];
+    };
+
+    /** Total canvas height (including overhang above and below viewport). */
+    const canvasH = H + 2 * yOverhang;
 
     // Look up the road info for this level to get real texture IDs.
     const roadInfo  = level.properties.roadInfo;
@@ -2189,9 +2236,10 @@ export class App implements OnInit, OnDestroy {
         // Tile size in canvas pixels
         const tileW = tc.width * scale;
         const tileH = tc.height * scale;
-        // Translate so that world origin (0,0) aligns with a tile boundary
+        // Translate so that world origin (0,0) aligns with a tile boundary.
+        // Canvas-Y of world Y=0: cy = (H/2 + yOverhang) - (0 - panY)*zoom = H/2+yOverhang+panY*zoom
         const tx = ((W / 2 - panX * zoom) % tileW + tileW) % tileW;
-        const ty = ((H / 2 - panY * zoom) % tileH + tileH) % tileH;
+        const ty = (((H / 2 + yOverhang) + panY * zoom) % tileH + tileH) % tileH;
         // DOMMatrix: [a, b, c, d, e, f] = [scaleX, 0, 0, scaleY, translateX, translateY]
         pat.setTransform(new DOMMatrix([scale, 0, 0, scale, tx, ty]));
         return pat;
@@ -2216,12 +2264,12 @@ export class App implements OnInit, OnDestroy {
       x3: number, y3: number,
       fill: CanvasPattern | string,
     ): void => {
-      const [ax0, ay0] = this.worldToCanvas(x0, y0);
-      const [ax1, ay1] = this.worldToCanvas(x1, y1);
-      const [ax2, ay2] = this.worldToCanvas(x2, y2);
-      const [ax3, ay3] = this.worldToCanvas(x3, y3);
+      const [ax0, ay0] = wtc(x0, y0);
+      const [ax1, ay1] = wtc(x1, y1);
+      const [ax2, ay2] = wtc(x2, y2);
+      const [ax3, ay3] = wtc(x3, y3);
       if (ay0 < -H && ay1 < -H && ay2 < -H && ay3 < -H) return;
-      if (ay0 > H * 2 && ay1 > H * 2 && ay2 > H * 2 && ay3 > H * 2) return;
+      if (ay0 > canvasH + H && ay1 > canvasH + H && ay2 > canvasH + H && ay3 > canvasH + H) return;
       ctx.fillStyle = fill as string; // CanvasPattern is assignable here
       ctx.beginPath();
       ctx.moveTo(ax0, ay0);
@@ -2235,8 +2283,8 @@ export class App implements OnInit, OnDestroy {
     // Draw road geometry using actual textures – only render segments visible in viewport.
     // Each road segment at index i has world Y = i*2.  Cull segments outside the viewport
     // with a generous margin (2 extra segment heights = 4 world units margin).
-    const visibleWorldMinY = panY - H / (2 * zoom) - 4;
-    const visibleWorldMaxY = panY + H / (2 * zoom) + 4;
+    const visibleWorldMinY = panY - (H / 2 + yOverhang) / zoom - 4;
+    const visibleWorldMaxY = panY + (H / 2 + yOverhang) / zoom + 4;
     const firstSeg = Math.max(0, Math.floor(visibleWorldMinY / 2));
     const lastSeg  = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
 
@@ -2297,7 +2345,7 @@ export class App implements OnInit, OnDestroy {
     for (let index = firstSeg; index <= lastSeg; index += 2) {
       const seg = level.roadSegs[index];
       const midX = (seg.v1 + seg.v2) / 2;
-      const [cx, cy] = this.worldToCanvas(midX, index * 2);
+      const [cx, cy] = wtc(midX, index * 2);
       if (!dashStarted) { ctx.moveTo(cx, cy); dashStarted = true; }
       else ctx.lineTo(cx, cy);
     }
@@ -2309,9 +2357,9 @@ export class App implements OnInit, OnDestroy {
     if (levelEnd > 0 && level.roadSegs.length > 0) {
       const endSegIdx = Math.min(Math.floor(levelEnd / 2), level.roadSegs.length - 1);
       const seg = level.roadSegs[endSegIdx];
-      const [leftX, lineY] = this.worldToCanvas(seg.v1, levelEnd);
-      const [rightX] = this.worldToCanvas(seg.v2, levelEnd);
-      if (lineY > -10 && lineY < H + 10) {
+      const [leftX, lineY] = wtc(seg.v1, levelEnd);
+      const [rightX] = wtc(seg.v2, levelEnd);
+      if (lineY > -10 && lineY < H + yOverhang * 2 + 10) {
         const roadWidth = Math.max(4, rightX - leftX);
         const sqSz = Math.max(6, roadWidth / 10);
         const numSq = Math.ceil(roadWidth / sqSz);
@@ -2326,28 +2374,24 @@ export class App implements OnInit, OnDestroy {
     }
 
     // Y-axis ruler tick marks (every 1000 world units)
-    const canvasEl = ctx.canvas as HTMLCanvasElement;
-    const canvasW  = canvasEl.width;
-    const canvasH  = canvasEl.height;
+    // canvasH (= H + 2*yOverhang) was declared at the top of the function.
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = '9px monospace';
     const startY = Math.floor((panY - canvasH / (2 * zoom)) / 1000) * 1000;
     const endY   = panY + canvasH / (2 * zoom);
     for (let wy = startY; wy <= endY; wy += 1000) {
-      const [, tickY] = this.worldToCanvas(0, wy);
+      const [, tickY] = wtc(0, wy);
       if (tickY < 0 || tickY > canvasH) continue;
-      ctx.fillRect(canvasW - 28, tickY - 0.5, 28, 1);
-      ctx.fillText(`${wy}`, canvasW - 60, tickY - 2);
+      ctx.fillRect(W - 28, tickY - 0.5, 28, 1);
+      ctx.fillText(`${wy}`, W - 60, tickY - 2);
     }
 
     // Vertical scrollbar-like position indicator (right edge)
     if (level.roadSegs.length > 1) {
       const totalWorldH = (level.roadSegs.length - 1) * 2;
-      // With Y flipped, world Y 0 (start) is at canvas bottom, levelEnd at top.
-      // viewWorldMin = lowest Y visible, viewWorldMax = highest Y visible
       const viewWorldMin = panY - canvasH / (2 * zoom);
       const viewWorldMax = panY + canvasH / (2 * zoom);
-      const barX = canvasW - 8;
+      const barX = W - 8;
       const barW = 6;
       const barH = canvasH - 20;
       const barY = 10;

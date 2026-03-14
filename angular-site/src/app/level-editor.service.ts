@@ -55,6 +55,12 @@ export interface MarkSeg {
   y2: number;  // SInt32
 }
 
+/** Identifies a single draggable or hovered track waypoint. */
+export interface TrackWaypointRef {
+  track: 'up' | 'down';
+  segIdx: number;
+}
+
 export interface LevelProperties {
   roadInfo: number;   // SInt16 – index into kPackRoad
   time: number;       // UInt16 – level time limit

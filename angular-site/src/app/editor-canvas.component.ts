@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
-import type { ObjectPos, MarkSeg } from './level-editor.service';
+import type { ObjectPos, MarkSeg, TrackWaypointRef } from './level-editor.service';
 
 @Component({
   selector: 'app-editor-canvas',
@@ -26,8 +26,8 @@ export class EditorCanvasComponent {
   @Input() levelNum = 0;
   @Input() workerBusy = false;
   @Input() isDragging = false;
-  @Input() dragTrackWaypoint: unknown = null;
-  @Input() hoverTrackWaypoint: unknown = null;
+  @Input() dragTrackWaypoint: TrackWaypointRef | null = null;
+  @Input() hoverTrackWaypoint: TrackWaypointRef | null = null;
   @Input() spaceDown = false;
 
   @Output() canvasMouseDown = new EventEmitter<MouseEvent>();
@@ -58,4 +58,18 @@ export class EditorCanvasComponent {
   @Output() markCanvasMouseUp = new EventEmitter<MouseEvent>();
   @Output() panXChange = new EventEmitter<number>();
   @Output() panYChange = new EventEmitter<number>();
+
+  /** Typed handler for the vertical range-input scrollbar. */
+  onVertScrollInput(event: Event): void {
+    if (event.target instanceof HTMLInputElement) {
+      this.panYChange.emit(Number(event.target.value));
+    }
+  }
+
+  /** Typed handler for the horizontal range-input scrollbar. */
+  onHorizScrollInput(event: Event): void {
+    if (event.target instanceof HTMLInputElement) {
+      this.panXChange.emit(Number(event.target.value));
+    }
+  }
 }

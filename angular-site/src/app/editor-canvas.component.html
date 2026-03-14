@@ -55,18 +55,18 @@
       (contextmenu)="canvasContextMenu.emit($event); $event.preventDefault()"
       [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'crosshair'))"
     ></canvas>
-    <!-- Vertical scrollbar: value = scrollYMax - panY so thumb-top = road end, thumb-bottom = road start -->
+    <!-- Vertical scrollbar: direct mapping - value=min(=0) → see start(Y=0), value=max → see end -->
     <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
       aria-label="Vertical scroll position"
       [min]="0" [max]="scrollYMax" [step]="10"
-      [value]="scrollYMax - panY"
-      (input)="panYChange.emit(scrollYMax - +$any($event.target).value)"
+      [value]="panY"
+      (input)="onVertScrollInput($event)"
     />
     <!-- Horizontal scrollbar -->
     <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
       [min]="scrollXMin" [max]="scrollXMax" [step]="5"
       [value]="panX"
-      (input)="panXChange.emit(+$any($event.target).value)"
+      (input)="onHorizScrollInput($event)"
     />
   </div>
   <div class="canvas-status-bar">
