@@ -1882,6 +1882,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Draw objects
     const baseRadius = Math.min(20, Math.max(5, 8 * zoom));
     const labelFont = `${Math.max(9, 10 * zoom)}px monospace`;
+    // When Konva is initialized it renders the same sprite images on top of the main canvas,
+    // so we skip the ctx.drawImage() / arc() fills here to avoid redundant GPU work.
+    // We still draw direction arrows, bounding-box outlines, labels, and selection rings
+    // since those are NOT rendered by the Konva overlay.
+    const konvaRendersSprites = this._konvaInitialized;
     for (let i = 0; i < objs.length; i++) {
       const obj = objs[i];
       const typeIdx = ((obj.typeRes % OBJ_PALETTE.length) + OBJ_PALETTE.length) % OBJ_PALETTE.length;
@@ -1907,19 +1912,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
       const isSel = i === selIdx;
 
-      if (preview) {
-        // Draw sprite rotated to match direction (game Y-axis is up, so negate for canvas)
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(-obj.dir);
-        ctx.drawImage(preview, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-        ctx.restore();
-      } else {
-        // Fallback circle
-        ctx.fillStyle = isPlayerCar ? '#ffe082' : color;
-        ctx.beginPath();
-        ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
-        ctx.fill();
+      if (!konvaRendersSprites) {
+        // Fallback: render sprites / circles in the main canvas before Konva is ready.
+        if (preview) {
+          // Draw sprite rotated to match direction (game Y-axis is up, so negate for canvas)
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(-obj.dir);
+          ctx.drawImage(preview, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+          ctx.restore();
+        } else {
+          // Fallback circle
+          ctx.fillStyle = isPlayerCar ? '#ffe082' : color;
+          ctx.beginPath();
+          ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       // Bounding-box outline (colour-coded by type)
