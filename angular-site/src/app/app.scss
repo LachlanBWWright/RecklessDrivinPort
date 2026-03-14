@@ -1249,6 +1249,13 @@ code {
   color: var(--muted);
 }
 
+.field-table-scroll {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--surface3);
+  border-radius: 4px;
+}
+
 .field-table {
   width: 100%;
   border-collapse: collapse;

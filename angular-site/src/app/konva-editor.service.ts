@@ -78,7 +78,8 @@ export class KonvaEditorService implements OnDestroy {
 
   // ── Object-layer cache (avoids full rebuild on zoom/pan) ────────────────
   private _lastObjects: readonly ObjectPos[] | null = null;
-  private _lastSelectedIndex: number | null | undefined = undefined;
+  /** `null` = no sentinel; matches `selectedIndex: number | null` in setObjects(). */
+  private _lastSelectedIndex: number | null = null;
   private _lastVisibleTypes: Set<number> | null = null;
   /** Stable references to object nodes in insertion order, indexed by object index. */
   private _konvaObjNodes: KonvaLayerChild[] = [];
@@ -309,6 +310,11 @@ export class KonvaEditorService implements OnDestroy {
     const R = Math.max(MIN_WAYPOINT_RADIUS, BASE_WAYPOINT_RADIUS * zoom * scaleX);
 
     // Fast path: only zoom/pan changed, update waypoint positions and radii in-place.
+    //
+    // Reference equality is valid here because the caller (app.ts) stores track waypoints
+    // in Angular Signals (`editTrackUp`, `editTrackDown`).  The signal returns the SAME
+    // array reference until the user actually edits a waypoint, so equality holds during
+    // pure pan/zoom interactions.
     if (trackUp === this._lastTrackUp && trackDown === this._lastTrackDown &&
         this.trackLayer.children.length > 0) {
       for (const node of this.trackLayer.children as Konva.Circle[]) {
@@ -434,7 +440,7 @@ export class KonvaEditorService implements OnDestroy {
     this.trackLayer = null;
     // Reset object-layer cache
     this._lastObjects = null;
-    this._lastSelectedIndex = undefined;
+    this._lastSelectedIndex = null;
     this._lastVisibleTypes = null;
     this._konvaObjNodes = [];
     // Reset track-layer cache

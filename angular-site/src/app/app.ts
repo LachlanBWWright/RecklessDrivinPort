@@ -253,6 +253,9 @@ function writeResField(view: DataView, f: ResFieldSchema, value: number): void {
  * Build a ResField[] from bytes, using a known schema if available, or
  * auto-generating u16 fields at every 2-byte offset otherwise.
  */
+/** Maximum number of auto-generated fields to display (avoids locking up for large blobs). */
+const MAX_AUTO_FIELDS = 128;
+
 function buildResFields(bytes: Uint8Array, schema: ResFieldSchema[] | null): ResField[] {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (schema) {
@@ -260,9 +263,10 @@ function buildResFields(bytes: Uint8Array, schema: ResFieldSchema[] | null): Res
       .filter(f => f.offset + fieldByteSize(f.type) <= bytes.byteLength)
       .map(f => ({ ...f, value: readResField(view, f) }));
   }
-  // Auto-generate: u16 at every 2 bytes
+  // Auto-generate: u16 at every 2 bytes (capped to avoid locking up on large blobs)
   const fields: ResField[] = [];
-  for (let offset = 0; offset + 1 < bytes.byteLength; offset += 2) {
+  const maxOffset = Math.min(bytes.byteLength, MAX_AUTO_FIELDS * 2);
+  for (let offset = 0; offset + 2 <= maxOffset; offset += 2) {
     fields.push({ name: `field_${offset}`, offset, type: 'u16', value: view.getUint16(offset, false) });
   }
   return fields;
@@ -465,9 +469,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly allResourceTypes = computed(() => {
     const map = new Map<string, { type: string; id: number; size: number }[]>();
     for (const entry of this.allResourceEntries()) {
-      if (!map.has(entry.type)) map.set(entry.type, []);
-      const bucket = map.get(entry.type);
-      if (bucket) bucket.push(entry);
+      let bucket = map.get(entry.type);
+      if (!bucket) { bucket = []; map.set(entry.type, bucket); }
+      bucket.push(entry);
     }
     return [...map.entries()].map(([type, entries]) => ({ type, entries }))
       .sort((a, b) => a.type.localeCompare(b.type));
@@ -496,6 +500,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly selectedResIsIcon = computed(() => {
     const t = this.selectedResType();
     return t !== null && ICON_RESOURCE_TYPES.has(t);
+  });
+
+  /** True if the selected resource type has a known named struct schema. */
+  readonly selectedResHasNamedSchema = computed(() => {
+    const t = this.selectedResType();
+    return t !== null && t in RESOURCE_SCHEMAS;
+  });
+
+  /** True if selected resource has more bytes than are shown as fields (auto-truncated). */
+  readonly selectedResFieldsTruncated = computed(() => {
+    const bytes = this.selectedResBytes();
+    const type = this.selectedResType();
+    if (!bytes || !type || type in RESOURCE_SCHEMAS) return false;
+    return bytes.byteLength > MAX_AUTO_FIELDS * 2;
   });
 
   private wasmScript: HTMLScriptElement | null = null;
@@ -879,13 +897,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           // STR is a Pascal string (1-byte length prefix); TEXT is raw bytes
           if (type === 'STR ') {
             const len = bytes[0] ?? 0;
-            let s = '';
-            for (let i = 1; i <= len && i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-            this.selectedResText.set(s);
+            const chars: string[] = [];
+            for (let i = 1; i <= len && i < bytes.length; i++) chars.push(String.fromCharCode(bytes[i]));
+            this.selectedResText.set(chars.join(''));
           } else {
-            let s = '';
-            for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-            this.selectedResText.set(s);
+            const chars: string[] = [];
+            for (let i = 0; i < bytes.length; i++) chars.push(String.fromCharCode(bytes[i]));
+            this.selectedResText.set(chars.join(''));
           }
         }
       } else {

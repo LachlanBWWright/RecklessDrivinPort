@@ -546,32 +546,37 @@
                         <div class="field-editor">
                           <h5 class="field-editor-title">
                             {{ selectedResBytes()!.length }} bytes
-                            @if (selectedResType() && selectedResType()! in {'ALRT':1,'DLOG':1,'WIND':1,'CNTL':1,'RECT':1}) {
+                            @if (selectedResHasNamedSchema()) {
                               &mdash; known struct
                             } @else {
                               &mdash; auto-detected fields
                             }
+                            @if (selectedResFieldsTruncated()) {
+                              &mdash; <em>showing first {{ selectedResFields().length }} of {{ selectedResBytes()!.length / 2 | number:'1.0-0' }} fields</em>
+                            }
                           </h5>
-                          <table class="field-table">
-                            <thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Value</th></tr></thead>
-                            <tbody>
-                              @for (f of selectedResFields(); track f.offset) {
-                                <tr>
-                                  <td class="field-name">{{ f.name }}</td>
-                                  <td class="field-offset">{{ f.offset }}</td>
-                                  <td class="field-type">{{ f.type }}</td>
-                                  <td>
-                                    <input
-                                      class="field-input"
-                                      type="number"
-                                      [value]="f.value"
-                                      (input)="onResFieldInput($index, $event)"
-                                    />
-                                  </td>
-                                </tr>
-                              }
-                            </tbody>
-                          </table>
+                          <div class="field-table-scroll">
+                            <table class="field-table">
+                              <thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Value</th></tr></thead>
+                              <tbody>
+                                @for (f of selectedResFields(); track f.offset) {
+                                  <tr>
+                                    <td class="field-name">{{ f.name }}</td>
+                                    <td class="field-offset">{{ f.offset }}</td>
+                                    <td class="field-type">{{ f.type }}</td>
+                                    <td>
+                                      <input
+                                        class="field-input"
+                                        type="number"
+                                        [value]="f.value"
+                                        (input)="onResFieldInput($index, $event)"
+                                      />
+                                    </td>
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
                           <div class="field-editor-actions">
                             <button mat-raised-button color="primary" (click)="saveResFields()">
                               <mat-icon>save</mat-icon> Save Changes
