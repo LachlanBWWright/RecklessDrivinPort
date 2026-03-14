@@ -2,10 +2,10 @@
 .canvas-toolbar {
   background: #1e1e1e;
   border-bottom: 1px solid #383838;
-  padding: 6px 12px;
+  padding: 8px 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .hint-text {
@@ -179,7 +179,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 3px 10px;
+  padding: 4px 14px;
   background: #151515;
   border-top: 1px solid #2a2a2a;
   font-size: 0.72rem;

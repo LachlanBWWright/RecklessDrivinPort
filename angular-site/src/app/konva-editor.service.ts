@@ -34,8 +34,6 @@ type KonvaLayerChild = Konva.Group | Konva.Circle;
 
 /** Minimum rendered size (CSS px) for object icons at any zoom level. */
 const MIN_OBJECT_SIZE    = 14;
-/** Base multiplier for object icon size at zoom=1 and scale=1. */
-const BASE_OBJECT_SIZE   = 32;
 /** Minimum rendered radius (CSS px) for fallback circles when no sprite is available. */
 const MIN_CIRCLE_RADIUS  = 7;
 /** Base multiplier for fallback circle radius. */
@@ -153,6 +151,7 @@ export class KonvaEditorService implements OnDestroy {
 
     const PALETTE_LEN = paletteColors.length;
     const scaleX = this._cssW / this._logicalW;
+    const scaleY = this._cssH / this._logicalH;
 
     objects.forEach((obj, i) => {
       const typeIdx = ((obj.typeRes % PALETTE_LEN) + PALETTE_LEN) % PALETTE_LEN;
@@ -160,13 +159,19 @@ export class KonvaEditorService implements OnDestroy {
       if (!visible && i !== selectedIndex) return;
 
       const [sx, sy] = this.worldToStage(obj.x, obj.y);
-      const SIZE = Math.max(MIN_OBJECT_SIZE, BASE_OBJECT_SIZE * zoom * scaleX);
       const isSel = i === selectedIndex;
       const img = getImageForType(obj.typeRes);
 
+      // Scale: sprite dimensions (in logical canvas pixels at zoom=1) × zoom × CSS scale.
+      // This matches the main canvas which draws at preview.width * canvasZoom logical px.
       let node: KonvaLayerChild;
 
       if (img instanceof HTMLCanvasElement || img instanceof HTMLImageElement) {
+        // Use the actual sprite pixel dimensions rather than a fixed BASE_OBJECT_SIZE.
+        const spriteW = img.width;
+        const spriteH = img.height;
+        const W = Math.max(MIN_OBJECT_SIZE, spriteW * zoom * scaleX);
+        const H = Math.max(MIN_OBJECT_SIZE, spriteH * zoom * scaleY);
         const group = new Konva.Group({
           x: sx,
           y: sy,
@@ -176,15 +181,15 @@ export class KonvaEditorService implements OnDestroy {
         });
         group.add(new Konva.Image({
           image: img,
-          width: SIZE,
-          height: SIZE,
-          offsetX: SIZE / 2,
-          offsetY: SIZE / 2,
+          width: W,
+          height: H,
+          offsetX: W / 2,
+          offsetY: H / 2,
           opacity: visible ? 1 : 0.3,
         }));
         if (isSel) {
           group.add(new Konva.Circle({
-            radius: SIZE / 2 + 5,
+            radius: Math.max(W, H) / 2 + 5,
             stroke: '#ffffff',
             strokeWidth: 2,
             fill: 'transparent',
