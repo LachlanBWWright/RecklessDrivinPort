@@ -1459,6 +1459,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.propertiesDirty.set(true);
   }
 
+  /** Bridge for PropertiesTabComponent propsInput output. */
+  onPropertiesTabInput(e: { field: keyof LevelProperties; event: Event }): void {
+    this.onPropsInput(e.field, e.event);
+  }
+
   async saveLevelProperties(): Promise<void> {
     const id = this.selectedLevelId();
     if (id === null) return;

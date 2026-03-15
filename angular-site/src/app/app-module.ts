@@ -31,8 +31,10 @@ import { MatGridListModule } from '@angular/material/grid-list';
 
 import { App } from './app';
 import { EditorCanvasComponent } from './editor-canvas.component';
+import { MarksEditorComponent } from './marks-editor.component';
 import { ObjectInspectorComponent } from './object-inspector.component';
 import { ObjectListComponent } from './object-list.component';
+import { PropertiesTabComponent } from './properties-tab.component';
 import { SpriteEditorComponent } from './sprite-editor.component';
 
 const MATERIAL_MODULES = [
@@ -46,7 +48,7 @@ const MATERIAL_MODULES = [
 ];
 
 @NgModule({
-  declarations: [App, EditorCanvasComponent, ObjectInspectorComponent, ObjectListComponent, SpriteEditorComponent],
+  declarations: [App, EditorCanvasComponent, MarksEditorComponent, ObjectInspectorComponent, ObjectListComponent, PropertiesTabComponent, SpriteEditorComponent],
   imports: [
     BrowserModule,
     CommonModule,

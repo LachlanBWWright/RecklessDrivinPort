@@ -456,8 +456,8 @@ export class KonvaEditorService implements OnDestroy {
     // Fast path: only transform changed, OR both new and previous were empty.
     const arraysUnchanged = (trackUp === this._lastTrackUp && trackDown === this._lastTrackDown);
     const bothEmpty = trackUp.length === 0 && trackDown.length === 0;
-    const prevBothEmpty = (this._lastTrackUp?.length ?? -1) === 0 &&
-                          (this._lastTrackDown?.length ?? -1) === 0;
+    const prevBothEmpty = (this._lastTrackUp?.length ?? 0) === 0 &&
+                          (this._lastTrackDown?.length ?? 0) === 0;
     if (arraysUnchanged || (bothEmpty && prevBothEmpty)) {
       this._applyGroupTransform();
       return;
@@ -561,7 +561,7 @@ export class KonvaEditorService implements OnDestroy {
     this._zoom = zoom; this._panX = panX; this._panY = panY;
 
     const marksUnchanged = marks === this._lastMarks
-      || (marks.length === 0 && (this._lastMarks?.length ?? -1) === 0);
+      || (marks.length === 0 && (this._lastMarks?.length ?? 0) === 0);
     const selUnchanged   = selectedMarkIndex === this._lastSelectedMarkIndex;
 
     if (marksUnchanged && selUnchanged) {

@@ -1,0 +1,5 @@
+/* Properties tab styles */
+:host { display: block; }
+
+/* Re-use styles defined in app.scss via global stylesheet for mat-card, badges,
+   data-table etc. No additional styles needed here. */
