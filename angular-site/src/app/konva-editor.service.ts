@@ -308,7 +308,12 @@ export class KonvaEditorService implements OnDestroy {
     if (!this.worldGroup || !this.objectsLayer) return;
     this._zoom = zoom; this._panX = panX; this._panY = panY;
 
-    const objsUnchanged = objects       === this._lastObjects;
+    // Treat any empty array as equivalent to a "no objects" state regardless
+    // of reference identity, so toggling showObjects() doesn't trigger a full
+    // rebuild every frame.
+    const prevEmpty = this._lastObjects !== null && this._lastObjects.length === 0;
+    const currEmpty = objects.length === 0;
+    const objsUnchanged = objects === this._lastObjects || (prevEmpty && currEmpty);
     const selUnchanged  = selectedIndex === this._lastSelectedIndex;
     const visUnchanged  = setsEqual(visibleTypes, this._lastVisibleTypes ?? EMPTY_SET);
 
@@ -418,10 +423,12 @@ export class KonvaEditorService implements OnDestroy {
     if (!this.trackWorldGroup || !this.trackLayer) return;
     this._zoom = zoom; this._panX = panX; this._panY = panY;
 
-    // Fast path: only transform changed
-    if (trackUp   === this._lastTrackUp   &&
-        trackDown === this._lastTrackDown &&
-        this.trackWorldGroup.children.length > 0) {
+    // Fast path: only transform changed, OR both new and previous were empty.
+    const arraysUnchanged = (trackUp === this._lastTrackUp && trackDown === this._lastTrackDown);
+    const bothEmpty = trackUp.length === 0 && trackDown.length === 0;
+    const prevBothEmpty = (this._lastTrackUp?.length ?? -1) === 0 &&
+                          (this._lastTrackDown?.length ?? -1) === 0;
+    if (arraysUnchanged || (bothEmpty && prevBothEmpty)) {
       this._applyGroupTransform();
       return;
     }
@@ -497,7 +504,7 @@ export class KonvaEditorService implements OnDestroy {
     this._lastTrackUp   = null;
     this._lastTrackDown = null;
     this.trackWorldGroup?.destroyChildren();
-    this.trackLayer?.batchDraw();
+    // Don't batchDraw here — flush() in redrawObjectCanvas() will draw synchronously.
   }
 
   // ─────────────────────────────────────────────────────────────────────────
