@@ -270,13 +270,22 @@
 .marks-table {
   width: 100%;
   font-size: 0.78rem;
-  background: #171717 !important;
+  background: #171717;
+  border-collapse: collapse;
 
-  th.mat-mdc-header-cell { font-size: 0.7rem; color: #555; background: #1a1a1a; }
-  td.mat-mdc-cell { color: #aaa; padding: 4px 8px !important; }
-  tr.mat-mdc-row { height: 30px !important; }
-  tr.mat-mdc-row:hover td { background: #222; cursor: pointer; }
-  tr.selected-row td { background: rgba(229,57,53,0.12); color: #f0f0f0; }
+  th {
+    font-size: 0.7rem;
+    color: #555;
+    background: #1a1a1a;
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px solid #2a2a2a;
+    font-weight: 600;
+  }
+  td { color: #aaa; padding: 4px 8px; border-bottom: 1px solid #1e1e1e; }
+  tr { height: 30px; }
+  tbody tr:hover td { background: #222; cursor: pointer; }
+  .selected-row td { background: rgba(229,57,53,0.12); color: #f0f0f0; }
 }
 
 /* ---- Road stats ---- */

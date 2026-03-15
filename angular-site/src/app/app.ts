@@ -716,7 +716,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       width:${cssW}px; height:${cssH}px;
       pointer-events:all;
       outline:none;
-      cursor:crosshair;
+      cursor:default;
     `;
 
     this.konva.init('konva-container', canvas.width, canvas.height, cssW, cssH);
@@ -803,6 +803,23 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
     };
 
+    // ── Mark segment endpoint drag ─────────────────────────────────────────
+    this.konva.onMarkEndpointDragEnd = (e) => {
+      this._pushUndo();
+      const ms = [...this.marks()];
+      if (e.markIdx < ms.length) {
+        const m = ms[e.markIdx];
+        ms[e.markIdx] = e.endpoint === 'p1'
+          ? { ...m, x1: e.worldX, y1: e.worldY }
+          : { ...m, x2: e.worldX, y2: e.worldY };
+        this.marks.set(ms);
+      }
+    };
+
+    this.konva.onMarkClick = (markIdx) => {
+      this.selectedMarkIndex.set(markIdx);
+    };
+
     // ── Pan via Konva stage mouse events ───────────────────────────────────
     // The Konva container intercepts ALL mouse events before they reach the
     // underlying #object-canvas.  We must handle panning through Konva's own
@@ -857,7 +874,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this._isPanning = false;
           this.isPanning.set(false);
           const kc = document.getElementById('konva-container');
-          if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : 'crosshair';
+          if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : 'default';
         }
         if (this._draggingStartMarker) {
           this._draggingStartMarker = false;
@@ -2270,6 +2287,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.konva.clearTrackWaypoints();
     }
 
+    // Update Konva marks layer – draggable endpoint handles
+    if (level && this.showMarks()) {
+      this.konva.setMarks(this.marks(), this.selectedMarkIndex(), zoom, panX, panY);
+    } else {
+      this.konva.clearMarks();
+    }
+
     // ── SYNCHRONOUS flush ──────────────────────────────────────────────────
     // Draw all Konva layers NOW, in the same requestAnimationFrame callback
     // as the road canvas above.  This keeps both canvases in the same
@@ -3427,6 +3451,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private drawMarksOnCanvas(ctx: CanvasRenderingContext2D): void {
     const marks = this.marks();
     const selMark = this.selectedMarkIndex();
+    // When Konva is active, endpoint circles are drawn by the Konva marks layer
+    // (draggable). We only draw the connecting line here.
+    const konvaActive = this._konvaInitialized;
     marks.forEach((m, i) => {
       const [x1, y1] = this.worldToCanvas(m.x1, m.y1);
       const [x2, y2] = this.worldToCanvas(m.x2, m.y2);
@@ -3439,15 +3466,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.lineTo(x2, y2);
       ctx.stroke();
       ctx.setLineDash([]);
-      // Endpoint dots
-      ctx.fillStyle = isSel ? '#ffffff' : '#ffeb3b';
-      [x1, y1, x2, y2].reduce<[number, number][]>((acc, v, idx) => {
-        if (idx % 2 === 0) acc.push([v, 0]);
-        else acc[acc.length - 1][1] = v;
-        return acc;
-      }, []).forEach(([px, py]) => {
-        ctx.beginPath(); ctx.arc(px, py, isSel ? 12 : 8, 0, Math.PI * 2); ctx.fill();
-      });
+      // Only draw endpoint dots when Konva is NOT rendering them
+      if (!konvaActive) {
+        ctx.fillStyle = isSel ? '#ffffff' : '#ffeb3b';
+        [[x1, y1], [x2, y2]].forEach(([px, py]) => {
+          ctx.beginPath(); ctx.arc(px, py, isSel ? 12 : 8, 0, Math.PI * 2); ctx.fill();
+        });
+      }
     });
   }
 

@@ -4,6 +4,7 @@ import type { ObjectPos } from './level-editor.service';
 @Component({
   selector: 'app-object-list',
   templateUrl: './object-list.component.html',
+  styleUrl: './object-list.component.scss',
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

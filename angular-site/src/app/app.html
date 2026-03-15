@@ -230,22 +230,19 @@
                   <mat-divider class="section-divider"></mat-divider>
                   <h4 class="section-subtitle">Object Group References <span class="badge">10 slots</span></h4>
 
-                  <table mat-table [dataSource]="selectedLevel()!.objectGroups" class="data-table mat-elevation-z2">
-                    <ng-container matColumnDef="index">
-                      <th mat-header-cell *matHeaderCellDef>#</th>
-                      <td mat-cell *matCellDef="let grp; let i = index">{{ i }}</td>
-                    </ng-container>
-                    <ng-container matColumnDef="resID">
-                      <th mat-header-cell *matHeaderCellDef>ResID (kPackOgrp)</th>
-                      <td mat-cell *matCellDef="let grp" [class.inactive-cell]="grp.resID === 0">{{ grp.resID }}</td>
-                    </ng-container>
-                    <ng-container matColumnDef="numObjs">
-                      <th mat-header-cell *matHeaderCellDef>numObjs</th>
-                      <td mat-cell *matCellDef="let grp" [class.inactive-cell]="grp.resID === 0">{{ grp.numObjs }}</td>
-                    </ng-container>
-                    <tr mat-header-row *matHeaderRowDef="['index','resID','numObjs']"></tr>
-                    <tr mat-row *matRowDef="let row; columns: ['index','resID','numObjs'];"
-                      [class.row-inactive]="row.resID === 0"></tr>
+                  <table class="data-table plain-table">
+                    <thead>
+                      <tr><th>#</th><th>ResID (kPackOgrp)</th><th>numObjs</th></tr>
+                    </thead>
+                    <tbody>
+                      @for (grp of selectedLevel()!.objectGroups; track $index) {
+                        <tr [class.row-inactive]="grp.resID === 0">
+                          <td>{{ $index }}</td>
+                          <td [class.inactive-cell]="grp.resID === 0">{{ grp.resID }}</td>
+                          <td [class.inactive-cell]="grp.resID === 0">{{ grp.numObjs }}</td>
+                        </tr>
+                      }
+                    </tbody>
                   </table>
                 </mat-card-content>
                 <mat-card-actions>

@@ -61,6 +61,16 @@ export interface KonvaWaypointDragEndEvent {
   worldY: number;
 }
 
+/** Fired when the user drags a mark segment endpoint. */
+export interface KonvaMarkDragEndEvent {
+  /** Index of the mark in the marks array. */
+  markIdx: number;
+  /** Which endpoint was dragged. */
+  endpoint: 'p1' | 'p2';
+  worldX: number;
+  worldY: number;
+}
+
 /** Union of node types added directly to worldGroup / trackWorldGroup. */
 type KonvaWorldNode = Konva.Group | Konva.Circle;
 
@@ -71,6 +81,8 @@ type KonvaWorldNode = Konva.Group | Konva.Circle;
 const WAYPOINT_WORLD_R       = 10;
 /** Fallback circle radius in world units (shown when no sprite image is available). */
 const FALLBACK_CIRCLE_WORLD_R = 14;
+/** Mark endpoint circle radius in world units. */
+const MARK_ENDPOINT_WORLD_R  = 12;
 
 /** Reusable empty-set sentinel to avoid allocating a new Set on every setsEqual call. */
 const EMPTY_SET = new Set<number>();
@@ -88,16 +100,21 @@ export class KonvaEditorService implements OnDestroy {
   private stage: Konva.Stage | null = null;
   private objectsLayer: Konva.Layer | null = null;
   private trackLayer: Konva.Layer | null = null;
+  private marksLayer: Konva.Layer | null = null;
   /** Group inside objectsLayer – transform = pan/zoom; children are at world coords. */
   private worldGroup: Konva.Group | null = null;
   /** Group inside trackLayer – same transform as worldGroup. */
   private trackWorldGroup: Konva.Group | null = null;
+  /** Group inside marksLayer – same transform as worldGroup. */
+  private marksWorldGroup: Konva.Group | null = null;
 
   // ── External callbacks ────────────────────────────────────────────────────
   onObjectDragEnd?: (e: KonvaDragEndEvent) => void;
   onObjectClick?: (index: number) => void;
   onWaypointDragEnd?: (e: KonvaWaypointDragEndEvent) => void;
   onWaypointRightClick?: (track: 'up' | 'down', segIdx: number, worldX: number, worldY: number) => void;
+  onMarkEndpointDragEnd?: (e: KonvaMarkDragEndEvent) => void;
+  onMarkClick?: (markIdx: number) => void;
   onStageDblClick?: (worldX: number, worldY: number) => void;
   onStageRightClick?: (worldX: number, worldY: number) => void;
 
@@ -139,6 +156,10 @@ export class KonvaEditorService implements OnDestroy {
   private _lastTrackUp:   readonly { x: number; y: number }[] | null = null;
   private _lastTrackDown: readonly { x: number; y: number }[] | null = null;
 
+  // ── Marks-layer cache ─────────────────────────────────────────────────────
+  private _lastMarks:             readonly { x1: number; y1: number; x2: number; y2: number }[] | null = null;
+  private _lastSelectedMarkIndex: number | null = null;
+
   // ─────────────────────────────────────────────────────────────────────────
   // INIT / RESIZE / DESTROY
   // ─────────────────────────────────────────────────────────────────────────
@@ -163,12 +184,15 @@ export class KonvaEditorService implements OnDestroy {
 
     this.objectsLayer    = new Konva.Layer();
     this.trackLayer      = new Konva.Layer();
+    this.marksLayer      = new Konva.Layer();
     this.worldGroup      = new Konva.Group();
     this.trackWorldGroup = new Konva.Group();
+    this.marksWorldGroup = new Konva.Group();
 
     this.objectsLayer.add(this.worldGroup);
     this.trackLayer.add(this.trackWorldGroup);
-    this.stage.add(this.objectsLayer, this.trackLayer);
+    this.marksLayer.add(this.marksWorldGroup);
+    this.stage.add(this.objectsLayer, this.trackLayer, this.marksLayer);
 
     // ── Stage-level events ────────────────────────────────────────────────
 
@@ -250,6 +274,7 @@ export class KonvaEditorService implements OnDestroy {
     const gy = this._cssH / 2 + this._panY * sy;
     this.worldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
     this.trackWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
+    this.marksWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
   }
 
   /**
@@ -288,6 +313,11 @@ export class KonvaEditorService implements OnDestroy {
     }
     if (this.trackWorldGroup) {
       for (const node of this.trackWorldGroup.children) {
+        (node as Konva.Node).draggable(!isPan);
+      }
+    }
+    if (this.marksWorldGroup) {
+      for (const node of this.marksWorldGroup.children) {
         (node as Konva.Node).draggable(!isPan);
       }
     }
@@ -508,6 +538,107 @@ export class KonvaEditorService implements OnDestroy {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // MARK SEGMENTS (checkpoint lines)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Create (or update) draggable Konva circles for each mark-segment endpoint.
+   *
+   * Each mark has two endpoints (p1: x1/y1, p2: x2/y2).  Both are rendered as
+   * draggable circles in world-unit coordinates.  The line connecting them is
+   * still drawn on the 2-D canvas by drawMarksOnCanvas(); we only handle the
+   * interactive endpoint handles here.
+   *
+   * Fast path: if marks array reference AND selectedMarkIndex are unchanged,
+   * only the group transform is updated.
+   */
+  setMarks(
+    marks:             readonly { x1: number; y1: number; x2: number; y2: number }[],
+    selectedMarkIndex: number | null,
+    zoom: number, panX: number, panY: number,
+  ): void {
+    if (!this.marksWorldGroup || !this.marksLayer) return;
+    this._zoom = zoom; this._panX = panX; this._panY = panY;
+
+    const marksUnchanged = marks === this._lastMarks
+      || (marks.length === 0 && (this._lastMarks?.length ?? -1) === 0);
+    const selUnchanged   = selectedMarkIndex === this._lastSelectedMarkIndex;
+
+    if (marksUnchanged && selUnchanged) {
+      this._applyGroupTransform();
+      return;
+    }
+
+    this._lastMarks             = marks;
+    this._lastSelectedMarkIndex = selectedMarkIndex;
+    this.marksWorldGroup.destroyChildren();
+
+    const sx = zoom * (this._cssW / this._logicalW);
+
+    marks.forEach((m, markIdx) => {
+      const isSel = markIdx === selectedMarkIndex;
+      const color      = isSel ? '#ffffff' : '#ffeb3b';
+      const strokeClr  = isSel ? 'rgba(255,235,59,0.8)' : 'rgba(0,0,0,0.4)';
+
+      (['p1', 'p2'] as const).forEach((endpoint) => {
+        const wx = endpoint === 'p1' ? m.x1 : m.x2;
+        const wy = endpoint === 'p1' ? m.y1 : m.y2;
+
+        const circle = new Konva.Circle({
+          x:           wx,
+          y:           -wy,   // world Y negated (Konva Y is down)
+          radius:      MARK_ENDPOINT_WORLD_R,
+          fill:        color,
+          stroke:      strokeClr,
+          strokeWidth: 1.5 / sx,
+          draggable:   !this._panMode,
+          id:          `mark-${markIdx}-${endpoint}`,
+        });
+
+        circle.on('dragend', () => {
+          this.onMarkEndpointDragEnd?.({
+            markIdx,
+            endpoint,
+            worldX: Math.round(circle.x()),
+            worldY: Math.round(-circle.y()),
+          });
+        });
+
+        circle.on('click', (e: Konva.KonvaEventObject<MouseEvent>) => {
+          e.cancelBubble = true;
+          this.onMarkClick?.(markIdx);
+        });
+
+        // Hover feedback
+        circle.on('mouseenter', () => {
+          circle.radius(MARK_ENDPOINT_WORLD_R * 1.4);
+          circle.stroke('#fff');
+          this.marksLayer?.draw();
+          document.body.style.cursor = 'grab';
+        });
+        circle.on('mouseleave', () => {
+          circle.radius(MARK_ENDPOINT_WORLD_R);
+          circle.stroke(strokeClr);
+          this.marksLayer?.draw();
+          document.body.style.cursor = '';
+        });
+        circle.on('dragstart', () => { document.body.style.cursor = 'grabbing'; });
+        circle.on('dragend',   () => { document.body.style.cursor = ''; });
+
+        this.marksWorldGroup?.add(circle);
+      });
+    });
+
+    this._applyGroupTransform();
+  }
+
+  clearMarks(): void {
+    this._lastMarks             = null;
+    this._lastSelectedMarkIndex = null;
+    this.marksWorldGroup?.destroyChildren();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // FLUSH — call this ONCE at the end of the host's render function
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -522,6 +653,7 @@ export class KonvaEditorService implements OnDestroy {
   flush(): void {
     this.objectsLayer?.draw();
     this.trackLayer?.draw();
+    this.marksLayer?.draw();
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -553,17 +685,21 @@ export class KonvaEditorService implements OnDestroy {
 
   destroy(): void {
     this.stage?.destroy();
-    this.stage              = null;
-    this.objectsLayer       = null;
-    this.trackLayer         = null;
-    this.worldGroup         = null;
-    this.trackWorldGroup    = null;
-    this._lastObjects       = null;
-    this._lastSelectedIndex = null;
-    this._lastVisibleTypes  = null;
-    this._konvaObjNodes     = [];
-    this._lastTrackUp       = null;
-    this._lastTrackDown     = null;
+    this.stage                  = null;
+    this.objectsLayer           = null;
+    this.trackLayer             = null;
+    this.marksLayer             = null;
+    this.worldGroup             = null;
+    this.trackWorldGroup        = null;
+    this.marksWorldGroup        = null;
+    this._lastObjects           = null;
+    this._lastSelectedIndex     = null;
+    this._lastVisibleTypes      = null;
+    this._konvaObjNodes         = [];
+    this._lastTrackUp           = null;
+    this._lastTrackDown         = null;
+    this._lastMarks             = null;
+    this._lastSelectedMarkIndex = null;
   }
 
   ngOnDestroy(): void { this.destroy(); }

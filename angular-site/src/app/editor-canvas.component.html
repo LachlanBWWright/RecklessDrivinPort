@@ -83,7 +83,7 @@
       (keyup)="canvasKeyUp.emit($event)"
       (wheel)="canvasWheel.emit($event)"
       (contextmenu)="canvasContextMenu.emit($event); $event.preventDefault()"
-      [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'crosshair'))"
+      [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'default'))"
     ></canvas>
     <!-- Vertical scrollbar: direct mapping - value=min(=0) → see start(Y=0), value=max → see end -->
     <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
@@ -164,31 +164,23 @@
         (mouseup)="markCanvasMouseUp.emit($event)"
         (mouseleave)="markCanvasMouseUp.emit($event)"
       ></canvas>
-      <table mat-table [dataSource]="marks" class="marks-table">
-        <ng-container matColumnDef="idx">
-          <th mat-header-cell *matHeaderCellDef>#</th>
-          <td mat-cell *matCellDef="let mark; let i = index">{{ i }}</td>
-        </ng-container>
-        <ng-container matColumnDef="x1">
-          <th mat-header-cell *matHeaderCellDef>x1</th>
-          <td mat-cell *matCellDef="let mark">{{ mark.x1 }}</td>
-        </ng-container>
-        <ng-container matColumnDef="y1">
-          <th mat-header-cell *matHeaderCellDef>y1</th>
-          <td mat-cell *matCellDef="let mark">{{ mark.y1 }}</td>
-        </ng-container>
-        <ng-container matColumnDef="x2">
-          <th mat-header-cell *matHeaderCellDef>x2</th>
-          <td mat-cell *matCellDef="let mark">{{ mark.x2 }}</td>
-        </ng-container>
-        <ng-container matColumnDef="y2">
-          <th mat-header-cell *matHeaderCellDef>y2</th>
-          <td mat-cell *matCellDef="let mark">{{ mark.y2 }}</td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['idx','x1','y1','x2','y2']"></tr>
-        <tr mat-row *matRowDef="let row; columns: ['idx','x1','y1','x2','y2'];"
-          [class.selected-row]="selectedMarkIndex === marks.indexOf(row)"
-          (click)="markSelected.emit(marks.indexOf(row))" style="cursor:pointer"></tr>
+      <!-- Plain HTML table instead of mat-table to avoid _MatRow performance overhead -->
+      <table class="marks-table">
+        <thead>
+          <tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr>
+        </thead>
+        <tbody>
+          @for (mark of marks; track $index) {
+            <tr [class.selected-row]="selectedMarkIndex === $index"
+                (click)="markSelected.emit($index)" style="cursor:pointer">
+              <td>{{ $index }}</td>
+              <td>{{ mark.x1 }}</td>
+              <td>{{ mark.y1 }}</td>
+              <td>{{ mark.x2 }}</td>
+              <td>{{ mark.y2 }}</td>
+            </tr>
+          }
+        </tbody>
       </table>
       @if (marks.length === 0) {
         <p class="marks-empty">No mark segments. Click <strong>Add Mark</strong> to create one.</p>
