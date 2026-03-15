@@ -46,10 +46,10 @@
       <mat-icon>route</mat-icon>
     </button>
     <button mat-icon-button [class.btn-active]="showTrackUp" (click)="toggleTrackUp.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-up waypoints">
-      <mat-icon style="color:#42a5f5">arrow_upward</mat-icon>
+      <mat-icon class="has-custom-color" style="color:#42a5f5">arrow_upward</mat-icon>
     </button>
     <button mat-icon-button [class.btn-active]="showTrackDown" (click)="toggleTrackDown.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-down waypoints">
-      <mat-icon style="color:#ef5350">arrow_downward</mat-icon>
+      <mat-icon class="has-custom-color" style="color:#ef5350">arrow_downward</mat-icon>
     </button>
     <button mat-icon-button [class.btn-active]="showGrid" (click)="toggleGrid.emit()" matTooltip="Toggle background grid">
       <mat-icon>grid_on</mat-icon>

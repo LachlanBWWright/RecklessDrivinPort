@@ -80,12 +80,11 @@
     }
     &:hover mat-icon, &:hover ::ng-deep mat-icon { color: #42a5f5; }
     // btn-active: highlight the button background, don't override icon colors
-    // (track-up/down icons have specific colors set via inline style)
+    // Icons without `.has-custom-color` class get the default red active color.
     &.btn-active {
       background: rgba(229, 57, 53, 0.12) !important;
-      mat-icon, ::ng-deep mat-icon {
-        // Only apply red if the icon doesn't have its own inline color
-        &:not([style]) { color: #e53935 !important; }
+      mat-icon:not(.has-custom-color), ::ng-deep mat-icon:not(.has-custom-color) {
+        color: #e53935 !important;
       }
     }
     &[disabled] { opacity: 0.35; }

@@ -761,8 +761,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const typeRes = selIdx !== null && selIdx < objs.length
         ? objs[selIdx].typeRes
         : 128;
-      objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes });
+      // Push undo BEFORE mutating so undo restores the pre-add state.
       this._pushUndo();
+      objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes });
       this.objects.set(objs);
       this.selectObject(objs.length - 1);
     };
@@ -1941,9 +1942,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   onCanvasWheel(event: WheelEvent): void {
     event.preventDefault();
     const oldZoom = this.canvasZoom();
-    const factor  = 1 - event.deltaY * 0.001;
+
+    // Normalise deltaY: WheelEvent.deltaMode can be pixels (0), lines (1), or pages (2).
+    // A mouse-wheel notch produces deltaY ≈ 120 in line mode (deltaMode=1).
+    // Touchpads fire pixel mode (deltaMode=0) with small values (2-10 per event).
+    // Dividing by 4 converts pixel-mode deltas to roughly line-mode scale
+    // (typical touchpad scroll: 480px = ~120 lines → divide by 4).
+    let delta = event.deltaY;
+    if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL) {
+      delta = delta / 4; // ~120 "line units" per 480px of scrolling
+    } else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+      delta = delta * 120;
+    }
+    const factor  = 1 - delta * 0.001;
     const newZoom = Math.min(10, Math.max(0.1, oldZoom * factor));
-    if (newZoom === oldZoom) return;
+    if (Math.abs(newZoom - oldZoom) < 1e-6) return;
 
     // Zoom toward the cursor position: the world point under the cursor
     // stays at the same screen position after zoom.
@@ -3512,6 +3525,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
    * Restart the game in place, using the custom resources.dat already written
    * to the Emscripten MEMFS.  Works without a full page reload by calling the
    * Emscripten module's callMain() entry point.
+   *
+   * Note: This is a FULL GAME RESTART, not just a resource reload.
+   * callMain() re-runs the C main() which re-initializes SDL, audio, and all
+   * global game state from scratch.  Any in-progress game session will be lost.
    */
   restartGameWithCustomResources(): void {
     const mod = (window as any).Module;
