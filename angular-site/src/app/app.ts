@@ -707,6 +707,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       width:${cssW}px; height:${cssH}px;
       pointer-events:all;
       outline:none;
+      cursor:crosshair;
     `;
 
     this.konva.init('konva-container', canvas.width, canvas.height, cssW, cssH);
@@ -798,20 +799,40 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.isPanning.set(true);
         this._prevPanMouseX = cssX;
         this._prevPanMouseY = cssY;
+        // Update cursor on the Konva container
+        const kc = document.getElementById('konva-container');
+        if (kc) kc.style.cursor = 'grabbing';
+        return;
+      }
+      if (button === 0) {
+        // Check for start-marker drag (the player start position triangle at Y=0)
+        const [wx, wy] = this.canvasToWorld(cssX, cssY);
+        const startHitR = Math.max(MIN_START_MARKER_HIT_RADIUS, BASE_START_MARKER_HIT_RADIUS / this.canvasZoom());
+        if (dist2d(this.editXStartPos(), 0, wx, wy) < startHitR) {
+          this._draggingStartMarker = true;
+          return;
+        }
       }
     };
 
     this.konva.onStageMouseMove = (cssX, cssY) => {
-      if (!this._isPanning) return;
-      const zoom = this.canvasZoom();
-      const dx = cssX - this._prevPanMouseX;
-      const dy = cssY - this._prevPanMouseY;
-      this._prevPanMouseX = cssX;
-      this._prevPanMouseY = cssY;
-      // Screen right → world left ⟹ panX decreases
-      // Screen down  → world down ⟹ panY decreases (world +Y is up)
-      this.canvasPanX.update(x => x - dx / zoom);
-      this.canvasPanY.update(y => y - dy / zoom);
+      if (this._isPanning) {
+        const zoom = this.canvasZoom();
+        const dx = cssX - this._prevPanMouseX;
+        const dy = cssY - this._prevPanMouseY;
+        this._prevPanMouseX = cssX;
+        this._prevPanMouseY = cssY;
+        // Screen right → world left ⟹ panX decreases
+        // Screen down  → world down ⟹ panY decreases (world +Y is up)
+        this.canvasPanX.update(x => x - dx / zoom);
+        this.canvasPanY.update(y => y - dy / zoom);
+        return;
+      }
+      if (this._draggingStartMarker) {
+        const [wx] = this.canvasToWorld(cssX, cssY);
+        this.editXStartPos.set(Math.round(wx));
+        this.propertiesDirty.set(true);
+      }
     };
 
     this.konva.onStageMouseUp = (button) => {
@@ -819,6 +840,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (this._isPanning) {
           this._isPanning = false;
           this.isPanning.set(false);
+          const kc = document.getElementById('konva-container');
+          if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : 'crosshair';
+        }
+        if (this._draggingStartMarker) {
+          this._draggingStartMarker = false;
         }
       }
     };
@@ -1849,6 +1875,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (event.key === ' ') {
       this.spaceDown.set(true);
       this.konva.setPanMode(true);
+      // Update cursor on the Konva container
+      const kc = document.getElementById('konva-container');
+      if (kc) kc.style.cursor = 'grab';
       event.preventDefault(); // prevent page scroll
       return;
     }
@@ -1884,6 +1913,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (event.key === ' ') {
       this.spaceDown.set(false);
       this.konva.setPanMode(false);
+      // Restore cursor
+      const kc = document.getElementById('konva-container');
+      if (kc) kc.style.cursor = 'crosshair';
       if (this._isPanning) {
         this._isPanning = false;
         this.isPanning.set(false);
