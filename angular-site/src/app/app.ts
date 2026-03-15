@@ -691,10 +691,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Forward key events to the canvas so existing Angular key handlers fire.
       konvaContainer.tabIndex = 0;
       konvaContainer.addEventListener('keydown', (e) => {
-        canvas.dispatchEvent(new KeyboardEvent('keydown', e));
+        canvas.dispatchEvent(new KeyboardEvent('keydown', {
+          key: e.key, code: e.code, keyCode: e.keyCode, which: e.which,
+          ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey,
+          repeat: e.repeat, bubbles: true, cancelable: true,
+        }));
       });
       konvaContainer.addEventListener('keyup', (e) => {
-        canvas.dispatchEvent(new KeyboardEvent('keyup', e));
+        canvas.dispatchEvent(new KeyboardEvent('keyup', {
+          key: e.key, code: e.code, keyCode: e.keyCode, which: e.which,
+          ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey,
+          repeat: e.repeat, bubbles: true, cancelable: true,
+        }));
       });
       // Focus Konva container when user clicks in canvas area
       konvaContainer.addEventListener('mousedown', () => {
@@ -1925,10 +1933,29 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   onCanvasWheel(event: WheelEvent): void {
     event.preventDefault();
-    const delta = event.deltaY;
-    const factor = 1 - delta * 0.001;
-    const newZoom = Math.min(10, Math.max(0.1, this.canvasZoom() * factor));
+    const oldZoom = this.canvasZoom();
+    const factor  = 1 - event.deltaY * 0.001;
+    const newZoom = Math.min(10, Math.max(0.1, oldZoom * factor));
+    if (newZoom === oldZoom) return;
+
+    // Zoom toward the cursor position: the world point under the cursor
+    // stays at the same screen position after zoom.
+    const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
+    const scale    = this.getCanvasScale();
+    const canvas   = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+    const W = canvas?.width  ?? 900;
+    const H = canvas?.height ?? 700;
+    const lx = event.offsetX * scale;
+    const ly = event.offsetY * scale;
+    // New pan so that (wx, wy) stays at canvas pixel (lx, ly):
+    //   lx = (wx - panX') * newZoom + W/2  →  panX' = wx - (lx - W/2) / newZoom
+    //   ly = -(wy - panY') * newZoom + H/2 →  panY' = wy + (ly - H/2) / newZoom
+    const newPanX = wx - (lx - W / 2) / newZoom;
+    const newPanY = wy + (ly - H / 2) / newZoom;
+
     this.canvasZoom.set(newZoom);
+    this.canvasPanX.set(newPanX);
+    this.canvasPanY.set(newPanY);
   }
 
   zoomIn(): void {
@@ -3505,7 +3532,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this.gameRestarting.set(false);
         }, 100);
       } else if (typeof mod._main === 'function') {
-        // Some builds expose _main directly
+        // Some builds expose _main directly as _main(argc, argv).
+        // argc=0, argv=0 (null pointer) is the safest minimal invocation for a
+        // game that doesn't use command-line arguments; wrapped in try/catch as
+        // a fallback before the full page reload.
         setTimeout(() => {
           try {
             mod._main(0, 0);

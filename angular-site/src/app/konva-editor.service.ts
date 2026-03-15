@@ -263,8 +263,8 @@ export class KonvaEditorService implements OnDestroy {
     for (const node of this._konvaObjNodes) {
       if (node instanceof Konva.Group) {
         for (const child of node.children) {
-          if (child instanceof Konva.Circle && (child as Konva.Circle).stroke() === '#ffffff') {
-            (child as Konva.Circle).strokeWidth(w);
+          if (child instanceof Konva.Circle && child.stroke() === '#ffffff') {
+            child.strokeWidth(w);
           }
         }
       }
@@ -465,17 +465,19 @@ export class KonvaEditorService implements OnDestroy {
           this.onWaypointRightClick?.(track, i, circle.x(), -circle.y());
         });
 
-        // Hover feedback: slightly enlarge and change stroke
+        // Hover feedback: slightly enlarge and change stroke.
+        // draw() (not flush) is used here because hover effects are independent
+        // of the road canvas; they don't need frame-synchronisation with redrawObjectCanvas.
         circle.on('mouseenter', () => {
           circle.radius(WAYPOINT_WORLD_R * 1.4);
           circle.stroke('#fff');
-          this.trackLayer?.batchDraw();
+          this.trackLayer?.draw();
           document.body.style.cursor = 'grab';
         });
         circle.on('mouseleave', () => {
           circle.radius(WAYPOINT_WORLD_R);
           circle.stroke('rgba(0,0,0,0.5)');
-          this.trackLayer?.batchDraw();
+          this.trackLayer?.draw();
           document.body.style.cursor = '';
         });
         circle.on('dragstart', () => { document.body.style.cursor = 'grabbing'; });
