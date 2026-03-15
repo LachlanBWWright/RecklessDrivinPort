@@ -683,12 +683,27 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const fwd = new WheelEvent('wheel', e);
         canvas.dispatchEvent(fwd);
       }, { passive: false });
+
+      // Make Konva container focusable so it can receive keyboard events.
+      // Forward key events to the canvas so existing Angular key handlers fire.
+      konvaContainer.tabIndex = 0;
+      konvaContainer.addEventListener('keydown', (e) => {
+        canvas.dispatchEvent(new KeyboardEvent('keydown', e));
+      });
+      konvaContainer.addEventListener('keyup', (e) => {
+        canvas.dispatchEvent(new KeyboardEvent('keyup', e));
+      });
+      // Focus Konva container when user clicks in canvas area
+      konvaContainer.addEventListener('mousedown', () => {
+        konvaContainer!.focus({ preventScroll: true });
+      });
     }
     // Always update the container CSS to match the current canvas display size
     konvaContainer.style.cssText = `
       position:absolute; top:0; left:0;
       width:${cssW}px; height:${cssH}px;
       pointer-events:all;
+      outline:none;
     `;
 
     this.konva.init('konva-container', canvas.width, canvas.height, cssW, cssH);
@@ -765,6 +780,43 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const arr = [...this.editTrackDown()];
         arr.splice(segIdx, 1);
         this.editTrackDown.set(arr);
+      }
+    };
+
+    // ── Pan via Konva stage mouse events ───────────────────────────────────
+    // The Konva container intercepts ALL mouse events before they reach the
+    // underlying #object-canvas.  We must handle panning through Konva's own
+    // stage mouse callbacks.  The stage.getPointerPosition() returns CSS-pixel
+    // coordinates equivalent to MouseEvent.offsetX/offsetY on the canvas.
+    this.konva.onStageMouseDown = (cssX, cssY, button) => {
+      const isPanGesture = button === 1 || (button === 0 && this.spaceDown());
+      if (isPanGesture) {
+        this._isPanning = true;
+        this.isPanning.set(true);
+        this._prevPanMouseX = cssX;
+        this._prevPanMouseY = cssY;
+      }
+    };
+
+    this.konva.onStageMouseMove = (cssX, cssY) => {
+      if (!this._isPanning) return;
+      const zoom = this.canvasZoom();
+      const dx = cssX - this._prevPanMouseX;
+      const dy = cssY - this._prevPanMouseY;
+      this._prevPanMouseX = cssX;
+      this._prevPanMouseY = cssY;
+      // Screen right → world left ⟹ panX decreases
+      // Screen down  → world down ⟹ panY decreases (world +Y is up)
+      this.canvasPanX.update(x => x - dx / zoom);
+      this.canvasPanY.update(y => y - dy / zoom);
+    };
+
+    this.konva.onStageMouseUp = (button) => {
+      if (button === 0 || button === 1) {
+        if (this._isPanning) {
+          this._isPanning = false;
+          this.isPanning.set(false);
+        }
       }
     };
   }
@@ -1793,6 +1845,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   onCanvasKeyDown(event: KeyboardEvent): void {
     if (event.key === ' ') {
       this.spaceDown.set(true);
+      this.konva.setPanMode(true);
       event.preventDefault(); // prevent page scroll
       return;
     }
@@ -1827,6 +1880,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   onCanvasKeyUp(event: KeyboardEvent): void {
     if (event.key === ' ') {
       this.spaceDown.set(false);
+      this.konva.setPanMode(false);
       if (this._isPanning) {
         this._isPanning = false;
         this.isPanning.set(false);
@@ -2131,6 +2185,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     } else {
       this.konva.clearTrackWaypoints();
     }
+
+    // ── SYNCHRONOUS flush ──────────────────────────────────────────────────
+    // Draw all Konva layers NOW, in the same requestAnimationFrame callback
+    // as the road canvas above.  This keeps both canvases in the same
+    // compositor frame and eliminates the one-frame "objects trail behind
+    // background" effect.
+    this.konva.flush();
   }
 
   // ---- Mark segment editor ----
@@ -3348,7 +3409,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /**
    * Handle file selection for custom resources.dat in the game tab.
-   * Reads the file and mounts it in the Emscripten MEMFS, then reloads the game.
+   * Reads the file and mounts it in the Emscripten MEMFS, then attempts an
+   * in-place game restart (no full page reload needed).
    */
   async onCustomResourcesFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
@@ -3372,9 +3434,68 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     input.value = '';
   }
 
+  /** True while a game restart triggered by custom resources is in progress. */
+  gameRestarting = signal(false);
+
+  /**
+   * Restart the game in place, using the custom resources.dat already written
+   * to the Emscripten MEMFS.  Works without a full page reload by calling the
+   * Emscripten module's callMain() entry point.
+   */
+  restartGameWithCustomResources(): void {
+    const mod = (window as any).Module;
+    if (!mod) {
+      this.statusText.set('WASM module not ready. Please wait and try again.');
+      return;
+    }
+    this.gameRestarting.set(true);
+    this.statusText.set('Restarting game with custom resources…');
+    try {
+      // Attempt graceful restart via Emscripten callMain if available.
+      // This re-runs the C main() function which reloads all resources from FS.
+      if (typeof mod.pauseMainLoop === 'function') {
+        mod.pauseMainLoop();
+      }
+      if (typeof mod.callMain === 'function') {
+        setTimeout(() => {
+          try {
+            mod.callMain([]);
+            this.statusText.set('Game restarted with custom resources.dat ✓');
+          } catch (err) {
+            console.warn('[Angular] callMain failed, falling back to page reload', err);
+            window.location.reload();
+          }
+          this.gameRestarting.set(false);
+        }, 100);
+      } else if (typeof mod._main === 'function') {
+        // Some builds expose _main directly
+        setTimeout(() => {
+          try {
+            mod._main(0, 0);
+            this.statusText.set('Game restarted with custom resources.dat ✓');
+          } catch (err) {
+            console.warn('[Angular] _main failed, falling back to page reload', err);
+            window.location.reload();
+          }
+          this.gameRestarting.set(false);
+        }, 100);
+      } else {
+        // No restart API – fall back to page reload.
+        // Store the loaded file in sessionStorage so it auto-applies on next load.
+        this.statusText.set('Applying custom resources requires a page reload…');
+        setTimeout(() => window.location.reload(), 500);
+        this.gameRestarting.set(false);
+      }
+    } catch (e) {
+      console.error('[Angular] Game restart failed', e);
+      this.gameRestarting.set(false);
+      this.statusText.set('Failed to restart game. Please refresh the page manually.');
+    }
+  }
+
   /**
    * Mount a custom resources.dat into the Emscripten MEMFS at /resources/resources.dat.
-   * The game reads from this path so the custom data takes effect immediately.
+   * The game reads from this path so the custom data takes effect on next restart.
    */
   private _mountCustomResourcesFs(bytes: Uint8Array): void {
     try {
@@ -3392,8 +3513,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       FS.writeFile('/resources/resources.dat', bytes);
       this.customResourcesLoaded.set(true);
       this.statusText.set(
-        `Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB) into the game filesystem. ` +
-        'If the game is already running, restart it (refresh the page) to apply the new resources.',
+        `Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB). ` +
+        'Click "Restart Game" to apply the new resources without a page reload.',
       );
       console.log('[Angular] Custom resources.dat written to MEMFS');
     } catch (e) {

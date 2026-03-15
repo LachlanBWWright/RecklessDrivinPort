@@ -79,6 +79,19 @@
           <button mat-stroked-button (click)="customResInput.click()" matTooltip="Load a custom resources.dat to test edited levels">
             <mat-icon>upload_file</mat-icon> Load Custom resources.dat
           </button>
+          @if (customResourcesLoaded()) {
+            <button mat-raised-button color="accent"
+              [disabled]="gameRestarting()"
+              (click)="restartGameWithCustomResources()"
+              matTooltip="Restart the game with your custom resources.dat — no page reload needed">
+              @if (gameRestarting()) {
+                <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
+              } @else {
+                <mat-icon>restart_alt</mat-icon>
+              }
+              Restart Game
+            </button>
+          }
           @if (customResourcesName()) {
             <span class="custom-res-badge">
               <mat-icon class="badge-icon">check_circle</mat-icon>
