@@ -531,7 +531,7 @@ main {
 
 .object-canvas-layout {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: stretch;
   width: 100%;
   min-height: 500px;
@@ -553,7 +553,7 @@ main {
     overflow-y: auto;
     border-left: 1px solid var(--border);
     background: var(--surface2);
-    padding-left: 4px;
+    padding: 0 8px 12px 8px;
 
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 3px; }

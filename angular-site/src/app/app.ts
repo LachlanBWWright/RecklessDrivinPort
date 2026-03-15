@@ -410,6 +410,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   showTrackUp = signal(true);
   /** True while track-down waypoints are visible. */
   showTrackDown = signal(true);
+  /** True while the background grid is visible. */
+  showGrid = signal(true);
 
   // ---- Undo / Redo ----
   /** Snapshot stack for undo. Each entry is a deep copy of the objects array. */
@@ -605,6 +607,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.showRoad();
       this.showTrackUp();
       this.showTrackDown();
+      this.showGrid();
       this.editTrackUp();
       this.editTrackDown();
       this.hoverTrackWaypoint();
@@ -1962,29 +1965,31 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     ctx.fillRect(0, 0, W, H);
 
     // Draw grid (subtle, over the background) — all lines in a single path for performance
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-    ctx.lineWidth = 1;
-    const gridStep = 100; // world units
-    const gridStepPx = gridStep * zoom;
-    if (gridStepPx > 8) {
-      const startWorldX = panX - W / (2 * zoom);
-      const startWorldY = panY - H / (2 * zoom);
-      const endWorldX = panX + W / (2 * zoom);
-      const endWorldY = panY + H / (2 * zoom);
-      const firstX = Math.floor(startWorldX / gridStep) * gridStep;
-      const firstY = Math.floor(startWorldY / gridStep) * gridStep;
-      ctx.beginPath();
-      for (let gx = firstX; gx <= endWorldX; gx += gridStep) {
-        const [cx] = this.worldToCanvas(gx, 0);
-        ctx.moveTo(cx, 0);
-        ctx.lineTo(cx, H);
+    if (this.showGrid()) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 1;
+      const gridStep = 100; // world units
+      const gridStepPx = gridStep * zoom;
+      if (gridStepPx > 8) {
+        const startWorldX = panX - W / (2 * zoom);
+        const startWorldY = panY - H / (2 * zoom);
+        const endWorldX = panX + W / (2 * zoom);
+        const endWorldY = panY + H / (2 * zoom);
+        const firstX = Math.floor(startWorldX / gridStep) * gridStep;
+        const firstY = Math.floor(startWorldY / gridStep) * gridStep;
+        ctx.beginPath();
+        for (let gx = firstX; gx <= endWorldX; gx += gridStep) {
+          const [cx] = this.worldToCanvas(gx, 0);
+          ctx.moveTo(cx, 0);
+          ctx.lineTo(cx, H);
+        }
+        for (let gy = firstY; gy <= endWorldY; gy += gridStep) {
+          const [, cy] = this.worldToCanvas(0, gy);
+          ctx.moveTo(0, cy);
+          ctx.lineTo(W, cy);
+        }
+        ctx.stroke();
       }
-      for (let gy = firstY; gy <= endWorldY; gy += gridStep) {
-        const [, cy] = this.worldToCanvas(0, gy);
-        ctx.moveTo(0, cy);
-        ctx.lineTo(W, cy);
-      }
-      ctx.stroke();
     }
 
     if (level && this.showRoad()) {

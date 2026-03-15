@@ -19,6 +19,7 @@ export class EditorCanvasComponent {
   @Input() showRoad = true;
   @Input() showTrackUp = true;
   @Input() showTrackDown = true;
+  @Input() showGrid = true;
   @Input() canUndo = false;
   @Input() canRedo = false;
   @Input() trackUpCount = 0;
@@ -62,6 +63,7 @@ export class EditorCanvasComponent {
   @Output() toggleRoad = new EventEmitter<void>();
   @Output() toggleTrackUp = new EventEmitter<void>();
   @Output() toggleTrackDown = new EventEmitter<void>();
+  @Output() toggleGrid = new EventEmitter<void>();
   @Output() markSelected = new EventEmitter<number>();
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();

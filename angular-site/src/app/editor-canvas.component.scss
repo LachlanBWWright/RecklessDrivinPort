@@ -66,14 +66,28 @@
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    mat-icon {
+    // Fix icon baseline alignment — use a wrapper flex to center icon
+    ::ng-deep .mat-mdc-button-touch-target { display: none; }
+    ::ng-deep .mat-mdc-button-persistent-ripple { border-radius: 50%; }
+    mat-icon, ::ng-deep mat-icon {
       font-size: 18px !important;
-      color: #aaa;
-      line-height: 1 !important;
-      vertical-align: middle !important;
+      height: 18px !important;
+      width: 18px !important;
+      line-height: 18px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
-    &:hover mat-icon { color: #42a5f5; }
-    &.btn-active mat-icon { color: #e53935 !important; }
+    &:hover mat-icon, &:hover ::ng-deep mat-icon { color: #42a5f5; }
+    // btn-active: highlight the button background, don't override icon colors
+    // (track-up/down icons have specific colors set via inline style)
+    &.btn-active {
+      background: rgba(229, 57, 53, 0.12) !important;
+      mat-icon, ::ng-deep mat-icon {
+        // Only apply red if the icon doesn't have its own inline color
+        &:not([style]) { color: #e53935 !important; }
+      }
+    }
     &[disabled] { opacity: 0.35; }
   }
 }
