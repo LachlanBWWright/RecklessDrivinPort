@@ -5,9 +5,9 @@
  * as used by the Reckless Drivin' port in port/lzrw/lzrw.c.
  *
  * The pack handle format used by Reckless Drivin' is:
- *   [4-byte big-endian uncompressed size] [FLAG_BYTE] [payload…]
+ *   [4-byte big-endian uncompressed size] [FLAG_BYTE + 3 zero bytes] [payload…]
  *
- * FLAG_BYTE = 0  → LZRW3-A compressed payload
+ * FLAG_BYTE = 0  → LZRW3-A compressed payload (in the first of the 4 flag bytes)
  * FLAG_BYTE = 1  → uncompressed copy (payload is raw data)
  *
  * Exported helpers:
@@ -22,7 +22,7 @@ const DEPTH = 1 << DEPTH_BITS; // 8
 const PARTITION_LEN = 1 << (12 - DEPTH_BITS); // 512
 const HASH_MASK = PARTITION_LEN - 1; // 511
 const DEPTH_MASK = DEPTH - 1; // 7
-const FLAG_BYTES = 1;
+const FLAG_BYTES = 4; // lzrw.c line 275: FLAG_BYTES = 4 (FLAG_BYTE + 3 padding zeros)
 const FLAG_COPY = 1;
 const MAX_CMP_GROUP = 2 + 16 * 2; // 34
 const COMPRESS_OVERRUN = 1024;
@@ -94,7 +94,12 @@ export function lzrw3aDecompress(src: Uint8Array): Uint8Array {
     for (let u = 0; u < unroll && pSrc < srcLen; u++) {
       if (control & 1) {
         // ---- Copy item ----
-        if (pSrc + 1 >= srcLen) break;
+        if (pSrc + 1 >= srcLen) {
+          // Incomplete copy item at end of stream: advance past end to
+          // terminate the outer while loop and avoid an infinite loop.
+          pSrc = srcLen;
+          break;
+        }
         const lenmt_raw = src[pSrc++];
         const byte2 = src[pSrc++];
         const index = ((lenmt_raw & 0xf0) << 4) | byte2;
@@ -173,15 +178,16 @@ export function packHandleDecompress(handle: Uint8Array): Uint8Array {
 /**
  * Encode raw data as a FLAG_COPY pack handle (no compression).
  *
- * Format: [4-byte BE uint32 uncompressed_size][0x01][data…]
+ * Format: [4-byte BE uint32 uncompressed_size][FLAG_COPY][0x00][0x00][0x00][data…]
+ *         (FLAG_BYTES=4: FLAG_BYTE at offset 4 + 3 zero padding bytes)
  *
  * The runtime's LZRWDecodeHandle will accept this and simply copy the payload.
  */
 export function packHandleCompress(data: Uint8Array): Uint8Array {
-  const out = new Uint8Array(4 + 1 + data.length);
+  const out = new Uint8Array(4 + FLAG_BYTES + data.length);
   const view = new DataView(out.buffer);
   view.setUint32(0, data.length, false); // big-endian
-  out[4] = FLAG_COPY;
-  out.set(data, 5);
+  out[4] = FLAG_COPY; // bytes 5–7 remain 0 (Uint8Array zero-initialised)
+  out.set(data, 4 + FLAG_BYTES);
   return out;
 }

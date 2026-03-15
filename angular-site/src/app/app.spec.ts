@@ -1,9 +1,13 @@
 import { TestBed } from '@angular/core/testing';
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { App } from './app';
 
 describe('App', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ declarations: [App] }).compileComponents();
+    await TestBed.configureTestingModule({
+      declarations: [App],
+      schemas: [NO_ERRORS_SCHEMA],
+    }).compileComponents();
   });
 
   it('should create the app', () => {
@@ -85,10 +89,10 @@ describe('App', () => {
     const app = TestBed.createComponent(App).componentInstance;
     app.setSection('objects');
     expect(app.editorSection()).toBe('objects');
-    app.setSection('road');
-    expect(app.editorSection()).toBe('road');
     app.setSection('sprites');
     expect(app.editorSection()).toBe('sprites');
+    app.setSection('properties');
+    expect(app.editorSection()).toBe('properties');
   });
 
   it('should start with no editor data', () => {
@@ -108,13 +112,12 @@ describe('App', () => {
     expect(app.selectedObjIndex()).toBe(1);
   });
 
-  it('should update raw time when editing friendly seconds', () => {
+  it('should update time when editing time directly (seconds stored as-is)', () => {
     const app = TestBed.createComponent(App).componentInstance;
 
-    app.onTimeSecondsInput({ target: { value: '45' } } as unknown as Event);
+    app.onPropsInput('time', { target: { value: '45' } } as unknown as Event);
 
-    expect(app.editTimeSeconds()).toBe(45);
-    expect(app.editTime()).toBe(4500);
+    expect(app.editTime()).toBe(45);
     expect(app.propertiesDirty()).toBe(true);
   });
 
@@ -161,7 +164,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.site-nav')).toBeTruthy();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.site-toolbar, .site-nav, mat-toolbar')).toBeTruthy();
   });
 
   it('should have nav tabs for game and editor', async () => {

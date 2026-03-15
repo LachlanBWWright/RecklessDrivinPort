@@ -43,30 +43,25 @@ export interface PackEntry {
 export function cryptPackHandle(handle: Uint8Array): void {
   if (handle.length <= UNCRYPTED_HEADER) return;
 
-  // On little-endian (browser), the 4-byte XOR key must be byte-swapped
-  // to match the big-endian byte order the original Mac code expected.
+  // We read/write 4-byte chunks as big-endian uint32 (DataView, littleEndian=false).
+  // The original Mac PPC C code did: *longPtr++ ^= gKey  (big-endian machine)
+  // which XORs each 4-byte chunk's bytes as [gKey>>24, gKey>>16, gKey>>8, gKey&ff].
+  // When we read big-endian with DataView and XOR with G_KEY directly, we get the
+  // same byte-level result — NO byte-swap needed.
   const k = G_KEY;
-  const xorKey =
-    (((k & 0xff000000) >>> 24) |
-      ((k & 0x00ff0000) >>> 8) |
-      ((k & 0x0000ff00) << 8) |
-      ((k & 0x000000ff) << 24)) >>>
-    0;
+  const xorKey = k >>> 0; // use G_KEY directly; big-endian DataView handles byte order
 
   let pos = UNCRYPTED_HEADER;
 
   // 4-byte aligned XOR
   while (pos + 4 <= handle.length) {
     const view = new DataView(handle.buffer, handle.byteOffset + pos, 4);
-    const v = view.getUint32(0, false) ^ xorKey; // big-endian XOR
+    const v = view.getUint32(0, false) ^ xorKey; // big-endian read/write
     view.setUint32(0, v, false);
     pos += 4;
   }
 
-  // Trailing bytes (< 4) use individual bytes from the ORIGINAL key (not the
-  // byte-swapped xorKey). The original C code (packs.c) explicitly uses `gKey>>24`
-  // etc. for the tail section, because those shifts operate on the big-endian key
-  // value directly and already produce the correct byte ordering without an extra swap.
+  // Trailing bytes (< 4) use individual key bytes [gKey>>24, gKey>>16, gKey>>8, gKey&ff]
   const keyBytes = [(k >>> 24) & 0xff, (k >>> 16) & 0xff, (k >>> 8) & 0xff, k & 0xff];
   let shift = 0;
   while (pos < handle.length) {

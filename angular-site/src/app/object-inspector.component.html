@@ -1,0 +1,86 @@
+<div class="inspector-container">
+  <div class="inspector-header">
+    <mat-icon class="inspector-icon">tune</mat-icon>
+    <span class="inspector-title">Inspector</span>
+  </div>
+
+  @if (selectedIndex !== null) {
+    <div class="inspector-sprite-row">
+      @if (spriteUrl; as url) {
+        <div class="inspector-sprite-wrapper">
+          <img [src]="url" class="obj-inspector-sprite" alt="sprite preview" />
+        </div>
+      }
+      <div class="inspector-obj-info">
+        <span class="inspector-obj-label">Object #{{ selectedIndex }}</span>
+        @if (typeDimLabel) {
+          <span class="type-dim-badge">{{ typeDimLabel }}</span>
+        }
+      </div>
+    </div>
+
+    <mat-divider class="inspector-divider"></mat-divider>
+
+    <div class="inspector-fields">
+      <mat-form-field appearance="outline" class="inspector-field">
+        <mat-label>X (pixels)</mat-label>
+        <input matInput type="number" [value]="editX" (input)="fieldInput.emit({field: 'x', event: $event})" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="inspector-field">
+        <mat-label>Y (pixels)</mat-label>
+        <input matInput type="number" [value]="editY" (input)="fieldInput.emit({field: 'y', event: $event})" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="inspector-field">
+        <mat-label>Direction (rad)</mat-label>
+        <input matInput type="number" step="0.01" min="-3.14159" max="3.14159"
+          [value]="editDir" (input)="fieldInput.emit({field: 'dir', event: $event})" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="inspector-field">
+        <mat-label>Type ID</mat-label>
+        <input matInput type="number" [value]="editTypeRes"
+          (input)="fieldInput.emit({field: 'typeRes', event: $event})" />
+        <mat-hint>128 = player car</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <mat-divider class="inspector-divider"></mat-divider>
+
+    <div class="type-filter-section">
+      <div class="type-filter-header">
+        <span class="filter-label">Filter by type</span>
+        <div class="filter-actions">
+          <button mat-button (click)="showAll.emit()" class="filter-btn">All</button>
+          <button mat-button (click)="hideAll.emit()" class="filter-btn">None</button>
+        </div>
+      </div>
+      <div class="type-chip-list">
+        @for (type of typePalette; track type.typeId) {
+          <button type="button" class="type-chip"
+            [class.type-chip--inactive]="!visibleTypeFilter.has(type.typeId)"
+            [matTooltip]="'Type ' + type.typeId"
+            (click)="typeVisibilityToggle.emit(type.typeId)">
+            <span class="type-chip-swatch" [style.background]="type.hex"></span>
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="inspector-actions">
+      <button mat-stroked-button color="warn" (click)="removeSelected.emit()" class="remove-btn">
+        <mat-icon>delete</mat-icon> Remove
+      </button>
+      <span class="auto-apply-note muted">Changes apply automatically</span>
+    </div>
+
+  } @else {
+    <div class="inspector-empty">
+      <mat-icon class="empty-icon">touch_app</mat-icon>
+      <p>Click an object on the canvas to select it,<br>or double-click to add one.</p>
+      <p class="muted">Drag track waypoints (coloured dots) to reposition them.</p>
+    </div>
+  }
+</div>
+

@@ -1,0 +1,153 @@
+<!-- Canvas toolbar -->
+<div class="canvas-toolbar">
+  <span class="hint-text">
+    <mat-icon class="hint-icon">mouse</mat-icon>
+    Drag objects &amp; track dots · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Ctrl+Z</kbd> undo · <kbd>Ctrl+Y</kbd> redo · <kbd>Space</kbd>+drag pans
+  </span>
+  <div class="canvas-controls">
+    <!-- Undo / Redo -->
+    <button mat-icon-button (click)="undo.emit()" [disabled]="!canUndo" matTooltip="Undo (Ctrl+Z)">
+      <mat-icon>undo</mat-icon>
+    </button>
+    <button mat-icon-button (click)="redo.emit()" [disabled]="!canRedo" matTooltip="Redo (Ctrl+Y)">
+      <mat-icon>redo</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Object actions -->
+    <button mat-stroked-button (click)="addObject.emit()" matTooltip="Add new object">
+      <mat-icon>add</mat-icon> Object
+    </button>
+    <button mat-icon-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+    <button mat-icon-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected (Del)">
+      <mat-icon>delete</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- View controls -->
+    <button mat-icon-button (click)="frameAll.emit()" matTooltip="Frame all objects">
+      <mat-icon>fit_screen</mat-icon>
+    </button>
+    <button mat-icon-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
+      <mat-icon>center_focus_strong</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Visibility toggles -->
+    <button mat-icon-button [class.btn-active]="showRoad" (click)="toggleRoad.emit()" matTooltip="Toggle road preview">
+      <mat-icon>road</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showObjects" (click)="toggleObjects.emit()" matTooltip="Toggle objects">
+      <mat-icon>directions_car</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle mark segments">
+      <mat-icon>edit_location</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()" matTooltip="Toggle track overlay">
+      <mat-icon>route</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackUp" (click)="toggleTrackUp.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-up waypoints">
+      <mat-icon class="has-custom-color" style="color:#42a5f5">arrow_upward</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackDown" (click)="toggleTrackDown.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-down waypoints">
+      <mat-icon class="has-custom-color" style="color:#ef5350">arrow_downward</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showGrid" (click)="toggleGrid.emit()" matTooltip="Toggle background grid">
+      <mat-icon>grid_on</mat-icon>
+    </button>
+    @if (showTrackOverlay) {
+      <button mat-stroked-button [disabled]="workerBusy" (click)="saveTrack.emit()" matTooltip="Save track waypoints">
+        <mat-icon>save</mat-icon> Tracks
+      </button>
+    }
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Zoom controls -->
+    <button mat-icon-button (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
+    <button mat-icon-button (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
+    <button mat-icon-button (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
+  </div>
+</div>
+
+<div class="object-canvas-col">
+  <div class="canvas-subtitle">
+    <mat-icon class="canvas-subtitle-icon">map</mat-icon>
+    Scene Preview — drag objects &amp; track waypoints
+  </div>
+  <div class="canvas-with-scrollbars">
+    <canvas id="object-canvas" class="object-canvas" width="900" height="700"
+      tabindex="0"
+      (mousedown)="canvasMouseDown.emit($event)"
+      (mousemove)="canvasMouseMove.emit($event)"
+      (mouseup)="canvasMouseUp.emit($event)"
+      (dblclick)="canvasDblClick.emit($event)"
+      (keydown)="canvasKeyDown.emit($event)"
+      (keyup)="canvasKeyUp.emit($event)"
+      (wheel)="canvasWheel.emit($event)"
+      (contextmenu)="canvasContextMenu.emit($event); $event.preventDefault()"
+      [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'default'))"
+    ></canvas>
+    <!-- Vertical scrollbar: direct mapping - value=min(=0) → see start(Y=0), value=max → see end -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
+      aria-label="Vertical scroll position"
+      [min]="0" [max]="scrollYMax" [step]="10"
+      [value]="panY"
+      (input)="onVertScrollInput($event)"
+    />
+    <!-- Horizontal scrollbar -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
+      [min]="scrollXMin" [max]="scrollXMax" [step]="5"
+      [value]="panX"
+      (input)="onHorizScrollInput($event)"
+    />
+  </div>
+  <div class="canvas-status-bar">
+    <span class="zoom-info">{{ (zoom * 100).toFixed(0) }}%</span>
+    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
+    <span class="pan-info">({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})</span>
+    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
+    <span class="legend-item" style="color:#42a5f5">■ Up</span>
+    <span class="legend-item" style="color:#ef5350">■ Down</span>
+    <span class="legend-item" style="color:#ffeb3b">■ Marks</span>
+    <span class="legend-item" style="color:#00e5ff">▲ Start X</span>
+  </div>
+
+  <!-- Marks editor panel (extracted into its own component) -->
+  <app-marks-editor
+    [marks]="marks"
+    [selectedMarkIndex]="selectedMarkIndex"
+    [workerBusy]="workerBusy"
+    (markSelected)="markSelected.emit($event)"
+    (addMark)="addMark.emit()"
+    (removeMark)="removeMark.emit()"
+    (saveMarks)="saveMarks.emit()"
+    (markFieldInput)="markFieldInput.emit($event)"
+    (markCanvasMouseDown)="markCanvasMouseDown.emit($event)"
+    (markCanvasMouseMove)="markCanvasMouseMove.emit($event)"
+    (markCanvasMouseUp)="markCanvasMouseUp.emit($event)"
+  ></app-marks-editor>
+
+  <!-- Road stats -->
+  <mat-expansion-panel class="road-stats-panel" [expanded]="false">
+    <mat-expansion-panel-header>
+      <mat-panel-title><mat-icon>timeline</mat-icon>&nbsp;Road &amp; Track Stats</mat-panel-title>
+    </mat-expansion-panel-header>
+    <div class="road-stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" style="color:#42a5f5">{{ trackUpCount }}</div>
+        <div class="stat-label">Track Up</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#ef5350">{{ trackDownCount }}</div>
+        <div class="stat-label">Track Down</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ roadSegCount }}</div>
+        <div class="stat-label">Road Segs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#ffeb3b">{{ marks.length }}</div>
+        <div class="stat-label">Marks</div>
+      </div>
+    </div>
+  </mat-expansion-panel>
+</div>
+

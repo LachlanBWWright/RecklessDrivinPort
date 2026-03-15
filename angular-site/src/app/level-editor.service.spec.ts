@@ -88,16 +88,16 @@ describe('parseMarkSegs', () => {
   it('parses mark segments correctly', () => {
     const buf = new Uint8Array(16 * 2); // 2 marks
     const view = new DataView(buf.buffer);
-    view.setInt32(0, 10, false);
-    view.setInt32(4, 20, false);
-    view.setInt32(8, 30, false);
-    view.setInt32(12, 40, false);
+    view.setFloat32(0, 10, false);
+    view.setFloat32(4, 20, false);
+    view.setFloat32(8, 30, false);
+    view.setFloat32(12, 40, false);
     const marks = parseMarkSegs(buf);
     expect(marks.length).toBe(2);
-    expect(marks[0].x1).toBe(10);
-    expect(marks[0].y1).toBe(20);
-    expect(marks[0].x2).toBe(30);
-    expect(marks[0].y2).toBe(40);
+    expect(marks[0].x1).toBeCloseTo(10);
+    expect(marks[0].y1).toBeCloseTo(20);
+    expect(marks[0].x2).toBeCloseTo(30);
+    expect(marks[0].y2).toBeCloseTo(40);
   });
 
   it('returns empty array for empty input', () => {
@@ -220,16 +220,17 @@ describe('LevelEditorService', () => {
     });
   });
 
-  it('decodeSpriteFrame decodes 16-bit sprite pixels from Pack #137', () => {
+  it('decodeSpriteFrame decodes 16-bit sprite pixels from Pack #137 (RGB555)', () => {
     const sprite = new Uint8Array(8 + 2 * 4);
     const view = new DataView(sprite.buffer);
     view.setUint16(0, 2, false); // width
     view.setUint16(2, 2, false); // height
     sprite[4] = 1; // log2xSize => stride 2
     view.setUint16(8, 0x0000, false); // mask / transparent
-    view.setUint16(10, 0xf800, false); // red
-    view.setUint16(12, 0x07e0, false); // green
-    view.setUint16(14, 0x001f, false); // blue
+    // RGB555 test values: bits [14-10]=R, [9-5]=G, [4-0]=B
+    view.setUint16(10, 0xf800, false); // r≈30, g=0, b=0 (red-dominant)
+    view.setUint16(12, 0x07e0, false); // r=1, g=31, b=0 (green-dominant)
+    view.setUint16(14, 0x001f, false); // r=0, g=0, b=31 (pure blue)
 
     const resources = [{
       type: 'Pack',
@@ -247,18 +248,18 @@ describe('LevelEditorService', () => {
 });
 
 describe('serializeMarkSegs', () => {
-  it('produces big-endian bytes matching input marks', () => {
+  it('produces big-endian float32 bytes matching input marks', () => {
     const marks = [{ x1: 10, y1: 20, x2: 30, y2: 40 }];
     const buf = serializeMarkSegs(marks);
     expect(buf.length).toBe(16);
     const view = new DataView(buf.buffer);
-    expect(view.getInt32(0,  false)).toBe(10);
-    expect(view.getInt32(4,  false)).toBe(20);
-    expect(view.getInt32(8,  false)).toBe(30);
-    expect(view.getInt32(12, false)).toBe(40);
+    expect(view.getFloat32(0,  false)).toBeCloseTo(10);
+    expect(view.getFloat32(4,  false)).toBeCloseTo(20);
+    expect(view.getFloat32(8,  false)).toBeCloseTo(30);
+    expect(view.getFloat32(12, false)).toBeCloseTo(40);
   });
 
-  it('round-trips through parseMarkSegs', () => {
+  it('round-trips through parseMarkSegs (integer values representable exactly as float32)', () => {
     const orig = [
       { x1: -100, y1: 200, x2: 300, y2: -400 },
       { x1: 0,    y1: 0,   x2: 1,   y2: 1    },
@@ -266,8 +267,14 @@ describe('serializeMarkSegs', () => {
     const serialized = serializeMarkSegs(orig);
     const parsed = parseMarkSegs(serialized);
     expect(parsed.length).toBe(2);
-    expect(parsed[0]).toEqual(orig[0]);
-    expect(parsed[1]).toEqual(orig[1]);
+    expect(parsed[0].x1).toBeCloseTo(orig[0].x1);
+    expect(parsed[0].y1).toBeCloseTo(orig[0].y1);
+    expect(parsed[0].x2).toBeCloseTo(orig[0].x2);
+    expect(parsed[0].y2).toBeCloseTo(orig[0].y2);
+    expect(parsed[1].x1).toBeCloseTo(orig[1].x1);
+    expect(parsed[1].y1).toBeCloseTo(orig[1].y1);
+    expect(parsed[1].x2).toBeCloseTo(orig[1].x2);
+    expect(parsed[1].y2).toBeCloseTo(orig[1].y2);
   });
 
   it('returns empty buffer for empty array', () => {
