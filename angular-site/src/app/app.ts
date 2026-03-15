@@ -613,6 +613,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.hoverTrackWaypoint();
       this.marks();
       this.selectedMarkIndex();
+      this.editXStartPos();
       const section = this.editorSection();
       if (section === 'objects') {
         this.scheduleCanvasRedraw();
@@ -755,7 +756,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     this.konva.onStageDblClick = (wx, wy) => {
       const objs = [...this.objects()];
-      objs.push({ x: wx, y: wy, dir: 0, typeRes: 128 });
+      // Use currently selected object's typeRes if available, otherwise default to 128
+      const selIdx = this.selectedObjIndex();
+      const typeRes = selIdx !== null && selIdx < objs.length
+        ? objs[selIdx].typeRes
+        : 128;
+      objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes });
+      this._pushUndo();
       this.objects.set(objs);
       this.selectObject(objs.length - 1);
     };
