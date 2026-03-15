@@ -71,6 +71,21 @@
           </mat-slider>
           <span class="volume-value">{{ masterVolume() }}%</span>
         </div>
+        <!-- Custom resources.dat loader -->
+        <div class="custom-resources-row">
+          <span class="controls-label">Custom resources.dat:</span>
+          <input #customResInput type="file" accept=".dat" style="display:none"
+                 (change)="onCustomResourcesFileSelected($event)" />
+          <button mat-stroked-button (click)="customResInput.click()" matTooltip="Load a custom resources.dat to test edited levels">
+            <mat-icon>upload_file</mat-icon> Load Custom resources.dat
+          </button>
+          @if (customResourcesName()) {
+            <span class="custom-res-badge">
+              <mat-icon class="badge-icon">check_circle</mat-icon>
+              {{ customResourcesName() }} loaded
+            </span>
+          }
+        </div>
       </mat-card-footer>
     </mat-card>
   </section>
@@ -256,6 +271,13 @@
                       [marks]="marks()"
                       [selectedMarkIndex]="selectedMarkIndex()"
                       [showTrackOverlay]="showTrackOverlay()"
+                      [showObjects]="showObjects()"
+                      [showMarks]="showMarks()"
+                      [showRoad]="showRoad()"
+                      [showTrackUp]="showTrackUp()"
+                      [showTrackDown]="showTrackDown()"
+                      [canUndo]="canUndo()"
+                      [canRedo]="canRedo()"
                       [trackUpCount]="selectedLevel()!.trackUp.length"
                       [trackDownCount]="selectedLevel()!.trackDown.length"
                       [roadSegCount]="selectedLevel()!.roadSegCount"
@@ -285,6 +307,13 @@
                       (frameAll)="frameAllObjects()"
                       (centerSelected)="centerOnSelectedObject()"
                       (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
+                      (toggleObjects)="showObjects.set(!showObjects())"
+                      (toggleMarks)="showMarks.set(!showMarks())"
+                      (toggleRoad)="showRoad.set(!showRoad())"
+                      (toggleTrackUp)="showTrackUp.set(!showTrackUp())"
+                      (toggleTrackDown)="showTrackDown.set(!showTrackDown())"
+                      (undo)="undo()"
+                      (redo)="redo()"
                       (saveTrack)="saveTrack()"
                       (zoomIn)="zoomIn()"
                       (zoomOut)="zoomOut()"
@@ -399,6 +428,13 @@
                                   (click)="openSpriteEditor(selectedPackSpriteId()!)"
                                   [disabled]="workerBusy()">
                                   <mat-icon>brush</mat-icon> Edit Pixels
+                                </button>
+                                <!-- PNG upload to replace the sprite directly -->
+                                <input #spritePngInput type="file" accept="image/png,image/*" style="display:none"
+                                  (change)="onSpritePngUpload($event, selectedPackSpriteId()!)" />
+                                <button mat-stroked-button (click)="spritePngInput.click()" [disabled]="workerBusy()"
+                                  matTooltip="Upload a PNG to replace this sprite (scaled to match dimensions)">
+                                  <mat-icon>upload</mat-icon> Upload PNG
                                 </button>
                               }
                               <button mat-stroked-button (click)="exportSpritePng()">

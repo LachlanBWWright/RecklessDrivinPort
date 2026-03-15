@@ -247,6 +247,40 @@ main {
   .volume-value { color: var(--muted); font-size: 0.82rem; min-width: 36px; }
 }
 
+.custom-resources-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 2px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+
+  .controls-label {
+    color: var(--muted);
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .custom-res-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: var(--success);
+    background: rgba(102, 187, 106, 0.12);
+    border: 1px solid var(--success);
+    border-radius: 4px;
+    padding: 2px 8px;
+
+    .badge-icon {
+      font-size: 14px !important;
+      width: 14px !important;
+      height: 14px !important;
+    }
+  }
+}
+
 /* ======================================================
    EDITOR SECTION
    ====================================================== */
@@ -497,7 +531,7 @@ main {
 
 .object-canvas-layout {
   display: flex;
-  gap: 0;
+  gap: 12px;
   align-items: stretch;
   width: 100%;
   min-height: 500px;
@@ -519,6 +553,7 @@ main {
     overflow-y: auto;
     border-left: 1px solid var(--border);
     background: var(--surface2);
+    padding-left: 4px;
 
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 3px; }

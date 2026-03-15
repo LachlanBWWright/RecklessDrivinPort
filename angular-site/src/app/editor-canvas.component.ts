@@ -14,6 +14,13 @@ export class EditorCanvasComponent {
   @Input() marks: MarkSeg[] = [];
   @Input() selectedMarkIndex: number | null = null;
   @Input() showTrackOverlay = false;
+  @Input() showObjects = true;
+  @Input() showMarks = true;
+  @Input() showRoad = true;
+  @Input() showTrackUp = true;
+  @Input() showTrackDown = true;
+  @Input() canUndo = false;
+  @Input() canRedo = false;
   @Input() trackUpCount = 0;
   @Input() trackDownCount = 0;
   @Input() roadSegCount = 0;
@@ -48,6 +55,13 @@ export class EditorCanvasComponent {
   @Output() zoomIn = new EventEmitter<void>();
   @Output() zoomOut = new EventEmitter<void>();
   @Output() resetView = new EventEmitter<void>();
+  @Output() undo = new EventEmitter<void>();
+  @Output() redo = new EventEmitter<void>();
+  @Output() toggleObjects = new EventEmitter<void>();
+  @Output() toggleMarks = new EventEmitter<void>();
+  @Output() toggleRoad = new EventEmitter<void>();
+  @Output() toggleTrackUp = new EventEmitter<void>();
+  @Output() toggleTrackDown = new EventEmitter<void>();
   @Output() markSelected = new EventEmitter<number>();
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();

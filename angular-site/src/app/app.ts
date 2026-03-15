@@ -28,6 +28,8 @@ interface WorkerResponse {
  */
 interface EmscriptenModuleInterface {
   canvas: HTMLCanvasElement;
+  /** Emscripten hook to resolve file paths (e.g. .wasm, .data) relative to base href. */
+  locateFile?: (path: string, scriptDirectory?: string) => string;
   print: (text: string) => void;
   printErr: (text: string) => void;
   setStatus: (status: string) => void;
@@ -398,6 +400,48 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   editTrackDown = signal<{ x: number; y: number; flags: number; velo: number }[]>([]);
   /** True while track waypoints are shown/editable on the canvas. */
   showTrackOverlay = signal(true);
+  /** True while objects are visible on the canvas. */
+  showObjects = signal(true);
+  /** True while mark segments are shown on the canvas. */
+  showMarks = signal(true);
+  /** True while road segments are shown on the canvas. */
+  showRoad = signal(true);
+  /** True while track-up waypoints are visible. */
+  showTrackUp = signal(true);
+  /** True while track-down waypoints are visible. */
+  showTrackDown = signal(true);
+
+  // ---- Undo / Redo ----
+  /** Snapshot stack for undo. Each entry is a deep copy of the objects array. */
+  private _undoStack: ObjectPos[][] = [];
+  private _redoStack: ObjectPos[][] = [];
+  readonly canUndo = signal(false);
+  readonly canRedo = signal(false);
+
+  /** Push a snapshot of the current objects list onto the undo stack. */
+  private _pushUndo(): void {
+    this._undoStack.push(this.objects().map((o) => ({ ...o })));
+    if (this._undoStack.length > 50) this._undoStack.shift();
+    this._redoStack = [];
+    this.canUndo.set(true);
+    this.canRedo.set(false);
+  }
+
+  undo(): void {
+    if (this._undoStack.length === 0) return;
+    this._redoStack.push(this.objects().map((o) => ({ ...o })));
+    this.objects.set(this._undoStack.pop()!);
+    this.canUndo.set(this._undoStack.length > 0);
+    this.canRedo.set(true);
+  }
+
+  redo(): void {
+    if (this._redoStack.length === 0) return;
+    this._undoStack.push(this.objects().map((o) => ({ ...o })));
+    this.objects.set(this._redoStack.pop()!);
+    this.canUndo.set(true);
+    this.canRedo.set(this._redoStack.length > 0);
+  }
 
   // ---- Mark editor ----
   marks = signal<MarkSeg[]>([]);
@@ -517,6 +561,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   });
 
   private wasmScript: HTMLScriptElement | null = null;
+  /** Custom resources.dat loaded via the game tab upload; queued until WASM inits if needed. */
+  private _pendingCustomResources: Uint8Array | null = null;
+  /** True after the custom resources.dat has been applied to the WASM FS. */
+  customResourcesLoaded = signal(false);
+  /** Name of custom resources.dat file, shown in UI. */
+  customResourcesName = signal<string | null>(null);
+
   private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
   private objectSpritePreviews = new Map<number, HTMLCanvasElement | null>();
 
@@ -549,6 +600,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.spritePreviewsVersion();
       this.roadTexturesVersion();
       this.showTrackOverlay();
+      this.showObjects();
+      this.showMarks();
+      this.showRoad();
+      this.showTrackUp();
+      this.showTrackDown();
       this.editTrackUp();
       this.editTrackDown();
       this.hoverTrackWaypoint();
@@ -656,13 +712,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.konva.onObjectDragEnd = (e) => {
       const objs = [...this.objects()];
       if (e.index < objs.length) {
+        this._pushUndo();
         objs[e.index] = { ...objs[e.index], x: e.worldX, y: e.worldY };
         this.objects.set(objs);
         if (this.selectedObjIndex() === e.index) {
           this.editObjX.set(e.worldX);
           this.editObjY.set(e.worldY);
         }
-        this.applyObjEdit();
       }
     };
 
@@ -1354,6 +1410,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (idx === null) return;
     const objs = [...this.objects()];
     if (idx < 0 || idx >= objs.length) return;
+    this._pushUndo();
     objs[idx] = {
       x: this.editObjX(),
       y: this.editObjY(),
@@ -1364,6 +1421,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   addObject(): void {
+    this._pushUndo();
     const objs = [...this.objects()];
     objs.push({ x: 0, y: 0, dir: 0, typeRes: 128 });
     this.objects.set(objs);
@@ -1375,6 +1433,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (idx === null) return;
     const objs = [...this.objects()];
     if (idx < 0 || idx >= objs.length) return;
+    this._pushUndo();
     const original = objs[idx];
     objs.push({ ...original, x: original.x + 50 });
     this.objects.set(objs);
@@ -1409,6 +1468,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   removeSelectedObject(): void {
     const idx = this.selectedObjIndex();
     if (idx === null) return;
+    this._pushUndo();
     const objs = this.objects().filter((_, i) => i !== idx);
     this.objects.set(objs);
     this.selectedObjIndex.set(objs.length > 0 ? Math.min(idx, objs.length - 1) : null);
@@ -1736,6 +1796,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       event.preventDefault(); // prevent page scroll
       return;
     }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      this.undo();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'y' || (event.key.toLowerCase() === 'z' && event.shiftKey))) {
+      event.preventDefault();
+      this.redo();
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
       event.preventDefault();
       this.duplicateSelectedObject();
@@ -1881,7 +1951,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Draw marks (checkpoint lines) over road
-    if (level) {
+    if (level && this.showMarks()) {
       this.drawMarksOnCanvas(ctx);
     }
 
@@ -1893,10 +1963,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // We still draw direction arrows, bounding-box outlines, labels, and selection rings
     // since those are NOT rendered by the Konva overlay.
     const konvaRendersSprites = this._konvaInitialized;
+    const objsVisible = this.showObjects();
     for (let i = 0; i < objs.length; i++) {
       const obj = objs[i];
       const typeIdx = ((obj.typeRes % OBJ_PALETTE.length) + OBJ_PALETTE.length) % OBJ_PALETTE.length;
-      const isFilteredOut = !visibleTypes.has(typeIdx);
+      const isFilteredOut = !visibleTypes.has(typeIdx) || !objsVisible;
       if (isFilteredOut && i !== selIdx) continue;
       const [cx, cy] = this.worldToCanvas(obj.x, obj.y);
       if (cx < -50 || cx > W + 50 || cy < -50 || cy > H + 50) continue;
@@ -2048,15 +2119,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const getImgForType = (typeRes: number): CanvasImageSource | null => {
       return this.getObjectSpritePreview(typeRes);
     };
-    this.konva.setObjects(objs, selIdx, visibleTypes, OBJ_PALETTE, getImgForType, zoom, panX, panY);
+    // Pass empty objects array when objects visibility is off
+    const konvaObjs = this.showObjects() ? objs : [];
+    this.konva.setObjects(konvaObjs, selIdx, visibleTypes, OBJ_PALETTE, getImgForType, zoom, panX, panY);
 
-    // Update Konva track layer
+    // Update Konva track layer – respect showTrackUp / showTrackDown
     if (level && this.showTrackOverlay()) {
-      this.konva.setTrackWaypoints(
-        this.editTrackUp() as {x:number,y:number}[],
-        this.editTrackDown() as {x:number,y:number}[],
-        zoom, panX, panY,
-      );
+      const up   = this.showTrackUp()   ? this.editTrackUp()   as {x:number,y:number}[] : [];
+      const down = this.showTrackDown() ? this.editTrackDown() as {x:number,y:number}[] : [];
+      this.konva.setTrackWaypoints(up, down, zoom, panX, panY);
     } else {
       this.konva.clearTrackWaypoints();
     }
@@ -2532,6 +2603,54 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.spriteEditorOpen.set(true);
   }
 
+  /**
+   * Handle PNG file upload to replace a sprite frame.
+   * The PNG is scaled to the sprite's existing dimensions and converted to RGB555.
+   */
+  async onSpritePngUpload(event: Event, frameId: number): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = ''; // reset so same file can be re-selected
+
+    const frame = this.packSpriteDecodedFrames.get(frameId);
+    if (!frame) { this.editorError.set('Sprite frame not found'); return; }
+
+    try {
+      // Load the PNG into an Image
+      const url = URL.createObjectURL(file);
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = url;
+      });
+      URL.revokeObjectURL(url);
+
+      // Draw it scaled to the frame's dimensions on an offscreen canvas
+      const canvas = document.createElement('canvas');
+      canvas.width  = frame.width;
+      canvas.height = frame.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, frame.width, frame.height);
+      const imageData = ctx.getImageData(0, 0, frame.width, frame.height);
+
+      // Apply using the same path as the pixel editor
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>(
+        'APPLY_SPRITE_PACK_PIXELS',
+        { frameId, pixels: imageData.data },
+      );
+      this.applyLevelsResult(result.levels);
+      this.decodePackSpritesInBackground();
+      this.resourcesStatus.set(`Sprite frame #${frameId} replaced from PNG.`);
+    } catch (err) {
+      this.editorError.set(err instanceof Error ? err.message : 'PNG upload failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
   /** Handle save event from sprite editor – write pixels back to the pack. */
   async onSpriteEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
     this.spriteEditorOpen.set(false);
@@ -2650,7 +2769,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       origOpen.call(this, method, url, asyncFlag, user, password);
     } as typeof XMLHttpRequest.prototype.open;
 
+    // Check for cross-origin isolation required by SharedArrayBuffer / pthreads WASM.
+    // Without COOP + COEP headers the browser will not set window.crossOriginIsolated
+    // and the Emscripten runtime will fail with "Import #0 env: module is not an object".
+    if (typeof window.crossOriginIsolated !== 'undefined' && !window.crossOriginIsolated) {
+      this.statusText.set(
+        'Cross-origin isolation missing. The dev server may not be serving the required ' +
+        'Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy headers. ' +
+        'Run `npm start` from the angular-site folder (not from a plain http-server).',
+      );
+      console.error('[Angular] window.crossOriginIsolated is false – WASM with SharedArrayBuffer will fail.');
+    }
+
     window.Module = {
+      // locateFile lets Emscripten find .wasm and .data files relative to base href,
+      // which is critical when the Angular app is deployed under a sub-path.
+      locateFile: (path: string) => this.assetUrl(path),
       canvas,
       print: (t: string) => console.log('[WASM]', t),
       printErr: (t: string) => console.warn('[WASM ERR]', t),
@@ -2671,6 +2805,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.overlayVisible.set(false);
         console.log('[Angular] WASM runtime initialized');
         this.applyVolumeToWasm(this.masterVolume());
+        // Reload WASM filesystem if a custom resources.dat was queued before init finished
+        if (this._pendingCustomResources) {
+          this._mountCustomResourcesFs(this._pendingCustomResources);
+          this._pendingCustomResources = null;
+        }
       },
       preRun: [],
       postRun: [],
@@ -3199,6 +3338,58 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const mod = window.Module;
     if (mod && typeof mod._set_wasm_master_volume === 'function') {
       mod._set_wasm_master_volume(pct / 100.0);
+    }
+  }
+
+  /**
+   * Handle file selection for custom resources.dat in the game tab.
+   * Reads the file and mounts it in the Emscripten MEMFS, then reloads the game.
+   */
+  async onCustomResourcesFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      this.customResourcesName.set(file.name);
+      const mod = window.Module;
+      if (!mod) {
+        // WASM not yet initialized – queue for when it finishes
+        this._pendingCustomResources = bytes;
+        this.statusText.set('Custom resources.dat queued – waiting for WASM to initialize…');
+      } else {
+        this._mountCustomResourcesFs(bytes);
+      }
+    } catch (e) {
+      console.error('[Angular] Failed to read custom resources.dat', e);
+    }
+    // Reset input so same file can be selected again
+    input.value = '';
+  }
+
+  /**
+   * Mount a custom resources.dat into the Emscripten MEMFS at /resources/resources.dat.
+   * The game reads from this path so the custom data takes effect immediately.
+   */
+  private _mountCustomResourcesFs(bytes: Uint8Array): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const FS = (window as any).FS as {
+        mkdir: (path: string) => void;
+        writeFile: (path: string, data: Uint8Array) => void;
+      } | undefined;
+      if (!FS) {
+        console.warn('[Angular] Emscripten FS not available yet');
+        this._pendingCustomResources = bytes;
+        return;
+      }
+      try { FS.mkdir('/resources'); } catch { /* already exists */ }
+      FS.writeFile('/resources/resources.dat', bytes);
+      this.customResourcesLoaded.set(true);
+      this.statusText.set(`Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB). Reload the page to apply.`);
+      console.log('[Angular] Custom resources.dat written to MEMFS');
+    } catch (e) {
+      console.error('[Angular] Failed to mount custom resources.dat', e);
     }
   }
 }

@@ -2,37 +2,61 @@
 <div class="canvas-toolbar">
   <span class="hint-text">
     <mat-icon class="hint-icon">mouse</mat-icon>
-    Drag objects &amp; track dots · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Space</kbd>+drag pans · <kbd>↑↓←→</kbd> pan · <kbd>Right-click</kbd> on track: add/remove waypoint
+    Drag objects &amp; track dots · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Ctrl+Z</kbd> undo · <kbd>Ctrl+Y</kbd> redo · <kbd>Space</kbd>+drag pans
   </span>
   <div class="canvas-controls">
+    <!-- Undo / Redo -->
+    <button mat-icon-button (click)="undo.emit()" [disabled]="!canUndo" matTooltip="Undo (Ctrl+Z)">
+      <mat-icon>undo</mat-icon>
+    </button>
+    <button mat-icon-button (click)="redo.emit()" [disabled]="!canRedo" matTooltip="Redo (Ctrl+Y)">
+      <mat-icon>redo</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Object actions -->
     <button mat-stroked-button (click)="addObject.emit()" matTooltip="Add new object">
       <mat-icon>add</mat-icon> Object
     </button>
-    <button mat-stroked-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected">
+    <button mat-icon-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
       <mat-icon>content_copy</mat-icon>
     </button>
-    <button mat-stroked-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected">
+    <button mat-icon-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected (Del)">
       <mat-icon>delete</mat-icon>
     </button>
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
-    <button mat-stroked-button (click)="frameAll.emit()" matTooltip="Frame all objects">
+    <!-- View controls -->
+    <button mat-icon-button (click)="frameAll.emit()" matTooltip="Frame all objects">
       <mat-icon>fit_screen</mat-icon>
     </button>
-    <button mat-stroked-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
+    <button mat-icon-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
       <mat-icon>center_focus_strong</mat-icon>
     </button>
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
-    <button mat-stroked-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()" matTooltip="Toggle track overlay">
-      <mat-icon>route</mat-icon> {{ showTrackOverlay ? 'Hide' : 'Show' }} Tracks
+    <!-- Visibility toggles -->
+    <button mat-icon-button [class.btn-active]="showObjects" (click)="toggleObjects.emit()" matTooltip="Toggle objects">
+      <mat-icon>directions_car</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle mark segments">
+      <mat-icon>edit_location</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()" matTooltip="Toggle track overlay">
+      <mat-icon>route</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackUp" (click)="toggleTrackUp.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-up waypoints" style="color:#42a5f5">
+      <mat-icon>arrow_upward</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackDown" (click)="toggleTrackDown.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-down waypoints" style="color:#ef5350">
+      <mat-icon>arrow_downward</mat-icon>
     </button>
     @if (showTrackOverlay) {
       <button mat-stroked-button [disabled]="workerBusy" (click)="saveTrack.emit()" matTooltip="Save track waypoints">
-        <mat-icon>save</mat-icon> Save Tracks
+        <mat-icon>save</mat-icon> Tracks
       </button>
     }
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
-    <button mat-icon-button (click)="zoomIn.emit()" matTooltip="Zoom in"><mat-icon>zoom_in</mat-icon></button>
-    <button mat-icon-button (click)="zoomOut.emit()" matTooltip="Zoom out"><mat-icon>zoom_out</mat-icon></button>
+    <!-- Zoom controls -->
+    <button mat-icon-button (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
+    <button mat-icon-button (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
     <button mat-icon-button (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
   </div>
 </div>

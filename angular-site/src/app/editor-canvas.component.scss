@@ -43,11 +43,19 @@
     min-width: unset !important;
     color: #ccc !important;
     border-color: #444 !important;
-    display: inline-flex;
-    align-items: center;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     gap: 2px;
+    line-height: 28px !important;
 
-    mat-icon { font-size: 15px !important; height: 15px !important; width: 15px !important; }
+    mat-icon {
+      font-size: 15px !important;
+      height: 15px !important;
+      width: 15px !important;
+      line-height: 15px !important;
+      vertical-align: middle !important;
+    }
     &.btn-active { color: #e53935 !important; border-color: #e53935 !important; }
     &:hover:not([disabled]) { border-color: #42a5f5 !important; color: #42a5f5 !important; }
   }
@@ -55,8 +63,18 @@
   button[mat-icon-button] {
     width: 28px !important;
     height: 28px !important;
-    mat-icon { font-size: 18px !important; color: #aaa; }
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    mat-icon {
+      font-size: 18px !important;
+      color: #aaa;
+      line-height: 1 !important;
+      vertical-align: middle !important;
+    }
     &:hover mat-icon { color: #42a5f5; }
+    &.btn-active mat-icon { color: #e53935 !important; }
+    &[disabled] { opacity: 0.35; }
   }
 }
 
