@@ -33,6 +33,9 @@
     </button>
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
     <!-- Visibility toggles -->
+    <button mat-icon-button [class.btn-active]="showRoad" (click)="toggleRoad.emit()" matTooltip="Toggle road preview">
+      <mat-icon>road</mat-icon>
+    </button>
     <button mat-icon-button [class.btn-active]="showObjects" (click)="toggleObjects.emit()" matTooltip="Toggle objects">
       <mat-icon>directions_car</mat-icon>
     </button>

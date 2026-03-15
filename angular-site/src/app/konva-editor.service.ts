@@ -238,8 +238,10 @@ export class KonvaEditorService implements OnDestroy {
     const selUnchanged  = selectedIndex   === this._lastSelectedIndex;
     const visUnchanged  = setsEqual(visibleTypes, this._lastVisibleTypes ?? EMPTY_SET);
 
-    // Fast path: only pan/zoom changed – just update the group transform
-    if (objsUnchanged && selUnchanged && visUnchanged && this._konvaObjNodes.length >= 0) {
+    // Fast path: only pan/zoom changed – just update the group transform.
+    // We take this path whenever objects/selection/visibility are unchanged,
+    // even when there are no nodes (nothing to reposition either way).
+    if (objsUnchanged && selUnchanged && visUnchanged) {
       this._applyGroupTransform();
       this._updateCounterScaledNodes();
       this.objectsLayer.batchDraw();

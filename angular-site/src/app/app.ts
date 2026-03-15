@@ -1933,7 +1933,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.stroke();
     }
 
-    if (level) {
+    if (level && this.showRoad()) {
       this.drawObjectRoadPreviewCached(ctx, level, theme, W, H, zoom, panX, panY);
     }
 
@@ -2774,11 +2774,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // and the Emscripten runtime will fail with "Import #0 env: module is not an object".
     if (typeof window.crossOriginIsolated !== 'undefined' && !window.crossOriginIsolated) {
       this.statusText.set(
-        'Cross-origin isolation missing. The dev server may not be serving the required ' +
-        'Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy headers. ' +
-        'Run `npm start` from the angular-site folder (not from a plain http-server).',
+        'Cross-origin isolation unavailable – the WASM game requires SharedArrayBuffer. ' +
+        'The server must send Cross-Origin-Opener-Policy: same-origin and ' +
+        'Cross-Origin-Embedder-Policy: require-corp headers. ' +
+        'Run `npm start` from the angular-site directory (the built-in dev server already ' +
+        'sets these headers). The level editor will still work without the game.',
       );
-      console.error('[Angular] window.crossOriginIsolated is false – WASM with SharedArrayBuffer will fail.');
+      console.error(
+        '[Angular] window.crossOriginIsolated is false – WASM with SharedArrayBuffer will fail. ' +
+        'Use `npm start` (ng serve) which sets COOP/COEP headers automatically.',
+      );
     }
 
     window.Module = {
@@ -3386,7 +3391,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       try { FS.mkdir('/resources'); } catch { /* already exists */ }
       FS.writeFile('/resources/resources.dat', bytes);
       this.customResourcesLoaded.set(true);
-      this.statusText.set(`Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB). Reload the page to apply.`);
+      this.statusText.set(
+        `Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB) into the game filesystem. ` +
+        'If the game is already running, restart it (refresh the page) to apply the new resources.',
+      );
       console.log('[Angular] Custom resources.dat written to MEMFS');
     } catch (e) {
       console.error('[Angular] Failed to mount custom resources.dat', e);
