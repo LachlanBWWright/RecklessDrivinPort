@@ -107,37 +107,51 @@
   @if (activeTab() === 'editor') {
     <section id="panel-editor" role="tabpanel" class="editor-section">
 
-      <!-- Toolbar row -->
-      <mat-card class="editor-toolbar-card">
-        <mat-card-content>
-          <div class="editor-toolbar-row">
-            <div class="toolbar-actions">
-              <button mat-stroked-button (click)="loadDefaultResources()" [disabled]="workerBusy()">
-                <mat-icon>cloud_download</mat-icon> Load Default
-              </button>
-              <input #fileInput type="file" accept=".dat" (change)="onResourceFileSelected($event)" [disabled]="workerBusy()" style="display:none" />
-              <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy()">
-                <mat-icon>folder_open</mat-icon> Upload resources.dat
-              </button>
-              <button mat-raised-button color="primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
-                <mat-icon>download</mat-icon> Download Edited
-              </button>
+        <!-- Toolbar row merged with level selector -->
+        <mat-card class="editor-toolbar-card">
+          <mat-card-content>
+            <div class="editor-toolbar-row">
+              <div class="toolbar-actions">
+                <button mat-stroked-button (click)="loadDefaultResources()" [disabled]="workerBusy()">
+                  <mat-icon>cloud_download</mat-icon> Load Default
+                </button>
+                <input #fileInput type="file" accept=".dat" (change)="onResourceFileSelected($event)" [disabled]="workerBusy()" style="display:none" />
+                <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy()">
+                  <mat-icon>folder_open</mat-icon> Upload resources.dat
+                </button>
+                <button mat-raised-button color="primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
+                  <mat-icon>download</mat-icon> Download Edited
+                </button>
+
+                <div class="level-btns-inline">
+                  <span class="level-label">Level</span>
+                  @for (level of parsedLevels(); track level.resourceId) {
+                    <button mat-mini-fab
+                      [color]="selectedLevelId() === level.resourceId ? 'primary' : undefined"
+                      class="level-btn"
+                      [class.level-btn--active]="selectedLevelId() === level.resourceId"
+                      (click)="selectLevel(level.resourceId)"
+                      [matTooltip]="'Level ' + levelDisplayNum(level.resourceId) + (level.encrypted ? ' (encrypted)' : '')">
+                      {{ levelDisplayNum(level.resourceId) }}
+                    </button>
+                  }
+                </div>
+              </div>
+              <div class="toolbar-status">
+                @if (workerBusy()) {
+                  <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
+                  <span class="muted">Processing…</span>
+                }
+                <!-- resourcesStatus contains a verbose "Loaded X levels and Y sprites" message; hide it to save vertical space -->
+                @if (editorError()) {
+                  <span class="editor-error">
+                    <mat-icon>warning</mat-icon> {{ editorError() }}
+                  </span>
+                }
+              </div>
             </div>
-            <div class="toolbar-status">
-              @if (workerBusy()) {
-                <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
-                <span class="muted">Processing…</span>
-              }
-              <span class="resources-status" [class.has-data]="hasEditorData()">{{ resourcesStatus() }}</span>
-              @if (editorError()) {
-                <span class="editor-error">
-                  <mat-icon>warning</mat-icon> {{ editorError() }}
-                </span>
-              }
-            </div>
-          </div>
-        </mat-card-content>
-      </mat-card>
+          </mat-card-content>
+        </mat-card>
 
       @if (!hasEditorData() && !workerBusy()) {
         <mat-card class="no-data-card">
@@ -165,27 +179,7 @@
       }
 
       @if (hasEditorData()) {
-        <!-- Level selector -->
-        <mat-card class="level-selector-card">
-          <mat-card-content>
-            <div class="level-selector-row">
-              <span class="level-label">Level:</span>
-              @for (level of parsedLevels(); track level.resourceId) {
-                <button mat-mini-fab
-                  [color]="selectedLevelId() === level.resourceId ? 'primary' : undefined"
-                  class="level-btn"
-                  [class.level-btn--active]="selectedLevelId() === level.resourceId"
-                  (click)="selectLevel(level.resourceId)"
-                  [matTooltip]="'Level ' + levelDisplayNum(level.resourceId) + (level.encrypted ? ' (encrypted)' : '')">
-                  {{ levelDisplayNum(level.resourceId) }}
-                </button>
-              }
-              @if (parsedLevels().length === 0) {
-                <span class="muted">No Pack #140-149 entries found.</span>
-              }
-            </div>
-          </mat-card-content>
-        </mat-card>
+        <!-- Level selector now inlined into toolbar for vertical efficiency -->
 
         <!-- Editor section tabs using mat-tab-group -->
         <mat-tab-group class="editor-tabs" [(selectedIndex)]="editorSectionIndex" animationDuration="150ms">
@@ -216,12 +210,7 @@
             @if (selectedLevel()) {
               <mat-card class="tab-panel-card objects-panel-card">
                 <mat-card-header>
-                  <mat-card-title>
-                    Level {{ levelDisplayNum(selectedLevel()!.resourceId) }} – Scene Editor
-                    <span class="badge">{{ objects().length }} objects</span>
-                    <span class="badge badge--blue">{{ selectedLevel()!.trackUp.length }} up</span>
-                    <span class="badge badge--red">{{ selectedLevel()!.trackDown.length }} down</span>
-                  </mat-card-title>
+                  <mat-card-title></mat-card-title>
                 </mat-card-header>
                 <mat-card-content class="objects-card-content">
                   <div class="object-canvas-layout">
@@ -232,7 +221,6 @@
                       [selectedMarkIndex]="selectedMarkIndex()"
                       [showTrackOverlay]="showTrackOverlay()"
                       [showObjects]="showObjects()"
-                      [showMarks]="showMarks()"
                       [showRoad]="showRoad()"
                       [showTrackUp]="showTrackUp()"
                       [showTrackDown]="showTrackDown()"
@@ -269,7 +257,6 @@
                       (centerSelected)="centerOnSelectedObject()"
                       (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
                       (toggleObjects)="showObjects.set(!showObjects())"
-                      (toggleMarks)="showMarks.set(!showMarks())"
                       (toggleRoad)="showRoad.set(!showRoad())"
                       (toggleTrackUp)="showTrackUp.set(!showTrackUp())"
                       (toggleTrackDown)="showTrackDown.set(!showTrackDown())"
@@ -280,21 +267,32 @@
                       (zoomIn)="zoomIn()"
                       (zoomOut)="zoomOut()"
                       (resetView)="resetView()"
-                      (markSelected)="selectedMarkIndex.set($event)"
-                      (addMark)="addMark()"
-                      (removeMark)="removeSelectedMark()"
-                      (saveMarks)="saveMarks()"
-                      (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
-                      (markCanvasMouseDown)="onMarkCanvasMouseDown($event)"
-                      (markCanvasMouseMove)="onMarkCanvasMouseMove($event)"
-                      (markCanvasMouseUp)="onMarkCanvasMouseUp($event)"
+                      <!-- Mark segment UI removed -->
                       (panXChange)="canvasPanX.set($event)"
                       (panYChange)="canvasPanY.set($event)"
                     ></app-editor-canvas>
 
                     <div class="object-form-col">
-                      <app-object-inspector
-                        [selectedIndex]="selectedObjIndex()"
+                      <div class="objects-side-header">
+                        <details class="objects-side-info">
+                          <summary>
+                            <span class="objects-side-summary-title">Info</span>
+                            <span class="badge">{{ objects().length }} objects</span>
+                          </summary>
+                          <div class="objects-side-info-body">
+                            <div class="objects-side-title">Level {{ levelDisplayNum(selectedLevel()!.resourceId) }}</div>
+                            <div class="objects-side-badges">
+                        <!-- Track up/down badges removed -->
+                            </div>
+                          </div>
+                          <div class="objects-side-help">
+                            <p class="muted">Drag objects &amp; track dots · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Ctrl+Z</kbd> undo · <kbd>Ctrl+Y</kbd> redo · <kbd>Space</kbd>+drag pans</p>
+                          </div>
+                        </details>
+                      </div>
+
+                        <app-object-inspector
+                          [selectedIndex]="selectedObjIndex()"
                         [editX]="editObjX()"
                         [editY]="editObjY()"
                         [editDir]="editObjDir()"
@@ -309,7 +307,8 @@
                         (showAll)="showAllObjectTypes()"
                         (hideAll)="hideAllObjectTypes()"
                         (removeSelected)="removeSelectedObject()"
-                      ></app-object-inspector>
+                          (deselect)="selectedObjIndex.set(null)"
+                        ></app-object-inspector>
 
                       <app-object-list
                         [objects]="objects()"
@@ -325,10 +324,7 @@
                   </div>
                 </mat-card-content>
                 <mat-card-actions>
-                  <button mat-raised-button color="primary" (click)="saveLevelObjects()" [disabled]="workerBusy()">
-                    <mat-icon>save</mat-icon>
-                    {{ workerBusy() ? 'Saving…' : 'Save Objects to Pack' }}
-                  </button>
+                <!-- 'Save Objects to Pack' button removed — download already provides exported resources -->
                 </mat-card-actions>
               </mat-card>
             }
@@ -698,4 +694,3 @@
   (closed)="spriteEditorOpen.set(false)"
   (saved)="onSpriteEditorSaved($event)"
 ></app-sprite-editor>
-

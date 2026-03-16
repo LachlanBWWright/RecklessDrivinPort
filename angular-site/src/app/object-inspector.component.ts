@@ -23,4 +23,5 @@ export class ObjectInspectorComponent {
   @Output() showAll = new EventEmitter<void>();
   @Output() hideAll = new EventEmitter<void>();
   @Output() removeSelected = new EventEmitter<void>();
+  @Output() deselect = new EventEmitter<void>();
 }

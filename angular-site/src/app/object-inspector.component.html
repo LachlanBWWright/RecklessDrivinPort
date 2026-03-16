@@ -1,36 +1,52 @@
 <div class="inspector-container">
-  <div class="inspector-header">
-    <mat-icon class="inspector-icon">tune</mat-icon>
-    <span class="inspector-title">Inspector</span>
-  </div>
+  <div class="inspector-top">
+    <div class="inspector-title-row">
+      <span class="inspector-title">Inspector</span>
+    </div>
+    @if (selectedIndex !== null) {
+      <div class="inspector-top-buttons">
+        <button mat-stroked-button class="top-btn" (click)="deselect.emit()" aria-label="Deselect object">
+          <mat-icon>arrow_back</mat-icon>
+        </button>
+        <button mat-stroked-button color="warn" class="top-btn" (click)="removeSelected.emit()" aria-label="Remove object">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    }
 
-  @if (selectedIndex !== null) {
-    <div class="inspector-sprite-row">
+    @if (selectedIndex !== null) {
+    <!-- Move object label above the sprite to avoid overlap with fields below -->
+    <div class="inspector-sprite-row inspector-sprite-vertical">
+      <div class="inspector-obj-info">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+          <span class="inspector-obj-label">Object #{{ selectedIndex }}</span>
+          @if (typeDimLabel) {
+            <span class="type-dim-badge">{{ typeDimLabel }}</span>
+          }
+        </div>
+      </div>
       @if (spriteUrl; as url) {
         <div class="inspector-sprite-wrapper">
           <img [src]="url" class="obj-inspector-sprite" alt="sprite preview" />
         </div>
       }
-      <div class="inspector-obj-info">
-        <span class="inspector-obj-label">Object #{{ selectedIndex }}</span>
-        @if (typeDimLabel) {
-          <span class="type-dim-badge">{{ typeDimLabel }}</span>
-        }
-      </div>
     </div>
 
     <mat-divider class="inspector-divider"></mat-divider>
 
-    <div class="inspector-fields">
-      <mat-form-field appearance="outline" class="inspector-field">
-        <mat-label>X (pixels)</mat-label>
-        <input matInput type="number" [value]="editX" (input)="fieldInput.emit({field: 'x', event: $event})" />
-      </mat-form-field>
 
-      <mat-form-field appearance="outline" class="inspector-field">
-        <mat-label>Y (pixels)</mat-label>
-        <input matInput type="number" [value]="editY" (input)="fieldInput.emit({field: 'y', event: $event})" />
-      </mat-form-field>
+    <div class="inspector-fields">
+      <div class="xy-row">
+        <mat-form-field appearance="outline" class="inspector-field xy-field">
+          <mat-label>X (pixels)</mat-label>
+          <input matInput type="number" [value]="editX" (input)="fieldInput.emit({field: 'x', event: $event})" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="inspector-field xy-field">
+          <mat-label>Y (pixels)</mat-label>
+          <input matInput type="number" [value]="editY" (input)="fieldInput.emit({field: 'y', event: $event})" />
+        </mat-form-field>
+      </div>
 
       <mat-form-field appearance="outline" class="inspector-field">
         <mat-label>Direction (rad)</mat-label>
@@ -68,19 +84,14 @@
       </div>
     </div>
 
+    <!-- Actions moved to top; keep the auto-apply note here -->
     <div class="inspector-actions">
-      <button mat-stroked-button color="warn" (click)="removeSelected.emit()" class="remove-btn">
-        <mat-icon>delete</mat-icon> Remove
-      </button>
       <span class="auto-apply-note muted">Changes apply automatically</span>
     </div>
 
   } @else {
     <div class="inspector-empty">
-      <mat-icon class="empty-icon">touch_app</mat-icon>
-      <p>Click an object on the canvas to select it,<br>or double-click to add one.</p>
-      <p class="muted">Drag track waypoints (coloured dots) to reposition them.</p>
+      <p class="muted inspector-empty-text">No object selected</p>
     </div>
   }
 </div>
-

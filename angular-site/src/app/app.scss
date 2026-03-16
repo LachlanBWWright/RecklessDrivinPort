@@ -91,7 +91,7 @@ main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px 16px 40px;
+  padding: 20px 0 40px; /* removed horizontal padding */
   gap: 16px;
   background: var(--bg);
 }
@@ -286,10 +286,11 @@ main {
    ====================================================== */
 .editor-section {
   width: 100%;
-  max-width: 1400px;
+  max-width: none; /* span full available page width */
   display: flex;
   flex-direction: column;
   gap: 12px;
+  align-self: stretch;
 }
 
 /* Toolbar card */
@@ -304,14 +305,14 @@ main {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .toolbar-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   flex: 1;
 
   button {
@@ -324,6 +325,9 @@ main {
     mat-icon { font-size: 18px !important; height: 18px !important; width: 18px !important; }
   }
 }
+
+.level-btns-inline { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+.level-btns-inline .level-label { font-size: 0.82rem; color: var(--muted); margin-right: 6px; }
 
 .toolbar-status {
   display: flex;
@@ -559,7 +563,7 @@ main {
 
 .object-canvas-layout {
   display: flex;
-  gap: 16px;
+  gap: 0;
   align-items: stretch;
   width: 100%;
   min-height: 500px;
@@ -581,10 +585,32 @@ main {
     overflow-y: auto;
     border-left: 1px solid var(--border);
     background: var(--surface2);
-    padding: 0 8px 12px 8px;
+    padding: 0 0 12px 0; /* removed horizontal padding so tabs span full width */
 
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 3px; }
+  }
+
+  /* Side header shown above inspector: level number + track counts */
+    .objects-side-header {
+    padding: 6px 0 8px 0;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+
+    .objects-side-info {
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .objects-side-summary-title { font-weight: 700; margin-right: 8px; color: var(--on-surface); }
+
+    .objects-side-info-body { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+    .objects-side-title { font-size: 0.86rem; font-weight: 700; color: var(--on-surface); }
+
+    .objects-side-badges { display: flex; gap: 6px; align-items: center; }
+
+    .objects-side-help { margin-top: 8px; color: var(--muted); font-size: 0.8rem; }
+    .objects-side-help kbd { font-size: 0.75rem; }
   }
 }
 
@@ -623,55 +649,99 @@ main {
 }
 
 .inspector-header {
+  display: block;
+  background: var(--surface3);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+}
+
+.inspector-top-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px 8px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
   background: var(--surface3);
-
-  .inspector-icon { color: var(--accent2); font-size: 18px !important; }
-  .inspector-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 }
+
+
+.inspector-top { background: var(--surface3); border-bottom: 1px solid var(--border); }
+.inspector-title-row { display:flex; justify-content:center; padding:10px 12px; }
+.inspector-title { font-size: 0.98rem; font-weight:700; color:var(--on-surface); }
+.inspector-top-buttons { display:flex; justify-content:center; gap:12px; padding-bottom:8px; }
+.inspector-top-buttons button.top-btn, .inspector-top-buttons button.top-btn.mat-stroked-button {
+  height:36px;
+  width:36px;
+  min-width: 36px !important;
+  padding: 0 !important;
+  border-radius: 50% !important; /* make circular */
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing: border-box;
+}
+.inspector-top-buttons .top-btn.mat-stroked-button {
+  /* tighten stroked button internals */
+  line-height: 1;
+}
+
 
 .inspector-sprite-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* align text to top of sprite to avoid overlap */
   gap: 12px;
-  padding: 12px 14px;
-}
+  padding: 12px 12px;
+  margin-bottom: 24px; /* more space to ensure form fields don't overlap */
+  min-height: 80px; /* reserve vertical space so labels can't clip inputs below */
+  position: relative;
 
-.inspector-sprite-wrapper {
-  width: 64px;
-  height: 64px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface3);
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  overflow: hidden;
-
-  .obj-inspector-sprite {
+  .inspector-sprite-wrapper {
     width: 64px;
     height: 64px;
-    object-fit: contain;
-    image-rendering: pixelated;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface3);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+
+    .obj-inspector-sprite {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+  }
+
+  .inspector-obj-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 auto; /* allow the info column to shrink/grow without overlapping */
+    min-width: 0;
+    
+    .inspector-obj-label {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--on-surface);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* allow wrapping so long labels don't push into form fields */
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      display: block;
+      max-width: 100%;
+      line-height: 1.15;
+    }
   }
 }
 
-.inspector-obj-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  .inspector-obj-label {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--on-surface);
-  }
-}
+/* Vertical variant: label above sprite */
+.inspector-sprite-row.inspector-sprite-vertical { flex-direction: column; align-items: center; min-height: auto; }
+.inspector-sprite-row.inspector-sprite-vertical .inspector-obj-info { order: 0; }
+.inspector-sprite-row.inspector-sprite-vertical .inspector-sprite-wrapper { order: 1; }
 
 .type-dim-badge {
   display: inline-flex;
@@ -689,8 +759,9 @@ main {
 .inspector-fields {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px 8px;
+  gap: 8px;
+  padding: 12px 12px 8px;
+  margin-top: 12px; /* ensure separation from header area */
 
   .inspector-field {
     width: 100%;
@@ -699,12 +770,20 @@ main {
 
   /* Compact form fields for inspector */
   ::ng-deep .mat-mdc-form-field-infix {
-    min-height: 40px;
-    padding-top: 8px !important;
-    padding-bottom: 8px !important;
+    min-height: 36px;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
   }
   ::ng-deep .mat-mdc-text-field-wrapper { background: var(--surface3) !important; }
 }
+
+/* X/Y row: put X and Y side-by-side */
+.xy-row { display:flex; gap:8px; }
+.xy-field { flex: 1; }
+
+/* Prevent long labels from overflowing into adjacent controls */
+.inspector-obj-info { min-width: 0; }
+.inspector-obj-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .type-filter-section {
   padding: 8px 14px;
@@ -773,6 +852,15 @@ main {
 
   .empty-icon { font-size: 40px !important; height: 40px !important; width: 40px !important; color: var(--surface4); margin-bottom: 4px; }
 }
+
+/* Centered italic text for empty inspector */
+.inspector-empty-text {
+  font-style: italic;
+  text-align: center;
+}
+
+/* Remove horizontal padding around tab contents so they span full width */
+.tab-panel-card, .tab-panel-card mat-card-content { padding-left: 0 !important; padding-right: 0 !important; }
 
 /* ======================================================
    SPRITES PANEL
