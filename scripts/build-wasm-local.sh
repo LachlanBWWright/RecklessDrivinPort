@@ -146,11 +146,41 @@ find_and_activate_emsdk() {
     return 0
   fi
 
-  error "Emscripten (emsdk) not found.  Install it from https://emscripten.org/docs/getting_started/downloads.html"
-  error "Then either:"
-  error "  • source ~/emsdk/emsdk_env.sh   (to activate in your shell)"
-  error "  • set EMSDK=<path_to_emsdk>     (to let this script find it)"
-  error "  • run with --skip-wasm           (to skip the WASM build)"
+  # ── Auto-install Emscripten SDK ──────────────────────────────────────────
+  warn "Emscripten (emsdk) not found in any standard location."
+  info "Attempting automatic installation into $REPO_ROOT/emsdk …"
+
+  # Require git
+  if ! command -v git &>/dev/null; then
+    error "git is required to install emsdk automatically but was not found in PATH."
+    error "Install git and re-run, or manually install emsdk: https://emscripten.org/docs/getting_started/downloads.html"
+    exit 1
+  fi
+
+  local EMSDK_INSTALL_DIR="$REPO_ROOT/emsdk"
+
+  if [[ ! -d "$EMSDK_INSTALL_DIR" ]]; then
+    info "Cloning emsdk repository…"
+    git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$EMSDK_INSTALL_DIR"
+  else
+    info "Updating existing emsdk clone at $EMSDK_INSTALL_DIR…"
+    git -C "$EMSDK_INSTALL_DIR" pull --ff-only || true
+  fi
+
+  info "Installing latest Emscripten toolchain…"
+  "$EMSDK_INSTALL_DIR/emsdk" install latest
+  "$EMSDK_INSTALL_DIR/emsdk" activate latest
+
+  # shellcheck source=/dev/null
+  source "$EMSDK_INSTALL_DIR/emsdk_env.sh"
+
+  if command -v emcc &>/dev/null; then
+    success "Emscripten auto-installed and activated: $(emcc --version 2>&1 | head -1)"
+    return 0
+  fi
+
+  error "Emscripten auto-installation failed. Please install manually:"
+  error "  https://emscripten.org/docs/getting_started/downloads.html"
   exit 1
 }
 

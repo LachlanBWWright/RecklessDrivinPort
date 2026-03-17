@@ -372,6 +372,56 @@ const ICON_RESOURCE_TYPES = new Set(['ICN#', 'ics#', 'icl8', 'ics8']);
 const AUDIO_RESOURCE_TYPES = new Set(['snd ']);
 
 /**
+ * Standard Macintosh 8-bit system colour table (clut id=8).
+ * 256 entries × 3 bytes (R, G, B). Used for icl8 and ics8 icon resources.
+ * This matches the Apple System 7 / Mac OS 9 "system palette".
+ */
+// prettier-ignore
+const MAC_8BIT_PALETTE: readonly number[] = [
+  255,255,255, 255,255,204, 255,255,153, 255,255,102, 255,255,51,  255,255,0,
+  255,204,255, 255,204,204, 255,204,153, 255,204,102, 255,204,51,  255,204,0,
+  255,153,255, 255,153,204, 255,153,153, 255,153,102, 255,153,51,  255,153,0,
+  255,102,255, 255,102,204, 255,102,153, 255,102,102, 255,102,51,  255,102,0,
+  255,51,255,  255,51,204,  255,51,153,  255,51,102,  255,51,51,   255,51,0,
+  255,0,255,   255,0,204,   255,0,153,   255,0,102,   255,0,51,    255,0,0,
+  204,255,255, 204,255,204, 204,255,153, 204,255,102, 204,255,51,  204,255,0,
+  204,204,255, 204,204,204, 204,204,153, 204,204,102, 204,204,51,  204,204,0,
+  204,153,255, 204,153,204, 204,153,153, 204,153,102, 204,153,51,  204,153,0,
+  204,102,255, 204,102,204, 204,102,153, 204,102,102, 204,102,51,  204,102,0,
+  204,51,255,  204,51,204,  204,51,153,  204,51,102,  204,51,51,   204,51,0,
+  204,0,255,   204,0,204,   204,0,153,   204,0,102,   204,0,51,    204,0,0,
+  153,255,255, 153,255,204, 153,255,153, 153,255,102, 153,255,51,  153,255,0,
+  153,204,255, 153,204,204, 153,204,153, 153,204,102, 153,204,51,  153,204,0,
+  153,153,255, 153,153,204, 153,153,153, 153,153,102, 153,153,51,  153,153,0,
+  153,102,255, 153,102,204, 153,102,153, 153,102,102, 153,102,51,  153,102,0,
+  153,51,255,  153,51,204,  153,51,153,  153,51,102,  153,51,51,   153,51,0,
+  153,0,255,   153,0,204,   153,0,153,   153,0,102,   153,0,51,    153,0,0,
+  102,255,255, 102,255,204, 102,255,153, 102,255,102, 102,255,51,  102,255,0,
+  102,204,255, 102,204,204, 102,204,153, 102,204,102, 102,204,51,  102,204,0,
+  102,153,255, 102,153,204, 102,153,153, 102,153,102, 102,153,51,  102,153,0,
+  102,102,255, 102,102,204, 102,102,153, 102,102,102, 102,102,51,  102,102,0,
+  102,51,255,  102,51,204,  102,51,153,  102,51,102,  102,51,51,   102,51,0,
+  102,0,255,   102,0,204,   102,0,153,   102,0,102,   102,0,51,    102,0,0,
+  51,255,255,  51,255,204,  51,255,153,  51,255,102,  51,255,51,   51,255,0,
+  51,204,255,  51,204,204,  51,204,153,  51,204,102,  51,204,51,   51,204,0,
+  51,153,255,  51,153,204,  51,153,153,  51,153,102,  51,153,51,   51,153,0,
+  51,102,255,  51,102,204,  51,102,153,  51,102,102,  51,102,51,   51,102,0,
+  51,51,255,   51,51,204,   51,51,153,   51,51,102,   51,51,51,    51,51,0,
+  51,0,255,    51,0,204,    51,0,153,    51,0,102,    51,0,51,     51,0,0,
+  0,255,255,   0,255,204,   0,255,153,   0,255,102,   0,255,51,    0,255,0,
+  0,204,255,   0,204,204,   0,204,153,   0,204,102,   0,204,51,    0,204,0,
+  0,153,255,   0,153,204,   0,153,153,   0,153,102,   0,153,51,    0,153,0,
+  0,102,255,   0,102,204,   0,102,153,   0,102,102,   0,102,51,    0,102,0,
+  0,51,255,    0,51,204,    0,51,153,    0,51,102,    0,51,51,     0,51,0,
+  0,0,255,     0,0,204,     0,0,153,     0,0,102,     0,0,51,
+  // Extra 16 + grayscale
+  0,0,0,       0,17,0,      0,34,0,      0,68,0,      0,85,0,      0,119,0,
+  0,136,0,     0,170,0,     0,187,0,     0,221,0,     0,238,0,
+  238,238,238, 221,221,221, 187,187,187, 170,170,170, 136,136,136,
+  119,119,119, 85,85,85,    68,68,68,    34,34,34,    17,17,17,
+];
+
+/**
  * Parse a Mac OS 'snd ' resource header to extract sample metadata.
  * Supports both format 1 and format 2 snd resources.
  * Returns null if the data is too short or malformed.
@@ -1059,13 +1109,29 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.konva.onMarkEndpointDragEnd = (e) => {
       this._pushUndo();
       const ms = [...this.marks()];
-      if (e.markIdx < ms.length) {
-        const m = ms[e.markIdx];
-        ms[e.markIdx] = e.endpoint === 'p1'
-          ? { ...m, x1: e.worldX, y1: e.worldY }
-          : { ...m, x2: e.worldX, y2: e.worldY };
-        this.marks.set(ms);
+      if (e.markIdx >= ms.length) return;
+      const m = ms[e.markIdx];
+      // Get the OLD position of the dragged endpoint
+      const oldX = e.endpoint === 'p1' ? m.x1 : m.x2;
+      const oldY = e.endpoint === 'p1' ? m.y1 : m.y2;
+      // Move the dragged endpoint
+      ms[e.markIdx] = e.endpoint === 'p1'
+        ? { ...m, x1: e.worldX, y1: e.worldY }
+        : { ...m, x2: e.worldX, y2: e.worldY };
+      // Move all OTHER endpoints that were colocated with the dragged endpoint
+      // (i.e. same x,y as oldX,oldY). This lets chained/shared mark vertices
+      // move as a single handle when they are coincident.
+      for (let i = 0; i < ms.length; i++) {
+        if (i === e.markIdx) continue;
+        const other = ms[i];
+        if (other.x1 === oldX && other.y1 === oldY) {
+          ms[i] = { ...other, x1: e.worldX, y1: e.worldY };
+        }
+        if (other.x2 === oldX && other.y2 === oldY) {
+          ms[i] = { ...ms[i], x2: e.worldX, y2: e.worldY };
+        }
       }
+      this.marks.set(ms);
     };
 
     this.konva.onMarkClick = (markIdx) => {
@@ -1596,11 +1662,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _audioCtx: AudioContext | null = null;
 
   /** Play the currently selected 'snd ' resource via the Web Audio API. */
-  playSndResource(): void {
+  async playSndResource(): Promise<void> {
     const bytes = this.selectedResBytes();
     if (!bytes) return;
     if (!this._audioCtx) {
       this._audioCtx = new AudioContext();
+    }
+    if (this._audioCtx.state === 'suspended') {
+      try { await this._audioCtx.resume(); } catch { /* ignore */ }
     }
     const played = tryPlaySndResource(bytes, this._audioCtx);
     if (!played) {
@@ -2207,6 +2276,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.removeSelectedObject();
       return;
     }
+    // Mark-segment nub helpers (only when showMarks is active)
+    if (this.showMarks()) {
+      // S = Split colocated mark nubs near the selected mark's endpoints
+      if (event.key === 's' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        this._splitCollocatedMarkNubs();
+        return;
+      }
+      // J = Join/combine adjacent mark endpoints that are within snap range
+      if (event.key === 'j' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        this._joinAdjacentMarkNubs();
+        return;
+      }
+    }
     // Arrow key panning (Y flipped: ArrowUp → higher world Y)
     const panStep = 50 / this.canvasZoom(); // world units per keystroke
     if (event.key === 'ArrowUp')    { event.preventDefault(); this.canvasPanY.update((y) => y + panStep); }
@@ -2590,6 +2674,86 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const ms = this.marks().filter((_, i) => i !== idx);
     this.marks.set(ms);
     this.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
+  }
+
+  /**
+   * Split colocated mark endpoints: for each endpoint of the selected mark that is
+   * shared with another mark's endpoint, nudge the other endpoint(s) slightly so they
+   * can be dragged independently. Press [S] to activate.
+   */
+  private _splitCollocatedMarkNubs(): void {
+    const selIdx = this.selectedMarkIndex();
+    if (selIdx === null) return;
+    const ms = [...this.marks()];
+    const sel = ms[selIdx];
+    if (!sel) return;
+    this._pushUndo();
+    // Nudge offset (1 world unit) so they visually separate
+    const NUDGE = 1;
+    for (const ep of ['p1', 'p2'] as const) {
+      const ox = ep === 'p1' ? sel.x1 : sel.x2;
+      const oy = ep === 'p1' ? sel.y1 : sel.y2;
+      let nudged = false;
+      for (let i = 0; i < ms.length; i++) {
+        if (i === selIdx) continue;
+        if (ms[i].x1 === ox && ms[i].y1 === oy) {
+          ms[i] = { ...ms[i], x1: ox + NUDGE, y1: oy + NUDGE };
+          nudged = true;
+        }
+        if (ms[i].x2 === ox && ms[i].y2 === oy) {
+          ms[i] = { ...ms[i], x2: ox + NUDGE, y2: oy + NUDGE };
+          nudged = true;
+        }
+      }
+      if (!nudged) {
+        this.snackBar.open(`No colocated nubs found at ${ep}.`, undefined, { duration: 2000 });
+      }
+    }
+    this.marks.set(ms);
+  }
+
+  /**
+   * Join adjacent mark endpoints: snap the closest pair of endpoints (from different marks)
+   * to the same position so they become colocated. Press [J] to activate.
+   */
+  private _joinAdjacentMarkNubs(): void {
+    const ms = [...this.marks()];
+    if (ms.length < 2) return;
+    const SNAP_R = 30; // world units
+    let bestDist = SNAP_R;
+    let bestI = -1, bestIEp: 'x1'|'y1'|'x2'|'y2' = 'x1';
+    let bestJ = -1, bestJEp: 'x1'|'y1'|'x2'|'y2' = 'x1';
+
+    const endpoints = (i: number) => [
+      { field: 'x1' as const, fx: 'x1' as const, fy: 'y1' as const, x: ms[i].x1, y: ms[i].y1 },
+      { field: 'x2' as const, fx: 'x2' as const, fy: 'y2' as const, x: ms[i].x2, y: ms[i].y2 },
+    ];
+
+    for (let i = 0; i < ms.length; i++) {
+      for (const ept of endpoints(i)) {
+        for (let j = i + 1; j < ms.length; j++) {
+          for (const epj of endpoints(j)) {
+            const dx = ept.x - epj.x; const dy = ept.y - epj.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d > 0 && d < bestDist) {
+              bestDist = d;
+              bestI = i; bestIEp = ept.fx;
+              bestJ = j; bestJEp = epj.fx;
+            }
+          }
+        }
+      }
+    }
+    if (bestI < 0) {
+      this.snackBar.open('No nearby mark endpoints to join (within 30 world units).', undefined, { duration: 2500 });
+      return;
+    }
+    this._pushUndo();
+    const tx = ms[bestI][bestIEp]; const ty = ms[bestI][bestIEp === 'x1' ? 'y1' : 'y2'];
+    const jEpY = bestJEp === 'x1' ? 'y1' as const : 'y2' as const;
+    ms[bestJ] = { ...ms[bestJ], [bestJEp]: tx, [jEpY]: ty };
+    this.marks.set(ms);
+    this.snackBar.open('Joined nearest mark endpoints.', undefined, { duration: 2000 });
   }
 
   /** Valid field names: 'x1' | 'y1' | 'x2' | 'y2' */
@@ -3209,11 +3373,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Play the currently selected audio entry. */
-  playAudioEntry(): void {
+  async playAudioEntry(): Promise<void> {
     const bytes = this.selectedAudioBytes();
     if (!bytes) return;
     if (!this._audioCtx) this._audioCtx = new AudioContext();
-    tryPlaySndResource(bytes, this._audioCtx);
+    // Modern browsers suspend AudioContext until a user gesture resumes it.
+    // We must resume() before attempting to schedule audio playback.
+    if (this._audioCtx.state === 'suspended') {
+      try { await this._audioCtx.resume(); } catch { /* ignore */ }
+    }
+    const played = tryPlaySndResource(bytes, this._audioCtx);
+    if (!played) {
+      this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+    }
   }
 
   /** Replace the selected audio entry from a WAV file upload. */
@@ -3341,67 +3513,103 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   // ---- HUD / Screens tab ----
 
-  /** All ICN# resource entries (32×32 1-bit icons). */
-  iconEntries = signal<{ id: number; label: string }[]>([]);
-  /** Currently selected ICN# resource id. */
+  /** All icon-family and screen image resource entries. */
+  iconEntries = signal<{ type: string; id: number; label: string; sizeBytes: number }[]>([]);
+  /** Currently selected entry: type + id. */
   selectedIconId = signal<number | null>(null);
-  /** Canvas displaying the selected ICN# (32×32). */
+  /** Currently selected resource type (ICN#, icl8, ics8, PICT). */
+  selectedIconType = signal<string>('ICN#');
+  /** Canvas displaying the selected image resource. */
   iconPreviewCanvas = signal<HTMLCanvasElement | null>(null);
   /** Label for the currently selected icon entry (derived from iconEntries). */
   readonly selectedIconLabel = computed<string>(() => {
     const id = this.selectedIconId();
+    const type = this.selectedIconType();
     if (id === null) return '';
-    return this.iconEntries().find((e) => e.id === id)?.label ?? `Icon #${id}`;
+    return this.iconEntries().find((e) => e.id === id && e.type === type)?.label ?? `${type} #${id}`;
   });
 
-  /** Load list of ICN# resources. */
+  /** Load list of all screen-image resource types (ICN#, icl8, ics8, PICT). */
   async loadIconEntries(): Promise<void> {
     try {
       type ListResult = { entries: { type: string; id: number; size: number }[] };
       const result = await this.dispatchWorker<ListResult>('LIST_RESOURCES');
-      const icons = result.entries.filter((e) => e.type === 'ICN#');
-      this.iconEntries.set(icons.map((e) => ({ id: e.id, label: this._iconLabel(e.id) })));
-      if (icons.length > 0 && this.selectedIconId() === null) {
-        this.selectIconEntry(icons[0].id);
+      const SCREEN_TYPES = new Set(['ICN#', 'icl8', 'ics8', 'PICT']);
+      const entries = result.entries
+        .filter((e) => SCREEN_TYPES.has(e.type))
+        .map((e) => ({ type: e.type, id: e.id, label: this._iconLabel(e.type, e.id), sizeBytes: e.size }));
+      this.iconEntries.set(entries);
+      if (entries.length > 0 && this.selectedIconId() === null) {
+        this.selectIconEntry(entries[0].type, entries[0].id);
       }
     } catch { /* non-fatal */ }
   }
 
-  async selectIconEntry(id: number): Promise<void> {
+  async selectIconEntry(type: string, id: number): Promise<void> {
     this.selectedIconId.set(id);
+    this.selectedIconType.set(type);
+    this.iconPreviewCanvas.set(null);
+    if (type === 'PICT') {
+      // PICT resources are shown as download-only; no in-editor preview.
+      return;
+    }
     try {
       type RawResult = { bytes: ArrayBuffer | null };
-      const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type: 'ICN#', id });
+      const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
       if (result.bytes) {
-        const canvas = this._renderIconBytes(new Uint8Array(result.bytes));
+        const bytes = new Uint8Array(result.bytes);
+        let canvas: HTMLCanvasElement | null = null;
+        if (type === 'ICN#' || type === 'ics#') {
+          canvas = this._renderIconBytes(bytes);
+        } else if (type === 'icl8') {
+          canvas = this._renderIcl8Bytes(bytes);
+        } else if (type === 'ics8') {
+          canvas = this._renderIcs8Bytes(bytes);
+        }
         this.iconPreviewCanvas.set(canvas);
-      } else {
-        this.iconPreviewCanvas.set(null);
       }
     } catch { this.iconPreviewCanvas.set(null); }
   }
 
-  /** Export the selected ICN# resource as a PNG file. */
+  /** Export the selected icon/screen resource as a PNG file. */
   exportIconPng(): void {
     const canvas = this.iconPreviewCanvas();
     const id = this.selectedIconId();
+    const type = this.selectedIconType();
     if (!canvas || id === null) return;
     try {
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `icon-${id}.png`;
+      a.download = `${type.trim()}-${id}.png`;
       a.click();
     } catch { /* security */ }
   }
 
-  /** Upload a PNG to replace the selected ICN# resource. */
+  /** Export PICT resource as raw bytes. */
+  exportIconRaw(): void {
+    const id = this.selectedIconId();
+    const type = this.selectedIconType();
+    if (id === null) return;
+    void (async () => {
+      try {
+        type RawResult = { bytes: ArrayBuffer | null };
+        const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
+        if (result.bytes) {
+          this.triggerBytesDownload(new Uint8Array(result.bytes), `${type.trim()}-${id}.bin`);
+        }
+      } catch { /* ignore */ }
+    })();
+  }
+
+  /** Upload a PNG to replace the selected image resource. */
   async onIconPngUpload(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
     input.value = '';
     const id = this.selectedIconId();
+    const type = this.selectedIconType();
     if (id === null) return;
     try {
       this.workerBusy.set(true);
@@ -3413,30 +3621,58 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         i.src = url;
       });
       URL.revokeObjectURL(url);
-      // Scale to 32×32 and convert to 1-bit ICN# format
-      const offscreen = document.createElement('canvas');
-      offscreen.width = 32; offscreen.height = 32;
-      const ctx = offscreen.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, 32, 32);
-      const imageData = ctx.getImageData(0, 0, 32, 32);
-      const iconBytes = this._imageDataToIconHash(imageData.data);
-      await this.dispatchWorker<Record<string, never>>('PUT_RESOURCE_RAW', { type: 'ICN#', id, bytes: iconBytes.buffer });
-      await this.selectIconEntry(id);
-      this.resourcesStatus.set(`Icon #${id} replaced.`);
+
+      let iconBytes: Uint8Array;
+      if (type === 'icl8') {
+        // Scale to 32×32 and convert to 8-bit Mac palette
+        const offscreen = document.createElement('canvas');
+        offscreen.width = 32; offscreen.height = 32;
+        const ctx = offscreen.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, 32, 32);
+        iconBytes = this._imageDataToIcl8(ctx.getImageData(0, 0, 32, 32).data);
+      } else if (type === 'ics8') {
+        // Scale to 16×16 and convert to 8-bit Mac palette
+        const offscreen = document.createElement('canvas');
+        offscreen.width = 16; offscreen.height = 16;
+        const ctx = offscreen.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, 16, 16);
+        iconBytes = this._imageDataToIcl8(ctx.getImageData(0, 0, 16, 16).data);
+      } else {
+        // ICN# or ics#: 32×32 1-bit
+        const offscreen = document.createElement('canvas');
+        offscreen.width = 32; offscreen.height = 32;
+        const ctx = offscreen.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, 32, 32);
+        iconBytes = this._imageDataToIconHash(ctx.getImageData(0, 0, 32, 32).data);
+      }
+      await this.dispatchWorker<Record<string, never>>('PUT_RESOURCE_RAW', { type, id, bytes: iconBytes.buffer });
+      await this.selectIconEntry(type, id);
+      this.resourcesStatus.set(`${type} #${id} replaced.`);
     } catch (err) {
-      this.editorError.set(err instanceof Error ? err.message : 'Icon upload failed');
+      this.editorError.set(err instanceof Error ? err.message : 'Image upload failed');
     } finally {
       this.workerBusy.set(false);
     }
   }
 
-  private _iconLabel(id: number): string {
-    const labels: Record<number, string> = {
+  private _iconLabel(type: string, id: number): string {
+    const iconLabels: Record<number, string> = {
       128: 'Application Icon',
-      129: 'Main Menu',
+      129: 'Main Menu / Home Screen',
       130: 'Game Over',
+      131: 'HUD',
+      132: 'Level Complete',
     };
-    return labels[id] ?? `Icon #${id}`;
+    const pictLabels: Record<number, string> = {
+      128: 'Title Screen',
+      129: 'Game Over Screen',
+      130: 'About Box',
+    };
+    if (type === 'ICN#' || type === 'ics#') return iconLabels[id] ?? `ICN# #${id}`;
+    if (type === 'icl8') return iconLabels[id] ?? `icl8 #${id} (32×32 color)`;
+    if (type === 'ics8') return iconLabels[id] ?? `ics8 #${id} (16×16 color)`;
+    if (type === 'PICT') return pictLabels[id] ?? `PICT #${id}`;
+    return `${type} #${id}`;
   }
 
   /** Render an ICN# resource (32×32 1-bit) to an HTMLCanvasElement. */
@@ -3481,6 +3717,59 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         out[row * 4 + byteInRow] = b;
         out[128 + row * 4 + byteInRow] = mask;
       }
+    }
+    return out;
+  }
+
+  /** Render a Mac icl8 (32×32 8-bit palette-indexed) resource to canvas. */
+  private _renderIcl8Bytes(bytes: Uint8Array): HTMLCanvasElement | null {
+    return this._renderPalettedIcon(bytes, 32, 32);
+  }
+
+  /** Render a Mac ics8 (16×16 8-bit palette-indexed) resource to canvas. */
+  private _renderIcs8Bytes(bytes: Uint8Array): HTMLCanvasElement | null {
+    return this._renderPalettedIcon(bytes, 16, 16);
+  }
+
+  /** Render a Mac 8-bit palette-indexed icon to an HTMLCanvasElement. */
+  private _renderPalettedIcon(bytes: Uint8Array, w: number, h: number): HTMLCanvasElement | null {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const imgData = ctx.createImageData(w, h);
+    const pal = MAC_8BIT_PALETTE;
+    const palLen = pal.length / 3; // number of palette entries
+    for (let i = 0; i < w * h; i++) {
+      const idx = i < bytes.length ? bytes[i] : 0;
+      const pi = (idx < palLen ? idx : 0) * 3;
+      const di = i * 4;
+      imgData.data[di]     = pal[pi]     ?? 0;
+      imgData.data[di + 1] = pal[pi + 1] ?? 0;
+      imgData.data[di + 2] = pal[pi + 2] ?? 0;
+      imgData.data[di + 3] = 255;
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+  }
+
+  /** Convert RGBA8888 image data to Mac 8-bit palette-indexed format (icl8/ics8). */
+  private _imageDataToIcl8(rgba: Uint8ClampedArray): Uint8Array {
+    const pixelCount = rgba.length / 4;
+    const out = new Uint8Array(pixelCount);
+    const pal = MAC_8BIT_PALETTE;
+    const palLen = pal.length / 3;
+    for (let i = 0; i < pixelCount; i++) {
+      const r = rgba[i * 4]; const g = rgba[i * 4 + 1]; const b = rgba[i * 4 + 2];
+      // Find nearest palette colour (simple Euclidean distance)
+      let bestIdx = 0; let bestDist = Infinity;
+      for (let p = 0; p < palLen; p++) {
+        const dr = r - (pal[p * 3] ?? 0); const dg = g - (pal[p * 3 + 1] ?? 0); const db = b - (pal[p * 3 + 2] ?? 0);
+        const dist = dr * dr + dg * dg + db * db;
+        if (dist < bestDist) { bestDist = dist; bestIdx = p; }
+      }
+      out[i] = bestIdx;
     }
     return out;
   }

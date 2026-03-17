@@ -576,19 +576,20 @@
             <mat-card class="tab-panel-card">
               <mat-card-header>
                 <mat-card-title>Screens &amp; HUD Icons Editor</mat-card-title>
-                <mat-card-subtitle>ICN# icon resources (32×32 1-bit) — HUD graphics, menu icons</mat-card-subtitle>
+                <mat-card-subtitle>Icon and screen image resources — ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</mat-card-subtitle>
               </mat-card-header>
               <mat-card-content>
                 @if (iconEntries().length > 0) {
                   <div class="screens-layout">
                     <!-- Left: icon list -->
                     <div class="icon-entry-list">
-                      @for (icon of iconEntries(); track icon.id) {
+                      @for (icon of iconEntries(); track (icon.type + '-' + icon.id)) {
                         <button class="audio-entry-btn"
-                          [class.audio-entry-btn--active]="selectedIconId() === icon.id"
-                          (click)="selectIconEntry(icon.id)">
-                          <mat-icon class="audio-entry-icon">image</mat-icon>
+                          [class.audio-entry-btn--active]="selectedIconId() === icon.id && selectedIconType() === icon.type"
+                          (click)="selectIconEntry(icon.type, icon.id)">
+                          <mat-icon class="audio-entry-icon">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
                           <span>{{ icon.label }}</span>
+                          <span class="res-size-badge">{{ icon.type }}</span>
                         </button>
                       }
                     </div>
@@ -597,51 +598,61 @@
                     @if (selectedIconId() !== null) {
                       <div class="icon-detail">
                         <h4 class="audio-detail-title">{{ selectedIconLabel() }}</h4>
-                        @if (iconPreviewCanvas(); as canvas) {
-                          <img [src]="canvas.toDataURL()" class="icon-large-preview"
-                            [style.imageRendering]="'pixelated'" alt="icon preview">
+                        @if (selectedIconType() !== 'PICT') {
+                          @if (iconPreviewCanvas(); as canvas) {
+                            <img [src]="canvas.toDataURL()" class="icon-large-preview"
+                              [style.imageRendering]="'pixelated'" alt="icon preview">
+                          } @else {
+                            <div class="icon-placeholder">
+                              <mat-spinner diameter="32"></mat-spinner>
+                            </div>
+                          }
+                          <div class="sprite-actions">
+                            <button mat-stroked-button (click)="exportIconPng()">
+                              <mat-icon>download</mat-icon> Export PNG
+                            </button>
+                            <input #iconPngInput type="file" accept="image/png,image/*" style="display:none"
+                              (change)="onIconPngUpload($event)" />
+                            <button mat-stroked-button (click)="iconPngInput.click()" [disabled]="workerBusy()"
+                              [matTooltip]="selectedIconType() === 'icl8' ? 'Upload PNG (32×32), converted to 8-bit Mac palette'
+                                : selectedIconType() === 'ics8' ? 'Upload PNG (16×16), converted to 8-bit Mac palette'
+                                : 'Upload PNG (32×32), converted to 1-bit'">
+                              <mat-icon>upload</mat-icon> Replace PNG
+                            </button>
+                          </div>
+                          <p class="muted" style="margin-top:12px;font-size:0.85em">
+                            @if (selectedIconType() === 'ICN#' || selectedIconType() === 'ics#') {
+                              ICN# / ics# resources are 32×32 1-bit black-and-white bitmaps.
+                            } @else if (selectedIconType() === 'icl8') {
+                              icl8 resources are 32×32 8-bit colour-palette icons (Mac system palette).
+                            } @else if (selectedIconType() === 'ics8') {
+                              ics8 resources are 16×16 8-bit colour-palette icons (Mac system palette).
+                            }
+                          </p>
                         } @else {
-                          <div class="icon-placeholder">
-                            <mat-spinner diameter="32"></mat-spinner>
+                          <!-- PICT: download only -->
+                          <div class="icon-placeholder" style="flex-direction:column;gap:8px">
+                            <mat-icon style="font-size:48px;opacity:0.4">wallpaper</mat-icon>
+                            <p class="muted">PICT (QuickDraw picture) — in-editor preview not yet supported.</p>
+                          </div>
+                          <div class="sprite-actions">
+                            <button mat-stroked-button (click)="exportIconRaw()">
+                              <mat-icon>download</mat-icon> Export Raw
+                            </button>
                           </div>
                         }
-                        <div class="sprite-actions">
-                          <button mat-stroked-button (click)="exportIconPng()">
-                            <mat-icon>download</mat-icon> Export PNG
-                          </button>
-                          <input #iconPngInput type="file" accept="image/png,image/*" style="display:none"
-                            (change)="onIconPngUpload($event)" />
-                          <button mat-stroked-button (click)="iconPngInput.click()" [disabled]="workerBusy()"
-                            matTooltip="Upload a PNG (32×32) to replace this icon">
-                            <mat-icon>upload</mat-icon> Replace PNG
-                          </button>
-                        </div>
-                        <p class="muted" style="margin-top:12px;font-size:0.85em">
-                          ICN# resources are 32×32 1-bit black-and-white bitmaps (HUD icons, menu graphics).
-                          Upload any image to replace — it will be scaled to 32×32 and converted to 1-bit.
-                        </p>
                       </div>
                     } @else {
                       <div class="res-placeholder">
-                        <p class="muted">Select an icon from the list.</p>
+                        <p class="muted">Select an entry from the list.</p>
                       </div>
                     }
                   </div>
                 } @else {
                   <div class="no-data-content">
                     <mat-icon class="no-data-icon">image_not_supported</mat-icon>
-                    <p>ICN# icon resources will appear here once a resources.dat is loaded.</p>
+                    <p>Screen and icon resources will appear here once a resources.dat is loaded.</p>
                   </div>
-                }
-
-                <!-- Strings editor section -->
-                @if (hasEditorData()) {
-                  <mat-divider style="margin: 24px 0"></mat-divider>
-                  <h3 style="margin: 0 0 12px">String Resources (STR#)</h3>
-                  <p class="muted" style="margin-bottom:12px">
-                    Use the Resources tab below for detailed string/text editing. String resources
-                    contain game text like level names and UI labels.
-                  </p>
                 }
               </mat-card-content>
             </mat-card>

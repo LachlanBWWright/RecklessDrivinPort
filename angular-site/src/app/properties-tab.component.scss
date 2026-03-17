@@ -17,9 +17,17 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   align-items: start;
+  /* Add bottom padding so mat-hint text doesn't clip into the divider below */
+  padding-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .prop-field { width: 100%; }
+
+/* Ensure mat-form-field rows are tall enough for hints */
+.prop-field .mat-mdc-form-field-subscript-wrapper {
+  overflow: visible;
+}
 
 /* Table: make sure it fits the card and long content wraps or scrolls */
 .data-table {
