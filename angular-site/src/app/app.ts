@@ -3292,23 +3292,23 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
     if (dataLen === 0) throw new Error('No data chunk in WAV');
     let pcm = wav.slice(dataOff, dataOff + dataLen);
-    // Convert stereo → mono (average)
+    // Convert 16-bit signed → 8-bit unsigned FIRST (before stereo down-mix)
+    // so that the stereo down-mix always works on 8-bit unsigned samples.
+    if (bitsPerSample === 16) {
+      const pcmView = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
+      const pcm8 = new Uint8Array(pcm.length / 2);
+      for (let i = 0; i < pcm8.length; i++) {
+        pcm8[i] = ((pcmView.getInt16(i * 2, true) >> 8) + 128) & 0xff;
+      }
+      pcm = pcm8;
+    }
+    // Convert stereo → mono (average of left+right channels)
     if (numChannels === 2) {
       const mono = new Uint8Array(pcm.length / 2);
       for (let i = 0; i < mono.length; i++) {
-        if (bitsPerSample === 8) mono[i] = ((pcm[i*2] + pcm[i*2+1]) / 2) | 0;
-        else mono[i] = 128; // leave as silence if we can't convert
+        mono[i] = ((pcm[i * 2] + pcm[i * 2 + 1]) / 2) | 0;
       }
       pcm = mono;
-    }
-    // Convert 16-bit signed → 8-bit unsigned
-    if (bitsPerSample === 16) {
-      const mono8 = new Uint8Array(pcm.length / 2);
-      const pcmView = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
-      for (let i = 0; i < mono8.length; i++) {
-        mono8[i] = ((pcmView.getInt16(i*2, true) >> 8) + 128) & 0xff;
-      }
-      pcm = mono8;
     }
     // Build minimal 'snd ' Format 1 resource:
     // [format=1(u16)] [numTypes=1(u16)] [soundType=0x0005(u16)=sampledSynth] [initOption=0x80(u32)]
@@ -3347,6 +3347,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   selectedIconId = signal<number | null>(null);
   /** Canvas displaying the selected ICN# (32×32). */
   iconPreviewCanvas = signal<HTMLCanvasElement | null>(null);
+  /** Label for the currently selected icon entry (derived from iconEntries). */
+  readonly selectedIconLabel = computed<string>(() => {
+    const id = this.selectedIconId();
+    if (id === null) return '';
+    return this.iconEntries().find((e) => e.id === id)?.label ?? `Icon #${id}`;
+  });
 
   /** Load list of ICN# resources. */
   async loadIconEntries(): Promise<void> {
@@ -3413,8 +3419,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const ctx = offscreen.getContext('2d')!;
       ctx.drawImage(img, 0, 0, 32, 32);
       const imageData = ctx.getImageData(0, 0, 32, 32);
-      const sndBytes = this._imageDataToIconHash(imageData.data);
-      await this.dispatchWorker<Record<string, never>>('PUT_RESOURCE_RAW', { type: 'ICN#', id, bytes: sndBytes.buffer });
+      const iconBytes = this._imageDataToIconHash(imageData.data);
+      await this.dispatchWorker<Record<string, never>>('PUT_RESOURCE_RAW', { type: 'ICN#', id, bytes: iconBytes.buffer });
       await this.selectIconEntry(id);
       this.resourcesStatus.set(`Icon #${id} replaced.`);
     } catch (err) {

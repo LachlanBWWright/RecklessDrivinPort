@@ -596,7 +596,7 @@
                     <!-- Right: icon detail -->
                     @if (selectedIconId() !== null) {
                       <div class="icon-detail">
-                        <h4 class="audio-detail-title">{{ iconEntries()[(iconEntries().findIndex(e => e.id === selectedIconId()))]?.label ?? 'Icon #' + selectedIconId() }}</h4>
+                        <h4 class="audio-detail-title">{{ selectedIconLabel() }}</h4>
                         @if (iconPreviewCanvas(); as canvas) {
                           <img [src]="canvas.toDataURL()" class="icon-large-preview"
                             [style.imageRendering]="'pixelated'" alt="icon preview">
