@@ -6,8 +6,8 @@
  * Data flow:
  *   resources.dat  →  ResourceDatService.parse()  →  ResourceDatEntry[]
  *   ResourceDatEntry (type='Pack', id=140-149)  →  parsePackHandle()  →  PackEntry[]
- *   PackEntry id=1  →  parseLevelEntry()  →  ParsedLevel
- *   PackEntry id=2  →  parseMarkSegs()    →  MarkSeg[]
+ *   PackEntry id=1  →  parseLevelEntry()         →  Result<ParsedLevel, Error>
+ *   PackEntry id=2  →  parseMarkSegs()           →  MarkSeg[]
  *
  * Editing:
  *   mutate ParsedLevel fields → serializeLevelProperties() → Uint8Array
@@ -15,6 +15,7 @@
  *   replace ResourceDatEntry.data with new handle bytes
  */
 
+import { ok, err, type Result } from 'neverthrow';
 import type { ResourceDatEntry } from './resource-dat.service';
 import { parsePackHandle, encodePackHandle } from './pack-parser.service';
 
@@ -300,7 +301,7 @@ function indexed8ToRgba(value: number): [number, number, number, number] {
 // Level entry parser
 // ------------------------------------------------------------------
 
-export function parseLevelEntry(data: Uint8Array): {
+export type LevelEntryData = {
   properties: LevelProperties;
   objectGroups: ObjectGroupRef[];
   trackUp: TrackSeg[];
@@ -309,13 +310,15 @@ export function parseLevelEntry(data: Uint8Array): {
   roadSegs: RoadSeg[];
   roadSegCount: number;
   rawEntry1: Uint8Array;
-} {
+};
+
+export function parseLevelEntry(data: Uint8Array): Result<LevelEntryData, Error> {
+  if (data.length < LEVEL_DATA_SIZE) {
+    return err(new Error(`Level entry too small: ${data.length} < ${LEVEL_DATA_SIZE}`));
+  }
+
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let pos = 0;
-
-  if (data.length < LEVEL_DATA_SIZE) {
-    throw new Error(`Level entry too small: ${data.length} < ${LEVEL_DATA_SIZE}`);
-  }
 
   const roadInfo  = view.getInt16(pos, false);   pos += 2;
   const time      = view.getUint16(pos, false);  pos += 2;
@@ -385,8 +388,8 @@ export function parseLevelEntry(data: Uint8Array): {
     pos += ROAD_SEG_SIZE;
   }
 
-  return { properties: { roadInfo, time, xStartPos, levelEnd }, objectGroups,
-    trackUp, trackDown, objects, roadSegs, roadSegCount: roadLen, rawEntry1: data };
+  return ok({ properties: { roadInfo, time, xStartPos, levelEnd }, objectGroups,
+    trackUp, trackDown, objects, roadSegs, roadSegCount: roadLen, rawEntry1: data });
 }
 
 export function parseMarkSegs(data: Uint8Array): MarkSeg[] {
@@ -512,7 +515,12 @@ export class LevelEditorService {
         const e2 = packEntries.find((e) => e.id === 2);
         if (!e1) continue;
 
-        const partial = parseLevelEntry(e1.data);
+        const parseResult = parseLevelEntry(e1.data);
+        if (parseResult.isErr()) {
+          console.warn(`[LevelEditor] parse error for Pack #${entry.id}:`, parseResult.error);
+          continue;
+        }
+        const partial = parseResult.value;
         const marks   = e2 ? parseMarkSegs(e2.data) : [];
 
         levels.push({

@@ -1351,3 +1351,28 @@ code {
     background: #fff;
   }
 }
+
+.audio-player {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .audio-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .audio-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+}
+
+.tile-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+

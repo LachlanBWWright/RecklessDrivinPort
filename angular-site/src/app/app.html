@@ -412,6 +412,65 @@
             </mat-card>
           </mat-tab>
 
+          <!-- ===== TILES TAB ===== -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>grid_view</mat-icon>&nbsp;Tiles
+            </ng-template>
+            <mat-card class="tab-panel-card">
+              <mat-card-header>
+                <mat-card-title>Road &amp; Background Tile Viewer</mat-card-title>
+                <mat-card-subtitle>Decoded from Pack 136 (kPackTx16 — 16-bit RGB555 textures)</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                @if (tileTileEntries().length > 0) {
+                  <div class="tile-viewer">
+                    <div class="pack-sprite-grid">
+                      @for (tile of tileTileEntries(); track tile.texId) {
+                        @if (getTileDataUrl(tile.texId); as url) {
+                          <div class="pack-sprite-cell"
+                            [class.selected]="selectedTileId() === tile.texId"
+                            (click)="selectedTileId.set(tile.texId)"
+                            [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
+                            <img [src]="url" class="pack-sprite-thumb"
+                              [style.imageRendering]="'pixelated'" alt="" />
+                            <span class="pack-sprite-label">#{{ tile.texId }}</span>
+                          </div>
+                        }
+                      }
+                    </div>
+
+                    @if (selectedTileId() !== null) {
+                      @if (getTileDataUrl(selectedTileId()!); as url) {
+                        <div class="pack-sprite-detail">
+                          <img [src]="url" class="pack-sprite-large"
+                            [style.imageRendering]="'pixelated'" alt="tile preview" />
+                          <mat-card class="sprite-meta-card">
+                            <mat-card-content>
+                              <p class="sprite-meta">
+                                <strong>Tile</strong> #{{ selectedTileId() }}<br>
+                                <strong>Size</strong> {{ getTileDimensions(selectedTileId()!) }}<br>
+                                <strong>Format</strong> RGB555 (16-bit)
+                              </p>
+                            </mat-card-content>
+                          </mat-card>
+                          <div class="sprite-actions">
+                            <p class="muted">Replace via the Resources tab → Pack #136 → entry #{{ selectedTileId() }}</p>
+                          </div>
+                        </div>
+                      }
+                    }
+                  </div>
+                } @else {
+                  <div class="no-data-content">
+                    <mat-icon class="no-data-icon">grid_view</mat-icon>
+                    <p>Road texture tiles from Pack 136 (kPackTx16) will appear here once decoded. Load a resources.dat to begin.</p>
+                  </div>
+                }
+              </mat-card-content>
+            </mat-card>
+          </mat-tab>
+
           <!-- ──────────────────────────────────────────────────────── -->
           <!-- Resources tab – browse and edit ALL resources.dat entries -->
           <!-- ──────────────────────────────────────────────────────── -->
@@ -530,6 +589,35 @@
                                  [style.width.px]="64" [style.height.px]="64" alt="Icon preview">
                           }
                           <p class="muted">{{ selectedResBytes()!.length }} bytes &mdash; replace via Upload to edit</p>
+                        </div>
+                      }
+
+                      <!-- Audio player (snd ) -->
+                      @if (selectedResIsAudio() && selectedResBytes()) {
+                        <div class="audio-player">
+                          <h5 class="field-editor-title">
+                            <mat-icon>volume_up</mat-icon>&nbsp;Audio Resource
+                          </h5>
+                          @if (selectedResSndInfo(); as info) {
+                            <div class="audio-meta">
+                              <span class="badge">Format {{ info.format }}</span>
+                              <span class="badge">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
+                              <span class="badge">{{ info.length | number }} samples</span>
+                              <span class="badge">{{ info.encode === 0 ? 'PCM 8-bit' : 'encode=' + info.encode }}</span>
+                            </div>
+                          }
+                          <div class="audio-actions">
+                            <button mat-raised-button color="primary"
+                              (click)="playSndResource()"
+                              [disabled]="!selectedResBytes()"
+                              matTooltip="Play this sound (uncompressed PCM only)">
+                              <mat-icon>play_arrow</mat-icon> Play
+                            </button>
+                            <button mat-stroked-button (click)="downloadSelectedResource()" [disabled]="!selectedResBytes()">
+                              <mat-icon>download</mat-icon> Export raw
+                            </button>
+                          </div>
+                          <p class="muted">{{ selectedResBytes()!.length }} bytes — replace via Upload to swap sound</p>
                         </div>
                       }
 

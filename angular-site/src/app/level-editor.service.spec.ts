@@ -38,30 +38,40 @@ describe('parseLevelEntry', () => {
   it('extracts tLevelData fields correctly', () => {
     const entry = makeLevelEntry({ roadInfo: 3, time: 1200, xStartPos: -50, levelEnd: 60000 });
     const result = parseLevelEntry(entry);
-    expect(result.properties.roadInfo).toBe(3);
-    expect(result.properties.time).toBe(1200);
-    expect(result.properties.xStartPos).toBe(-50);
-    expect(result.properties.levelEnd).toBe(60000);
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.properties.roadInfo).toBe(3);
+      expect(result.value.properties.time).toBe(1200);
+      expect(result.value.properties.xStartPos).toBe(-50);
+      expect(result.value.properties.levelEnd).toBe(60000);
+    }
   });
 
   it('returns 10 object group references', () => {
     const entry = makeLevelEntry();
     const result = parseLevelEntry(entry);
-    expect(result.objectGroups.length).toBe(10);
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.objectGroups.length).toBe(10);
+    }
   });
 
   it('returns empty track/object/road arrays for a minimal entry', () => {
     const entry = makeLevelEntry();
     const result = parseLevelEntry(entry);
-    expect(result.trackUp.length).toBe(0);
-    expect(result.trackDown.length).toBe(0);
-    expect(result.objects.length).toBe(0);
-    expect(result.roadSegs.length).toBe(0);
-    expect(result.roadSegCount).toBe(0);
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.trackUp.length).toBe(0);
+      expect(result.value.trackDown.length).toBe(0);
+      expect(result.value.objects.length).toBe(0);
+      expect(result.value.roadSegs.length).toBe(0);
+      expect(result.value.roadSegCount).toBe(0);
+    }
   });
 
-  it('throws on too-small input', () => {
-    expect(() => parseLevelEntry(new Uint8Array(10))).toThrow();
+  it('returns an error Result on too-small input', () => {
+    const result = parseLevelEntry(new Uint8Array(10));
+    expect(result.isErr()).toBe(true);
   });
 
   it('parses objects in entry', () => {
@@ -77,10 +87,13 @@ describe('parseLevelEntry', () => {
     view.setInt16(72, 200, false);   // obj.typeRes
     view.setUint32(76, 0, false);   // roadLen = 0
     const result = parseLevelEntry(buf);
-    expect(result.objects.length).toBe(1);
-    expect(result.objects[0].x).toBe(123);
-    expect(result.objects[0].y).toBe(456);
-    expect(result.objects[0].typeRes).toBe(200);
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.objects.length).toBe(1);
+      expect(result.value.objects[0].x).toBe(123);
+      expect(result.value.objects[0].y).toBe(456);
+      expect(result.value.objects[0].typeRes).toBe(200);
+    }
   });
 });
 
@@ -135,17 +148,23 @@ describe('serializeLevelObjects', () => {
     const result = serializeLevelObjects(entry, newObjs);
     // Re-parse to verify
     const parsed = parseLevelEntry(result);
-    expect(parsed.objects.length).toBe(1);
-    expect(parsed.objects[0].x).toBe(100);
-    expect(parsed.objects[0].y).toBe(200);
-    expect(parsed.objects[0].typeRes).toBe(128);
+    expect(parsed.isOk()).toBe(true);
+    if (parsed.isOk()) {
+      expect(parsed.value.objects.length).toBe(1);
+      expect(parsed.value.objects[0].x).toBe(100);
+      expect(parsed.value.objects[0].y).toBe(200);
+      expect(parsed.value.objects[0].typeRes).toBe(128);
+    }
   });
 
   it('allows removing all objects', () => {
     const entry = makeLevelEntry();
     const result = serializeLevelObjects(entry, []);
     const parsed = parseLevelEntry(result);
-    expect(parsed.objects.length).toBe(0);
+    expect(parsed.isOk()).toBe(true);
+    if (parsed.isOk()) {
+      expect(parsed.value.objects.length).toBe(0);
+    }
   });
 });
 

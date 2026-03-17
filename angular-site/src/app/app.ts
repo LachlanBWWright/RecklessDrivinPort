@@ -38,6 +38,12 @@ interface EmscriptenModuleInterface {
   preRun: (() => void)[];
   postRun: (() => void)[];
   _set_wasm_master_volume?: (vol: number) => void;
+  /** Pause the Emscripten main loop before a restart. */
+  pauseMainLoop?: () => void;
+  /** Re-run C main() with new argv — restarts the game in-place. */
+  callMain?: (args: string[]) => void;
+  /** Direct C _main(argc, argv) — fallback if callMain not present. */
+  _main?: (argc: number, argv: number) => void;
 }
 
 declare global {
@@ -129,7 +135,7 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
 export interface ResField {
   name: string;
   offset: number;
-  type: 'u8' | 'u16' | 's16' | 'u32' | 's32';
+  type: 'u8' | 'u16' | 's16' | 'u32' | 's32' | 'f32';
   value: number;
 }
 
@@ -185,30 +191,106 @@ const RESOURCE_SCHEMAS: Record<string, ResFieldSchema[]> = {
     { name: 'bottom', offset: 4, type: 's16' },
     { name: 'right',  offset: 6, type: 's16' },
   ],
+  // Mac OS Menu resource (MENU) — header fields
+  'MENU': [
+    { name: 'menuId',       offset: 0,  type: 's16' },
+    { name: 'width',        offset: 2,  type: 'u16' },
+    { name: 'height',       offset: 4,  type: 'u16' },
+    { name: 'procId',       offset: 6,  type: 's16' },
+    { name: 'flags',        offset: 10, type: 'u32' },
+  ],
+  // Version resource (vers)
+  'vers': [
+    { name: 'numericVersion', offset: 0, type: 'u32' },
+    { name: 'country',        offset: 4, type: 'u16' },
+  ],
+  // Mac OS Picture (PICT) — header only
+  'PICT': [
+    { name: 'size',        offset: 0, type: 'u16' },
+    { name: 'bounds.top',  offset: 2, type: 's16' },
+    { name: 'bounds.left', offset: 4, type: 's16' },
+    { name: 'bounds.bot',  offset: 6, type: 's16' },
+    { name: 'bounds.rgt',  offset: 8, type: 's16' },
+  ],
+  // Mac OS snd resource — format header
+  'snd ': [
+    { name: 'format',        offset: 0, type: 'u16' },
+    { name: 'numSynths',     offset: 2, type: 'u16' },
+  ],
 };
 
 /** Known struct schemas for Pack entry types (by Pack resource ID). */
 const PACK_ENTRY_SCHEMAS: Record<number, ResFieldSchema[]> = {
-  // Pack 128: Object group reference (OGRP)
+  // Pack 128: Object group reference (tObjectGroupReference)
   128: [
     { name: 'typeRes',  offset: 0, type: 's16' },
     { name: 'numObjs',  offset: 2, type: 'u16' },
   ],
-  // Pack 135: Road info record
+  // Pack 130: Object group entries (tObjectGroup + tObjectGroupEntry[])
+  130: [
+    { name: 'numEntries',         offset: 0,  type: 'u32' },
+    // First entry at offset 4 (tObjectGroupEntry: typeRes s16 + minOffs s16 + maxOffs s16 + probility s16 + dir f32)
+    { name: 'entry[0].typeRes',   offset: 4,  type: 's16' },
+    { name: 'entry[0].minOffs',   offset: 6,  type: 's16' },
+    { name: 'entry[0].maxOffs',   offset: 8,  type: 's16' },
+    { name: 'entry[0].probility', offset: 10, type: 's16' },
+    { name: 'entry[0].dir',       offset: 12, type: 'f32' },
+  ],
+  // Pack 134 (kPackSnds): Mac OS 'snd ' entries — SoundHeader
+  134: [
+    { name: 'snd.format',     offset: 0,  type: 'u16' },
+    { name: 'snd.numSynths',  offset: 2,  type: 'u16' },
+  ],
+  // Pack 135 (kPackRoad): Road info record (tRoadInfo, big-endian)
+  // struct tRoadInfo {
+  //   float friction;         @  0  (f32)
+  //   float airResistance;    @  4  (f32)
+  //   float backResistance;   @  8  (f32)
+  //   UInt16 tolerance;       @ 12  (u16)
+  //   SInt16 marks;           @ 14  (s16) — marking texture index
+  //   SInt16 deathOffs;       @ 16  (s16)
+  //   SInt16 backgroundTex;   @ 18  (s16) — background texture
+  //   SInt16 foregroundTex;   @ 20  (s16) — road foreground texture
+  //   SInt16 roadLeftBorder;  @ 22  (s16)
+  //   SInt16 roadRightBorder; @ 24  (s16)
+  //   SInt16 tracks;          @ 26  (s16)
+  //   SInt16 skidSound;       @ 28  (s16)
+  //   SInt16 filler;          @ 30  (s16)
+  //   float xDrift;           @ 32  (f32)
+  //   float yDrift;           @ 36  (f32)
+  //   float xFrontDrift;      @ 40  (f32)
+  //   float yFrontDrift;      @ 44  (f32)
+  //   float trackSlide;       @ 48  (f32)
+  //   float dustSlide;        @ 52  (f32)
+  //   UInt8 dustColor;        @ 56  (u8)
+  //   UInt8 water;            @ 57  (u8)
+  //   UInt16 filler2;         @ 58  (u16)
+  //   float slideFriction;    @ 60  (f32)
+  // }
   135: [
-    { name: 'flags',         offset: 0,  type: 'u16' },
-    { name: 'roadWidth',     offset: 2,  type: 'u16' },
-    { name: 'field_4',       offset: 4,  type: 'u16' },
-    { name: 'field_6',       offset: 6,  type: 'u16' },
-    { name: 'field_8',       offset: 8,  type: 'u16' },
-    { name: 'field_10',      offset: 10, type: 'u16' },
-    { name: 'field_12',      offset: 12, type: 'u16' },
-    { name: 'field_14',      offset: 14, type: 'u16' },
-    { name: 'field_16',      offset: 16, type: 'u16' },
-    { name: 'bgTex',         offset: 18, type: 'u16' },
-    { name: 'fgTex',         offset: 20, type: 'u16' },
-    { name: 'lBorder',       offset: 22, type: 'u16' },
-    { name: 'rBorder',       offset: 24, type: 'u16' },
+    { name: 'friction',        offset: 0,  type: 'f32' },
+    { name: 'airResistance',   offset: 4,  type: 'f32' },
+    { name: 'backResistance',  offset: 8,  type: 'f32' },
+    { name: 'tolerance',       offset: 12, type: 'u16' },
+    { name: 'marks',           offset: 14, type: 's16' },
+    { name: 'deathOffs',       offset: 16, type: 's16' },
+    { name: 'bgTex',           offset: 18, type: 's16' },
+    { name: 'fgTex',           offset: 20, type: 's16' },
+    { name: 'lBorder',         offset: 22, type: 's16' },
+    { name: 'rBorder',         offset: 24, type: 's16' },
+    { name: 'tracks',          offset: 26, type: 's16' },
+    { name: 'skidSound',       offset: 28, type: 's16' },
+    { name: 'filler',          offset: 30, type: 's16' },
+    { name: 'xDrift',          offset: 32, type: 'f32' },
+    { name: 'yDrift',          offset: 36, type: 'f32' },
+    { name: 'xFrontDrift',     offset: 40, type: 'f32' },
+    { name: 'yFrontDrift',     offset: 44, type: 'f32' },
+    { name: 'trackSlide',      offset: 48, type: 'f32' },
+    { name: 'dustSlide',       offset: 52, type: 'f32' },
+    { name: 'dustColor',       offset: 56, type: 'u8'  },
+    { name: 'water',           offset: 57, type: 'u8'  },
+    { name: 'filler2',         offset: 58, type: 'u16' },
+    { name: 'slideFriction',   offset: 60, type: 'f32' },
   ],
 };
 
@@ -236,6 +318,7 @@ function readResField(view: DataView, f: ResFieldSchema): number {
     case 's16': return view.getInt16(f.offset, le);
     case 'u32': return view.getUint32(f.offset, le);
     case 's32': return view.getInt32(f.offset, le);
+    case 'f32': return view.getFloat32(f.offset, le);
   }
 }
 
@@ -248,6 +331,7 @@ function writeResField(view: DataView, f: ResFieldSchema, value: number): void {
     case 's16': view.setInt16(f.offset, value, le); break;
     case 'u32': view.setUint32(f.offset, value, le); break;
     case 's32': view.setInt32(f.offset, value, le); break;
+    case 'f32': view.setFloat32(f.offset, value, le); break;
   }
 }
 
@@ -275,7 +359,7 @@ function buildResFields(bytes: Uint8Array, schema: ResFieldSchema[] | null): Res
 }
 
 function fieldByteSize(type: ResField['type']): number {
-  if (type === 'u32' || type === 's32') return 4;
+  if (type === 'u32' || type === 's32' || type === 'f32') return 4;
   if (type === 'u8') return 1;
   return 2; // u16, s16
 }
@@ -284,6 +368,119 @@ function fieldByteSize(type: ResField['type']): number {
 const TEXT_RESOURCE_TYPES = new Set(['TEXT', 'STR ']);
 /** Resource types that contain an icon (shown as a canvas). */
 const ICON_RESOURCE_TYPES = new Set(['ICN#', 'ics#', 'icl8', 'ics8']);
+/** Resource types that contain Mac OS audio data. */
+const AUDIO_RESOURCE_TYPES = new Set(['snd ']);
+
+/**
+ * Parse a Mac OS 'snd ' resource header to extract sample metadata.
+ * Supports both format 1 and format 2 snd resources.
+ * Returns null if the data is too short or malformed.
+ */
+function parseSndHeader(bytes: Uint8Array): { format: number; sampleRate: number; length: number; encode: number } | null {
+  if (bytes.length < 6) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const format = view.getUint16(0, false);
+  let cmdOffset = 0;
+
+  if (format === 1) {
+    // Format 1: 2 bytes format, 2 bytes numSynths, N*6 bytes synth records, then commands
+    const numSynths = view.getUint16(2, false);
+    cmdOffset = 4 + numSynths * 6;
+  } else if (format === 2) {
+    // Format 2: 2 bytes format, 2 bytes refCount, then commands
+    cmdOffset = 4;
+  } else {
+    return null;
+  }
+
+  if (cmdOffset + 2 > bytes.length) return null;
+  const numCmds = view.getUint16(cmdOffset, false);
+  cmdOffset += 2;
+
+  for (let i = 0; i < numCmds; i++) {
+    if (cmdOffset + 8 > bytes.length) break;
+    const cmd = view.getUint16(cmdOffset, false) & 0x7FFF;
+    const param2 = view.getUint32(cmdOffset + 4, false);
+    cmdOffset += 8;
+
+    // bufferCmd (80) or soundCmd (81) point to a SoundHeader
+    if (cmd === 80 || cmd === 81) {
+      const headerOff = param2;
+      // SoundHeader layout: samplePtr(4) + length(4) + sampleRate(4.16fp) + loopStart(4) + loopEnd(4) + encode(1) + baseFreq(1)
+      if (headerOff + 22 > bytes.length) break;
+      const length = view.getUint32(headerOff + 4, false);
+      const sampleRateFixed = view.getUint32(headerOff + 8, false);
+      const sampleRate = sampleRateFixed / 65536;
+      const encode = view.getUint8(headerOff + 20);
+      return { format, sampleRate, length, encode };
+    }
+  }
+  return null;
+}
+
+/**
+ * Attempt to play a Mac OS 'snd ' resource using the Web Audio API.
+ * Only works for uncompressed (encode=0, 8-bit mono) snd resources.
+ * Returns true if playback started, false if format is unsupported.
+ */
+function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean {
+  if (bytes.length < 6) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const format = view.getUint16(0, false);
+  let cmdOffset = 0;
+
+  if (format === 1) {
+    const numSynths = view.getUint16(2, false);
+    cmdOffset = 4 + numSynths * 6;
+  } else if (format === 2) {
+    cmdOffset = 4;
+  } else {
+    return false;
+  }
+
+  if (cmdOffset + 2 > bytes.length) return false;
+  const numCmds = view.getUint16(cmdOffset, false);
+  cmdOffset += 2;
+
+  for (let i = 0; i < numCmds; i++) {
+    if (cmdOffset + 8 > bytes.length) break;
+    const cmd = view.getUint16(cmdOffset, false) & 0x7FFF;
+    const param2 = view.getUint32(cmdOffset + 4, false);
+    cmdOffset += 8;
+
+    if (cmd === 80 || cmd === 81) {
+      const headerOff = param2;
+      if (headerOff + 22 > bytes.length) break;
+      const length = view.getUint32(headerOff + 4, false);
+      const sampleRateFixed = view.getUint32(headerOff + 8, false);
+      const sampleRate = sampleRateFixed / 65536;
+      const encode = view.getUint8(headerOff + 20);
+      if (encode !== 0) break; // only uncompressed
+
+      const dataStart = headerOff + 22;
+      const dataEnd = Math.min(dataStart + length, bytes.length);
+      if (dataStart >= bytes.length) break;
+
+      // Convert 8-bit unsigned PCM (0-255) to float32 (-1 to 1)
+      const sampleCount = dataEnd - dataStart;
+      // AudioContext requires sampleRate ≥ 1 Hz; clamp to avoid Safari/Chrome errors
+      // with corrupt or zero sample rates.
+      const MIN_SAMPLE_RATE = 100;
+      const audioBuffer = audioCtx.createBuffer(1, sampleCount, Math.max(sampleRate, MIN_SAMPLE_RATE));
+      const channelData = audioBuffer.getChannelData(0);
+      for (let s = 0; s < sampleCount; s++) {
+        channelData[s] = (bytes[dataStart + s] - 128) / 128;
+      }
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
+      source.start();
+      return true;
+    }
+  }
+  return false;
+}
 
 
 @Component({
@@ -529,6 +726,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const type = this.selectedResType();
     if (!bytes || bytes.length === 0) return [];
     if (type && TEXT_RESOURCE_TYPES.has(type)) return [];
+    if (type && AUDIO_RESOURCE_TYPES.has(type)) return [];
     if (type === 'STR#') return [];
     if (type === 'Pack') return [];
     return buildResFields(bytes, type ? (RESOURCE_SCHEMAS[type] ?? null) : null);
@@ -546,6 +744,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly selectedResIsIcon = computed(() => {
     const t = this.selectedResType();
     return t !== null && ICON_RESOURCE_TYPES.has(t);
+  });
+
+  /** True if the selected resource is an audio type (snd). */
+  readonly selectedResIsAudio = computed(() => {
+    const t = this.selectedResType();
+    return t !== null && AUDIO_RESOURCE_TYPES.has(t);
+  });
+
+  /** Parsed Mac snd resource metadata for the selected audio resource. */
+  readonly selectedResSndInfo = computed<{ format: number; sampleRate: number; length: number; encode: number } | null>(() => {
+    if (!this.selectedResIsAudio()) return null;
+    const bytes = this.selectedResBytes();
+    if (!bytes || bytes.length < 4) return null;
+    return parseSndHeader(bytes);
   });
 
   /** True if the selected resource type has a known named struct schema. */
@@ -579,6 +791,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private roadTextureCanvases = new Map<number, HTMLCanvasElement>();
   /** Version signal bumped when road textures are loaded (triggers canvas redraw). */
   roadTexturesVersion = signal(0);
+
+  /** Tile viewer: all decoded texture tile entries for the Tiles tab. */
+  tileTileEntries = signal<{ texId: number; width: number; height: number }[]>([]);
+  /** Currently selected tile ID in the tile viewer. */
+  selectedTileId = signal<number | null>(null);
 
   // ---- Pack Worker ----
   private packWorker: Worker | null = null;
@@ -1337,6 +1554,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.snackBar.open(`✗ Save failed: ${err}`, 'Dismiss', { duration: 5000 });
     } finally {
       this.resBrowserBusy.set(false);
+    }
+  }
+
+  /** Web Audio context, lazily created for snd resource playback. */
+  private _audioCtx: AudioContext | null = null;
+
+  /** Play the currently selected 'snd ' resource via the Web Audio API. */
+  playSndResource(): void {
+    const bytes = this.selectedResBytes();
+    if (!bytes) return;
+    if (!this._audioCtx) {
+      this._audioCtx = new AudioContext();
+    }
+    const played = tryPlaySndResource(bytes, this._audioCtx);
+    if (!played) {
+      this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
     }
   }
 
@@ -2691,6 +2924,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
 
       // Build one HTMLCanvasElement per texture (for createPattern use)
+      const tileEntries: { texId: number; width: number; height: number }[] = [];
       for (const { texId, width, height, pixels } of result.textures) {
         const clamped = new Uint8ClampedArray(pixels);
         const tc = document.createElement('canvas');
@@ -2702,7 +2936,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           tctx.putImageData(imgData, 0, 0);
         }
         this.roadTextureCanvases.set(texId, tc);
+        tileEntries.push({ texId, width, height });
       }
+      this.tileTileEntries.set(tileEntries);
       // Bump version to trigger canvas redraw with real textures
       this.roadTexturesVersion.update((v) => v + 1);
     } catch {
@@ -2746,6 +2982,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const canvas = this.packSpriteCanvases.get(frameId) ?? null;
     if (!canvas) return null;
     try { return canvas.toDataURL(); } catch { return null; }
+  }
+
+  /** Return a data URL for a road texture tile by its texId. */
+  getTileDataUrl(texId: number): string | null {
+    const canvas = this.roadTextureCanvases.get(texId) ?? null;
+    if (!canvas) return null;
+    try { return canvas.toDataURL(); } catch { return null; }
+  }
+
+  /** Return "WxH px" label for a tile by texId, or '?' if not found. */
+  getTileDimensions(texId: number): string {
+    const entry = this.tileTileEntries().find((t) => t.texId === texId);
+    if (!entry) return '?';
+    return `${entry.width}×${entry.height} px`;
   }
 
   exportSpritePng(): void {
@@ -3561,7 +3811,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
    * global game state from scratch.  Any in-progress game session will be lost.
    */
   restartGameWithCustomResources(): void {
-    const mod = (window as any).Module;
+    const mod = window.Module;
     if (!mod) {
       this.statusText.set('WASM module not ready. Please wait and try again.');
       return;
@@ -3577,7 +3827,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (typeof mod.callMain === 'function') {
         setTimeout(() => {
           try {
-            mod.callMain([]);
+            mod?.callMain?.([]);
             this.statusText.set('Game restarted with custom resources.dat ✓');
           } catch (err) {
             console.warn('[Angular] callMain failed, falling back to page reload', err);
@@ -3592,7 +3842,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         // a fallback before the full page reload.
         setTimeout(() => {
           try {
-            mod._main(0, 0);
+            mod?._main?.(0, 0);
             this.statusText.set('Game restarted with custom resources.dat ✓');
           } catch (err) {
             console.warn('[Angular] _main failed, falling back to page reload', err);
@@ -3620,8 +3870,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
    */
   private _mountCustomResourcesFs(bytes: Uint8Array): void {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const FS = (window as any).FS as {
+      const FS = (window as unknown as Record<string, unknown>)['FS'] as {
         mkdir: (path: string) => void;
         writeFile: (path: string, data: Uint8Array) => void;
       } | undefined;
