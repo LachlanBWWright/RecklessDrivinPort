@@ -267,7 +267,6 @@
                       (zoomIn)="zoomIn()"
                       (zoomOut)="zoomOut()"
                       (resetView)="resetView()"
-                      <!-- Mark segment UI removed -->
                       (panXChange)="canvasPanX.set($event)"
                       (panYChange)="canvasPanY.set($event)"
                     ></app-editor-canvas>
@@ -282,7 +281,6 @@
                           <div class="objects-side-info-body">
                             <div class="objects-side-title">Level {{ levelDisplayNum(selectedLevel()!.resourceId) }}</div>
                             <div class="objects-side-badges">
-                        <!-- Track up/down badges removed -->
                             </div>
                           </div>
                           <div class="objects-side-help">
@@ -324,7 +322,7 @@
                   </div>
                 </mat-card-content>
                 <mat-card-actions>
-                <!-- 'Save Objects to Pack' button removed — download already provides exported resources -->
+                
                 </mat-card-actions>
               </mat-card>
             }

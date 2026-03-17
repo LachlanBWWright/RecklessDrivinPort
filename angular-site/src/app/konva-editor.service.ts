@@ -47,51 +47,29 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import Konva from 'konva';
 import type { ObjectPos } from './level-editor.service';
+import { profiler } from './konva-editor.profiler';
+import {
+  WAYPOINT_WORLD_R,
+  FALLBACK_CIRCLE_WORLD_R,
+  MARK_ENDPOINT_WORLD_R,
+  EMPTY_SET,
+  setsEqual,
+} from './konva-editor.types';
+import type {
+  KonvaDragEndEvent,
+  KonvaWaypointDragEndEvent,
+  KonvaMarkDragEndEvent,
+  KonvaWorldNode,
+} from './konva-editor.types';
+import {
+  createOffscreenBitmap as _createOffscreenBitmap,
+  applyBackgroundTransform as _applyBackgroundTransform,
+} from './konva-editor.background';
+import { buildObjects } from './konva-editor.objects';
+import { buildTrackWaypoints } from './konva-editor.track';
+import { buildMarks } from './konva-editor.marks';
 
-export interface KonvaDragEndEvent {
-  index: number;
-  worldX: number;
-  worldY: number;
-}
 
-export interface KonvaWaypointDragEndEvent {
-  track: 'up' | 'down';
-  segIdx: number;
-  worldX: number;
-  worldY: number;
-}
-
-/** Fired when the user drags a mark segment endpoint. */
-export interface KonvaMarkDragEndEvent {
-  /** Index of the mark in the marks array. */
-  markIdx: number;
-  /** Which endpoint was dragged. */
-  endpoint: 'p1' | 'p2';
-  worldX: number;
-  worldY: number;
-}
-
-/** Union of node types added directly to worldGroup / trackWorldGroup. */
-type KonvaWorldNode = Konva.Group | Konva.Circle;
-
-/**
- * Waypoint radius in WORLD UNITS.  These scale with the zoom exactly like the road
- * so waypoints never appear disproportionately large or small.
- */
-const WAYPOINT_WORLD_R       = 10;
-/** Fallback circle radius in world units (shown when no sprite image is available). */
-const FALLBACK_CIRCLE_WORLD_R = 14;
-/** Mark endpoint circle radius in world units. */
-const MARK_ENDPOINT_WORLD_R  = 12;
-
-/** Reusable empty-set sentinel to avoid allocating a new Set on every setsEqual call. */
-const EMPTY_SET = new Set<number>();
-
-function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
-  if (a.size !== b.size) return false;
-  for (const item of a) { if (!b.has(item)) return false; }
-  return true;
-}
 
 @Injectable({ providedIn: 'root' })
 export class KonvaEditorService implements OnDestroy {
@@ -107,6 +85,10 @@ export class KonvaEditorService implements OnDestroy {
   private trackWorldGroup: Konva.Group | null = null;
   /** Group inside marksLayer – same transform as worldGroup. */
   private marksWorldGroup: Konva.Group | null = null;
+  // Background offscreen-bitmap layer (prototype)
+  private bgLayer: Konva.Layer | null = null;
+  private bgImageNode: Konva.Image | null = null;
+  private bgBitmap: ImageBitmap | null = null;
 
   // ── External callbacks ────────────────────────────────────────────────────
   onObjectDragEnd?: (e: KonvaDragEndEvent) => void;
@@ -169,6 +151,7 @@ export class KonvaEditorService implements OnDestroy {
     logicalW: number, logicalH: number,
     cssW: number,     cssH: number,
   ): void {
+    const t = profiler.start('konva.init');
     this.destroy();
 
     this._logicalW = logicalW;
@@ -189,10 +172,23 @@ export class KonvaEditorService implements OnDestroy {
     this.trackWorldGroup = new Konva.Group();
     this.marksWorldGroup = new Konva.Group();
 
+    // Background layer (offscreen-bitmap prototype) — add first so it sits behind others
+    this.bgLayer = new Konva.Layer({ listening: false });
+    this.bgImageNode = new Konva.Image({
+      image: undefined,
+      width: this._logicalW,
+      height: this._logicalH,
+      offsetX: this._logicalW / 2,
+      offsetY: this._logicalH / 2,
+      listening: false,
+      hitGraphEnabled: false,
+    });
+    this.bgLayer.add(this.bgImageNode);
+
     this.objectsLayer.add(this.worldGroup);
     this.trackLayer.add(this.trackWorldGroup);
     this.marksLayer.add(this.marksWorldGroup);
-    this.stage.add(this.objectsLayer, this.trackLayer, this.marksLayer);
+    this.stage.add(this.bgLayer, this.objectsLayer, this.trackLayer, this.marksLayer);
 
     // ── Stage-level events ────────────────────────────────────────────────
 
@@ -232,6 +228,7 @@ export class KonvaEditorService implements OnDestroy {
     this.stage.on('mouseup', (e) => {
       this.onStageMouseUp?.(e.evt.button);
     });
+    t.end();
   }
 
   resize(cssW: number, cssH: number): void {
@@ -275,6 +272,8 @@ export class KonvaEditorService implements OnDestroy {
     this.worldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
     this.trackWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
     this.marksWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
+    // keep background image transform in sync as well
+    _applyBackgroundTransform(this.bgImageNode, this._zoom, this._panX, this._panY, this._cssW, this._cssH, this._logicalW, this._logicalH);
   }
 
   /**
@@ -335,7 +334,8 @@ export class KonvaEditorService implements OnDestroy {
     getImageForType: (typeRes: number) => CanvasImageSource | null,
     zoom: number, panX: number, panY: number,
   ): void {
-    if (!this.worldGroup || !this.objectsLayer) return;
+    const t = profiler.start('konva.setObjects');
+    if (!this.worldGroup || !this.objectsLayer) { t.end(); return; }
     this._zoom = zoom; this._panX = panX; this._panY = panY;
 
     // Treat any empty array as equivalent to a "no objects" state regardless
@@ -351,94 +351,23 @@ export class KonvaEditorService implements OnDestroy {
     if (objsUnchanged && selUnchanged && visUnchanged) {
       this._applyGroupTransform();
       this._updateSelectionRingWidths();
+      t.end();
       return;
     }
 
-    // Full rebuild
+    // Full rebuild — delegate to objects module
     this._lastObjects       = objects;
     this._lastSelectedIndex = selectedIndex;
     this._lastVisibleTypes  = new Set(visibleTypes);
-    this.worldGroup.destroyChildren();
-    this._konvaObjNodes = [];
-
-    const PALETTE_LEN = paletteColors.length;
-    const sx = zoom * (this._cssW / this._logicalW); // used for thin strokes
-
-    objects.forEach((obj, i) => {
-      const typeIdx = ((obj.typeRes % PALETTE_LEN) + PALETTE_LEN) % PALETTE_LEN;
-      const visible = visibleTypes.has(typeIdx);
-      if (!visible && i !== selectedIndex) return;
-
-      const isSel = i === selectedIndex;
-      const img   = getImageForType(obj.typeRes);
-
-      let node: KonvaWorldNode;
-
-      if (img instanceof HTMLCanvasElement || img instanceof HTMLImageElement) {
-        const W = img.width;
-        const H = img.height;
-        // Objects placed at (worldX, −worldY) so world +Y = Konva −Y (up on screen)
-        const group = new Konva.Group({
-          x:         obj.x,
-          y:         -obj.y,
-          rotation:  (-obj.dir * 180) / Math.PI,
-          draggable: !this._panMode,
-          id:        `obj-${i}`,
-        });
-        group.add(new Konva.Image({
-          image:   img,
-          width:   W,
-          height:  H,
-          offsetX: W / 2,
-          offsetY: H / 2,
-          opacity: visible ? 1 : 0.3,
-        }));
-        if (isSel) {
-          // Selection ring: radius in sprite-local pixels (not world units).
-          // strokeWidth is in world units so it stays thin regardless of zoom.
-          group.add(new Konva.Circle({
-            radius:      Math.max(W, H) / 2 + 6,
-            stroke:      '#ffffff',
-            strokeWidth: 2 / sx,   // ~2 CSS pixels
-            fill:        'transparent',
-          }));
-        }
-        node = group;
-      } else {
-        // Fallback circle – radius in world units so it scales with the road
-        const color = paletteColors[typeIdx] ?? '#888888';
-        node = new Konva.Circle({
-          x:           obj.x,
-          y:           -obj.y,
-          radius:      FALLBACK_CIRCLE_WORLD_R,
-          fill:        isSel ? '#ffe082' : color,
-          stroke:      isSel ? '#fff' : 'rgba(0,0,0,0.3)',
-          strokeWidth: isSel ? 2 / sx : 1 / sx,
-          opacity:     visible ? 1 : 0.3,
-          draggable:   !this._panMode,
-          id:          `obj-${i}`,
-        });
-      }
-
-      const eventNode = node as Konva.Node;
-
-      // dragend: node position is in group-local coords = world coords (Y negated)
-      eventNode.on('dragend', () => {
-        const wx = node.x();
-        const wy = -node.y();
-        this.onObjectDragEnd?.({ index: i, worldX: Math.round(wx), worldY: Math.round(wy) });
-      });
-
-      eventNode.on('click', (e: Konva.KonvaEventObject<MouseEvent>) => {
-        e.cancelBubble = true;
-        this.onObjectClick?.(i);
-      });
-
-      this.worldGroup?.add(node);
-      this._konvaObjNodes.push(node);
-    });
-
+    const result = buildObjects(
+      this.worldGroup, this.objectsLayer, objects, selectedIndex, visibleTypes, paletteColors, getImageForType,
+      this._panMode, this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
+      (idx, wx, wy) => this.onObjectDragEnd?.({ index: idx, worldX: wx, worldY: wy }),
+      (idx) => this.onObjectClick?.(idx),
+    );
+    this._konvaObjNodes = result.nodes;
     this._applyGroupTransform();
+    t.end();
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -450,7 +379,8 @@ export class KonvaEditorService implements OnDestroy {
     trackDown: { x: number; y: number }[],
     zoom: number, panX: number, panY: number,
   ): void {
-    if (!this.trackWorldGroup || !this.trackLayer) return;
+    const t = profiler.start('konva.setTrackWaypoints');
+    if (!this.trackWorldGroup || !this.trackLayer) { t.end(); return; }
     this._zoom = zoom; this._panX = panX; this._panY = panY;
 
     // Fast path: only transform changed, OR both new and previous were empty.
@@ -460,74 +390,22 @@ export class KonvaEditorService implements OnDestroy {
                           (this._lastTrackDown?.length ?? 0) === 0;
     if (arraysUnchanged || (bothEmpty && prevBothEmpty)) {
       this._applyGroupTransform();
+      t.end();
       return;
     }
 
     this._lastTrackUp   = trackUp;
     this._lastTrackDown = trackDown;
-    this.trackWorldGroup.destroyChildren();
 
-    const sx = zoom * (this._cssW / this._logicalW);
-
-    const addWaypoints = (
-      pts:   { x: number; y: number }[],
-      track: 'up' | 'down',
-      color: string,
-    ): void => {
-      pts.forEach((pt, i) => {
-        const circle = new Konva.Circle({
-          x:           pt.x,
-          y:           -pt.y,   // world Y negated
-          // WORLD-UNIT radius: scales proportionally with the road as you zoom
-          radius:      WAYPOINT_WORLD_R,
-          fill:        color,
-          stroke:      'rgba(0,0,0,0.5)',
-          strokeWidth: 1.5 / sx,  // thin stroke in CSS pixels
-          draggable:   !this._panMode,
-          id:          `wp-${track}-${i}`,
-        });
-
-        circle.on('dragend', () => {
-          this.onWaypointDragEnd?.({
-            track,
-            segIdx: i,
-            worldX: Math.round(circle.x()),
-            worldY: Math.round(-circle.y()),
-          });
-        });
-
-        circle.on('contextmenu', (e) => {
-          e.evt.preventDefault();
-          e.cancelBubble = true;
-          this.onWaypointRightClick?.(track, i, circle.x(), -circle.y());
-        });
-
-        // Hover feedback: slightly enlarge and change stroke.
-        // draw() (not flush) is used here because hover effects are independent
-        // of the road canvas; they don't need frame-synchronisation with redrawObjectCanvas.
-        circle.on('mouseenter', () => {
-          circle.radius(WAYPOINT_WORLD_R * 1.4);
-          circle.stroke('#fff');
-          this.trackLayer?.draw();
-          document.body.style.cursor = 'grab';
-        });
-        circle.on('mouseleave', () => {
-          circle.radius(WAYPOINT_WORLD_R);
-          circle.stroke('rgba(0,0,0,0.5)');
-          this.trackLayer?.draw();
-          document.body.style.cursor = '';
-        });
-        circle.on('dragstart', () => { document.body.style.cursor = 'grabbing'; });
-        circle.on('dragend',   () => { document.body.style.cursor = ''; });
-
-        this.trackWorldGroup?.add(circle);
-      });
-    };
-
-    addWaypoints(trackUp,   'up',   '#42a5f5');
-    addWaypoints(trackDown, 'down', '#ef5350');
+    buildTrackWaypoints(
+      this.trackWorldGroup, this.trackLayer, trackUp, trackDown, this._panMode,
+      this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
+      (track, segIdx, wx, wy) => this.onWaypointDragEnd?.({ track, segIdx, worldX: wx, worldY: wy }),
+      (track, segIdx, wx, wy) => this.onWaypointRightClick?.(track, segIdx, wx, wy),
+    );
 
     this._applyGroupTransform();
+    t.end();
   }
 
   clearTrackWaypoints(): void {
@@ -557,7 +435,8 @@ export class KonvaEditorService implements OnDestroy {
     selectedMarkIndex: number | null,
     zoom: number, panX: number, panY: number,
   ): void {
-    if (!this.marksWorldGroup || !this.marksLayer) return;
+    const t = profiler.start('konva.setMarks');
+    if (!this.marksWorldGroup || !this.marksLayer) { t.end(); return; }
     this._zoom = zoom; this._panX = panX; this._panY = panY;
 
     const marksUnchanged = marks === this._lastMarks
@@ -566,70 +445,22 @@ export class KonvaEditorService implements OnDestroy {
 
     if (marksUnchanged && selUnchanged) {
       this._applyGroupTransform();
+      t.end();
       return;
     }
 
     this._lastMarks             = marks;
     this._lastSelectedMarkIndex = selectedMarkIndex;
-    this.marksWorldGroup.destroyChildren();
 
-    const sx = zoom * (this._cssW / this._logicalW);
-
-    marks.forEach((m, markIdx) => {
-      const isSel = markIdx === selectedMarkIndex;
-      const color      = isSel ? '#ffffff' : '#ffeb3b';
-      const strokeClr  = isSel ? 'rgba(255,235,59,0.8)' : 'rgba(0,0,0,0.4)';
-
-      (['p1', 'p2'] as const).forEach((endpoint) => {
-        const wx = endpoint === 'p1' ? m.x1 : m.x2;
-        const wy = endpoint === 'p1' ? m.y1 : m.y2;
-
-        const circle = new Konva.Circle({
-          x:           wx,
-          y:           -wy,   // world Y negated (Konva Y is down)
-          radius:      MARK_ENDPOINT_WORLD_R,
-          fill:        color,
-          stroke:      strokeClr,
-          strokeWidth: 1.5 / sx,
-          draggable:   !this._panMode,
-          id:          `mark-${markIdx}-${endpoint}`,
-        });
-
-        circle.on('dragend', () => {
-          this.onMarkEndpointDragEnd?.({
-            markIdx,
-            endpoint,
-            worldX: Math.round(circle.x()),
-            worldY: Math.round(-circle.y()),
-          });
-        });
-
-        circle.on('click', (e: Konva.KonvaEventObject<MouseEvent>) => {
-          e.cancelBubble = true;
-          this.onMarkClick?.(markIdx);
-        });
-
-        // Hover feedback
-        circle.on('mouseenter', () => {
-          circle.radius(MARK_ENDPOINT_WORLD_R * 1.4);
-          circle.stroke('#fff');
-          this.marksLayer?.draw();
-          document.body.style.cursor = 'grab';
-        });
-        circle.on('mouseleave', () => {
-          circle.radius(MARK_ENDPOINT_WORLD_R);
-          circle.stroke(strokeClr);
-          this.marksLayer?.draw();
-          document.body.style.cursor = '';
-        });
-        circle.on('dragstart', () => { document.body.style.cursor = 'grabbing'; });
-        circle.on('dragend',   () => { document.body.style.cursor = ''; });
-
-        this.marksWorldGroup?.add(circle);
-      });
-    });
+    buildMarks(
+      this.marksWorldGroup, this.marksLayer, marks, selectedMarkIndex, this._panMode,
+      this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
+      (markIdx, endpoint, wx, wy) => this.onMarkEndpointDragEnd?.({ markIdx, endpoint, worldX: wx, worldY: wy }),
+      (markIdx) => this.onMarkClick?.(markIdx),
+    );
 
     this._applyGroupTransform();
+    t.end();
   }
 
   clearMarks(): void {
@@ -651,9 +482,37 @@ export class KonvaEditorService implements OnDestroy {
    * eliminating the one-frame "objects trail behind background" effect.
    */
   flush(): void {
+    const t = profiler.start('konva.flush');
     this.objectsLayer?.draw();
     this.trackLayer?.draw();
     this.marksLayer?.draw();
+    t.end();
+  }
+
+  // Expose a code-level toggle for profiling (no UI).
+  setProfilingEnabled(enabled: boolean): void { profiler.setEnabled(enabled); }
+  isProfilingEnabled(): boolean { return profiler.enabled; }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Offscreen background bitmap prototype
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // background helpers moved to konva-editor.background.ts
+
+  async setOffscreenBackground(
+    drawFn: (ctx: CanvasRenderingContext2D, logicalW: number, logicalH: number) => void,
+    desiredDpr?: number,
+  ): Promise<void> {
+    const t = profiler.start('konva.setOffscreenBackground');
+    if (!this.stage || !this.bgImageNode || !this.bgLayer) { t.end(); return; }
+    const dpr = desiredDpr ?? Math.max(1, Math.floor(window.devicePixelRatio || 1));
+    this.bgBitmap = await _createOffscreenBitmap(drawFn, this._logicalW, this._logicalH, dpr);
+    this.bgImageNode.image(this.bgBitmap);
+    this.bgImageNode.width(this._logicalW);
+    this.bgImageNode.height(this._logicalH);
+    _applyBackgroundTransform(this.bgImageNode, this._zoom, this._panX, this._panY, this._cssW, this._cssH, this._logicalW, this._logicalH);
+    this.bgLayer.draw();
+    t.end();
   }
 
   // ─────────────────────────────────────────────────────────────────────────

@@ -91,7 +91,7 @@ main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px 0 40px; /* removed horizontal padding */
+  padding: 20px 0 40px;
   gap: 16px;
   background: var(--bg);
 }
@@ -585,7 +585,7 @@ main {
     overflow-y: auto;
     border-left: 1px solid var(--border);
     background: var(--surface2);
-    padding: 0 0 12px 0; /* removed horizontal padding so tabs span full width */
+    padding: 0 0 12px 0;
 
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 3px; }
