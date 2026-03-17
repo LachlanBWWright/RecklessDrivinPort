@@ -19,7 +19,8 @@
  *   APPLY_TRACK            payload: { resourceId, trackUp, trackDown }
  *   APPLY_MARKS            payload: { resourceId, marks }
  *   APPLY_SPRITE_BYTE      payload: { spriteId, offset, value }
- *   APPLY_SPRITE_PACK_PIXELS payload: { frameId, pixels: Uint8ClampedArray }
+ *   APPLY_TILE16_PIXELS  payload: { texId: number; pixels: Uint8ClampedArray }
+ *   DECODE_ALL_ROAD_TEXTURES (no payload) → { textures: DecodedRoadTexture[] }
  *   GET_SPRITE_BYTES       payload: { spriteId }
  *   SERIALIZE              (no payload)
  *   LIST_RESOURCES         (no payload) → { entries: {type,id,size}[] }
@@ -145,6 +146,24 @@ self.addEventListener('message', (event: MessageEvent) => {
         const frames = levelEditorSvc.decodeAllSpriteFrames(resources);
         const framePixelBuffers: ArrayBuffer[] = frames.map((f) => f.pixels);
         self.postMessage({ id, ok: true, cmd, result: { frames } }, framePixelBuffers);
+        break;
+      }
+
+      case 'DECODE_ALL_ROAD_TEXTURES': {
+        // Decode every tile in kPackTx16 (not just those referenced by road infos).
+        const textures = levelEditorSvc.extractAllRoadTextures(resources);
+        const transferables3: ArrayBuffer[] = textures.map((t) => t.pixels);
+        self.postMessage(
+          { id, ok: true, cmd, result: { textures } },
+          transferables3,
+        );
+        break;
+      }
+
+      case 'APPLY_TILE16_PIXELS': {
+        const { texId, pixels } = payload as { texId: number; pixels: Uint8ClampedArray };
+        resources = levelEditorSvc.applyTile16Pixels(resources, texId, pixels);
+        self.postMessage({ id, ok: true, cmd, result: {} });
         break;
       }
 

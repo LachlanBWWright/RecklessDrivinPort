@@ -970,6 +970,69 @@ export class LevelEditorService {
   }
 
   /**
+   * Decode ALL textures from kPackTx16 (Pack ID 136) regardless of which road
+   * info entries reference them.  Used by the tile editor to list every tile.
+   */
+  extractAllRoadTextures(resources: ResourceDatEntry[]): DecodedRoadTexture[] {
+    const pack = resources.find((e) => e.type === 'Pack' && e.id === TX16_PACK_ID);
+    if (!pack) return [];
+    try {
+      const entries = parsePackHandle(pack.data, pack.id);
+      const allIds = entries.map((e) => e.id);
+      return this.extractRoadTextures(resources, allIds);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Write edited RGBA8888 pixels back into a kPackTx16 tile entry.
+   * The tile format is raw big-endian RGB555 with no header; dimensions are
+   * inferred from the existing data length exactly as in extractRoadTextures.
+   */
+  applyTile16Pixels(
+    resources: ResourceDatEntry[],
+    texId: number,
+    pixels: Uint8ClampedArray,
+  ): ResourceDatEntry[] {
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== TX16_PACK_ID) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, res.id);
+        const entry = packEntries.find((e) => e.id === texId);
+        if (!entry || entry.data.length < 2) return res;
+
+        // Infer dimensions the same way as extractRoadTextures.
+        const pixelCount = entry.data.length / 2;
+        let w: number, h: number;
+        if (pixelCount === BORDER_TEX_W * BORDER_TEX_H) {
+          w = BORDER_TEX_W; h = BORDER_TEX_H;
+        } else {
+          w = Math.round(Math.sqrt(pixelCount));
+          h = pixelCount / w;
+        }
+
+        const newData = entry.data.slice();
+        const newView = new DataView(newData.buffer, newData.byteOffset, newData.byteLength);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const srcI = (y * w + x) * 4;
+            const dstOffset = (y * w + x) * 2;
+            if (dstOffset + 2 > newData.length) continue;
+            const rgb = rgbaToRgb555(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
+            newView.setUint16(dstOffset, rgb, false);
+          }
+        }
+        const newEntries = packEntries.map((e) => e.id === texId ? { ...e, data: newData } : e);
+        return { ...res, data: encodePackHandle(newEntries, res.id) };
+      } catch (err) {
+        console.warn('[LevelEditor] applyTile16Pixels error:', err);
+        return res;
+      }
+    });
+  }
+
+  /**
    * Decode all textures needed for road rendering from kPackTx16 (Pack ID 136).
    * Returns decoded RGBA8888 textures keyed by texture ID.
    *

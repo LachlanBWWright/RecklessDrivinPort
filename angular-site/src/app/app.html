@@ -419,8 +419,8 @@
             </ng-template>
             <mat-card class="tab-panel-card">
               <mat-card-header>
-                <mat-card-title>Road &amp; Background Tile Viewer</mat-card-title>
-                <mat-card-subtitle>Decoded from Pack 136 (kPackTx16 — 16-bit RGB555 textures)</mat-card-subtitle>
+                <mat-card-title>Road &amp; Background Tile Editor</mat-card-title>
+                <mat-card-subtitle>Pack 136 (kPackTx16 — 16-bit RGB555) &amp; Pack 133 (kPackTxtR — 8-bit)</mat-card-subtitle>
               </mat-card-header>
               <mat-card-content>
                 @if (tileTileEntries().length > 0) {
@@ -455,7 +455,23 @@
                             </mat-card-content>
                           </mat-card>
                           <div class="sprite-actions">
-                            <p class="muted">Replace via the Resources tab → Pack #136 → entry #{{ selectedTileId() }}</p>
+                            <!-- Edit pixels inline (reuses SpriteEditorComponent) -->
+                            <button mat-raised-button color="primary"
+                              (click)="openTileEditor(selectedTileId()!)"
+                              [disabled]="workerBusy()"
+                              matTooltip="Open pixel editor for this tile">
+                              <mat-icon>brush</mat-icon> Edit Pixels
+                            </button>
+                            <!-- PNG upload to replace this tile -->
+                            <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
+                              (change)="onTilePngUpload($event, selectedTileId()!)" />
+                            <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy()"
+                              matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
+                              <mat-icon>upload</mat-icon> Upload PNG
+                            </button>
+                            <button mat-stroked-button (click)="exportTilePng(selectedTileId()!)">
+                              <mat-icon>download</mat-icon> Export PNG
+                            </button>
                           </div>
                         </div>
                       }
@@ -471,288 +487,166 @@
             </mat-card>
           </mat-tab>
 
-          <!-- ──────────────────────────────────────────────────────── -->
-          <!-- Resources tab – browse and edit ALL resources.dat entries -->
-          <!-- ──────────────────────────────────────────────────────── -->
+          <!-- ===== AUDIO TAB ===== -->
           <mat-tab>
             <ng-template mat-tab-label>
-              <mat-icon>folder</mat-icon>&nbsp;Resources
+              <mat-icon>music_note</mat-icon>&nbsp;Audio
             </ng-template>
+            <mat-card class="tab-panel-card">
+              <mat-card-header>
+                <mat-card-title>Sound Editor</mat-card-title>
+                <mat-card-subtitle>Pack 134 (kPackSnds — Mac OS &#39;snd &#39; format)</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                @if (audioEntries().length > 0) {
+                  <div class="audio-editor-layout">
+                    <!-- Left: list of sound entries -->
+                    <div class="audio-entry-list">
+                      @for (entry of audioEntries(); track entry.id) {
+                        <button class="audio-entry-btn"
+                          [class.audio-entry-btn--active]="selectedAudioId() === entry.id"
+                          (click)="selectAudioEntry(entry.id)">
+                          <mat-icon class="audio-entry-icon">audiotrack</mat-icon>
+                          <span>Sound #{{ entry.id }}</span>
+                          <span class="res-size-badge">{{ entry.sizeBytes | number }} B</span>
+                        </button>
+                      }
+                    </div>
 
-            @if (hasEditorData()) {
-              <mat-card class="tab-panel-card resources-panel-card">
-                <mat-card-header>
-                  <mat-card-title>Resource Browser</mat-card-title>
-                  <mat-card-subtitle>All {{ allResourceEntries().length }} entries from resources.dat</mat-card-subtitle>
-                </mat-card-header>
-                <mat-card-content class="resources-content">
-
-                  <!-- Left: type+id selector tree -->
-                  <div class="res-tree">
-                    @for (group of allResourceTypes(); track group.type) {
-                      <div class="res-type-group">
-                        <div class="res-type-header">
-                          <mat-icon class="res-type-icon">category</mat-icon>
-                          <span class="res-type-name">{{ group.type }}</span>
-                          <span class="badge">{{ group.entries.length }}</span>
-                        </div>
-                        @for (entry of group.entries; track entry.id) {
-                          <button
-                            class="res-entry-btn"
-                            [class.res-entry-btn--active]="selectedResType() === group.type && selectedResId() === entry.id"
-                            (click)="selectResource(group.type, entry.id)"
-                          >
-                            #{{ entry.id }}&nbsp;<span class="res-size-badge">{{ entry.size | number }} B</span>
-                          </button>
+                    <!-- Right: selected sound detail -->
+                    @if (selectedAudioId() !== null && selectedAudioBytes()) {
+                      <div class="audio-detail">
+                        <h4 class="audio-detail-title">Sound #{{ selectedAudioId() }}</h4>
+                        @if (selectedAudioSndInfo(); as info) {
+                          <div class="audio-meta">
+                            <span class="badge">Format {{ info.format }}</span>
+                            <span class="badge">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
+                            <span class="badge">{{ info.length | number }} samples</span>
+                            <span class="badge">{{ info.encode === 0 ? 'PCM 8-bit' : 'encode=' + info.encode }}</span>
+                          </div>
                         }
-                      </div>
-                    }
-                    @if (allResourceTypes().length === 0) {
-                      <p class="muted">Loading resource list…</p>
-                    }
-                  </div>
-
-                  <!-- Right: detail panel -->
-                  <div class="res-detail">
-                    @if (resBrowserBusy()) {
-                      <mat-spinner diameter="32"></mat-spinner>
-                    } @else if (selectedResId() !== null && selectedResType() !== null) {
-                      <div class="res-detail-header">
-                        <h4 class="res-detail-title">
-                          {{ selectedResType() }}&#35;{{ selectedResId() }}
-                        </h4>
-                        <div class="res-detail-actions">
-                          @if (selectedResType() !== 'Pack') {
-                            <button mat-stroked-button (click)="downloadSelectedResource()" [disabled]="!selectedResBytes()">
-                              <mat-icon>download</mat-icon> Download
-                            </button>
-                            <button mat-stroked-button (click)="triggerUploadResource()">
-                              <mat-icon>upload</mat-icon> Replace
-                            </button>
-                          }
+                        <div class="audio-waveform-placeholder">
+                          <mat-icon class="waveform-icon">graphic_eq</mat-icon>
+                          <span>{{ selectedAudioBytes()!.length | number }} bytes</span>
+                        </div>
+                        <div class="audio-actions">
+                          <button mat-raised-button color="primary"
+                            (click)="playAudioEntry()"
+                            [disabled]="!selectedAudioBytes()">
+                            <mat-icon>play_arrow</mat-icon> Play
+                          </button>
+                          <button mat-stroked-button (click)="exportAudioWav()"
+                            [disabled]="!selectedAudioBytes()">
+                            <mat-icon>download</mat-icon> Export WAV
+                          </button>
+                          <!-- WAV upload to replace the sound -->
+                          <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none"
+                            (change)="onAudioWavUpload($event)" />
+                          <button mat-stroked-button (click)="audioWavInput.click()" [disabled]="workerBusy()"
+                            matTooltip="Upload a WAV file to replace this sound">
+                            <mat-icon>upload</mat-icon> Replace WAV
+                          </button>
                         </div>
                       </div>
-
-                      <!-- STR# string editor -->
-                      @if (selectedResType() === 'STR#' && selectedResStrings() !== null) {
-                        <div class="str-editor">
-                          <h5 class="str-editor-title">String List ({{ selectedResStrings()!.length }} entries)</h5>
-                          @for (s of selectedResStrings()!; track $index) {
-                            <div class="str-row">
-                              <span class="str-idx">{{ $index }}</span>
-                              <input
-                                class="str-input"
-                                type="text"
-                                [value]="s"
-                                (input)="updateResString($index, $any($event.target).value)"
-                              />
-                              <button mat-icon-button color="warn" (click)="removeResString($index)" matTooltip="Remove">
-                                <mat-icon>remove_circle_outline</mat-icon>
-                              </button>
-                            </div>
-                          }
-                          <div class="str-editor-actions">
-                            <button mat-stroked-button (click)="addResString()">
-                              <mat-icon>add</mat-icon> Add String
-                            </button>
-                            <button mat-raised-button color="primary" (click)="saveStrList()">
-                              <mat-icon>save</mat-icon> Save
-                            </button>
-                          </div>
-                        </div>
-                      }
-
-                      <!-- STR / TEXT text editor -->
-                      @if (selectedResText() !== null) {
-                        <div class="text-editor">
-                          <h5 class="field-editor-title">Text Content</h5>
-                          <textarea
-                            class="text-editor-area"
-                            rows="8"
-                            [value]="selectedResText()!"
-                            (input)="selectedResText.set($any($event.target).value)"
-                          ></textarea>
-                          <div class="field-editor-actions">
-                            <button mat-raised-button color="primary" (click)="saveResText()">
-                              <mat-icon>save</mat-icon> Save
-                            </button>
-                          </div>
-                        </div>
-                      }
-
-                      <!-- Icon preview (ICN#, ics#) -->
-                      @if (selectedResIsIcon() && selectedResBytes()) {
-                        <div class="icon-preview">
-                          <h5 class="field-editor-title">Icon Preview</h5>
-                          @if (getIconResourceDataUrl(selectedResBytes()); as url) {
-                            <img [src]="url" class="icon-preview-img" [style.imageRendering]="'pixelated'"
-                                 [style.width.px]="64" [style.height.px]="64" alt="Icon preview">
-                          }
-                          <p class="muted">{{ selectedResBytes()!.length }} bytes &mdash; replace via Upload to edit</p>
-                        </div>
-                      }
-
-                      <!-- Audio player (snd ) -->
-                      @if (selectedResIsAudio() && selectedResBytes()) {
-                        <div class="audio-player">
-                          <h5 class="field-editor-title">
-                            <mat-icon>volume_up</mat-icon>&nbsp;Audio Resource
-                          </h5>
-                          @if (selectedResSndInfo(); as info) {
-                            <div class="audio-meta">
-                              <span class="badge">Format {{ info.format }}</span>
-                              <span class="badge">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
-                              <span class="badge">{{ info.length | number }} samples</span>
-                              <span class="badge">{{ info.encode === 0 ? 'PCM 8-bit' : 'encode=' + info.encode }}</span>
-                            </div>
-                          }
-                          <div class="audio-actions">
-                            <button mat-raised-button color="primary"
-                              (click)="playSndResource()"
-                              [disabled]="!selectedResBytes()"
-                              matTooltip="Play this sound (uncompressed PCM only)">
-                              <mat-icon>play_arrow</mat-icon> Play
-                            </button>
-                            <button mat-stroked-button (click)="downloadSelectedResource()" [disabled]="!selectedResBytes()">
-                              <mat-icon>download</mat-icon> Export raw
-                            </button>
-                          </div>
-                          <p class="muted">{{ selectedResBytes()!.length }} bytes — replace via Upload to swap sound</p>
-                        </div>
-                      }
-
-                      <!-- Binary field editor for structured resources -->
-                      @if (selectedResFields().length > 0) {
-                        <div class="field-editor">
-                          <h5 class="field-editor-title">
-                            {{ selectedResBytes()!.length }} bytes
-                            @if (selectedResHasNamedSchema()) {
-                              &mdash; known struct
-                            } @else {
-                              &mdash; auto-detected fields
-                            }
-                            @if (selectedResFieldsTruncated()) {
-                              &mdash; <em>showing first {{ selectedResFields().length }} of {{ selectedResBytes()!.length / 2 | number:'1.0-0' }} fields</em>
-                            }
-                          </h5>
-                          <div class="field-table-scroll">
-                            <table class="field-table">
-                              <thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Value</th></tr></thead>
-                              <tbody>
-                                @for (f of selectedResFields(); track f.offset) {
-                                  <tr>
-                                    <td class="field-name">{{ f.name }}</td>
-                                    <td class="field-offset">{{ f.offset }}</td>
-                                    <td class="field-type">{{ f.type }}</td>
-                                    <td>
-                                      <input
-                                        class="field-input"
-                                        type="number"
-                                        [value]="f.value"
-                                        (input)="onResFieldInput($index, $event)"
-                                      />
-                                    </td>
-                                  </tr>
-                                }
-                              </tbody>
-                            </table>
-                          </div>
-                          <div class="field-editor-actions">
-                            <button mat-raised-button color="primary" (click)="saveResFields()">
-                              <mat-icon>save</mat-icon> Save Changes
-                            </button>
-                          </div>
-                        </div>
-                      }
-
-                      <!-- Pack entry browser -->
-                      @if (selectedResType() === 'Pack') {
-                        <div class="pack-entry-browser">
-                          @if (selectedPackEntries() !== null) {
-                            <div class="pack-entry-list">
-                              <h5 class="pack-entries-title">{{ selectedPackEntries()!.length }} entries</h5>
-                              @for (e of selectedPackEntries()!; track e.id) {
-                                <button
-                                  class="pack-entry-btn"
-                                  [class.pack-entry-btn--active]="selectedPackEntryId() === e.id"
-                                  (click)="selectPackEntry(selectedResId()!, e.id)"
-                                >
-                                  Entry #{{ e.id }} &nbsp;<span class="res-size-badge">{{ e.size | number }} B</span>
-                                </button>
-                              }
-                            </div>
-                            @if (selectedPackEntryId() !== null) {
-                              <div class="pack-entry-detail">
-                                <div class="res-detail-actions" style="margin-bottom:8px">
-                                  <button mat-stroked-button (click)="downloadSelectedPackEntry()" [disabled]="!selectedPackEntryBytes()">
-                                    <mat-icon>download</mat-icon> Download entry
-                                  </button>
-                                  <button mat-stroked-button (click)="triggerUploadPackEntry()">
-                                    <mat-icon>upload</mat-icon> Replace entry
-                                  </button>
-                                </div>
-                                <!-- Pack entry field editor -->
-                                @if (selectedPackEntryFields().length > 0) {
-                                  <div class="field-editor">
-                                    <h5 class="field-editor-title">
-                                      {{ selectedPackEntryBytes()!.length }} bytes
-                                    </h5>
-                                    <table class="field-table">
-                                      <thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Value</th></tr></thead>
-                                      <tbody>
-                                        @for (f of selectedPackEntryFields(); track f.offset) {
-                                          <tr>
-                                            <td class="field-name">{{ f.name }}</td>
-                                            <td class="field-offset">{{ f.offset }}</td>
-                                            <td class="field-type">{{ f.type }}</td>
-                                            <td>
-                                              <input
-                                                class="field-input"
-                                                type="number"
-                                                [value]="f.value"
-                                                (input)="onPackEntryFieldInput($index, $event)"
-                                              />
-                                            </td>
-                                          </tr>
-                                        }
-                                      </tbody>
-                                    </table>
-                                    <div class="field-editor-actions">
-                                      <button mat-raised-button color="primary" (click)="savePackEntryFields()">
-                                        <mat-icon>save</mat-icon> Save Entry
-                                      </button>
-                                    </div>
-                                  </div>
-                                } @else if (resBrowserBusy()) {
-                                  <mat-spinner diameter="24"></mat-spinner>
-                                } @else {
-                                  <p class="muted">Loading entry data…</p>
-                                }
-                              </div>
-                            }
-                          } @else {
-                            <p class="muted">Could not parse pack entries.</p>
-                          }
-                        </div>
-                      }
-
+                    } @else if (selectedAudioId() !== null) {
+                      <div class="res-placeholder">
+                        <mat-spinner diameter="32"></mat-spinner>
+                      </div>
                     } @else {
                       <div class="res-placeholder">
-                        <mat-icon class="res-placeholder-icon">folder_open</mat-icon>
-                        <p>Select a resource from the list to inspect it.</p>
+                        <p class="muted">Select a sound from the list.</p>
                       </div>
                     }
                   </div>
-
-                </mat-card-content>
-              </mat-card>
-            } @else {
-              <div class="tab-empty-state">
-                <mat-icon class="no-data-icon">folder</mat-icon>
-                <p>Load a resources.dat file to browse all resources.</p>
-              </div>
-            }
+                } @else {
+                  <div class="no-data-content">
+                    <mat-icon class="no-data-icon">music_off</mat-icon>
+                    <p>Sound entries from Pack 134 (kPackSnds) will appear here once a resources.dat is loaded.</p>
+                  </div>
+                }
+              </mat-card-content>
+            </mat-card>
           </mat-tab>
+
+          <!-- ===== SCREENS / HUD TAB ===== -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>image</mat-icon>&nbsp;Screens
+            </ng-template>
+            <mat-card class="tab-panel-card">
+              <mat-card-header>
+                <mat-card-title>Screens &amp; HUD Icons Editor</mat-card-title>
+                <mat-card-subtitle>ICN# icon resources (32×32 1-bit) — HUD graphics, menu icons</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                @if (iconEntries().length > 0) {
+                  <div class="screens-layout">
+                    <!-- Left: icon list -->
+                    <div class="icon-entry-list">
+                      @for (icon of iconEntries(); track icon.id) {
+                        <button class="audio-entry-btn"
+                          [class.audio-entry-btn--active]="selectedIconId() === icon.id"
+                          (click)="selectIconEntry(icon.id)">
+                          <mat-icon class="audio-entry-icon">image</mat-icon>
+                          <span>{{ icon.label }}</span>
+                        </button>
+                      }
+                    </div>
+
+                    <!-- Right: icon detail -->
+                    @if (selectedIconId() !== null) {
+                      <div class="icon-detail">
+                        <h4 class="audio-detail-title">{{ iconEntries()[(iconEntries().findIndex(e => e.id === selectedIconId()))]?.label ?? 'Icon #' + selectedIconId() }}</h4>
+                        @if (iconPreviewCanvas(); as canvas) {
+                          <img [src]="canvas.toDataURL()" class="icon-large-preview"
+                            [style.imageRendering]="'pixelated'" alt="icon preview">
+                        } @else {
+                          <div class="icon-placeholder">
+                            <mat-spinner diameter="32"></mat-spinner>
+                          </div>
+                        }
+                        <div class="sprite-actions">
+                          <button mat-stroked-button (click)="exportIconPng()">
+                            <mat-icon>download</mat-icon> Export PNG
+                          </button>
+                          <input #iconPngInput type="file" accept="image/png,image/*" style="display:none"
+                            (change)="onIconPngUpload($event)" />
+                          <button mat-stroked-button (click)="iconPngInput.click()" [disabled]="workerBusy()"
+                            matTooltip="Upload a PNG (32×32) to replace this icon">
+                            <mat-icon>upload</mat-icon> Replace PNG
+                          </button>
+                        </div>
+                        <p class="muted" style="margin-top:12px;font-size:0.85em">
+                          ICN# resources are 32×32 1-bit black-and-white bitmaps (HUD icons, menu graphics).
+                          Upload any image to replace — it will be scaled to 32×32 and converted to 1-bit.
+                        </p>
+                      </div>
+                    } @else {
+                      <div class="res-placeholder">
+                        <p class="muted">Select an icon from the list.</p>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <div class="no-data-content">
+                    <mat-icon class="no-data-icon">image_not_supported</mat-icon>
+                    <p>ICN# icon resources will appear here once a resources.dat is loaded.</p>
+                  </div>
+                }
+
+                <!-- Strings editor section -->
+                @if (hasEditorData()) {
+                  <mat-divider style="margin: 24px 0"></mat-divider>
+                  <h3 style="margin: 0 0 12px">String Resources (STR#)</h3>
+                  <p class="muted" style="margin-bottom:12px">
+                    Use the Resources tab below for detailed string/text editing. String resources
+                    contain game text like level names and UI labels.
+                  </p>
+                }
+              </mat-card-content>
+            </mat-card>
+          </mat-tab>
+
 
         </mat-tab-group>
       }

@@ -54,7 +54,7 @@ declare global {
 }
 
 export type AppTab = 'game' | 'editor';
-export type EditorSection = 'properties' | 'objects' | 'sprites' | 'resources';
+export type EditorSection = 'properties' | 'objects' | 'sprites' | 'tiles' | 'audio' | 'screens';
 
 const OBJ_PALETTE = [
   '#e53935', '#42a5f5', '#66bb6a', '#ffa726',
@@ -482,6 +482,39 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
   return false;
 }
 
+/**
+ * Build a minimal PCM WAV file from raw PCM samples.
+ * @param pcm  Raw samples (8-bit unsigned mono or 16-bit signed mono).
+ * @param sampleRate Samples per second.
+ * @param numChannels 1 = mono.
+ * @param bitsPerSample 8 or 16.
+ */
+function buildWav(pcm: Uint8Array, sampleRate: number, numChannels: number, bitsPerSample: number): Uint8Array {
+  const dataSize   = pcm.length;
+  const byteRate   = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const out        = new Uint8Array(44 + dataSize);
+  const dv         = new DataView(out.buffer);
+  // RIFF chunk
+  out.set([82, 73, 70, 70], 0);              // 'RIFF'
+  dv.setUint32(4, 36 + dataSize, true);      // file size - 8
+  out.set([87, 65, 86, 69], 8);              // 'WAVE'
+  // fmt  sub-chunk
+  out.set([102, 109, 116, 32], 12);          // 'fmt '
+  dv.setUint32(16, 16, true);                // sub-chunk size = 16
+  dv.setUint16(20, 1, true);                 // PCM format = 1
+  dv.setUint16(22, numChannels, true);
+  dv.setUint32(24, sampleRate, true);
+  dv.setUint32(28, byteRate, true);
+  dv.setUint16(32, blockAlign, true);
+  dv.setUint16(34, bitsPerSample, true);
+  // data sub-chunk
+  out.set([100, 97, 116, 97], 36);           // 'data'
+  dv.setUint32(40, dataSize, true);
+  out.set(pcm, 44);
+  return out;
+}
+
 
 @Component({
   selector: 'app-root',
@@ -683,6 +716,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   spriteEditorOpen = signal(false);
   /** The decoded frame currently being edited in the popup. */
   spriteEditorFrame = signal<DecodedSpriteFrame | null>(null);
+  /** True when the sprite editor is being used to edit a tile (not a sprite). */
+  private _editingTileId: number | null = null;
 
   // ---- Raw resource browser ----
   /** Summary list of all resources from resources.dat (type, id, size). Populated on load. */
@@ -1160,7 +1195,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Maps EditorSection → mat-tab index for [(selectedIndex)] binding. */
-  private readonly SECTION_ORDER: EditorSection[] = ['properties', 'objects', 'sprites', 'resources'];
+  private readonly SECTION_ORDER: EditorSection[] = ['properties', 'objects', 'sprites', 'tiles', 'audio', 'screens'];
   get editorSectionIndex(): number {
     return this.SECTION_ORDER.indexOf(this.editorSection());
   }
@@ -2876,6 +2911,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       void this.decodePackSpritesInBackground();
       // Populate resource browser entry list.
       void this.loadResourceList();
+      // Populate audio tab entries.
+      void this.loadAudioEntries();
+      // Populate screens/HUD icon entries.
+      void this.loadIconEntries();
     } catch (error) {
       this.editorError.set(error instanceof Error ? error.message : 'Failed to parse resources');
       this.resourcesStatus.set('Failed to parse resources.');
@@ -2908,6 +2947,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /**
    * Ask the worker to decode road textures from kPackTx16 and store them as
    * OffscreenCanvas / HTMLCanvasElement entries for use as CanvasPattern fills.
+   * Also decodes ALL tiles for the Tiles tab viewer.
    */
   private async decodeRoadTexturesInBackground(): Promise<void> {
     try {
@@ -2915,7 +2955,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         roadInfoArr: [number, RoadInfoData][];
         textures: { texId: number; width: number; height: number; pixels: ArrayBuffer }[];
       };
-      const result = await this.dispatchWorker<RoadTexResult>('DECODE_ROAD_TEXTURES');
+      type AllTilesResult = {
+        textures: { texId: number; width: number; height: number; pixels: ArrayBuffer }[];
+      };
+
+      // Run both requests in parallel.
+      const [result, allTilesResult] = await Promise.all([
+        this.dispatchWorker<RoadTexResult>('DECODE_ROAD_TEXTURES'),
+        this.dispatchWorker<AllTilesResult>('DECODE_ALL_ROAD_TEXTURES'),
+      ]);
 
       // Rebuild road info map
       this.roadInfoDataMap.clear();
@@ -2923,20 +2971,36 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.roadInfoDataMap.set(id, ri);
       }
 
-      // Build one HTMLCanvasElement per texture (for createPattern use)
-      const tileEntries: { texId: number; width: number; height: number }[] = [];
-      for (const { texId, width, height, pixels } of result.textures) {
+      // Helper: build canvas from decoded texture
+      const buildCanvas = (texId: number, width: number, height: number, pixels: ArrayBuffer): HTMLCanvasElement | null => {
         const clamped = new Uint8ClampedArray(pixels);
         const tc = document.createElement('canvas');
         tc.width = width;
         tc.height = height;
         const tctx = tc.getContext('2d');
-        if (tctx) {
-          const imgData = new ImageData(clamped, width, height);
-          tctx.putImageData(imgData, 0, 0);
-        }
-        this.roadTextureCanvases.set(texId, tc);
+        if (!tctx) return null;
+        tctx.putImageData(new ImageData(clamped, width, height), 0, 0);
+        return tc;
+      };
+
+      // Store road-rendering textures (subset needed for road preview patterns)
+      for (const { texId, width, height, pixels } of result.textures) {
+        const tc = buildCanvas(texId, width, height, pixels);
+        if (tc) this.roadTextureCanvases.set(texId, tc);
+      }
+
+      // Store ALL tiles (superset) and populate tile viewer entries
+      const tileEntries: { texId: number; width: number; height: number }[] = [];
+      for (const { texId, width, height, pixels } of allTilesResult.textures) {
+        const tc = buildCanvas(texId, width, height, pixels);
+        if (tc) this.roadTextureCanvases.set(texId, tc);
         tileEntries.push({ texId, width, height });
+      }
+      // If all-tiles returned nothing, fall back to the road-info subset
+      if (tileEntries.length === 0) {
+        for (const { texId, width, height } of result.textures) {
+          tileEntries.push({ texId, width, height });
+        }
       }
       this.tileTileEntries.set(tileEntries);
       // Bump version to trigger canvas redraw with real textures
@@ -2998,6 +3062,423 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     return `${entry.width}×${entry.height} px`;
   }
 
+  // ---- Tile editor (reuses SpriteEditorComponent) ----
+
+  /** Decoded tile frame data cached for the editor, keyed by texId. */
+  private tileDecodedFrames = new Map<number, DecodedSpriteFrame>();
+
+  /** Open the pixel editor for a kPackTx16 tile. */
+  openTileEditor(texId: number): void {
+    const canvas = this.roadTextureCanvases.get(texId);
+    const entry = this.tileTileEntries().find((t) => t.texId === texId);
+    if (!canvas || !entry) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const imageData = ctx.getImageData(0, 0, entry.width, entry.height);
+    const pixels = new Uint8ClampedArray(imageData.data);
+    const frame: DecodedSpriteFrame = {
+      frameId: texId,
+      width: entry.width,
+      height: entry.height,
+      pixels,
+      bitDepth: 16,
+    };
+    this.tileDecodedFrames.set(texId, frame);
+    this._editingTileId = texId; // mark that we're editing a tile
+    this.spriteEditorFrame.set({ ...frame, pixels: pixels.slice() as Uint8ClampedArray });
+    this.spriteEditorOpen.set(true);
+  }
+
+  /** Export a tile canvas as a PNG download. */
+  exportTilePng(texId: number): void {
+    const canvas = this.roadTextureCanvases.get(texId);
+    if (!canvas) return;
+    try {
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tile-${texId}.png`;
+      a.click();
+    } catch { /* security error */ }
+  }
+
+  /** Handle PNG file upload to replace a kPackTx16 tile. */
+  async onTilePngUpload(event: Event, texId: number): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = '';
+    const entry = this.tileTileEntries().find((t) => t.texId === texId);
+    if (!entry) { this.editorError.set('Tile not found'); return; }
+    try {
+      const url = URL.createObjectURL(file);
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = url;
+      });
+      URL.revokeObjectURL(url);
+      const offscreen = document.createElement('canvas');
+      offscreen.width  = entry.width;
+      offscreen.height = entry.height;
+      const ctx = offscreen.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, entry.width, entry.height);
+      const imageData = ctx.getImageData(0, 0, entry.width, entry.height);
+      await this._applyTilePixels(texId, new Uint8ClampedArray(imageData.data));
+    } catch (err) {
+      this.editorError.set(err instanceof Error ? err.message : 'Tile PNG upload failed');
+    }
+  }
+
+  /** Handle save from the sprite pixel editor when editing a tile. */
+  async onTileEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
+    this.spriteEditorOpen.set(false);
+    await this._applyTilePixels(event.frameId, event.pixels);
+  }
+
+  private async _applyTilePixels(texId: number, pixels: Uint8ClampedArray): Promise<void> {
+    try {
+      this.workerBusy.set(true);
+      await this.dispatchWorker<Record<string, never>>('APPLY_TILE16_PIXELS', { texId, pixels });
+      // Re-decode ALL road textures so the canvas and tile grid refresh.
+      await this.decodeRoadTexturesInBackground();
+      this.resourcesStatus.set(`Tile #${texId} replaced.`);
+    } catch (err) {
+      this.editorError.set(err instanceof Error ? err.message : 'Tile save failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
+  // ---- Audio editor ----
+
+  /** All kPackSnds entries: { id, sizeBytes } */
+  audioEntries = signal<{ id: number; sizeBytes: number }[]>([]);
+  /** Currently selected audio entry ID for the audio editor. */
+  selectedAudioId = signal<number | null>(null);
+  /** Raw bytes of the selected audio resource (for playback/export/preview). */
+  selectedAudioBytes = signal<Uint8Array | null>(null);
+  /** Parsed snd metadata for the currently selected audio entry. */
+  readonly selectedAudioSndInfo = computed<{ format: number; sampleRate: number; length: number; encode: number } | null>(() => {
+    const bytes = this.selectedAudioBytes();
+    if (!bytes || bytes.length < 4) return null;
+    return parseSndHeader(bytes);
+  });
+
+  /** Load the list of all kPackSnds entries from the worker. */
+  async loadAudioEntries(): Promise<void> {
+    try {
+      type EntriesResult = { entries: { id: number; size: number }[] | null };
+      const result = await this.dispatchWorker<EntriesResult>('LIST_PACK_ENTRIES', { packId: 134 });
+      const entries = result.entries ?? [];
+      this.audioEntries.set(entries.map((e) => ({ id: e.id, sizeBytes: e.size })));
+      if (entries.length > 0 && this.selectedAudioId() === null) {
+        this.selectedAudioId.set(entries[0].id);
+        await this.loadSelectedAudioBytes(entries[0].id);
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  async selectAudioEntry(id: number): Promise<void> {
+    this.selectedAudioId.set(id);
+    await this.loadSelectedAudioBytes(id);
+  }
+
+  private async loadSelectedAudioBytes(id: number): Promise<void> {
+    try {
+      type RawResult = { bytes: ArrayBuffer | null };
+      const result = await this.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', { packId: 134, entryId: id });
+      this.selectedAudioBytes.set(result.bytes ? new Uint8Array(result.bytes) : null);
+    } catch { this.selectedAudioBytes.set(null); }
+  }
+
+  /** Download the selected audio entry as a WAV file. */
+  exportAudioWav(): void {
+    const id = this.selectedAudioId();
+    const bytes = this.selectedAudioBytes();
+    if (id === null || !bytes) return;
+    const wavBytes = this._sndToWav(bytes);
+    const blob = new Blob([new Uint8Array(wavBytes).buffer], { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sound-${id}.wav`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /** Play the currently selected audio entry. */
+  playAudioEntry(): void {
+    const bytes = this.selectedAudioBytes();
+    if (!bytes) return;
+    if (!this._audioCtx) this._audioCtx = new AudioContext();
+    tryPlaySndResource(bytes, this._audioCtx);
+  }
+
+  /** Replace the selected audio entry from a WAV file upload. */
+  async onAudioWavUpload(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = '';
+    const id = this.selectedAudioId();
+    if (id === null) return;
+    try {
+      this.workerBusy.set(true);
+      const arrBuf = await file.arrayBuffer();
+      // Convert uploaded WAV to raw Mac 'snd ' Format 1 resource bytes.
+      const sndBytes = this._wavToSnd(new Uint8Array(arrBuf));
+      await this.dispatchWorker<Record<string, never>>(
+        'PUT_PACK_ENTRY_RAW', { packId: 134, entryId: id, bytes: sndBytes.buffer },
+      );
+      await this.loadSelectedAudioBytes(id);
+      this.resourcesStatus.set(`Sound #${id} replaced from WAV.`);
+    } catch (err) {
+      this.editorError.set(err instanceof Error ? err.message : 'WAV upload failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
+  /**
+   * Convert a Mac OS 'snd ' resource to PCM WAV.
+   * Only handles uncompressed 8-bit mono (encode=0).
+   */
+  private _sndToWav(bytes: Uint8Array): Uint8Array {
+    const info = parseSndHeader(bytes);
+    if (!info) {
+      // Fallback: wrap raw bytes as 8-bit mono 22050 Hz WAV
+      return buildWav(bytes, 22050, 1, 8);
+    }
+    // Find the sound data offset: scan for bufferCmd (0x8051) or soundCmd (0x0028)
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let dataOffset = bytes.length;
+    const numCmds = view.getUint16(6, false);
+    const cmdBase = info.format === 2 ? 6 : 8;
+    for (let c = 0; c < numCmds; c++) {
+      const cmdOff = cmdBase + c * 8;
+      if (cmdOff + 8 > bytes.length) break;
+      const cmdCode = view.getUint16(cmdOff, false) & 0x7fff;
+      if (cmdCode === 0x0051 || cmdCode === 0x8051) { // bufferCmd
+        dataOffset = view.getUint32(cmdOff + 4, false) + 22; // skip SoundHeader
+        break;
+      }
+    }
+    const pcmStart = Math.min(dataOffset, bytes.length);
+    const pcmData = bytes.slice(pcmStart);
+    return buildWav(pcmData, Math.round(info.sampleRate), 1, 8);
+  }
+
+  /**
+   * Convert a WAV file to a minimal Mac OS 'snd ' Format 1 resource.
+   * Only handles 8-bit mono PCM WAV (converts stereo/16-bit if needed).
+   */
+  private _wavToSnd(wav: Uint8Array): Uint8Array {
+    // Parse WAV header (RIFF/WAVE)
+    if (wav.length < 44) throw new Error('WAV file too short');
+    const wavView = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+    const sampleRate = wavView.getUint32(24, true);
+    const numChannels = wavView.getUint16(22, true);
+    const bitsPerSample = wavView.getUint16(34, true);
+    // Find 'data' chunk
+    let dataOff = 12;
+    let dataLen = 0;
+    while (dataOff + 8 <= wav.length) {
+      const chunkId = String.fromCharCode(wav[dataOff], wav[dataOff+1], wav[dataOff+2], wav[dataOff+3]);
+      const chunkLen = wavView.getUint32(dataOff + 4, true);
+      if (chunkId === 'data') { dataOff += 8; dataLen = chunkLen; break; }
+      dataOff += 8 + chunkLen;
+    }
+    if (dataLen === 0) throw new Error('No data chunk in WAV');
+    let pcm = wav.slice(dataOff, dataOff + dataLen);
+    // Convert stereo → mono (average)
+    if (numChannels === 2) {
+      const mono = new Uint8Array(pcm.length / 2);
+      for (let i = 0; i < mono.length; i++) {
+        if (bitsPerSample === 8) mono[i] = ((pcm[i*2] + pcm[i*2+1]) / 2) | 0;
+        else mono[i] = 128; // leave as silence if we can't convert
+      }
+      pcm = mono;
+    }
+    // Convert 16-bit signed → 8-bit unsigned
+    if (bitsPerSample === 16) {
+      const mono8 = new Uint8Array(pcm.length / 2);
+      const pcmView = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
+      for (let i = 0; i < mono8.length; i++) {
+        mono8[i] = ((pcmView.getInt16(i*2, true) >> 8) + 128) & 0xff;
+      }
+      pcm = mono8;
+    }
+    // Build minimal 'snd ' Format 1 resource:
+    // [format=1(u16)] [numTypes=1(u16)] [soundType=0x0005(u16)=sampledSynth] [initOption=0x80(u32)]
+    // [numCmds=1(u16)] [bufferCmd 0x8051 param1=0 param2=headerOff(u32)]
+    // [SoundHeader: samplePtr(u32=0) length(u32) sampleRate(4.16fp u32) loopStart(u32=0)
+    //               loopEnd(u32=0) encode(u8=0) baseFreq(u8=60=middle-C)]
+    // [PCM data]
+    const headerOff = 20; // offset of SoundHeader from start of resource
+    const out = new Uint8Array(headerOff + 22 + pcm.length);
+    const dv = new DataView(out.buffer);
+    dv.setUint16(0, 1, false);          // format=1
+    dv.setUint16(2, 1, false);          // numSynthTypes=1
+    dv.setUint16(4, 5, false);          // sampledSynth
+    dv.setUint32(6, 0x80, false);       // initOption (stereoMask)
+    dv.setUint16(10, 1, false);         // numCmds=1
+    dv.setUint16(12, 0x8051, false);    // bufferCmd
+    dv.setUint16(14, 0, false);         // param1=0
+    dv.setUint32(16, headerOff, false); // param2 = offset of header
+    // SoundHeader at headerOff
+    dv.setUint32(headerOff + 0, 0, false);                         // samplePtr=0
+    dv.setUint32(headerOff + 4, pcm.length, false);                // length
+    dv.setUint32(headerOff + 8, sampleRate * 65536, false);        // sampleRate (4.16 fixed-point)
+    dv.setUint32(headerOff + 12, 0, false);                        // loopStart
+    dv.setUint32(headerOff + 16, 0, false);                        // loopEnd
+    dv.setUint8(headerOff + 20, 0);                                // encode=0 (stdSH)
+    dv.setUint8(headerOff + 21, 60);                               // baseFreq=middle-C
+    out.set(pcm, headerOff + 22);
+    return out;
+  }
+
+  // ---- HUD / Screens tab ----
+
+  /** All ICN# resource entries (32×32 1-bit icons). */
+  iconEntries = signal<{ id: number; label: string }[]>([]);
+  /** Currently selected ICN# resource id. */
+  selectedIconId = signal<number | null>(null);
+  /** Canvas displaying the selected ICN# (32×32). */
+  iconPreviewCanvas = signal<HTMLCanvasElement | null>(null);
+
+  /** Load list of ICN# resources. */
+  async loadIconEntries(): Promise<void> {
+    try {
+      type ListResult = { entries: { type: string; id: number; size: number }[] };
+      const result = await this.dispatchWorker<ListResult>('LIST_RESOURCES');
+      const icons = result.entries.filter((e) => e.type === 'ICN#');
+      this.iconEntries.set(icons.map((e) => ({ id: e.id, label: this._iconLabel(e.id) })));
+      if (icons.length > 0 && this.selectedIconId() === null) {
+        this.selectIconEntry(icons[0].id);
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  async selectIconEntry(id: number): Promise<void> {
+    this.selectedIconId.set(id);
+    try {
+      type RawResult = { bytes: ArrayBuffer | null };
+      const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type: 'ICN#', id });
+      if (result.bytes) {
+        const canvas = this._renderIconBytes(new Uint8Array(result.bytes));
+        this.iconPreviewCanvas.set(canvas);
+      } else {
+        this.iconPreviewCanvas.set(null);
+      }
+    } catch { this.iconPreviewCanvas.set(null); }
+  }
+
+  /** Export the selected ICN# resource as a PNG file. */
+  exportIconPng(): void {
+    const canvas = this.iconPreviewCanvas();
+    const id = this.selectedIconId();
+    if (!canvas || id === null) return;
+    try {
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `icon-${id}.png`;
+      a.click();
+    } catch { /* security */ }
+  }
+
+  /** Upload a PNG to replace the selected ICN# resource. */
+  async onIconPngUpload(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = '';
+    const id = this.selectedIconId();
+    if (id === null) return;
+    try {
+      this.workerBusy.set(true);
+      const url = URL.createObjectURL(file);
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = url;
+      });
+      URL.revokeObjectURL(url);
+      // Scale to 32×32 and convert to 1-bit ICN# format
+      const offscreen = document.createElement('canvas');
+      offscreen.width = 32; offscreen.height = 32;
+      const ctx = offscreen.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, 32, 32);
+      const imageData = ctx.getImageData(0, 0, 32, 32);
+      const sndBytes = this._imageDataToIconHash(imageData.data);
+      await this.dispatchWorker<Record<string, never>>('PUT_RESOURCE_RAW', { type: 'ICN#', id, bytes: sndBytes.buffer });
+      await this.selectIconEntry(id);
+      this.resourcesStatus.set(`Icon #${id} replaced.`);
+    } catch (err) {
+      this.editorError.set(err instanceof Error ? err.message : 'Icon upload failed');
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
+  private _iconLabel(id: number): string {
+    const labels: Record<number, string> = {
+      128: 'Application Icon',
+      129: 'Main Menu',
+      130: 'Game Over',
+    };
+    return labels[id] ?? `Icon #${id}`;
+  }
+
+  /** Render an ICN# resource (32×32 1-bit) to an HTMLCanvasElement. */
+  private _renderIconBytes(bytes: Uint8Array): HTMLCanvasElement | null {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 32; canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const imgData = ctx.createImageData(32, 32);
+    // ICN# = 32×32 1-bit big-endian bitmap (128 bytes for icon + 128 bytes for mask)
+    for (let row = 0; row < 32; row++) {
+      const rowByte = Math.floor(row * 4); // 4 bytes per row
+      for (let col = 0; col < 32; col++) {
+        const byteIdx = rowByte + Math.floor(col / 8);
+        const bitIdx = 7 - (col % 8);
+        const bit = byteIdx < bytes.length ? (bytes[byteIdx] >> bitIdx) & 1 : 0;
+        const i = (row * 32 + col) * 4;
+        imgData.data[i]     = bit ? 0 : 255;
+        imgData.data[i + 1] = bit ? 0 : 255;
+        imgData.data[i + 2] = bit ? 0 : 255;
+        imgData.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+  }
+
+  /** Convert RGBA8888 32×32 image data to ICN# 1-bit big-endian bitmap (256 bytes). */
+  private _imageDataToIconHash(rgba: Uint8ClampedArray): Uint8Array {
+    const out = new Uint8Array(256); // 128 bytes icon + 128 bytes mask (all 1s)
+    for (let row = 0; row < 32; row++) {
+      for (let byteInRow = 0; byteInRow < 4; byteInRow++) {
+        let b = 0;
+        let mask = 0xff;
+        for (let bit = 0; bit < 8; bit++) {
+          const col = byteInRow * 8 + bit;
+          const i = (row * 32 + col) * 4;
+          const lum = rgba[i] * 0.299 + rgba[i+1] * 0.587 + rgba[i+2] * 0.114;
+          if (lum < 128) b |= (1 << (7 - bit)); // dark pixel → 1 (black)
+        }
+        out[row * 4 + byteInRow] = b;
+        out[128 + row * 4 + byteInRow] = mask;
+      }
+    }
+    return out;
+  }
+
   exportSpritePng(): void {
     const id = this.selectedPackSpriteId();
     if (id === null) return;
@@ -3023,6 +3504,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   openSpriteEditor(frameId: number): void {
     const frame = this.packSpriteDecodedFrames.get(frameId) ?? null;
     if (!frame) return;
+    this._editingTileId = null; // clear any tile edit marker
     this.spriteEditorFrame.set({ ...frame, pixels: frame.pixels.slice() as Uint8ClampedArray });
     this.spriteEditorOpen.set(true);
   }
@@ -3075,9 +3557,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  /** Handle save event from sprite editor – write pixels back to the pack. */
+  /** Handle save event from sprite editor – route to tile or sprite save. */
   async onSpriteEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
     this.spriteEditorOpen.set(false);
+    const tileId = this._editingTileId;
+    this._editingTileId = null;
+    if (tileId !== null) {
+      // Was editing a tile – apply to kPackTx16
+      await this.onTileEditorSaved(event);
+      return;
+    }
+    // Was editing a sprite – apply to kPackSp16
     try {
       this.workerBusy.set(true);
       const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>(
@@ -3713,17 +4203,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const [x1, y1] = this.worldToCanvas(m.x1, m.y1);
       const [x2, y2] = this.worldToCanvas(m.x2, m.y2);
       const isSel = i === selMark;
-      ctx.strokeStyle = isSel ? '#ffeb3b' : 'rgba(255,235,59,0.7)';
+      // Road markings are solid white lines in the actual game (painted road marking
+      // textures from kPackTxtR).  Use solid white with a cyan highlight when selected.
+      ctx.strokeStyle = isSel ? '#00e5ff' : 'rgba(255,255,255,0.9)';
       ctx.lineWidth = isSel ? 3 : 2;
-      ctx.setLineDash(isSel ? [] : [6, 4]);
+      ctx.setLineDash([]); // always solid – matches the in-game appearance
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
-      ctx.setLineDash([]);
       // Only draw endpoint dots when Konva is NOT rendering them
       if (!konvaActive) {
-        ctx.fillStyle = isSel ? '#ffffff' : '#ffeb3b';
+        ctx.fillStyle = isSel ? '#00e5ff' : 'rgba(255,255,255,0.8)';
         [[x1, y1], [x2, y2]].forEach(([px, py]) => {
           ctx.beginPath(); ctx.arc(px, py, isSel ? 12 : 8, 0, Math.PI * 2); ctx.fill();
         });
