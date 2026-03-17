@@ -583,7 +583,7 @@
                   <div class="screens-layout">
                     <!-- Left: icon list -->
                     <div class="icon-entry-list">
-                      @for (icon of iconEntries(); track (icon.type + '-' + icon.id)) {
+                      @for (icon of iconEntries(); track $index) {
                         <button class="audio-entry-btn"
                           [class.audio-entry-btn--active]="selectedIconId() === icon.id && selectedIconType() === icon.type"
                           (click)="selectIconEntry(icon.type, icon.id)">

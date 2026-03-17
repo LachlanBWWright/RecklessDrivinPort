@@ -3754,22 +3754,47 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     return canvas;
   }
 
+  /** Lazily built RGB quantization lookup table (r×g×b → nearest palette index). */
+  private _mac8bitLUT: Map<number, number> | null = null;
+
+  /**
+   * Build (or return cached) a 3-component RGB → nearest Mac palette index lookup.
+   * Keys are packed as (r >> 3) << 10 | (g >> 3) << 5 | (b >> 3), giving a
+   * 32×32×32 = 32768 entry table that amortises the per-pixel search to O(1).
+   */
+  private _getMac8bitLUT(): Map<number, number> {
+    if (this._mac8bitLUT) return this._mac8bitLUT;
+    const pal = MAC_8BIT_PALETTE;
+    const palLen = pal.length / 3;
+    const lut = new Map<number, number>();
+    for (let rq = 0; rq < 32; rq++) {
+      for (let gq = 0; gq < 32; gq++) {
+        for (let bq = 0; bq < 32; bq++) {
+          const r = rq * 8; const g = gq * 8; const b = bq * 8;
+          let bestIdx = 0; let bestDist = Infinity;
+          for (let p = 0; p < palLen; p++) {
+            const dr = r - (pal[p * 3] ?? 0); const dg = g - (pal[p * 3 + 1] ?? 0); const db = b - (pal[p * 3 + 2] ?? 0);
+            const dist = dr * dr + dg * dg + db * db;
+            if (dist < bestDist) { bestDist = dist; bestIdx = p; }
+          }
+          lut.set((rq << 10) | (gq << 5) | bq, bestIdx);
+        }
+      }
+    }
+    this._mac8bitLUT = lut;
+    return lut;
+  }
+
   /** Convert RGBA8888 image data to Mac 8-bit palette-indexed format (icl8/ics8). */
   private _imageDataToIcl8(rgba: Uint8ClampedArray): Uint8Array {
     const pixelCount = rgba.length / 4;
     const out = new Uint8Array(pixelCount);
-    const pal = MAC_8BIT_PALETTE;
-    const palLen = pal.length / 3;
+    const lut = this._getMac8bitLUT();
     for (let i = 0; i < pixelCount; i++) {
-      const r = rgba[i * 4]; const g = rgba[i * 4 + 1]; const b = rgba[i * 4 + 2];
-      // Find nearest palette colour (simple Euclidean distance)
-      let bestIdx = 0; let bestDist = Infinity;
-      for (let p = 0; p < palLen; p++) {
-        const dr = r - (pal[p * 3] ?? 0); const dg = g - (pal[p * 3 + 1] ?? 0); const db = b - (pal[p * 3 + 2] ?? 0);
-        const dist = dr * dr + dg * dg + db * db;
-        if (dist < bestDist) { bestDist = dist; bestIdx = p; }
-      }
-      out[i] = bestIdx;
+      const rq = rgba[i * 4]     >> 3;
+      const gq = rgba[i * 4 + 1] >> 3;
+      const bq = rgba[i * 4 + 2] >> 3;
+      out[i] = lut.get((rq << 10) | (gq << 5) | bq) ?? 0;
     }
     return out;
   }
