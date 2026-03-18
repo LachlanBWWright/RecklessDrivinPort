@@ -1504,3 +1504,12 @@ code {
   justify-content: center;
 }
 
+
+.icon-list-thumb {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+  border-radius: 2px;
+}

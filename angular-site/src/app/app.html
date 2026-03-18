@@ -587,7 +587,11 @@
                         <button class="audio-entry-btn"
                           [class.audio-entry-btn--active]="selectedIconId() === icon.id && selectedIconType() === icon.type"
                           (click)="selectIconEntry(icon.type, icon.id)">
-                          <mat-icon class="audio-entry-icon">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
+                          @if (getIconThumbDataUrl(icon.type, icon.id); as thumbUrl) {
+                            <img [src]="thumbUrl" class="icon-list-thumb" alt="" />
+                          } @else {
+                            <mat-icon class="audio-entry-icon">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
+                          }
                           <span>{{ icon.label }}</span>
                           <span class="res-size-badge">{{ icon.type }}</span>
                         </button>
@@ -598,8 +602,7 @@
                     @if (selectedIconId() !== null) {
                       <div class="icon-detail">
                         <h4 class="audio-detail-title">{{ selectedIconLabel() }}</h4>
-                        @if (selectedIconType() !== 'PICT') {
-                          @if (iconPreviewCanvas(); as canvas) {
+                        @if (iconPreviewCanvas(); as canvas) {
                             <img [src]="canvas.toDataURL()" class="icon-large-preview"
                               [style.imageRendering]="'pixelated'" alt="icon preview">
                           } @else {
@@ -607,6 +610,7 @@
                               <mat-spinner diameter="32"></mat-spinner>
                             </div>
                           }
+                          @if (selectedIconType() !== 'PICT') {
                           <div class="sprite-actions">
                             <button mat-stroked-button (click)="exportIconPng()">
                               <mat-icon>download</mat-icon> Export PNG
@@ -629,18 +633,13 @@
                               ics8 resources are 16×16 8-bit colour-palette icons (Mac system palette).
                             }
                           </p>
-                        } @else {
-                          <!-- PICT: download only -->
-                          <div class="icon-placeholder" style="flex-direction:column;gap:8px">
-                            <mat-icon style="font-size:48px;opacity:0.4">wallpaper</mat-icon>
-                            <p class="muted">PICT (QuickDraw picture) — in-editor preview not yet supported.</p>
-                          </div>
+                          } @else {
                           <div class="sprite-actions">
                             <button mat-stroked-button (click)="exportIconRaw()">
                               <mat-icon>download</mat-icon> Export Raw
                             </button>
                           </div>
-                        }
+                          }
                       </div>
                     } @else {
                       <div class="res-placeholder">

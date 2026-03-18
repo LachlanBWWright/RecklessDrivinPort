@@ -129,6 +129,29 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+/** Decode Mac PackBits RLE-compressed bytes into a fixed-size output buffer. */
+function decodePackBits(src: Uint8Array, expectedSize: number): Uint8Array {
+  const out = new Uint8Array(expectedSize);
+  let si = 0, di = 0;
+  while (si < src.length && di < expectedSize) {
+    const flag = src[si++];
+    if (flag === undefined) break;
+    if (flag > 127) {
+      // Repeat next byte (-flag+1) times
+      const count = 257 - flag;
+      const val = si < src.length ? src[si++] : 0;
+      for (let k = 0; k < count && di < expectedSize; k++) out[di++] = val ?? 0;
+    } else {
+      // Copy next (flag+1) bytes literally
+      const count = flag + 1;
+      for (let k = 0; k < count && si < src.length && di < expectedSize; k++) {
+        out[di++] = src[si++] ?? 0;
+      }
+    }
+  }
+  return out;
+}
+
 // ── Resource editor types ─────────────────────────────────────────────────────
 
 /** A single editable field in a binary resource struct. */
@@ -879,6 +902,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Decoded road info from kPackRoad: roadInfoId → texture IDs + flags. */
   private roadInfoDataMap = new Map<number, RoadInfoData>();
+  /** Cached rendered canvases for icon/screen resources (type:id → canvas). */
+  iconCanvasMap = new Map<string, HTMLCanvasElement>();
   /** Decoded texture canvases from kPackTx16: texId → HTMLCanvasElement. */
   private roadTextureCanvases = new Map<number, HTMLCanvasElement>();
   /** Version signal bumped when road textures are loaded (triggers canvas redraw). */
@@ -965,6 +990,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** True once the Konva stage has been initialized on the canvas DOM element. */
   private _konvaInitialized = false;
+  /** Serialized key of the last barriers state drawn; used to skip redundant rebuilds. */
+  private _lastBarriersSerialized = '';
 
   /**
    * Initialise (or re-initialise) the Konva overlay.
@@ -1160,10 +1187,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const delta = e.worldX - seg.v0;
         seg.v0 = e.worldX;
         seg.v1 = seg.v1 + delta;
-      } else {
+      } else if (e.side === 'right') {
         const delta = e.worldX - seg.v3;
         seg.v3 = e.worldX;
         seg.v2 = seg.v2 + delta;
+      } else if (e.side === 'v1') {
+        seg.v1 = Math.min(e.worldX, seg.v2);
+      } else if (e.side === 'v2') {
+        seg.v2 = Math.max(e.worldX, seg.v1);
       }
       segs[e.segIdx] = seg;
 
@@ -1176,8 +1207,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           if (e.side === 'left') {
             s.v0 = Math.round(prevSeg.v0 + t * (seg.v0 - prevSeg.v0));
             s.v1 = Math.round(prevSeg.v1 + t * (seg.v1 - prevSeg.v1));
-          } else {
+          } else if (e.side === 'right') {
             s.v3 = Math.round(prevSeg.v3 + t * (seg.v3 - prevSeg.v3));
+            s.v2 = Math.round(prevSeg.v2 + t * (seg.v2 - prevSeg.v2));
+          } else if (e.side === 'v1') {
+            s.v1 = Math.round(prevSeg.v1 + t * (seg.v1 - prevSeg.v1));
+          } else if (e.side === 'v2') {
             s.v2 = Math.round(prevSeg.v2 + t * (seg.v2 - prevSeg.v2));
           }
           segs[i] = s;
@@ -1191,8 +1226,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           if (e.side === 'left') {
             s.v0 = Math.round(seg.v0 + t * (nextSeg.v0 - seg.v0));
             s.v1 = Math.round(seg.v1 + t * (nextSeg.v1 - seg.v1));
-          } else {
+          } else if (e.side === 'right') {
             s.v3 = Math.round(seg.v3 + t * (nextSeg.v3 - seg.v3));
+            s.v2 = Math.round(seg.v2 + t * (nextSeg.v2 - seg.v2));
+          } else if (e.side === 'v1') {
+            s.v1 = Math.round(seg.v1 + t * (nextSeg.v1 - seg.v1));
+          } else if (e.side === 'v2') {
             s.v2 = Math.round(seg.v2 + t * (nextSeg.v2 - seg.v2));
           }
           segs[i] = s;
@@ -1202,6 +1241,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.parsedLevels.update((levels) =>
         levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
       );
+      this._lastBarriersSerialized = ''; // force barriers redraw after drag
     };
 
     // ── Pan via Konva stage mouse events ───────────────────────────────────
@@ -2541,9 +2581,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // Draw barriers (road boundaries)
     if (level && this.showBarriers() && level.roadSegs.length > 0) {
-      this.konva.setBarriers(level.roadSegs, zoom);
+      const barrierKey = `${level.roadSegs.length}:${level.roadSegs[0]?.v0}:${level.roadSegs[Math.floor(level.roadSegs.length / 2)]?.v0}:${level.roadSegs[level.roadSegs.length - 1]?.v3}:${zoom}`;
+      if (barrierKey !== this._lastBarriersSerialized) {
+        this._lastBarriersSerialized = barrierKey;
+        this.konva.setBarriers(level.roadSegs, zoom);
+      }
     } else {
-      this.konva.clearBarriers();
+      if (this._lastBarriersSerialized !== '') {
+        this._lastBarriersSerialized = '';
+        this.konva.clearBarriers();
+      }
     }
 
     // Draw objects
@@ -3683,6 +3730,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (entries.length > 0 && this.selectedIconId() === null) {
         this.selectIconEntry(entries[0].type, entries[0].id);
       }
+      void this.loadAllIconThumbnails();
     } catch { /* non-fatal */ }
   }
 
@@ -3691,7 +3739,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedIconType.set(type);
     this.iconPreviewCanvas.set(null);
     if (type === 'PICT') {
-      // PICT resources are shown as download-only; no in-editor preview.
+      try {
+        type RawResult = { bytes: ArrayBuffer | null };
+        const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
+        if (result.bytes) {
+          const bytes = new Uint8Array(result.bytes);
+          const canvas = this._renderPictBytes(bytes);
+          if (canvas) {
+            this.iconPreviewCanvas.set(canvas);
+            this.iconCanvasMap.set(`${type}:${id}`, canvas);
+          }
+        }
+      } catch { /* non-fatal */ }
       return;
     }
     try {
@@ -3708,6 +3767,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           canvas = this._renderIcs8Bytes(bytes);
         }
         this.iconPreviewCanvas.set(canvas);
+        if (canvas) {
+          this.iconCanvasMap.set(`${type}:${id}`, canvas);
+        }
       }
     } catch { this.iconPreviewCanvas.set(null); }
   }
@@ -3816,11 +3878,44 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     return `${type} #${id}`;
   }
 
+  /** Return a data URL for a cached icon thumbnail, or null if not yet rendered. */
+  getIconThumbDataUrl(type: string, id: number): string | null {
+    const canvas = this.iconCanvasMap.get(`${type}:${id}`);
+    if (!canvas) return null;
+    try { return canvas.toDataURL(); } catch { return null; }
+  }
+
+  /** Load thumbnails for all icon entries in the background to populate iconCanvasMap. */
+  private async loadAllIconThumbnails(): Promise<void> {
+    for (const entry of this.iconEntries()) {
+      const key = `${entry.type}:${entry.id}`;
+      if (this.iconCanvasMap.has(key)) continue;
+      try {
+        type RawResult = { bytes: ArrayBuffer | null };
+        const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type: entry.type, id: entry.id });
+        if (!result.bytes) continue;
+        const bytes = new Uint8Array(result.bytes);
+        let canvas: HTMLCanvasElement | null = null;
+        if (entry.type === 'PICT') {
+          canvas = this._renderPictBytes(bytes);
+        } else if (entry.type === 'ICN#' || entry.type === 'ics#') {
+          canvas = this._renderIconBytes(bytes);
+        } else if (entry.type === 'icl8') {
+          canvas = this._renderIcl8Bytes(bytes);
+        } else if (entry.type === 'ics8') {
+          canvas = this._renderIcs8Bytes(bytes);
+        }
+        if (canvas) {
+          this.iconCanvasMap.set(key, canvas);
+        }
+      } catch { /* ignore */ }
+      // Yield to keep UI responsive
+      await new Promise<void>(r => setTimeout(r, 0));
+    }
+  }
+
   /** Render an ICN# resource (32×32 1-bit) to an HTMLCanvasElement. */
   private _renderIconBytes(bytes: Uint8Array): HTMLCanvasElement | null {
-    if (typeof document === 'undefined') return null;
-    const canvas = document.createElement('canvas');
-    canvas.width = 32; canvas.height = 32;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     const imgData = ctx.createImageData(32, 32);
@@ -3870,6 +3965,202 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Render a Mac ics8 (16×16 8-bit palette-indexed) resource to canvas. */
   private _renderIcs8Bytes(bytes: Uint8Array): HTMLCanvasElement | null {
     return this._renderPalettedIcon(bytes, 16, 16);
+  }
+
+  /** Render a Mac PICT v2 image (DirectBitsRect with 16-bit RGB555 pixels). */
+  private _renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
+    if (typeof document === 'undefined' || bytes.length < 14) return null;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+    // PICT header: 2-byte size + 8-byte bounding rect (top, left, bottom, right)
+    let pos = 2; // skip 'size' field
+    const picTop    = view.getInt16(pos,     false); pos += 2;
+    const picLeft   = view.getInt16(pos,     false); pos += 2;
+    const picBottom = view.getInt16(pos,     false); pos += 2;
+    const picRight  = view.getInt16(pos,     false); pos += 2;
+    const picW = picRight  - picLeft;
+    const picH = picBottom - picTop;
+    if (picW <= 0 || picH <= 0 || picW > 4096 || picH > 4096) return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = picW; canvas.height = picH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Detect PICT version
+    let isV2 = false;
+    if (pos + 2 <= bytes.length && view.getUint16(pos, false) === 0x0011) {
+      pos += 2; // version opcode
+      if (pos + 2 <= bytes.length && view.getUint16(pos, false) === 0x02FF) {
+        isV2 = true; pos += 2;
+      }
+    }
+
+    // Scan for image-bearing opcodes
+    let rendered = false;
+    outer: while (pos + (isV2 ? 2 : 1) <= bytes.length) {
+      let opcode: number;
+      if (isV2) {
+        if (pos % 2 !== 0) pos++; // align to even byte
+        if (pos + 2 > bytes.length) break;
+        opcode = view.getUint16(pos, false); pos += 2;
+      } else {
+        opcode = view.getUint8(pos++);
+      }
+
+      switch (opcode) {
+        case 0x0000: break; // NOP
+        case 0x00FF: case 0xFF: break outer; // EndOfPicture
+        case 0x0001: { // ClipRgn
+          if (pos + 2 > bytes.length) break outer;
+          const rgnSize = view.getUint16(pos, false); pos += rgnSize; break;
+        }
+        case 0x001E: break; // DefHilite (no data)
+        case 0x001F: pos += 6; break; // OpColor
+        case 0x0C00: pos += 24; break; // HeaderOp (v2)
+        case 0x0098: case 0x0099: // PackBitsRect / PackBitsRgn
+        case 0x009A: case 0x009B: { // DirectBitsRect / DirectBitsRgn
+          const isDirect = (opcode === 0x009A || opcode === 0x009B);
+          if (isDirect && pos + 4 <= bytes.length) pos += 4; // skip baseAddr
+
+          if (pos + 2 > bytes.length) break outer;
+          const rowBytesRaw = view.getUint16(pos, false); pos += 2;
+          const rowBytes    = rowBytesRaw & 0x3FFF;
+          const isPixMap    = (rowBytesRaw & 0x8000) !== 0 || isDirect;
+
+          // Bounds rect
+          if (pos + 8 > bytes.length) break outer;
+          const bTop    = view.getInt16(pos, false); pos += 2;
+          const bLeft   = view.getInt16(pos, false); pos += 2;
+          const bBottom = view.getInt16(pos, false); pos += 2;
+          const bRight  = view.getInt16(pos, false); pos += 2;
+          const imgW = bRight - bLeft;
+          const imgH = bBottom - bTop;
+          if (imgW <= 0 || imgH <= 0 || imgW > 4096 || imgH > 4096) break outer;
+
+          let pixelSize = 1;
+          let packType = 0;
+          let colorTable: number[] | null = null;
+
+          if (isPixMap) {
+            if (pos + 2 > bytes.length) break outer;
+            pos += 2; // pmVersion
+            if (pos + 2 > bytes.length) break outer;
+            packType = view.getUint16(pos, false); pos += 2;
+            if (pos + 4 > bytes.length) break outer;
+            pos += 4; // packSize
+            if (pos + 8 > bytes.length) break outer;
+            pos += 8; // hRes + vRes (Fixed 16.16)
+            if (pos + 2 > bytes.length) break outer;
+            pos += 2; // pixelType
+            if (pos + 2 > bytes.length) break outer;
+            pixelSize = view.getUint16(pos, false); pos += 2;
+            if (pos + 6 > bytes.length) break outer;
+            pos += 6; // cmpCount + cmpSize + planeBytes
+            if (pos + 4 > bytes.length) break outer;
+            pos += 4; // pmTable (ignored, read below for 8-bit)
+            if (pos + 4 > bytes.length) break outer;
+            pos += 4; // pmReserved
+
+            // Color table (only for indexed PixMaps, pixelSize ≤ 8)
+            if (!isDirect && pixelSize <= 8) {
+              if (pos + 8 > bytes.length) break outer;
+              pos += 4; // ctSeed
+              pos += 2; // ctFlags
+              const ctSize = view.getInt16(pos, false) + 1; pos += 2;
+              colorTable = [];
+              for (let ci = 0; ci < ctSize; ci++) {
+                if (pos + 8 > bytes.length) break outer;
+                pos += 2; // index (ignored)
+                const r = view.getUint16(pos, false) >> 8; pos += 2;
+                const g = view.getUint16(pos, false) >> 8; pos += 2;
+                const b = view.getUint16(pos, false) >> 8; pos += 2;
+                colorTable.push(r, g, b);
+              }
+            }
+          }
+
+          // srcRect + dstRect + mode
+          if (pos + 18 > bytes.length) break outer;
+          pos += 8; // srcRect
+          pos += 8; // dstRect
+          pos += 2; // mode
+
+          // If PackBitsRgn / DirectBitsRgn, skip region
+          if (opcode === 0x0099 || opcode === 0x009B) {
+            if (pos + 2 > bytes.length) break outer;
+            const rgnSize = view.getUint16(pos, false); pos += rgnSize;
+          }
+
+          // Decode pixel rows
+          const imgData = ctx.createImageData(imgW, imgH);
+          const isPacked = rowBytes > 250 || (packType !== 1 && pixelSize !== 1);
+
+          for (let row = 0; row < imgH; row++) {
+            let rowData: Uint8Array;
+            const bytesPerRow = rowBytes;
+            if (isPacked) {
+              if (pos + (bytesPerRow > 250 ? 2 : 1) > bytes.length) break outer;
+              const compLen = bytesPerRow > 250
+                ? (view.getUint16(pos, false) + (pos += 2, 0))
+                : (view.getUint8(pos++) + 0);
+              if (pos + compLen > bytes.length) break outer;
+              rowData = decodePackBits(bytes.subarray(pos, pos + compLen), bytesPerRow);
+              pos += compLen;
+            } else {
+              if (pos + bytesPerRow > bytes.length) break outer;
+              rowData = bytes.subarray(pos, pos + bytesPerRow);
+              pos += bytesPerRow;
+            }
+
+            // Write pixels
+            for (let col = 0; col < imgW; col++) {
+              const di = (row * imgW + col) * 4;
+              if (pixelSize === 16) {
+                // 16-bit RGB555
+                const pixOff = col * 2;
+                if (pixOff + 2 > rowData.length) break;
+                const pixel = (rowData[pixOff]! << 8) | rowData[pixOff + 1]!;
+                imgData.data[di]     = ((pixel >> 10) & 0x1F) * 255 / 31;
+                imgData.data[di + 1] = ((pixel >>  5) & 0x1F) * 255 / 31;
+                imgData.data[di + 2] =  (pixel        & 0x1F) * 255 / 31;
+                imgData.data[di + 3] = 255;
+              } else if (pixelSize === 32) {
+                // 32-bit ARGB
+                const pixOff = col * 4;
+                if (pixOff + 4 > rowData.length) break;
+                imgData.data[di]     = rowData[pixOff + 1]!;
+                imgData.data[di + 1] = rowData[pixOff + 2]!;
+                imgData.data[di + 2] = rowData[pixOff + 3]!;
+                imgData.data[di + 3] = rowData[pixOff]! || 255; // alpha (or 255 if 0)
+              } else if (pixelSize === 8) {
+                // 8-bit indexed or grayscale
+                const idx = rowData[col] ?? 0;
+                if (colorTable && colorTable.length >= (idx + 1) * 3) {
+                  imgData.data[di]     = colorTable[idx * 3]!;
+                  imgData.data[di + 1] = colorTable[idx * 3 + 1]!;
+                  imgData.data[di + 2] = colorTable[idx * 3 + 2]!;
+                } else {
+                  imgData.data[di] = imgData.data[di + 1] = imgData.data[di + 2] = idx;
+                }
+                imgData.data[di + 3] = 255;
+              } else {
+                // Unknown format; fill grey
+                imgData.data[di] = imgData.data[di + 1] = imgData.data[di + 2] = 128;
+                imgData.data[di + 3] = 255;
+              }
+            }
+          }
+          ctx.putImageData(imgData, 0, 0);
+          rendered = true;
+          break outer;
+        }
+        default:
+          break outer; // Unknown opcode; stop
+      }
+    }
+
+    return rendered ? canvas : null;
   }
 
   /** Render a Mac 8-bit palette-indexed icon to an HTMLCanvasElement. */

@@ -37,7 +37,7 @@ export function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
 
 export interface KonvaBarrierDragEndEvent {
   segIdx: number;
-  side: 'left' | 'right'; // left=v0, right=v3
+  side: 'left' | 'right' | 'v1' | 'v2'; // left=v0, right=v3, v1/v2=inner lane boundaries
   worldX: number;
 }
 
