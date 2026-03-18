@@ -414,11 +414,14 @@ const MAC_8BIT_PALETTE: readonly number[] = [
   0,102,255,   0,102,204,   0,102,153,   0,102,102,   0,102,51,    0,102,0,
   0,51,255,    0,51,204,    0,51,153,    0,51,102,    0,51,51,     0,51,0,
   0,0,255,     0,0,204,     0,0,153,     0,0,102,     0,0,51,
-  // Extra 16 + grayscale
-  0,0,0,       0,17,0,      0,34,0,      0,68,0,      0,85,0,      0,119,0,
-  0,136,0,     0,170,0,     0,187,0,     0,221,0,     0,238,0,
-  238,238,238, 221,221,221, 187,187,187, 170,170,170, 136,136,136,
-  119,119,119, 85,85,85,    68,68,68,    34,34,34,    17,17,17,
+  // 20 grayscale steps (entry 216..235) + 20 additional system colors (236..255)
+  0,0,0,         17,17,17,      34,34,34,      51,51,51,      68,68,68,      85,85,85,
+  102,102,102,   119,119,119,   136,136,136,   153,153,153,   170,170,170,   187,187,187,
+  204,204,204,   221,221,221,   238,238,238,   255,165,0,     255,128,0,     128,0,128,
+  128,128,0,     0,128,128,     0,128,0,       128,0,0,       0,0,128,       210,180,140,
+  160,82,45,     139,69,19,     105,105,105,   112,128,144,   119,136,153,   47,79,79,
+  72,61,139,     139,0,139,     0,100,0,       165,42,42,     188,143,143,   173,153,127,
+  244,164,96,    210,105,30,    255,218,185,   0,0,0,
 ];
 
 /**
@@ -513,6 +516,7 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
 
       // Convert 8-bit unsigned PCM (0-255) to float32 (-1 to 1)
       const sampleCount = dataEnd - dataStart;
+      if (sampleCount > 10_000_000) break; // safety: don't allocate massive buffers
       // AudioContext requires sampleRate ≥ 1 Hz; clamp to avoid Safari/Chrome errors
       // with corrupt or zero sample rates.
       const MIN_SAMPLE_RATE = 100;
@@ -692,6 +696,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   showTrackDown = signal(true);
   /** True while the background grid is visible. */
   showGrid = signal(true);
+  /** True while road barrier edges are visible. */
+  showBarriers = signal(true);
 
   // ---- Undo / Redo ----
   /** Snapshot stack for undo. Each entry is a deep copy of the objects array. */
@@ -728,6 +734,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   // ---- Mark editor ----
   marks = signal<MarkSeg[]>([]);
   selectedMarkIndex = signal<number | null>(null);
+  private _lastDraggedNubKey: { markIdx: number; endpoint: 'p1' | 'p2' } | null = null;
   dragMarkEndpoint = signal<{ markIdx: number; endpoint: 'p1' | 'p2' } | null>(null);
   /** True while user is dragging the player start X marker on the canvas. */
   private _draggingStartMarker = false;
@@ -1131,11 +1138,70 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           ms[i] = { ...ms[i], x2: e.worldX, y2: e.worldY };
         }
       }
+      this._lastDraggedNubKey = { markIdx: e.markIdx, endpoint: e.endpoint };
       this.marks.set(ms);
     };
 
     this.konva.onMarkClick = (markIdx) => {
       this.selectedMarkIndex.set(markIdx);
+    };
+
+    this.konva.onBarrierDragEnd = (e) => {
+      const level = this.selectedLevel();
+      if (!level) return;
+      this._pushUndo();
+      const segs = level.roadSegs.slice();
+      const seg = { ...segs[e.segIdx] };
+      const step = 10; // BARRIER_HANDLE_STEP
+      const prevHandle = e.segIdx - step;
+      const nextHandle = Math.min(e.segIdx + step, segs.length - 1);
+
+      if (e.side === 'left') {
+        const delta = e.worldX - seg.v0;
+        seg.v0 = e.worldX;
+        seg.v1 = seg.v1 + delta;
+      } else {
+        const delta = e.worldX - seg.v3;
+        seg.v3 = e.worldX;
+        seg.v2 = seg.v2 + delta;
+      }
+      segs[e.segIdx] = seg;
+
+      // Interpolate between previous and next handles
+      if (prevHandle >= 0) {
+        const prevSeg = segs[prevHandle];
+        for (let i = prevHandle + 1; i < e.segIdx; i++) {
+          const t = (i - prevHandle) / (e.segIdx - prevHandle);
+          const s = { ...segs[i] };
+          if (e.side === 'left') {
+            s.v0 = Math.round(prevSeg.v0 + t * (seg.v0 - prevSeg.v0));
+            s.v1 = Math.round(prevSeg.v1 + t * (seg.v1 - prevSeg.v1));
+          } else {
+            s.v3 = Math.round(prevSeg.v3 + t * (seg.v3 - prevSeg.v3));
+            s.v2 = Math.round(prevSeg.v2 + t * (seg.v2 - prevSeg.v2));
+          }
+          segs[i] = s;
+        }
+      }
+      if (nextHandle < segs.length && nextHandle > e.segIdx) {
+        const nextSeg = segs[nextHandle];
+        for (let i = e.segIdx + 1; i < nextHandle && i < segs.length; i++) {
+          const t = (i - e.segIdx) / (nextHandle - e.segIdx);
+          const s = { ...segs[i] };
+          if (e.side === 'left') {
+            s.v0 = Math.round(seg.v0 + t * (nextSeg.v0 - seg.v0));
+            s.v1 = Math.round(seg.v1 + t * (nextSeg.v1 - seg.v1));
+          } else {
+            s.v3 = Math.round(seg.v3 + t * (nextSeg.v3 - seg.v3));
+            s.v2 = Math.round(seg.v2 + t * (nextSeg.v2 - seg.v2));
+          }
+          segs[i] = s;
+        }
+      }
+
+      this.parsedLevels.update((levels) =>
+        levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
+      );
     };
 
     // ── Pan via Konva stage mouse events ───────────────────────────────────
@@ -1666,14 +1732,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const bytes = this.selectedResBytes();
     if (!bytes) return;
     if (!this._audioCtx) {
-      this._audioCtx = new AudioContext();
+      this._audioCtx = new AudioContext({ latencyHint: 'interactive' });
     }
     if (this._audioCtx.state === 'suspended') {
       try { await this._audioCtx.resume(); } catch { /* ignore */ }
     }
-    const played = tryPlaySndResource(bytes, this._audioCtx);
-    if (!played) {
-      this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+    if (this._audioCtx.state === 'suspended') {
+      this.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', { duration: 4000 });
+      return;
+    }
+    try {
+      const played = tryPlaySndResource(bytes, this._audioCtx);
+      if (!played) {
+        this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+      }
+    } catch (e) {
+      this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', { duration: 4000 });
     }
   }
 
@@ -2278,16 +2352,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
     // Mark-segment nub helpers (only when showMarks is active)
     if (this.showMarks()) {
-      // S = Split colocated mark nubs near the selected mark's endpoints
-      if (event.key === 's' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      // N = Toggle join/split: auto-detects if colocated nubs exist (splits) or joins nearest nubs
+      if (event.key === 'n' && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
-        this._splitCollocatedMarkNubs();
-        return;
-      }
-      // J = Join/combine adjacent mark endpoints that are within snap range
-      if (event.key === 'j' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        this._joinAdjacentMarkNubs();
+        if (this._hasColocatedNubs()) {
+          this._splitCollocatedMarkNubs();
+        } else {
+          this._joinAdjacentMarkNubs();
+        }
         return;
       }
     }
@@ -2465,6 +2537,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Draw marks (checkpoint lines) over road
     if (level && this.showMarks()) {
       this.drawMarksOnCanvas(ctx);
+    }
+
+    // Draw barriers (road boundaries)
+    if (level && this.showBarriers() && level.roadSegs.length > 0) {
+      this.konva.setBarriers(level.roadSegs, zoom);
+    } else {
+      this.konva.clearBarriers();
     }
 
     // Draw objects
@@ -2676,6 +2755,26 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
   }
 
+  /** Returns true if the selected mark has any endpoint colocated with another mark endpoint. */
+  private _hasColocatedNubs(): boolean {
+    const selIdx = this.selectedMarkIndex();
+    if (selIdx === null) return false;
+    const ms = this.marks();
+    const sel = ms[selIdx];
+    if (!sel) return false;
+    for (let i = 0; i < ms.length; i++) {
+      if (i === selIdx) continue;
+      const other = ms[i];
+      if (
+        (other.x1 === sel.x1 && other.y1 === sel.y1) ||
+        (other.x2 === sel.x1 && other.y2 === sel.y1) ||
+        (other.x1 === sel.x2 && other.y1 === sel.y2) ||
+        (other.x2 === sel.x2 && other.y2 === sel.y2)
+      ) return true;
+    }
+    return false;
+  }
+
   /**
    * Split colocated mark endpoints: for each endpoint of the selected mark that is
    * shared with another mark's endpoint, nudge the other endpoint(s) slightly so they
@@ -2713,45 +2812,56 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /**
-   * Join adjacent mark endpoints: snap the closest pair of endpoints (from different marks)
-   * to the same position so they become colocated. Press [J] to activate.
+   * Join adjacent mark endpoints: snap the closest endpoint from a DIFFERENT mark
+   * to the last-dragged (or selected mark's first) endpoint within SNAP_R world units.
    */
   private _joinAdjacentMarkNubs(): void {
     const ms = [...this.marks()];
     if (ms.length < 2) return;
     const SNAP_R = 30; // world units
+
+    // Determine source endpoint (last dragged, else any endpoint of selected mark)
+    const selIdx = this.selectedMarkIndex();
+    let srcX: number, srcY: number, srcI: number;
+    if (this._lastDraggedNubKey && this._lastDraggedNubKey.markIdx < ms.length) {
+      const { markIdx, endpoint } = this._lastDraggedNubKey;
+      srcI = markIdx;
+      srcX = endpoint === 'p1' ? ms[markIdx].x1 : ms[markIdx].x2;
+      srcY = endpoint === 'p1' ? ms[markIdx].y1 : ms[markIdx].y2;
+    } else if (selIdx !== null && selIdx < ms.length) {
+      srcI = selIdx;
+      srcX = ms[selIdx].x1;
+      srcY = ms[selIdx].y1;
+    } else {
+      this.snackBar.open('Select a mark first.', undefined, { duration: 2000 });
+      return;
+    }
+
     let bestDist = SNAP_R;
-    let bestI = -1, bestIEp: 'x1'|'y1'|'x2'|'y2' = 'x1';
-    let bestJ = -1, bestJEp: 'x1'|'y1'|'x2'|'y2' = 'x1';
+    let bestJ = -1;
+    let bestJEpX: 'x1' | 'x2' = 'x1';
 
-    const endpoints = (i: number) => [
-      { field: 'x1' as const, fx: 'x1' as const, fy: 'y1' as const, x: ms[i].x1, y: ms[i].y1 },
-      { field: 'x2' as const, fx: 'x2' as const, fy: 'y2' as const, x: ms[i].x2, y: ms[i].y2 },
-    ];
-
-    for (let i = 0; i < ms.length; i++) {
-      for (const ept of endpoints(i)) {
-        for (let j = i + 1; j < ms.length; j++) {
-          for (const epj of endpoints(j)) {
-            const dx = ept.x - epj.x; const dy = ept.y - epj.y;
-            const d = Math.sqrt(dx * dx + dy * dy);
-            if (d > 0 && d < bestDist) {
-              bestDist = d;
-              bestI = i; bestIEp = ept.fx;
-              bestJ = j; bestJEp = epj.fx;
-            }
-          }
+    for (let j = 0; j < ms.length; j++) {
+      if (j === srcI) continue;
+      for (const epX of ['x1', 'x2'] as const) {
+        const epY = epX === 'x1' ? 'y1' as const : 'y2' as const;
+        const dx = srcX - ms[j][epX]; const dy = srcY - ms[j][epY];
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 0 && d < bestDist) {
+          bestDist = d;
+          bestJ = j;
+          bestJEpX = epX;
         }
       }
     }
-    if (bestI < 0) {
+
+    if (bestJ < 0) {
       this.snackBar.open('No nearby mark endpoints to join (within 30 world units).', undefined, { duration: 2500 });
       return;
     }
     this._pushUndo();
-    const tx = ms[bestI][bestIEp]; const ty = ms[bestI][bestIEp === 'x1' ? 'y1' : 'y2'];
-    const jEpY = bestJEp === 'x1' ? 'y1' as const : 'y2' as const;
-    ms[bestJ] = { ...ms[bestJ], [bestJEp]: tx, [jEpY]: ty };
+    const bestJEpY = bestJEpX === 'x1' ? 'y1' as const : 'y2' as const;
+    ms[bestJ] = { ...ms[bestJ], [bestJEpX]: srcX, [bestJEpY]: srcY };
     this.marks.set(ms);
     this.snackBar.open('Joined nearest mark endpoints.', undefined, { duration: 2000 });
   }
@@ -2777,6 +2887,29 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       });
       this.applyLevelsResult(result.levels);
       const msg = `Saved ${this.marks().length} mark segments for level ${id - 139}.`;
+      this.resourcesStatus.set(msg);
+      this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Save failed';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
+  async saveBarriers(): Promise<void> {
+    const level = this.selectedLevel();
+    const id = this.selectedLevelId();
+    if (!level || id === null) return;
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_ROAD_SEGS', {
+        resourceId: id,
+        roadSegs: level.roadSegs,
+      });
+      this.applyLevelsResult(result.levels);
+      const msg = `Saved ${level.roadSegs.length} road segments for level ${id - 139}.`;
       this.resourcesStatus.set(msg);
       this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (error) {
@@ -3376,15 +3509,23 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   async playAudioEntry(): Promise<void> {
     const bytes = this.selectedAudioBytes();
     if (!bytes) return;
-    if (!this._audioCtx) this._audioCtx = new AudioContext();
-    // Modern browsers suspend AudioContext until a user gesture resumes it.
-    // We must resume() before attempting to schedule audio playback.
+    if (!this._audioCtx) {
+      this._audioCtx = new AudioContext({ latencyHint: 'interactive' });
+    }
     if (this._audioCtx.state === 'suspended') {
       try { await this._audioCtx.resume(); } catch { /* ignore */ }
     }
-    const played = tryPlaySndResource(bytes, this._audioCtx);
-    if (!played) {
-      this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+    if (this._audioCtx.state === 'suspended') {
+      this.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', { duration: 4000 });
+      return;
+    }
+    try {
+      const played = tryPlaySndResource(bytes, this._audioCtx);
+      if (!played) {
+        this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+      }
+    } catch (e) {
+      this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', { duration: 4000 });
     }
   }
 
@@ -3743,7 +3884,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const palLen = pal.length / 3; // number of palette entries
     for (let i = 0; i < w * h; i++) {
       const idx = i < bytes.length ? bytes[i] : 0;
-      const pi = (idx < palLen ? idx : 0) * 3;
+      const pi = (idx < palLen ? idx : palLen - 1) * 3;
       const di = i * 4;
       imgData.data[di]     = pal[pi]     ?? 0;
       imgData.data[di + 1] = pal[pi + 1] ?? 0;
@@ -4525,16 +4666,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const isSel = i === selMark;
       // Road markings are solid white lines in the actual game (painted road marking
       // textures from kPackTxtR).  Use solid white with a cyan highlight when selected.
-      ctx.strokeStyle = isSel ? '#00e5ff' : 'rgba(255,255,255,0.9)';
+      ctx.strokeStyle = isSel ? '#00e5ff' : '#ffd600';
       ctx.lineWidth = isSel ? 3 : 2;
-      ctx.setLineDash([]); // always solid – matches the in-game appearance
+      ctx.setLineDash(isSel ? [] : [8, 4]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
       // Only draw endpoint dots when Konva is NOT rendering them
       if (!konvaActive) {
-        ctx.fillStyle = isSel ? '#00e5ff' : 'rgba(255,255,255,0.8)';
+        ctx.fillStyle = isSel ? '#00e5ff' : '#ffd600';
         [[x1, y1], [x2, y2]].forEach(([px, py]) => {
           ctx.beginPath(); ctx.arc(px, py, isSel ? 12 : 8, 0, Math.PI * 2); ctx.fill();
         });

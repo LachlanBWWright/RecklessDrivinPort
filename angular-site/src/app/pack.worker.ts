@@ -18,6 +18,7 @@
  *   APPLY_OBJECTS          payload: { resourceId, objects }
  *   APPLY_TRACK            payload: { resourceId, trackUp, trackDown }
  *   APPLY_MARKS            payload: { resourceId, marks }
+ *   APPLY_ROAD_SEGS        payload: { resourceId, roadSegs }
  *   APPLY_SPRITE_BYTE      payload: { spriteId, offset, value }
  *   APPLY_TILE16_PIXELS  payload: { texId: number; pixels: Uint8ClampedArray }
  *   DECODE_ALL_ROAD_TEXTURES (no payload) → { textures: DecodedRoadTexture[] }
@@ -41,7 +42,7 @@ import {
   listPackEntries, getPackEntryRaw, putPackEntryRaw,
 } from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
-import type { LevelProperties, ObjectPos, MarkSeg, ObjectTypeDefinition, DecodedRoadTexture } from './level-editor.service';
+import type { LevelProperties, ObjectPos, MarkSeg, RoadSeg, ObjectTypeDefinition, DecodedRoadTexture } from './level-editor.service';
 
 const resourceDatSvc = new ResourceDatService();
 const levelEditorSvc = new LevelEditorService();
@@ -198,6 +199,14 @@ self.addEventListener('message', (event: MessageEvent) => {
       case 'APPLY_MARKS': {
         const { resourceId, marks } = payload as { resourceId: number; marks: MarkSeg[] };
         resources = levelEditorSvc.applyLevelMarks(resources, resourceId, marks);
+        const { levels } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { levels } });
+        break;
+      }
+
+      case 'APPLY_ROAD_SEGS': {
+        const { resourceId, roadSegs } = payload as { resourceId: number; roadSegs: RoadSeg[] };
+        resources = levelEditorSvc.applyLevelRoadSegs(resources, resourceId, roadSegs);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
         break;

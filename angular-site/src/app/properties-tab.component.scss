@@ -18,8 +18,12 @@
   gap: 12px;
   align-items: start;
   /* Add bottom padding so mat-hint text doesn't clip into the divider below */
-  padding-bottom: 8px;
+  padding-bottom: 28px;
   margin-bottom: 8px;
+}
+
+mat-card-content {
+  overflow: hidden;
 }
 
 .prop-field { width: 100%; }

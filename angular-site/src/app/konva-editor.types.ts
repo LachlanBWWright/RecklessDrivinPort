@@ -35,4 +35,10 @@ export function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   return true;
 }
 
+export interface KonvaBarrierDragEndEvent {
+  segIdx: number;
+  side: 'left' | 'right'; // left=v0, right=v3
+  worldX: number;
+}
+
 export type { ObjectPos };

@@ -499,6 +499,42 @@ export function serializeLevelObjects(rawEntry1: Uint8Array, objects: ObjectPos[
   return result;
 }
 
+export function serializeLevelRoadSegs(
+  rawEntry1: Uint8Array,
+  roadSegs: { v0: number; v1: number; v2: number; v3: number }[],
+): Uint8Array {
+  const view = new DataView(rawEntry1.buffer, rawEntry1.byteOffset, rawEntry1.byteLength);
+  let pos = LEVEL_DATA_SIZE;
+  const trackUpCount   = view.getUint32(pos, false);  pos += 4 + trackUpCount   * TRACK_SEG_SIZE;
+  const trackDownCount = view.getUint32(pos, false);  pos += 4 + trackDownCount * TRACK_SEG_SIZE;
+  const objCount       = view.getUint32(pos, false);  pos += 4 + objCount       * OBJECT_POS_SIZE;
+
+  // pos now points to road segment count
+  const roadStart = pos;
+  const oldRoadCount = pos + 4 <= rawEntry1.length ? view.getUint32(pos, false) : 0;
+  const afterStart   = roadStart + 4 + oldRoadCount * ROAD_SEG_SIZE;
+
+  const before = rawEntry1.slice(0, roadStart);
+  const after  = rawEntry1.slice(afterStart);
+
+  const newRoadBlock = new Uint8Array(4 + roadSegs.length * ROAD_SEG_SIZE);
+  const bv = new DataView(newRoadBlock.buffer);
+  bv.setUint32(0, roadSegs.length, false);
+  for (let i = 0; i < roadSegs.length; i++) {
+    const o = 4 + i * ROAD_SEG_SIZE;
+    bv.setInt16(o,     roadSegs[i].v0, false);
+    bv.setInt16(o + 2, roadSegs[i].v1, false);
+    bv.setInt16(o + 4, roadSegs[i].v2, false);
+    bv.setInt16(o + 6, roadSegs[i].v3, false);
+  }
+
+  const result = new Uint8Array(before.length + newRoadBlock.length + after.length);
+  result.set(before, 0);
+  result.set(newRoadBlock, before.length);
+  result.set(after, before.length + newRoadBlock.length);
+  return result;
+}
+
 // ------------------------------------------------------------------
 // LevelEditorService
 // ------------------------------------------------------------------
@@ -596,6 +632,27 @@ export class LevelEditorService {
         return { ...res, data: encodePackHandle(newEntries, resourceId) };
       } catch (err) {
         console.error(`[LevelEditor] applyLevelTrack error id=${resourceId}:`, err);
+        return res;
+      }
+    });
+  }
+
+  applyLevelRoadSegs(
+    resources: ResourceDatEntry[],
+    resourceId: number,
+    roadSegs: { v0: number; v1: number; v2: number; v3: number }[],
+  ): ResourceDatEntry[] {
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== resourceId) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, res.id);
+        const e1 = packEntries.find((e) => e.id === 1);
+        if (!e1) return res;
+        const newData    = serializeLevelRoadSegs(e1.data, roadSegs);
+        const newEntries = packEntries.map((e) => e.id === 1 ? { ...e, data: newData } : e);
+        return { ...res, data: encodePackHandle(newEntries, resourceId) };
+      } catch (err) {
+        console.error(`[LevelEditor] applyLevelRoadSegs error id=${resourceId}:`, err);
         return res;
       }
     });

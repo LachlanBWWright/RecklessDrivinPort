@@ -47,6 +47,14 @@
     <button mat-icon-button [class.btn-active]="showGrid" (click)="toggleGrid.emit()" matTooltip="Toggle background grid">
       <mat-icon>grid_on</mat-icon>
     </button>
+    <button mat-icon-button [class.btn-active]="showBarriers" (click)="toggleBarriers.emit()" matTooltip="Toggle road barriers">
+      <mat-icon>fence</mat-icon>
+    </button>
+    @if (showBarriers) {
+      <button mat-stroked-button [disabled]="workerBusy" (click)="saveBarriers.emit()" matTooltip="Save road barrier positions">
+        <mat-icon>save</mat-icon> Barriers
+      </button>
+    }
     @if (showTrackOverlay) {
       <button mat-stroked-button [disabled]="workerBusy" (click)="saveTrack.emit()" matTooltip="Save track waypoints">
         <mat-icon>save</mat-icon> Tracks

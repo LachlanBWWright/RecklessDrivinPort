@@ -59,6 +59,7 @@ import type {
   KonvaDragEndEvent,
   KonvaWaypointDragEndEvent,
   KonvaMarkDragEndEvent,
+  KonvaBarrierDragEndEvent,
   KonvaWorldNode,
 } from './konva-editor.types';
 import {
@@ -68,6 +69,7 @@ import {
 import { buildObjects } from './konva-editor.objects';
 import { buildTrackWaypoints } from './konva-editor.track';
 import { buildMarks } from './konva-editor.marks';
+import { buildBarriers } from './konva-editor.barriers';
 
 
 
@@ -85,6 +87,8 @@ export class KonvaEditorService implements OnDestroy {
   private trackWorldGroup: Konva.Group | null = null;
   /** Group inside marksLayer – same transform as worldGroup. */
   private marksWorldGroup: Konva.Group | null = null;
+  private barrierLayer: Konva.Layer | null = null;
+  private barrierWorldGroup: Konva.Group | null = null;
   // Background offscreen-bitmap layer (prototype)
   private bgLayer: Konva.Layer | null = null;
   private bgImageNode: Konva.Image | null = null;
@@ -98,6 +102,7 @@ export class KonvaEditorService implements OnDestroy {
   onMarkEndpointDragEnd?: (e: KonvaMarkDragEndEvent) => void;
   onMarkClick?: (markIdx: number) => void;
   onStageDblClick?: (worldX: number, worldY: number) => void;
+  onBarrierDragEnd?: (e: KonvaBarrierDragEndEvent) => void;
   onStageRightClick?: (worldX: number, worldY: number) => void;
 
   /**
@@ -190,6 +195,11 @@ export class KonvaEditorService implements OnDestroy {
     this.marksLayer.add(this.marksWorldGroup);
     this.stage.add(this.bgLayer, this.objectsLayer, this.trackLayer, this.marksLayer);
 
+    this.barrierLayer = new Konva.Layer();
+    this.barrierWorldGroup = new Konva.Group();
+    this.barrierLayer.add(this.barrierWorldGroup);
+    this.stage.add(this.barrierLayer);
+
     // ── Stage-level events ────────────────────────────────────────────────
 
     this.stage.on('dblclick', (e) => {
@@ -272,6 +282,7 @@ export class KonvaEditorService implements OnDestroy {
     this.worldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
     this.trackWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
     this.marksWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
+    this.barrierWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
     // keep background image transform in sync as well
     _applyBackgroundTransform(this.bgImageNode, this._zoom, this._panX, this._panY, this._cssW, this._cssH, this._logicalW, this._logicalH);
   }
@@ -469,6 +480,25 @@ export class KonvaEditorService implements OnDestroy {
     this.marksWorldGroup?.destroyChildren();
   }
 
+  setBarriers(
+    roadSegs: readonly { v0: number; v1: number; v2: number; v3: number }[],
+    zoom: number,
+  ): void {
+    if (!this.barrierWorldGroup || !this.barrierLayer) return;
+    buildBarriers(
+      this.barrierWorldGroup, this.barrierLayer, roadSegs, this._panMode,
+      this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
+      (segIdx, side, newX) => this.onBarrierDragEnd?.({ segIdx, side, worldX: newX }),
+    );
+    this._applyGroupTransform();
+    this.barrierLayer.draw();
+  }
+
+  clearBarriers(): void {
+    this.barrierWorldGroup?.destroyChildren();
+    this.barrierLayer?.draw();
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // FLUSH — call this ONCE at the end of the host's render function
   // ─────────────────────────────────────────────────────────────────────────
@@ -486,6 +516,7 @@ export class KonvaEditorService implements OnDestroy {
     this.objectsLayer?.draw();
     this.trackLayer?.draw();
     this.marksLayer?.draw();
+    this.barrierLayer?.draw();
     t.end();
   }
 
@@ -559,6 +590,8 @@ export class KonvaEditorService implements OnDestroy {
     this._lastTrackDown         = null;
     this._lastMarks             = null;
     this._lastSelectedMarkIndex = null;
+    this.barrierLayer           = null;
+    this.barrierWorldGroup      = null;
   }
 
   ngOnDestroy(): void { this.destroy(); }
