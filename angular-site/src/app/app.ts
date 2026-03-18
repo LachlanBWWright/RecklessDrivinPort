@@ -12,6 +12,7 @@ import type {
   TrackWaypointRef,
 } from './level-editor.service';
 import { KonvaEditorService } from './konva-editor.service';
+import { decodeIMA4, parseSndHeader, buildWav } from './snd-codec';
 
 /** Worker response envelope sent from pack.worker.ts */
 interface WorkerResponse {
@@ -444,59 +445,16 @@ const MAC_8BIT_PALETTE: readonly number[] = [
   128,128,0,     0,128,128,     0,128,0,       128,0,0,       0,0,128,       210,180,140,
   160,82,45,     139,69,19,     105,105,105,   112,128,144,   119,136,153,   47,79,79,
   72,61,139,     139,0,139,     0,100,0,       165,42,42,     188,143,143,   173,153,127,
-  244,164,96,    210,105,30,    255,218,185,   0,0,0,
+  244,164,96,    210,105,30,    255,218,185,
 ];
 
-/**
- * Parse a Mac OS 'snd ' resource header to extract sample metadata.
- * Supports both format 1 and format 2 snd resources.
- * Returns null if the data is too short or malformed.
- */
-function parseSndHeader(bytes: Uint8Array): { format: number; sampleRate: number; length: number; encode: number } | null {
-  if (bytes.length < 6) return null;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const format = view.getUint16(0, false);
-  let cmdOffset = 0;
-
-  if (format === 1) {
-    // Format 1: 2 bytes format, 2 bytes numSynths, N*6 bytes synth records, then commands
-    const numSynths = view.getUint16(2, false);
-    cmdOffset = 4 + numSynths * 6;
-  } else if (format === 2) {
-    // Format 2: 2 bytes format, 2 bytes refCount, then commands
-    cmdOffset = 4;
-  } else {
-    return null;
-  }
-
-  if (cmdOffset + 2 > bytes.length) return null;
-  const numCmds = view.getUint16(cmdOffset, false);
-  cmdOffset += 2;
-
-  for (let i = 0; i < numCmds; i++) {
-    if (cmdOffset + 8 > bytes.length) break;
-    const cmd = view.getUint16(cmdOffset, false) & 0x7FFF;
-    const param2 = view.getUint32(cmdOffset + 4, false);
-    cmdOffset += 8;
-
-    // bufferCmd (80) or soundCmd (81) point to a SoundHeader
-    if (cmd === 80 || cmd === 81) {
-      const headerOff = param2;
-      // SoundHeader layout: samplePtr(4) + length(4) + sampleRate(4.16fp) + loopStart(4) + loopEnd(4) + encode(1) + baseFreq(1)
-      if (headerOff + 22 > bytes.length) break;
-      const length = view.getUint32(headerOff + 4, false);
-      const sampleRateFixed = view.getUint32(headerOff + 8, false);
-      const sampleRate = sampleRateFixed / 65536;
-      const encode = view.getUint8(headerOff + 20);
-      return { format, sampleRate, length, encode };
-    }
-  }
-  return null;
-}
 
 /**
  * Attempt to play a Mac OS 'snd ' resource using the Web Audio API.
- * Only works for uncompressed (encode=0, 8-bit mono) snd resources.
+ * Supports:
+ *   - stdSH (encode=0x00): uncompressed 8-bit mono PCM
+ *   - cmpSH (encode=0xFE) with 'ima4': Apple IMA4 ADPCM compressed
+ *   - extSH (encode=0xFF): uncompressed 16-bit mono PCM
  * Returns true if playback started, false if format is unsupported.
  */
 function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean {
@@ -527,70 +485,78 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
     if (cmd === 80 || cmd === 81) {
       const headerOff = param2;
       if (headerOff + 22 > bytes.length) break;
-      const length = view.getUint32(headerOff + 4, false);
+      const numFrames      = view.getUint32(headerOff + 4, false);
       const sampleRateFixed = view.getUint32(headerOff + 8, false);
-      const sampleRate = sampleRateFixed / 65536;
-      const encode = view.getUint8(headerOff + 20);
-      if (encode !== 0) break; // only uncompressed
+      const sampleRate     = Math.max(sampleRateFixed / 65536, 100); // clamp ≥ 100 Hz
+      const encode         = view.getUint8(headerOff + 20);
 
-      const dataStart = headerOff + 22;
-      const dataEnd = Math.min(dataStart + length, bytes.length);
-      if (dataStart >= bytes.length) break;
-
-      // Convert 8-bit unsigned PCM (0-255) to float32 (-1 to 1)
-      const sampleCount = dataEnd - dataStart;
-      if (sampleCount > 10_000_000) break; // safety: don't allocate massive buffers
-      // AudioContext requires sampleRate ≥ 1 Hz; clamp to avoid Safari/Chrome errors
-      // with corrupt or zero sample rates.
-      const MIN_SAMPLE_RATE = 100;
-      const audioBuffer = audioCtx.createBuffer(1, sampleCount, Math.max(sampleRate, MIN_SAMPLE_RATE));
-      const channelData = audioBuffer.getChannelData(0);
-      for (let s = 0; s < sampleCount; s++) {
-        channelData[s] = (bytes[dataStart + s] - 128) / 128;
+      // ── stdSH: 8-bit unsigned mono PCM ──────────────────────────────
+      if (encode === 0x00) {
+        const dataStart = headerOff + 22;
+        const sampleCount = Math.min(numFrames, bytes.length - dataStart);
+        if (sampleCount <= 0 || sampleCount > 10_000_000) break;
+        const audioBuffer = audioCtx.createBuffer(1, sampleCount, sampleRate);
+        const ch = audioBuffer.getChannelData(0);
+        for (let s = 0; s < sampleCount; s++) ch[s] = (bytes[dataStart + s] - 128) / 128;
+        const src = audioCtx.createBufferSource();
+        src.buffer = audioBuffer; src.connect(audioCtx.destination); src.start();
+        return true;
       }
 
-      const source = audioCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioCtx.destination);
-      source.start();
-      return true;
+      // ── cmpSH: compressed (IMA4 ADPCM) ──────────────────────────────
+      if (encode === 0xFE) {
+        // cmpSH extra fields layout (after the 22-byte base):
+        //   numFrames2(4) + AIFFSampleRate(10) + markerChunk(4) + format(4) = 22 extra bytes
+        //   + futureUse2(4) + stateVars(4) + leftOverSamples(4) = 12 more
+        //   + compressionID(2) + packetSize(2) + snthID(2) + numChannels(2) + sampleSize(2) = 10
+        //   Total extra: 44 bytes → data starts at headerOff + 66
+        if (headerOff + 66 > bytes.length) break;
+        const fmtBytes = bytes.slice(headerOff + 40, headerOff + 44);
+        const comprFmt = String.fromCharCode(...fmtBytes);
+        if (comprFmt !== 'ima4') break; // only IMA4 supported
+
+        const dataStart = headerOff + 66;
+        // numFrames from headerOff+4 = number of IMA4 packets (each produces 64 samples)
+        const numPackets   = numFrames;
+        const totalSamples = numPackets * 64;
+        if (totalSamples <= 0 || totalSamples > 10_000_000) break;
+        const available    = Math.floor((bytes.length - dataStart) / 34);
+        const pktsToUse    = Math.min(numPackets, available);
+        if (pktsToUse <= 0) break;
+
+        const f32 = decodeIMA4(bytes.subarray(dataStart), pktsToUse);
+        const audioBuffer = audioCtx.createBuffer(1, f32.length, sampleRate);
+        audioBuffer.getChannelData(0).set(f32);
+        const src = audioCtx.createBufferSource();
+        src.buffer = audioBuffer; src.connect(audioCtx.destination); src.start();
+        return true;
+      }
+
+      // ── extSH: uncompressed 16-bit big-endian mono PCM ───────────────
+      if (encode === 0xFF) {
+        // extSH data starts at headerOff + 64 (base 22 + 42 extra bytes)
+        // numFrames at headerOff+4 is the frame count; each frame = 1 sample (mono)
+        const dataStart = headerOff + 64;
+        if (dataStart + 2 > bytes.length) break;
+        const sampleCount = Math.min(numFrames, Math.floor((bytes.length - dataStart) / 2));
+        if (sampleCount <= 0 || sampleCount > 10_000_000) break;
+        const audioBuffer = audioCtx.createBuffer(1, sampleCount, sampleRate);
+        const ch = audioBuffer.getChannelData(0);
+        for (let s = 0; s < sampleCount; s++) {
+          let sample = view.getInt16(dataStart + s * 2, false); // big-endian
+          ch[s] = sample / 32768.0;
+        }
+        const src = audioCtx.createBufferSource();
+        src.buffer = audioBuffer; src.connect(audioCtx.destination); src.start();
+        return true;
+      }
+
+      break; // encode value not supported
     }
   }
   return false;
 }
 
-/**
- * Build a minimal PCM WAV file from raw PCM samples.
- * @param pcm  Raw samples (8-bit unsigned mono or 16-bit signed mono).
- * @param sampleRate Samples per second.
- * @param numChannels 1 = mono.
- * @param bitsPerSample 8 or 16.
- */
-function buildWav(pcm: Uint8Array, sampleRate: number, numChannels: number, bitsPerSample: number): Uint8Array {
-  const dataSize   = pcm.length;
-  const byteRate   = sampleRate * numChannels * (bitsPerSample / 8);
-  const blockAlign = numChannels * (bitsPerSample / 8);
-  const out        = new Uint8Array(44 + dataSize);
-  const dv         = new DataView(out.buffer);
-  // RIFF chunk
-  out.set([82, 73, 70, 70], 0);              // 'RIFF'
-  dv.setUint32(4, 36 + dataSize, true);      // file size - 8
-  out.set([87, 65, 86, 69], 8);              // 'WAVE'
-  // fmt  sub-chunk
-  out.set([102, 109, 116, 32], 12);          // 'fmt '
-  dv.setUint32(16, 16, true);                // sub-chunk size = 16
-  dv.setUint16(20, 1, true);                 // PCM format = 1
-  dv.setUint16(22, numChannels, true);
-  dv.setUint32(24, sampleRate, true);
-  dv.setUint32(28, byteRate, true);
-  dv.setUint16(32, blockAlign, true);
-  dv.setUint16(34, bitsPerSample, true);
-  // data sub-chunk
-  out.set([100, 97, 116, 97], 36);           // 'data'
-  dv.setUint32(40, dataSize, true);
-  out.set(pcm, 44);
-  return out;
-}
 
 
 @Component({
@@ -868,7 +834,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   });
 
   /** Parsed Mac snd resource metadata for the selected audio resource. */
-  readonly selectedResSndInfo = computed<{ format: number; sampleRate: number; length: number; encode: number } | null>(() => {
+  readonly selectedResSndInfo = computed<{
+    format: number; sampleRate: number; length: number; encode: number; comprFmt?: string;
+  } | null>(() => {
     if (!this.selectedResIsAudio()) return null;
     const bytes = this.selectedResBytes();
     if (!bytes || bytes.length < 4) return null;
@@ -3497,31 +3465,54 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   // ---- Audio editor ----
 
-  /** All kPackSnds entries: { id, sizeBytes } */
-  audioEntries = signal<{ id: number; sizeBytes: number }[]>([]);
+  /** All kPackSnds entries: { id, sizeBytes, durationMs? } */
+  audioEntries = signal<{ id: number; sizeBytes: number; durationMs?: number }[]>([]);
   /** Currently selected audio entry ID for the audio editor. */
   selectedAudioId = signal<number | null>(null);
   /** Raw bytes of the selected audio resource (for playback/export/preview). */
   selectedAudioBytes = signal<Uint8Array | null>(null);
   /** Parsed snd metadata for the currently selected audio entry. */
-  readonly selectedAudioSndInfo = computed<{ format: number; sampleRate: number; length: number; encode: number } | null>(() => {
+  readonly selectedAudioSndInfo = computed<{
+    format: number; sampleRate: number; length: number; encode: number; comprFmt?: string;
+  } | null>(() => {
     const bytes = this.selectedAudioBytes();
     if (!bytes || bytes.length < 4) return null;
     return parseSndHeader(bytes);
   });
 
-  /** Load the list of all kPackSnds entries from the worker. */
+  /** Load the list of all kPackSnds entries from the worker, then populate durations. */
   async loadAudioEntries(): Promise<void> {
     try {
       type EntriesResult = { entries: { id: number; size: number }[] | null };
       const result = await this.dispatchWorker<EntriesResult>('LIST_PACK_ENTRIES', { packId: 134 });
       const entries = result.entries ?? [];
+      // Initial list without duration
       this.audioEntries.set(entries.map((e) => ({ id: e.id, sizeBytes: e.size })));
       if (entries.length > 0 && this.selectedAudioId() === null) {
         this.selectedAudioId.set(entries[0].id);
         await this.loadSelectedAudioBytes(entries[0].id);
       }
+      // Populate durations in background — load bytes for each entry and parse header
+      void this._loadAudioDurations(entries.map((e) => e.id));
     } catch { /* non-fatal */ }
+  }
+
+  /** Load bytes for each audio entry and compute duration from the snd header. */
+  private async _loadAudioDurations(ids: number[]): Promise<void> {
+    type RawResult = { bytes: ArrayBuffer | null };
+    for (const id of ids) {
+      try {
+        const result = await this.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', { packId: 134, entryId: id });
+        if (!result.bytes) continue;
+        const info = parseSndHeader(new Uint8Array(result.bytes));
+        if (!info || info.sampleRate <= 0) continue;
+        const durationMs = (info.length / info.sampleRate) * 1000;
+        // Patch the durationMs into the matching entry
+        this.audioEntries.update((prev) =>
+          prev.map((e) => e.id === id ? { ...e, durationMs } : e),
+        );
+      } catch { /* ignore individual failures */ }
+    }
   }
 
   async selectAudioEntry(id: number): Promise<void> {
@@ -3611,7 +3602,36 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Fallback: wrap raw bytes as 8-bit mono 22050 Hz WAV
       return buildWav(bytes, 22050, 1, 8);
     }
-    // Find the sound data offset: scan for bufferCmd (0x8051) or soundCmd (0x0028)
+    // For IMA4 compressed sounds: decode to 16-bit PCM then wrap
+    if (info.encode === 0xFE && info.comprFmt === 'ima4') {
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      // Find the headerOff via bufferCmd
+      const fmtVal  = view.getUint16(0, false);
+      const cmdBase = fmtVal === 2 ? 6 : (4 + view.getUint16(2, false) * 6 + 2);
+      const numCmds = view.getUint16(cmdBase - 2, false);
+      for (let c = 0; c < numCmds; c++) {
+        const cmdOff = cmdBase + c * 8;
+        if (cmdOff + 8 > bytes.length) break;
+        const cmdCode = view.getUint16(cmdOff, false) & 0x7FFF;
+        if (cmdCode === 0x51) { // bufferCmd
+          const headerOff  = view.getUint32(cmdOff + 4, false);
+          const numPackets = view.getUint32(headerOff + 4, false);
+          const dataStart  = headerOff + 66;
+          if (dataStart >= bytes.length) break;
+          const pktsAvail  = Math.floor((bytes.length - dataStart) / 34);
+          const pkts       = Math.min(numPackets, pktsAvail);
+          if (pkts <= 0) break;
+          const f32 = decodeIMA4(bytes.subarray(dataStart), pkts);
+          // Convert Float32 to 16-bit PCM
+          const pcm16 = new Int16Array(f32.length);
+          for (let s = 0; s < f32.length; s++) pcm16[s] = Math.max(-32768, Math.min(32767, Math.round(f32[s] * 32768)));
+          return buildWav(new Uint8Array(pcm16.buffer), Math.round(info.sampleRate), 1, 16);
+        }
+      }
+      // Fallback if parsing fails
+      return buildWav(bytes, Math.round(info.sampleRate), 1, 8);
+    }
+    // Find the sound data offset: scan for bufferCmd
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let dataOffset = bytes.length;
     const numCmds = view.getUint16(6, false);
@@ -3621,13 +3641,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (cmdOff + 8 > bytes.length) break;
       const cmdCode = view.getUint16(cmdOff, false) & 0x7fff;
       if (cmdCode === 0x0051 || cmdCode === 0x8051) { // bufferCmd
-        dataOffset = view.getUint32(cmdOff + 4, false) + 22; // skip SoundHeader
+        const hOff = view.getUint32(cmdOff + 4, false);
+        const enc  = bytes[hOff + 20] ?? 0;
+        dataOffset = hOff + (enc === 0xFF ? 64 : 22); // extSH data at +64, stdSH at +22
         break;
       }
     }
     const pcmStart = Math.min(dataOffset, bytes.length);
     const pcmData = bytes.slice(pcmStart);
-    return buildWav(pcmData, Math.round(info.sampleRate), 1, 8);
+    const bitsPerSample = info.encode === 0xFF ? 16 : 8;
+    return buildWav(pcmData, Math.round(info.sampleRate), 1, bitsPerSample);
   }
 
   /**

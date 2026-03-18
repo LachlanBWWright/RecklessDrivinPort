@@ -530,7 +530,11 @@
                           (click)="selectAudioEntry(entry.id)">
                           <mat-icon class="audio-entry-icon">audiotrack</mat-icon>
                           <span>Sound #{{ entry.id }}</span>
-                          <span class="res-size-badge">{{ entry.sizeBytes | number }} B</span>
+                          @if (entry.durationMs !== undefined) {
+                            <span class="res-size-badge">{{ entry.durationMs! / 1000 | number:'1.1-1' }}s</span>
+                          } @else {
+                            <span class="res-size-badge">{{ entry.sizeBytes | number }} B</span>
+                          }
                         </button>
                       }
                     </div>
@@ -543,8 +547,14 @@
                           <div class="audio-meta">
                             <span class="badge">Format {{ info.format }}</span>
                             <span class="badge">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
-                            <span class="badge">{{ info.length | number }} samples</span>
-                            <span class="badge">{{ info.encode === 0 ? 'PCM 8-bit' : 'encode=' + info.encode }}</span>
+                            <span class="badge">{{ (info.length / info.sampleRate) | number:'1.1-1' }}s</span>
+                            <span class="badge">
+                              @if (info.encode === 0) { PCM 8-bit }
+                              @else if (info.encode === 254 && info.comprFmt) { {{ info.comprFmt }} (compressed) }
+                              @else if (info.encode === 254) { cmpSH }
+                              @else if (info.encode === 255) { PCM 16-bit }
+                              @else { encode={{ info.encode }} }
+                            </span>
                           </div>
                         }
                         <div class="audio-waveform-placeholder">

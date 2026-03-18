@@ -128,6 +128,24 @@ export class KonvaEditorService implements OnDestroy {
   private _cssW     = 640;
   private _cssH     = 480;
 
+  // ── Dirty-layer tracking ───────────────────────────────────────────────────
+  // Only layers that were modified since the last flush() are redrawn.
+  // This avoids the cost of redrawing, e.g., the objects layer while the user
+  // is only dragging a mark endpoint.
+  private _dirtyLayers = new Set<Konva.Layer>();
+  /** Last applied group-transform values; used to skip redundant setAttrs calls. */
+  private _lastGx = NaN; private _lastGy = NaN; private _lastSx = NaN; private _lastSy = NaN;
+
+  private _markLayerDirty(layer: Konva.Layer | null): void {
+    if (layer) this._dirtyLayers.add(layer);
+  }
+  private _markAllLayersDirty(): void {
+    this._markLayerDirty(this.objectsLayer);
+    this._markLayerDirty(this.trackLayer);
+    this._markLayerDirty(this.marksLayer);
+    this._markLayerDirty(this.barrierLayer);
+  }
+
   // ── Interaction state ─────────────────────────────────────────────────────
   /** When true, node dragging is disabled (pan mode active). */
   private _panMode = false;
@@ -269,6 +287,9 @@ export class KonvaEditorService implements OnDestroy {
 
   /**
    * Apply the current pan/zoom as the group transform.
+   * Skips setAttrs calls when the transform hasn't changed (avoids marking layers
+   * as dirty unnecessarily) and marks ALL layers dirty only when transform actually
+   * differs from the previously applied values.
    *
    *   stage_x = x + worldX * scaleX  =  cssW/2  +  (worldX − panX) * zoom * (cssW/logicalW)
    *   stage_y = y − worldY * scaleY  =  cssH/2  −  (worldY − panY) * zoom * (cssH/logicalH)
@@ -279,12 +300,17 @@ export class KonvaEditorService implements OnDestroy {
     const sy = this._zoom * (this._cssH / this._logicalH);
     const gx = this._cssW / 2 - this._panX * sx;
     const gy = this._cssH / 2 + this._panY * sy;
-    this.worldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
-    this.trackWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
-    this.marksWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
-    this.barrierWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
-    // keep background image transform in sync as well
-    _applyBackgroundTransform(this.bgImageNode, this._zoom, this._panX, this._panY, this._cssW, this._cssH, this._logicalW, this._logicalH);
+    if (gx !== this._lastGx || gy !== this._lastGy || sx !== this._lastSx || sy !== this._lastSy) {
+      this._lastGx = gx; this._lastGy = gy; this._lastSx = sx; this._lastSy = sy;
+      this.worldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
+      this.trackWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
+      this.marksWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
+      this.barrierWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
+      // keep background image transform in sync as well
+      _applyBackgroundTransform(this.bgImageNode, this._zoom, this._panX, this._panY, this._cssW, this._cssH, this._logicalW, this._logicalH);
+      // All layers need redraw when the transform changes
+      this._markAllLayersDirty();
+    }
   }
 
   /**
@@ -378,6 +404,7 @@ export class KonvaEditorService implements OnDestroy {
     );
     this._konvaObjNodes = result.nodes;
     this._applyGroupTransform();
+    this._markLayerDirty(this.objectsLayer);
     t.end();
   }
 
@@ -416,6 +443,7 @@ export class KonvaEditorService implements OnDestroy {
     );
 
     this._applyGroupTransform();
+    this._markLayerDirty(this.trackLayer);
     t.end();
   }
 
@@ -423,7 +451,8 @@ export class KonvaEditorService implements OnDestroy {
     this._lastTrackUp   = null;
     this._lastTrackDown = null;
     this.trackWorldGroup?.destroyChildren();
-    // Don't batchDraw here — flush() in redrawObjectCanvas() will draw synchronously.
+    this._markLayerDirty(this.trackLayer);
+    // Don't draw here — flush() in redrawObjectCanvas() will draw synchronously.
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -471,6 +500,7 @@ export class KonvaEditorService implements OnDestroy {
     );
 
     this._applyGroupTransform();
+    this._markLayerDirty(this.marksLayer);
     t.end();
   }
 
@@ -478,6 +508,7 @@ export class KonvaEditorService implements OnDestroy {
     this._lastMarks             = null;
     this._lastSelectedMarkIndex = null;
     this.marksWorldGroup?.destroyChildren();
+    this._markLayerDirty(this.marksLayer);
   }
 
   setBarriers(
@@ -491,12 +522,12 @@ export class KonvaEditorService implements OnDestroy {
       (segIdx, side, newX) => this.onBarrierDragEnd?.({ segIdx, side, worldX: newX }),
     );
     this._applyGroupTransform();
-    this.barrierLayer.draw();
+    this._markLayerDirty(this.barrierLayer);
   }
 
   clearBarriers(): void {
     this.barrierWorldGroup?.destroyChildren();
-    this.barrierLayer?.draw();
+    this._markLayerDirty(this.barrierLayer);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -504,7 +535,12 @@ export class KonvaEditorService implements OnDestroy {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Synchronously draw all Konva layers.
+   * Synchronously draw all Konva layers that have been modified since the last flush().
+   *
+   * Dirty-layer tracking: each set*() method marks only the layer(s) it modifies.
+   * _applyGroupTransform() marks ALL layers dirty whenever the pan/zoom transform
+   * actually changes.  This avoids the cost of re-rendering unchanged layers every
+   * frame (e.g. the objects layer while the user is only dragging a mark endpoint).
    *
    * Call this exactly once at the end of redrawObjectCanvas() (inside the
    * requestAnimationFrame callback) AFTER all set*() calls.  This keeps the
@@ -513,10 +549,10 @@ export class KonvaEditorService implements OnDestroy {
    */
   flush(): void {
     const t = profiler.start('konva.flush');
-    this.objectsLayer?.draw();
-    this.trackLayer?.draw();
-    this.marksLayer?.draw();
-    this.barrierLayer?.draw();
+    if (this._dirtyLayers.size > 0) {
+      for (const layer of this._dirtyLayers) layer.draw();
+      this._dirtyLayers.clear();
+    }
     t.end();
   }
 
@@ -592,6 +628,8 @@ export class KonvaEditorService implements OnDestroy {
     this._lastSelectedMarkIndex = null;
     this.barrierLayer           = null;
     this.barrierWorldGroup      = null;
+    this._dirtyLayers.clear();
+    this._lastGx = NaN; this._lastGy = NaN; this._lastSx = NaN; this._lastSy = NaN;
   }
 
   ngOnDestroy(): void { this.destroy(); }
