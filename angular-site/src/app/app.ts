@@ -3916,6 +3916,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Render an ICN# resource (32×32 1-bit) to an HTMLCanvasElement. */
   private _renderIconBytes(bytes: Uint8Array): HTMLCanvasElement | null {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     const imgData = ctx.createImageData(32, 32);
@@ -4010,7 +4013,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       switch (opcode) {
         case 0x0000: break; // NOP
-        case 0x00FF: case 0xFF: break outer; // EndOfPicture
+        case 0x00FF: break outer; // EndOfPicture
         case 0x0001: { // ClipRgn
           if (pos + 2 > bytes.length) break outer;
           const rgnSize = view.getUint16(pos, false); pos += rgnSize; break;

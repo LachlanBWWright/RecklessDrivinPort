@@ -83,10 +83,10 @@ export function buildBarriers(
       strokeWidth: 1.5 / sx,
       draggable: !panMode,
       id: `barrier-left-${i}`,
-      dragBoundFunc: (pos) => {
-        return { x: pos.x, y: leftCircle.getAbsolutePosition().y };
-      },
     });
+    leftCircle.setAttr('dragBoundFunc', (pos: {x: number; y: number}) => (
+      { x: pos.x, y: leftCircle.getAbsolutePosition().y }
+    ));
     leftCircle.on('dragend', () => {
       onBarrierDragEnd?.(i, 'left', Math.round(leftCircle.x()));
       document.body.style.cursor = '';
@@ -116,10 +116,10 @@ export function buildBarriers(
       strokeWidth: 1.5 / sx,
       draggable: !panMode,
       id: `barrier-right-${i}`,
-      dragBoundFunc: (pos) => {
-        return { x: pos.x, y: rightCircle.getAbsolutePosition().y };
-      },
     });
+    rightCircle.setAttr('dragBoundFunc', (pos: {x: number; y: number}) => (
+      { x: pos.x, y: rightCircle.getAbsolutePosition().y }
+    ));
     rightCircle.on('dragend', () => {
       onBarrierDragEnd?.(i, 'right', Math.round(rightCircle.x()));
       document.body.style.cursor = '';
@@ -148,8 +148,10 @@ export function buildBarriers(
       strokeWidth: 1.5 / sx,
       draggable: !panMode,
       id: `barrier-v1-${i}`,
-      dragBoundFunc: (pos) => ({ x: pos.x, y: v1Circle.getAbsolutePosition().y }),
     });
+    v1Circle.setAttr('dragBoundFunc', (pos: {x: number; y: number}) => (
+      { x: pos.x, y: v1Circle.getAbsolutePosition().y }
+    ));
     v1Circle.on('dragend', () => { onBarrierDragEnd?.(i, 'v1', Math.round(v1Circle.x())); document.body.style.cursor = ''; });
     v1Circle.on('mouseenter', () => { v1Circle.radius(BARRIER_WORLD_R); v1Circle.stroke('#fff'); barrierLayer.draw(); document.body.style.cursor = 'ew-resize'; });
     v1Circle.on('mouseleave', () => { v1Circle.radius(BARRIER_WORLD_R * 0.8); v1Circle.stroke('rgba(0,0,0,0.5)'); barrierLayer.draw(); document.body.style.cursor = ''; });
@@ -165,8 +167,10 @@ export function buildBarriers(
       strokeWidth: 1.5 / sx,
       draggable: !panMode,
       id: `barrier-v2-${i}`,
-      dragBoundFunc: (pos) => ({ x: pos.x, y: v2Circle.getAbsolutePosition().y }),
     });
+    v2Circle.setAttr('dragBoundFunc', (pos: {x: number; y: number}) => (
+      { x: pos.x, y: v2Circle.getAbsolutePosition().y }
+    ));
     v2Circle.on('dragend', () => { onBarrierDragEnd?.(i, 'v2', Math.round(v2Circle.x())); document.body.style.cursor = ''; });
     v2Circle.on('mouseenter', () => { v2Circle.radius(BARRIER_WORLD_R); v2Circle.stroke('#fff'); barrierLayer.draw(); document.body.style.cursor = 'ew-resize'; });
     v2Circle.on('mouseleave', () => { v2Circle.radius(BARRIER_WORLD_R * 0.8); v2Circle.stroke('rgba(0,0,0,0.5)'); barrierLayer.draw(); document.body.style.cursor = ''; });
