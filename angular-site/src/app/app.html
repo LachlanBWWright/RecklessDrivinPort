@@ -225,6 +225,8 @@
                       [showTrackUp]="showTrackUp()"
                       [showTrackDown]="showTrackDown()"
                       [showGrid]="showGrid()"
+                      [showMarks]="showMarks()"
+                      [showBarriers]="showBarriers()"
                       [canUndo]="canUndo()"
                       [canRedo]="canRedo()"
                       [trackUpCount]="selectedLevel()!.trackUp.length"
@@ -261,6 +263,9 @@
                       (toggleTrackUp)="showTrackUp.set(!showTrackUp())"
                       (toggleTrackDown)="showTrackDown.set(!showTrackDown())"
                       (toggleGrid)="showGrid.set(!showGrid())"
+                      (toggleMarks)="showMarks.set(!showMarks())"
+                      (toggleBarriers)="showBarriers.set(!showBarriers())"
+                      (saveBarriers)="saveBarriers()"
                       (undo)="undo()"
                       (redo)="redo()"
                       (saveTrack)="saveTrack()"
@@ -284,7 +289,10 @@
                             </div>
                           </div>
                           <div class="objects-side-help">
-                            <p class="muted">Drag objects &amp; track dots · Dbl-click adds · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes · <kbd>Ctrl+Z</kbd> undo · <kbd>Ctrl+Y</kbd> redo · <kbd>Space</kbd>+drag pans</p>
+                            <p class="muted"><strong>Objects:</strong> Drag to move · Dbl-click canvas to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes</p>
+                            <p class="muted"><strong>Marks:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">edit_location</mat-icon> · Drag yellow nubs to reposition · <kbd>N</kbd> joins/splits nearest nubs · Use Save Marks to persist</p>
+                            <p class="muted"><strong>Barriers:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">fence</mat-icon> · Orange handles = outer (v0/v3) · Yellow handles = inner lane (v1/v2) · Drag handles horizontally · Interpolates adjacent segments · Use Save Barriers to persist</p>
+                            <p class="muted"><strong>Navigation:</strong> <kbd>Space</kbd>+drag pans · Scroll/zoom wheel · <kbd>+</kbd>/<kbd>-</kbd> zoom · Arrow keys pan · <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo</p>
                           </div>
                         </details>
                       </div>
@@ -318,6 +326,20 @@
                         (objectSelected)="selectObject($event, true)"
                         (searchTermChange)="objectSearchTerm.set($event)"
                       ></app-object-list>
+
+                      <app-marks-editor
+                        [marks]="marks()"
+                        [selectedMarkIndex]="selectedMarkIndex()"
+                        [workerBusy]="workerBusy()"
+                        (markSelected)="selectedMarkIndex.set($event)"
+                        (addMark)="addMark()"
+                        (removeMark)="removeSelectedMark()"
+                        (saveMarks)="saveMarks()"
+                        (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
+                        (markCanvasMouseDown)="onMarkCanvasMouseDown($event)"
+                        (markCanvasMouseMove)="onMarkCanvasMouseMove($event)"
+                        (markCanvasMouseUp)="onMarkCanvasMouseUp($event)"
+                      ></app-marks-editor>
                     </div>
                   </div>
                 </mat-card-content>

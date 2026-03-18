@@ -50,6 +50,9 @@
     <button mat-icon-button [class.btn-active]="showBarriers" (click)="toggleBarriers.emit()" matTooltip="Toggle road barriers">
       <mat-icon>fence</mat-icon>
     </button>
+    <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
+      <mat-icon>edit_location</mat-icon>
+    </button>
     @if (showBarriers) {
       <button mat-stroked-button [disabled]="workerBusy" (click)="saveBarriers.emit()" matTooltip="Save road barrier positions">
         <mat-icon>save</mat-icon> Barriers
