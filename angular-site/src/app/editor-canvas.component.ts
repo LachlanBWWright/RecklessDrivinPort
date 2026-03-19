@@ -67,6 +67,8 @@ export class EditorCanvasComponent {
   @Output() toggleGrid = new EventEmitter<void>();
   @Output() toggleBarriers = new EventEmitter<void>();
   @Output() saveBarriers = new EventEmitter<void>();
+  @Output() mergeMiddleBarriers = new EventEmitter<void>();
+  @Output() splitMiddleBarriers = new EventEmitter<void>();
   @Output() markSelected = new EventEmitter<number>();
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();

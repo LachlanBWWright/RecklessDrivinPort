@@ -268,6 +268,8 @@
                       (toggleMarks)="showMarks.set(!showMarks())"
                       (toggleBarriers)="showBarriers.set(!showBarriers())"
                       (saveBarriers)="saveBarriers()"
+                      (mergeMiddleBarriers)="mergeMiddleBarriers()"
+                      (splitMiddleBarriers)="splitMiddleBarriers()"
                       (undo)="undo()"
                       (redo)="redo()"
                       (saveTrack)="saveTrack()"
@@ -293,7 +295,7 @@
                           <div class="objects-side-help">
                             <p class="muted"><strong>Objects:</strong> Drag to move · Dbl-click canvas to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes</p>
                             <p class="muted"><strong>Marks:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">edit_location</mat-icon> · Drag yellow nubs to reposition · <kbd>N</kbd> joins/splits nearest nubs · Use Save Marks to persist</p>
-                            <p class="muted"><strong>Barriers:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">fence</mat-icon> · Orange handles = outer (v0/v3) · Yellow handles = inner lane (v1/v2) · Drag handles horizontally · Interpolates adjacent segments · Use Save Barriers to persist</p>
+                            <p class="muted"><strong>Barriers:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">fence</mat-icon> · Orange handles = outer (v0/v3) · Yellow handles = inner lane (v1/v2) · Drag handles horizontally · Interpolates adjacent segments · <kbd>M</kbd> merge lanes (remove median) · <kbd>D</kbd> split lanes (add median) · Use Save Barriers to persist</p>
                             <p class="muted"><strong>Navigation:</strong> <kbd>Space</kbd>+drag pans · Scroll/zoom wheel · <kbd>+</kbd>/<kbd>-</kbd> zoom · Arrow keys pan · <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo</p>
                           </div>
                         </details>

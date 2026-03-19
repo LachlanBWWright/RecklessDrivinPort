@@ -2519,6 +2519,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
     }
+    // Barrier merge/split shortcuts (only when showBarriers is active)
+    if (this.showBarriers()) {
+      // M = merge middle barriers (remove median)
+      if (event.key === 'm' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        this.mergeMiddleBarriers();
+        return;
+      }
+      // D = split/diverge middle barriers (add median)
+      if (event.key === 'd' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        this.splitMiddleBarriers();
+        return;
+      }
+    }
     // Arrow key panning (Y flipped: ArrowUp → higher world Y)
     const panStep = 50 / this.canvasZoom(); // world units per keystroke
     if (event.key === 'ArrowUp')    { event.preventDefault(); this.canvasPanY.update((y) => y + panStep); }
@@ -2697,10 +2712,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // Draw barriers (road boundaries)
     if (level && this.showBarriers() && level.roadSegs.length > 0) {
-      const barrierKey = `${level.roadSegs.length}:${level.roadSegs[0]?.v0}:${level.roadSegs[Math.floor(level.roadSegs.length / 2)]?.v0}:${level.roadSegs[level.roadSegs.length - 1]?.v3}:${zoom}`;
+      // Build a comprehensive cache key by sampling ~20 evenly-spaced segments
+      // (all four boundary values) so that any road change triggers a rebuild.
+      // Also include panY so viewport-culled polylines are rebuilt when scrolling.
+      const segs = level.roadSegs;
+      const N    = Math.max(1, Math.floor(segs.length / 20));
+      let barrierKey = `${segs.length}:${zoom.toFixed(2)}:${panY.toFixed(0)}`;
+      for (let ki = 0; ki < segs.length; ki += N) {
+        const s = segs[ki];
+        barrierKey += `:${s.v0},${s.v1},${s.v2},${s.v3}`;
+      }
       if (barrierKey !== this._lastBarriersSerialized) {
         this._lastBarriersSerialized = barrierKey;
-        this.konva.setBarriers(level.roadSegs, zoom);
+        this.konva.setBarriers(segs, zoom, panY);
       }
     } else {
       if (this._lastBarriersSerialized !== '') {
@@ -3082,6 +3106,68 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     } finally {
       this.workerBusy.set(false);
     }
+  }
+
+  /**
+   * Merge the two inner lane boundaries (v1 and v2) into a single shared line,
+   * collapsing the median and producing one continuous road band from v0 to v3.
+   *
+   * Before: v0 ─ [left lane] ─ v1 ┄┄median┄┄ v2 ─ [right lane] ─ v3
+   * After:  v0 ─────────── [single wide road] ─────────────────── v3
+   *         (v1 = v2 = midpoint of old v1/v2 for each segment)
+   */
+  mergeMiddleBarriers(): void {
+    const level = this.selectedLevel();
+    if (!level || level.roadSegs.length === 0) return;
+    // Check if there is anything to merge (at least one segment with a median)
+    const hasMedian = level.roadSegs.some((s) => s.v2 - s.v1 > 2);
+    if (!hasMedian) {
+      this.snackBar.open('No median to merge — v1 and v2 are already equal.', undefined, { duration: 2500 });
+      return;
+    }
+    this._pushUndo();
+    const segs = level.roadSegs.map((s) => {
+      const mid = Math.round((s.v1 + s.v2) / 2);
+      return { ...s, v1: mid, v2: mid };
+    });
+    this.parsedLevels.update((levels) =>
+      levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
+    );
+    this._lastBarriersSerialized = '';
+    this.snackBar.open('✓ Merged middle barriers — median removed.', undefined, { duration: 2000 });
+  }
+
+  /**
+   * Split the shared inner boundary into two separate lines, inserting a median
+   * between the two lanes.  The road becomes a dual-carriageway.
+   *
+   * Before: v0 ─────────── [single wide road] ─────────────────── v3
+   *         (v1 ≈ v2)
+   * After:  v0 ─ [left lane] ─ v1 ┄┄median┄┄ v2 ─ [right lane] ─ v3
+   *
+   * A median half-width of SPLIT_HALF is inserted around the current midpoint.
+   */
+  splitMiddleBarriers(): void {
+    const level = this.selectedLevel();
+    if (!level || level.roadSegs.length === 0) return;
+    const SPLIT_HALF = 30; // world units on each side of the midpoint
+    this._pushUndo();
+    const segs = level.roadSegs.map((s) => {
+      const mid = Math.round((s.v1 + s.v2) / 2);
+      const v1New = mid - SPLIT_HALF;
+      const v2New = mid + SPLIT_HALF;
+      // Keep v1 inside [v0, v2] and v2 inside [v1, v3]
+      return {
+        ...s,
+        v1: Math.max(s.v0, Math.min(v1New, s.v3 - 1)),
+        v2: Math.min(s.v3, Math.max(v2New, s.v0 + 1)),
+      };
+    });
+    this.parsedLevels.update((levels) =>
+      levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
+    );
+    this._lastBarriersSerialized = '';
+    this.snackBar.open(`✓ Split middle barriers — ${SPLIT_HALF * 2} world-unit median added.`, undefined, { duration: 2500 });
   }
 
   // ---- Mark canvas helpers ----

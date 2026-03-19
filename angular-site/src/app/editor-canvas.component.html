@@ -57,6 +57,14 @@
       <button mat-stroked-button [disabled]="workerBusy" (click)="saveBarriers.emit()" matTooltip="Save road barrier positions">
         <mat-icon>save</mat-icon> Barriers
       </button>
+      <button mat-stroked-button [disabled]="workerBusy" (click)="mergeMiddleBarriers.emit()"
+              matTooltip="Merge middle barriers: collapse median so v1=v2, creating one road [M]">
+        <mat-icon>merge</mat-icon> Merge
+      </button>
+      <button mat-stroked-button [disabled]="workerBusy" (click)="splitMiddleBarriers.emit()"
+              matTooltip="Split middle barriers: insert median between v1 and v2, creating dual carriageway [D]">
+        <mat-icon>call_split</mat-icon> Split
+      </button>
     }
     @if (showTrackOverlay) {
       <button mat-stroked-button [disabled]="workerBusy" (click)="saveTrack.emit()" matTooltip="Save track waypoints">

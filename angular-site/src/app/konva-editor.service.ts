@@ -532,11 +532,12 @@ export class KonvaEditorService implements OnDestroy {
   setBarriers(
     roadSegs: readonly { v0: number; v1: number; v2: number; v3: number }[],
     zoom: number,
+    panY: number,
   ): void {
     if (!this.barrierWorldGroup || !this.barrierLayer) return;
     buildBarriers(
       this.barrierWorldGroup, this.barrierLayer, roadSegs, this._panMode,
-      this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
+      this._cssW, this._cssH, this._logicalW, this._logicalH, zoom, panY,
       (segIdx, side, newX) => this.onBarrierDragEnd?.({ segIdx, side, worldX: newX }),
     );
     this._applyGroupTransform();
