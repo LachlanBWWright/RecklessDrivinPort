@@ -131,6 +131,40 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+/**
+ * Perpendicular distance from point (px,py) to segment (ax,ay)-(bx,by).
+ * Returns Euclidean distance to the nearest point on the segment.
+ */
+function distToSegment2d(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return dist2d(px, py, ax, ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return dist2d(px, py, ax + t * dx, ay + t * dy);
+}
+
+/**
+ * Insert a new waypoint into `arr` at the position that minimises total path
+ * distortion – i.e. between the two consecutive waypoints whose segment is
+ * closest to (wx, wy).  Falls back to append when the array is empty.
+ */
+function insertBetweenClosestSegment(
+  arr: readonly { x: number; y: number; flags: number; velo: number }[],
+  wx: number, wy: number,
+): { x: number; y: number; flags: number; velo: number }[] {
+  const newPt = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
+  if (arr.length <= 1) return [...arr, newPt];
+  let bestDist = Infinity;
+  let bestIdx = arr.length;
+  for (let i = 0; i < arr.length - 1; i++) {
+    const d = distToSegment2d(wx, wy, arr[i].x, arr[i].y, arr[i + 1].x, arr[i + 1].y);
+    if (d < bestDist) { bestDist = d; bestIdx = i + 1; }
+  }
+  const copy = [...arr];
+  copy.splice(bestIdx, 0, newPt);
+  return copy;
+}
+
 /** Decode Mac PackBits RLE-compressed bytes into a fixed-size output buffer. */
 function decodePackBits(src: Uint8Array, expectedSize: number): Uint8Array {
   const out = new Uint8Array(expectedSize);
@@ -660,6 +694,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _prevPanMouseX = 0;
   private _prevPanMouseY = 0;
   private _isPanning = false;
+  /** RAF gate: true while a hover-detection frame is already queued. */
+  private _hoverRafPending = false;
+  /** Pending waypoint position during a live drag (committed to signal on mouseup). */
+  private _pendingWaypointDragPos: { x: number; y: number } | null = null;
   /** True while Space is held (enables Space+drag panning). */
   readonly spaceDown = signal(false);
   /** True while actively panning (middle-mouse or space+drag). */
@@ -669,6 +707,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   dragTrackWaypoint = signal<TrackWaypointRef | null>(null);
   /** Hovered track waypoint (for cursor change and highlight). */
   hoverTrackWaypoint = signal<TrackWaypointRef | null>(null);
+  /** Hovered midpoint between two consecutive track waypoints (for insertion hint). */
+  hoverTrackMidpoint = signal<TrackMidpointRef | null>(null);
   /** Editable copies of track waypoints (only populated when user drags a point). */
   editTrackUp = signal<{ x: number; y: number; flags: number; velo: number }[]>([]);
   editTrackDown = signal<{ x: number; y: number; flags: number; velo: number }[]>([]);
@@ -914,6 +954,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.editTrackUp();
       this.editTrackDown();
       this.hoverTrackWaypoint();
+      this.hoverTrackMidpoint();
       this.marks();
       this.selectedMarkIndex();
       this.editXStartPos();
@@ -1298,20 +1339,29 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Insert into nearest track, sorted by Y
+    // Insert into the nearest track, positioned between the two closest consecutive waypoints
     const level = this.selectedLevel();
     if (!level) return;
 
-    const nearestUp   = trackUp.reduce((best, pt) => dist2d(pt.x, pt.y, wx, wy) < best ? dist2d(pt.x, pt.y, wx, wy) : best, Infinity);
-    const nearestDown = trackDown.reduce((best, pt) => dist2d(pt.x, pt.y, wx, wy) < best ? dist2d(pt.x, pt.y, wx, wy) : best, Infinity);
+    // Find nearest segment distance for each track to decide which to insert into
+    let nearestSegDistUp = Infinity;
+    for (let i = 0; i < trackUp.length - 1; i++) {
+      const d = distToSegment2d(wx, wy, trackUp[i].x, trackUp[i].y, trackUp[i + 1].x, trackUp[i + 1].y);
+      if (d < nearestSegDistUp) nearestSegDistUp = d;
+    }
+    if (trackUp.length === 1) nearestSegDistUp = dist2d(trackUp[0].x, trackUp[0].y, wx, wy);
 
-    const newPt = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
-    if (nearestUp <= nearestDown || trackDown.length === 0) {
-      const arr = [...trackUp, newPt].sort((a, b) => a.y - b.y);
-      this.editTrackUp.set(arr);
+    let nearestSegDistDown = Infinity;
+    for (let i = 0; i < trackDown.length - 1; i++) {
+      const d = distToSegment2d(wx, wy, trackDown[i].x, trackDown[i].y, trackDown[i + 1].x, trackDown[i + 1].y);
+      if (d < nearestSegDistDown) nearestSegDistDown = d;
+    }
+    if (trackDown.length === 1) nearestSegDistDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
+
+    if (nearestSegDistUp <= nearestSegDistDown || trackDown.length === 0) {
+      this.editTrackUp.set(insertBetweenClosestSegment(trackUp, wx, wy));
     } else {
-      const arr = [...trackDown, newPt].sort((a, b) => a.y - b.y);
-      this.editTrackDown.set(arr);
+      this.editTrackDown.set(insertBetweenClosestSegment(trackDown, wx, wy));
     }
   }
 
@@ -2142,9 +2192,33 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           return;
         }
       }
+      // Check midpoint diamond handles (click to insert between consecutive waypoints)
+      const midHitR = Math.max(14, 12 / this.canvasZoom());
+      for (let i = 0; i < trackUp.length - 1; i++) {
+        const mx = (trackUp[i].x + trackUp[i + 1].x) / 2;
+        const my = (trackUp[i].y + trackUp[i + 1].y) / 2;
+        if (dist2d(mx, my, wx, wy) < midHitR) {
+          this._pushUndo();
+          const copy = [...trackUp];
+          copy.splice(i + 1, 0, { x: Math.round(mx), y: Math.round(my), flags: 0, velo: 0 });
+          this.editTrackUp.set(copy);
+          this.hoverTrackMidpoint.set(null);
+          return;
+        }
+      }
+      for (let i = 0; i < trackDown.length - 1; i++) {
+        const mx = (trackDown[i].x + trackDown[i + 1].x) / 2;
+        const my = (trackDown[i].y + trackDown[i + 1].y) / 2;
+        if (dist2d(mx, my, wx, wy) < midHitR) {
+          this._pushUndo();
+          const copy = [...trackDown];
+          copy.splice(i + 1, 0, { x: Math.round(mx), y: Math.round(my), flags: 0, velo: 0 });
+          this.editTrackDown.set(copy);
+          this.hoverTrackMidpoint.set(null);
+          return;
+        }
+      }
     }
-
-    // Check start marker (player start X at world Y=0)
     const startHitR = Math.max(MIN_START_MARKER_HIT_RADIUS, BASE_START_MARKER_HIT_RADIUS / this.canvasZoom());
     if (dist2d(this.editXStartPos(), 0, wx, wy) < startHitR) {
       this._draggingStartMarker = true;
@@ -2182,19 +2256,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.canvasPanY.set(this.canvasPanY() - dy / zoom);
       return;
     }
-    // Track waypoint drag
+    // Track waypoint drag — move Konva node directly without signal update for 60fps.
+    // The signal is updated on mouseup so undo still works correctly.
     const twp = this.dragTrackWaypoint();
     if (twp) {
       const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
-      if (twp.track === 'up') {
-        const arr = [...this.editTrackUp()];
-        arr[twp.segIdx] = { ...arr[twp.segIdx], x: Math.round(wx), y: Math.round(wy) };
-        this.editTrackUp.set(arr);
-      } else {
-        const arr = [...this.editTrackDown()];
-        arr[twp.segIdx] = { ...arr[twp.segIdx], x: Math.round(wx), y: Math.round(wy) };
-        this.editTrackDown.set(arr);
-      }
+      const rx = Math.round(wx), ry = Math.round(wy);
+      // Store the pending position for commit on mouseup
+      this._pendingWaypointDragPos = { x: rx, y: ry };
+      // Move Konva node immediately (O(1), no signal/effect/redraw chain)
+      this.konva.moveTrackWaypointDirect(twp.track, twp.segIdx, rx, ry);
       return;
     }
     // Start marker drag (X only)
@@ -2205,23 +2276,51 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     if (!this.isDragging()) {
-      // Update hover state for track waypoints (for cursor feedback)
-      if (this.showTrackOverlay()) {
-        const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
-        const trackHitR = Math.max(12, 10 / this.canvasZoom());
-        let found: { track: 'up' | 'down'; segIdx: number } | null = null;
-        for (let i = 0; i < this.editTrackUp().length && !found; i++) {
-          const s = this.editTrackUp()[i];
-          if (dist2d(s.x, s.y, wx, wy) < trackHitR) found = { track: 'up', segIdx: i };
-        }
-        for (let i = 0; i < this.editTrackDown().length && !found; i++) {
-          const s = this.editTrackDown()[i];
-          if (dist2d(s.x, s.y, wx, wy) < trackHitR) found = { track: 'down', segIdx: i };
-        }
-        const prev = this.hoverTrackWaypoint();
-        if (found?.track !== prev?.track || found?.segIdx !== prev?.segIdx) {
-          this.hoverTrackWaypoint.set(found);
-        }
+      // Update hover state for track waypoints and segment midpoints.
+      // Throttle: only run the detection once per animation frame.
+      if (this.showTrackOverlay() && !this._hoverRafPending) {
+        this._hoverRafPending = true;
+        const evX = event.offsetX, evY = event.offsetY;
+        window.requestAnimationFrame(() => {
+          this._hoverRafPending = false;
+          const [wx, wy] = this.canvasToWorld(evX, evY);
+          const trackHitR = Math.max(12, 10 / this.canvasZoom());
+          // Check waypoint nodes first
+          let found: TrackWaypointRef | null = null;
+          for (let i = 0; i < this.editTrackUp().length && !found; i++) {
+            const s = this.editTrackUp()[i];
+            if (dist2d(s.x, s.y, wx, wy) < trackHitR) found = { track: 'up', segIdx: i };
+          }
+          for (let i = 0; i < this.editTrackDown().length && !found; i++) {
+            const s = this.editTrackDown()[i];
+            if (dist2d(s.x, s.y, wx, wy) < trackHitR) found = { track: 'down', segIdx: i };
+          }
+          const prev = this.hoverTrackWaypoint();
+          if (found?.track !== prev?.track || found?.segIdx !== prev?.segIdx) {
+            this.hoverTrackWaypoint.set(found);
+          }
+          // Check midpoints (only when not hovering a waypoint node)
+          let foundMid: TrackMidpointRef | null = null;
+          if (!found) {
+            const midHitR = Math.max(14, 12 / this.canvasZoom());
+            const upSegs = this.editTrackUp();
+            for (let i = 0; i < upSegs.length - 1 && !foundMid; i++) {
+              const mx = (upSegs[i].x + upSegs[i + 1].x) / 2;
+              const my = (upSegs[i].y + upSegs[i + 1].y) / 2;
+              if (dist2d(mx, my, wx, wy) < midHitR) foundMid = { track: 'up', segIdx: i };
+            }
+            const downSegs = this.editTrackDown();
+            for (let i = 0; i < downSegs.length - 1 && !foundMid; i++) {
+              const mx = (downSegs[i].x + downSegs[i + 1].x) / 2;
+              const my = (downSegs[i].y + downSegs[i + 1].y) / 2;
+              if (dist2d(mx, my, wx, wy) < midHitR) foundMid = { track: 'down', segIdx: i };
+            }
+          }
+          const prevMid = this.hoverTrackMidpoint();
+          if (foundMid?.track !== prevMid?.track || foundMid?.segIdx !== prevMid?.segIdx) {
+            this.hoverTrackMidpoint.set(foundMid);
+          }
+        });
       }
       return;
     }
@@ -2242,8 +2341,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.isPanning.set(false);
       return;
     }
-    // Finish track waypoint drag (no save needed – editTrackUp/Down are live)
+    // Finish track waypoint drag – commit the pending position to the signal
     if (this.dragTrackWaypoint()) {
+      const twp = this.dragTrackWaypoint()!;
+      const pos = this._pendingWaypointDragPos;
+      if (pos) {
+        if (twp.track === 'up') {
+          const arr = [...this.editTrackUp()];
+          arr[twp.segIdx] = { ...arr[twp.segIdx], x: pos.x, y: pos.y };
+          this.editTrackUp.set(arr);
+        } else {
+          const arr = [...this.editTrackDown()];
+          arr[twp.segIdx] = { ...arr[twp.segIdx], x: pos.x, y: pos.y };
+          this.editTrackDown.set(arr);
+        }
+        this._pendingWaypointDragPos = null;
+      }
       this.dragTrackWaypoint.set(null);
       return;
     }
@@ -2271,8 +2384,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /**
    * Right-click on the canvas:
    *  - When track overlay visible, right-click near an existing waypoint removes it.
-   *  - Right-click away from waypoints inserts a new waypoint into the nearest track
-   *    at the correct position (sorted by Y-coordinate so the path remains ordered).
+   /**
+   * Right-click on the canvas:
+   *  - When track overlay visible, right-click near an existing waypoint removes it.
+   *  - Right-click away from waypoints inserts a new waypoint between the two closest
+   *    consecutive waypoints in the nearest track (preserves path shape).
    */
   onCanvasContextMenu(event: MouseEvent): void {
     if (!this.showTrackOverlay()) return;
@@ -2299,32 +2415,29 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // 2. Insert new waypoint – choose track by X offset (negative=up, positive=down convention)
+    // 2. Insert new waypoint between the two closest consecutive waypoints
     const level = this.selectedLevel();
     if (!level) return;
-    const insertWp = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
-    // Insert into both tracks, sorted ascending by Y
-    const insertSorted = (arr: typeof trackUp, wp: typeof insertWp) => {
-      const idx = arr.findIndex((s) => s.y >= wp.y);
-      const copy = arr.slice();
-      if (idx === -1) copy.push(wp); else copy.splice(idx, 0, wp);
-      return copy;
-    };
-    // Determine which track to insert into based on minimum distance to any existing waypoint
-    let distToUp = Infinity;
-    for (const s of trackUp) {
-      const d = dist2d(s.x, s.y, wx, wy);
-      if (d < distToUp) distToUp = d;
+
+    // Find nearest segment distance for each track
+    let nearestSegDistUp = Infinity;
+    for (let i = 0; i < trackUp.length - 1; i++) {
+      const d = distToSegment2d(wx, wy, trackUp[i].x, trackUp[i].y, trackUp[i + 1].x, trackUp[i + 1].y);
+      if (d < nearestSegDistUp) nearestSegDistUp = d;
     }
-    let distToDown = Infinity;
-    for (const s of trackDown) {
-      const d = dist2d(s.x, s.y, wx, wy);
-      if (d < distToDown) distToDown = d;
+    if (trackUp.length === 1) nearestSegDistUp = dist2d(trackUp[0].x, trackUp[0].y, wx, wy);
+
+    let nearestSegDistDown = Infinity;
+    for (let i = 0; i < trackDown.length - 1; i++) {
+      const d = distToSegment2d(wx, wy, trackDown[i].x, trackDown[i].y, trackDown[i + 1].x, trackDown[i + 1].y);
+      if (d < nearestSegDistDown) nearestSegDistDown = d;
     }
-    if (distToUp <= distToDown) {
-      this.editTrackUp.set(insertSorted(trackUp, insertWp));
+    if (trackDown.length === 1) nearestSegDistDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
+
+    if (nearestSegDistUp <= nearestSegDistDown || trackDown.length === 0) {
+      this.editTrackUp.set(insertBetweenClosestSegment(trackUp, wx, wy));
     } else {
-      this.editTrackDown.set(insertSorted(trackDown, insertWp));
+      this.editTrackDown.set(insertBetweenClosestSegment(trackDown, wx, wy));
     }
     this._roadOffscreenKey = '';
   }
@@ -4894,8 +5007,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const W = canvas.width;
     const H = canvas.height;
     const zoom = this.canvasZoom();
-    const dragWp  = this.dragTrackWaypoint();
-    const hoverWp = this.hoverTrackWaypoint();
+    const dragWp   = this.dragTrackWaypoint();
+    const hoverWp  = this.hoverTrackWaypoint();
+    const hoverMid = this.hoverTrackMidpoint();
 
     const drawPath = (
       segs: { x: number; y: number }[],
@@ -4934,6 +5048,29 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+      }
+
+      // Midpoint diamond handles (only draw hovered one prominently; draw all when zoomed in)
+      const showAllMids = zoom > 0.5 && segs.length <= 80;
+      for (let i = 0; i < segs.length - 1; i++) {
+        const isHovMid = hoverMid?.track === track && hoverMid.segIdx === i;
+        if (!isHovMid && !showAllMids) continue;
+        const mx = (segs[i].x + segs[i + 1].x) / 2;
+        const my = (segs[i].y + segs[i + 1].y) / 2;
+        const [cx, cy] = this.worldToCanvas(mx, my);
+        if (cx < -10 || cx > W + 10 || cy < -10 || cy > H + 10) continue;
+        const size = isHovMid ? 9 : 5;
+        ctx.fillStyle = isHovMid ? '#ffdd00' : 'rgba(255,255,255,0.35)';
+        ctx.strokeStyle = isHovMid ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = isHovMid ? 1.5 : 0.8;
+        ctx.beginPath();
+        ctx.moveTo(cx,        cy - size);
+        ctx.lineTo(cx + size, cy);
+        ctx.lineTo(cx,        cy + size);
+        ctx.lineTo(cx - size, cy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
       }
 
       // Waypoint dots (only draw if zoomed in enough to be useful, or always show sparse set)

@@ -455,6 +455,24 @@ export class KonvaEditorService implements OnDestroy {
     // Don't draw here — flush() in redrawObjectCanvas() will draw synchronously.
   }
 
+  /**
+   * Move a single track waypoint node in Konva without rebuilding the whole layer.
+   * Call this during live-drag to keep 60 fps; `setTrackWaypoints` will do a full
+   * sync on drag-end when the signal is updated.
+   */
+  moveTrackWaypointDirect(track: 'up' | 'down', segIdx: number, worldX: number, worldY: number): void {
+    if (!this.trackWorldGroup || !this.trackLayer) return;
+    const node = this.trackWorldGroup.findOne(`#wp-${track}-${segIdx}`) as Konva.Circle | undefined;
+    if (node) {
+      node.x(worldX);
+      node.y(-worldY);
+      // Invalidate the cache reference so the next setTrackWaypoints call fully rebuilds.
+      if (track === 'up') this._lastTrackUp = null;
+      else                 this._lastTrackDown = null;
+      this._markLayerDirty(this.trackLayer);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // MARK SEGMENTS (checkpoint lines)
   // ─────────────────────────────────────────────────────────────────────────
