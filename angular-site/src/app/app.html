@@ -331,19 +331,6 @@
                         (searchTermChange)="objectSearchTerm.set($event)"
                       ></app-object-list>
 
-                      <app-marks-editor
-                        [marks]="marks()"
-                        [selectedMarkIndex]="selectedMarkIndex()"
-                        [workerBusy]="workerBusy()"
-                        (markSelected)="selectedMarkIndex.set($event)"
-                        (addMark)="addMark()"
-                        (removeMark)="removeSelectedMark()"
-                        (saveMarks)="saveMarks()"
-                        (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
-                        (markCanvasMouseDown)="onMarkCanvasMouseDown($event)"
-                        (markCanvasMouseMove)="onMarkCanvasMouseMove($event)"
-                        (markCanvasMouseUp)="onMarkCanvasMouseUp($event)"
-                      ></app-marks-editor>
                     </div>
                   </div>
                 </mat-card-content>

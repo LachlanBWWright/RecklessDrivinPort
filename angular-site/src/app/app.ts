@@ -947,6 +947,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.showObjects();
       this.showMarks();
       this.showRoad();
+      this.showBarriers();
       this.showTrackUp();
       this.showTrackDown();
       this.showGrid();
@@ -1251,6 +1252,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
       );
       this._lastBarriersSerialized = ''; // force barriers redraw after drag
+      this.scheduleCanvasRedraw();       // trigger immediate redraw so barriers update visually
     };
 
     // ── Pan via Konva stage mouse events ───────────────────────────────────

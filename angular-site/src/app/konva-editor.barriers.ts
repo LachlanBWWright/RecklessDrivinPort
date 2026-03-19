@@ -78,15 +78,17 @@ export function buildBarriers(
   for (let i = segFirst; i <= segLast; i++) {
     if (roadSegs[i].v2 - roadSegs[i].v1 > 2) { hasMedian = true; break; }
   }
+  let v1Line: Konva.Line | null = null;
+  let v2Line: Konva.Line | null = null;
   if (hasMedian) {
-    const v1Line = new Konva.Line({
+    v1Line = new Konva.Line({
       points: v1Points,
       stroke: 'rgba(255, 200, 50, 0.7)',
       strokeWidth: 1.5 / sx,
       listening: false,
       dash: [6 / sx, 4 / sx],
     });
-    const v2Line = new Konva.Line({
+    v2Line = new Konva.Line({
       points: v2Points,
       stroke: 'rgba(255, 200, 50, 0.7)',
       strokeWidth: 1.5 / sx,
@@ -96,6 +98,23 @@ export function buildBarriers(
     barrierWorldGroup.add(v1Line);
     barrierWorldGroup.add(v2Line);
   }
+
+  /**
+   * Update a single x-coordinate in a Konva.Line's point array for the
+   * segment at index `segIdx` (in road-segment space) and immediately
+   * repaint the barrier layer.  This gives zero-delay visual feedback
+   * while a handle is being dragged, without a full canvas rebuild.
+   */
+  const updateLinePoint = (line: Konva.Line | null, segIdx: number, newX: number) => {
+    if (!line) return;
+    const pts = line.points();
+    const ptIdx = (segIdx - segFirst) * 2;
+    if (ptIdx >= 0 && ptIdx < pts.length) {
+      pts[ptIdx] = newX;
+      line.points(pts);
+      barrierLayer.batchDraw();
+    }
+  };
 
   // Barrier drag handles – only place handles within the visible viewport
   // (plus a small margin so handles just off-screen don't pop in).
@@ -126,6 +145,7 @@ export function buildBarriers(
     leftCircle.setAttr('dragBoundFunc', (pos: {x: number; y: number}) => (
       { x: pos.x, y: leftCircle.getAbsolutePosition().y }
     ));
+    leftCircle.on('dragmove', () => { updateLinePoint(leftLine, i, leftCircle.x()); });
     leftCircle.on('dragend', () => {
       onBarrierDragEnd?.(i, 'left', Math.round(leftCircle.x()));
       document.body.style.cursor = '';
@@ -159,6 +179,7 @@ export function buildBarriers(
     rightCircle.setAttr('dragBoundFunc', (pos: {x: number; y: number}) => (
       { x: pos.x, y: rightCircle.getAbsolutePosition().y }
     ));
+    rightCircle.on('dragmove', () => { updateLinePoint(rightLine, i, rightCircle.x()); });
     rightCircle.on('dragend', () => {
       onBarrierDragEnd?.(i, 'right', Math.round(rightCircle.x()));
       document.body.style.cursor = '';
@@ -191,6 +212,7 @@ export function buildBarriers(
     v1Circle.setAttr('dragBoundFunc', (pos: {x: number; y: number}) => (
       { x: pos.x, y: v1Circle.getAbsolutePosition().y }
     ));
+    v1Circle.on('dragmove', () => { updateLinePoint(v1Line, i, v1Circle.x()); });
     v1Circle.on('dragend', () => { onBarrierDragEnd?.(i, 'v1', Math.round(v1Circle.x())); document.body.style.cursor = ''; });
     v1Circle.on('mouseenter', () => { v1Circle.radius(BARRIER_WORLD_R); v1Circle.stroke('#fff'); barrierLayer.draw(); document.body.style.cursor = 'ew-resize'; });
     v1Circle.on('mouseleave', () => { v1Circle.radius(BARRIER_WORLD_R * 0.8); v1Circle.stroke('rgba(0,0,0,0.5)'); barrierLayer.draw(); document.body.style.cursor = ''; });
@@ -210,6 +232,7 @@ export function buildBarriers(
     v2Circle.setAttr('dragBoundFunc', (pos: {x: number; y: number}) => (
       { x: pos.x, y: v2Circle.getAbsolutePosition().y }
     ));
+    v2Circle.on('dragmove', () => { updateLinePoint(v2Line, i, v2Circle.x()); });
     v2Circle.on('dragend', () => { onBarrierDragEnd?.(i, 'v2', Math.round(v2Circle.x())); document.body.style.cursor = ''; });
     v2Circle.on('mouseenter', () => { v2Circle.radius(BARRIER_WORLD_R); v2Circle.stroke('#fff'); barrierLayer.draw(); document.body.style.cursor = 'ew-resize'; });
     v2Circle.on('mouseleave', () => { v2Circle.radius(BARRIER_WORLD_R * 0.8); v2Circle.stroke('rgba(0,0,0,0.5)'); barrierLayer.draw(); document.body.style.cursor = ''; });
