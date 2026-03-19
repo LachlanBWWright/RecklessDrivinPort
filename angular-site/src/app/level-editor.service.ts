@@ -62,6 +62,17 @@ export interface TrackWaypointRef {
   segIdx: number;
 }
 
+/**
+ * Identifies the midpoint of a segment between two consecutive track waypoints.
+ * `segIdx` is the index of the first of the two waypoints (so the midpoint is
+ * between waypoints[segIdx] and waypoints[segIdx+1]).
+ */
+export interface TrackMidpointRef {
+  track: 'up' | 'down';
+  /** Index of the first waypoint of the segment (midpoint is between [segIdx] and [segIdx+1]). */
+  segIdx: number;
+}
+
 export interface LevelProperties {
   roadInfo: number;   // SInt16 – index into kPackRoad
   time: number;       // UInt16 – level time limit

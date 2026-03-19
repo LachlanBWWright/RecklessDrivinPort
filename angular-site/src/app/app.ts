@@ -10,6 +10,7 @@ import type {
   RoadInfoData,
   DecodedSpriteFrame,
   TrackWaypointRef,
+  TrackMidpointRef,
 } from './level-editor.service';
 import { KonvaEditorService } from './konva-editor.service';
 import { decodeIMA4, parseSndHeader, buildWav } from './snd-codec';
