@@ -643,6 +643,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   editTime = signal(0);
   editXStartPos = signal(0);
   editLevelEnd = signal(0);
+  editObjectGroups = signal<{ resID: number; numObjs: number }[]>([]);
   propertiesDirty = signal(false);
 
   // ---- Object placement ----
@@ -1886,6 +1887,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.editTime.set(level.properties.time);
       this.editXStartPos.set(level.properties.xStartPos);
       this.editLevelEnd.set(level.properties.levelEnd);
+      this.editObjectGroups.set(level.objectGroups.map((g) => ({ resID: g.resID, numObjs: g.numObjs })));
       this.propertiesDirty.set(false);
       this.objects.set([...level.objects]);
       this.selectedObjIndex.set(null);
@@ -1953,6 +1955,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.onPropsInput(e.field, e.event);
   }
 
+  /** Handle editing of a single objectGroup field (resID or numObjs). */
+  onObjGroupInput(index: number, field: 'resID' | 'numObjs', event: Event): void {
+    const target = event.target as EventTarget & { value?: string };
+    const val = Number.parseInt(target?.value ?? '', 10);
+    if (Number.isNaN(val)) return;
+    const groups = this.editObjectGroups().slice();
+    const existing = groups[index] ?? { resID: 0, numObjs: 0 };
+    groups[index] = { ...existing, [field]: val };
+    this.editObjectGroups.set(groups);
+    this.propertiesDirty.set(true);
+  }
+
   async saveLevelProperties(): Promise<void> {
     const id = this.selectedLevelId();
     if (id === null) return;
@@ -1961,6 +1975,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       time: this.editTime(),
       xStartPos: this.editXStartPos(),
       levelEnd: this.editLevelEnd(),
+      objectGroups: this.editObjectGroups(),
     };
     try {
       this.workerBusy.set(true);

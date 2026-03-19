@@ -117,90 +117,77 @@ describe('parseSndHeader', () => {
   });
 
   it('returns null for unknown format byte', () => {
-    const bytes = new Uint8Array([0x00, 0x03, 0, 0, 0, 0]); // format=3
+    // numVariants=0 should fail the sanity check
+    const bytes = new Uint8Array(16);
+    new DataView(bytes.buffer).setUint32(0, 0, false); // numVariants=0
     expect(parseSndHeader(bytes)).toBeNull();
   });
 
   /**
-   * Build a minimal format-1 stdSH (encode=0) snd resource:
-   *   [format=1(2)] [numSynths=1(2)] [synthID(2)] [initOpt(4)]
-   *   [numCmds=1(2)] [bufferCmd: cmd=0x8051(2) p1=0(2) p2=headerOff(4)]
-   *   [SoundHeader: samplePtr(4) length(4) sampleRate(4) loopS(4) loopE(4) encode(1) baseF(1)]
+   * Build a minimal Pack 134 tSound entry with a stdSH (encode=0) SoundHeader.
+   * tSound layout:
+   *   [numVariants(4)] [priority(4)] [flags(4)] [offsets[0](4)]  = 16 bytes
+   *   [SoundHeader at hdrOff: samplePtr(4) numFrames(4) sampleRate(4) loopS(4) loopE(4) encode(1) baseFreq(1)]
    *   [PCM data: N bytes]
    */
-  function buildStdSHSnd(
+  function buildTSoundStdSH(
     sampleCount: number,
     sampleRateHz: number,
     pcm?: Uint8Array,
   ): Uint8Array {
-    const cmdBase   = 4 + 1 * 6; // after format(2)+numSynths(2)+1 synth record(6)
-    const headerOff = cmdBase + 2 + 1 * 8; // after numCmds(2) + 1 cmd(8)
-    const dataStart = headerOff + 22;
+    const hdrOff    = 16; // tSound header = 16 bytes
+    const dataStart = hdrOff + 22;
     const data      = pcm ?? new Uint8Array(sampleCount);
     const out       = new Uint8Array(dataStart + data.length);
     const dv        = new DataView(out.buffer);
-    dv.setUint16(0, 1, false);                         // format=1
-    dv.setUint16(2, 1, false);                         // numSynths=1
-    dv.setUint16(4, 5, false);                         // synthID=5 (sampledSynth)
-    dv.setUint32(6, 0x80, false);                      // initOption
-    dv.setUint16(cmdBase, 1, false);                   // numCmds=1
-    dv.setUint16(cmdBase + 2, 0x8051, false);          // bufferCmd
-    dv.setUint16(cmdBase + 4, 0, false);               // param1=0
-    dv.setUint32(cmdBase + 6, headerOff, false);       // param2=headerOff
-    dv.setUint32(headerOff + 0, 0, false);             // samplePtr=0
-    dv.setUint32(headerOff + 4, sampleCount, false);   // length=sampleCount
-    dv.setUint32(headerOff + 8, sampleRateHz * 65536, false); // sampleRate
-    dv.setUint32(headerOff + 12, 0, false);            // loopStart
-    dv.setUint32(headerOff + 16, 0, false);            // loopEnd
-    dv.setUint8(headerOff + 20, 0);                    // encode=0 (stdSH)
-    dv.setUint8(headerOff + 21, 60);                   // baseFreq=middle-C
+    dv.setUint32(0,  1,   false); // numVariants=1
+    dv.setUint32(4,  0,   false); // priority=0
+    dv.setUint32(8,  0,   false); // flags=0
+    dv.setUint32(12, hdrOff, false); // offsets[0]=hdrOff
+    dv.setUint32(hdrOff + 0, 0,              false); // samplePtr=0
+    dv.setUint32(hdrOff + 4, sampleCount,    false); // numFrames
+    dv.setUint32(hdrOff + 8, sampleRateHz * 65536, false); // sampleRate (16.16 fixed)
+    dv.setUint32(hdrOff + 12, 0, false);             // loopStart
+    dv.setUint32(hdrOff + 16, 0, false);             // loopEnd
+    dv.setUint8(hdrOff + 20, 0);                     // encode=0 (stdSH)
+    dv.setUint8(hdrOff + 21, 60);                    // baseFreq=middle-C
     out.set(data, dataStart);
     return out;
   }
 
-  it('parses a valid stdSH snd resource', () => {
-    const bytes = buildStdSHSnd(1000, 22050);
+  it('parses a valid stdSH tSound entry', () => {
+    const bytes = buildTSoundStdSH(1000, 22050);
     const info = parseSndHeader(bytes);
     expect(info).not.toBeNull();
-    expect(info!.format).toBe(1);
     expect(info!.encode).toBe(0);
     expect(Math.round(info!.sampleRate)).toBe(22050);
-    expect(info!.length).toBe(1000);
+    expect(info!.numFrames).toBe(1000);
+    expect(info!.numChannels).toBe(1);
+    expect(info!.sampleSize).toBe(8);
+    expect(info!.pcmOffset).toBe(38); // hdrOff(16) + 22
   });
 
-  it('returns correct duration from stdSH header', () => {
+  it('returns correct duration from stdSH tSound entry', () => {
     const sampleRate = 11025;
     const sampleCount = 11025; // 1 second
-    const bytes = buildStdSHSnd(sampleCount, sampleRate);
+    const bytes = buildTSoundStdSH(sampleCount, sampleRate);
     const info = parseSndHeader(bytes);
     expect(info).not.toBeNull();
-    expect(info!.length / info!.sampleRate).toBeCloseTo(1.0, 2);
+    expect(info!.numFrames / info!.sampleRate).toBeCloseTo(1.0, 2);
   });
 
-  it('returns null for truncated snd resource', () => {
-    const bytes = buildStdSHSnd(100, 22050).slice(0, 10);
+  it('returns null for truncated tSound entry', () => {
+    const bytes = buildTSoundStdSH(100, 22050).slice(0, 10);
     expect(parseSndHeader(bytes)).toBeNull();
   });
 
-  it('returns non-null for format-2 snd resource', () => {
-    // Format 2: [format=2(2)] [refCount(2)] [numCmds(2)] [cmd(8)] [header+data...]
-    const cmdBase   = 4; // format(2)+refCount(2)
-    const headerOff = cmdBase + 2 + 8;
-    const dataStart = headerOff + 22;
-    const out       = new Uint8Array(dataStart + 10);
-    const dv        = new DataView(out.buffer);
-    dv.setUint16(0, 2, false);                     // format=2
-    dv.setUint16(2, 0, false);                     // refCount=0
-    dv.setUint16(cmdBase, 1, false);               // numCmds=1
-    dv.setUint16(cmdBase + 2, 0x8051, false);      // bufferCmd
-    dv.setUint32(cmdBase + 6, headerOff, false);   // param2=headerOff
-    dv.setUint32(headerOff + 4, 10, false);        // length=10
-    dv.setUint32(headerOff + 8, 22050 * 65536, false); // sampleRate
-    dv.setUint8(headerOff + 20, 0);                // encode=0
-    const info = parseSndHeader(out);
-    expect(info).not.toBeNull();
-    expect(info!.format).toBe(2);
-    expect(info!.length).toBe(10);
+  it('returns null when hdrOff points beyond end of buffer', () => {
+    // numVariants=1 but hdrOff is out of range
+    const bytes = new Uint8Array(16);
+    const dv = new DataView(bytes.buffer);
+    dv.setUint32(0,  1,   false); // numVariants=1
+    dv.setUint32(12, 999, false); // hdrOff way past end
+    expect(parseSndHeader(bytes)).toBeNull();
   });
 });
 

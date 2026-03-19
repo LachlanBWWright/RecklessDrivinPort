@@ -78,6 +78,7 @@ export interface LevelProperties {
   time: number;       // UInt16 – level time limit
   xStartPos: number;  // SInt16 – player start X position
   levelEnd: number;   // UInt16 – Y position of finish line
+  objectGroups: ObjectGroupRef[];  // 10 slots
 }
 
 /** Full in-memory representation of a decoded level. */
@@ -399,7 +400,7 @@ export function parseLevelEntry(data: Uint8Array): Result<LevelEntryData, Error>
     pos += ROAD_SEG_SIZE;
   }
 
-  return ok({ properties: { roadInfo, time, xStartPos, levelEnd }, objectGroups,
+  return ok({ properties: { roadInfo, time, xStartPos, levelEnd, objectGroups }, objectGroups,
     trackUp, trackDown, objects, roadSegs, roadSegCount: roadLen, rawEntry1: data });
 }
 
@@ -428,6 +429,14 @@ export function serializeLevelProperties(rawEntry1: Uint8Array, props: LevelProp
   const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
   view.setInt16(0, props.roadInfo, false);
   view.setUint16(2, props.time, false);
+  // Object groups: 10 × 4 bytes starting at offset 4
+  for (let i = 0; i < 10; i++) {
+    const grp = props.objectGroups[i];
+    if (grp) {
+      view.setInt16(4 + i * 4,     grp.resID,   false);
+      view.setInt16(4 + i * 4 + 2, grp.numObjs, false);
+    }
+  }
   view.setInt16(44, props.xStartPos, false);
   view.setUint16(46, props.levelEnd, false);
   return out;

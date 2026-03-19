@@ -126,7 +126,7 @@ describe('parseMarkSegs', () => {
 describe('serializeLevelProperties', () => {
   it('patches tLevelData fields in-place', () => {
     const entry = makeLevelEntry({ roadInfo: 1, time: 600 });
-    const patched = serializeLevelProperties(entry, { roadInfo: 7, time: 300, xStartPos: 50, levelEnd: 12345 });
+    const patched = serializeLevelProperties(entry, { roadInfo: 7, time: 300, xStartPos: 50, levelEnd: 12345, objectGroups: [] });
     const view = new DataView(patched.buffer);
     expect(view.getInt16(0, false)).toBe(7);
     expect(view.getUint16(2, false)).toBe(300);
@@ -136,7 +136,7 @@ describe('serializeLevelProperties', () => {
 
   it('does not modify the original entry', () => {
     const entry = makeLevelEntry({ roadInfo: 5 });
-    serializeLevelProperties(entry, { roadInfo: 99, time: 0, xStartPos: 0, levelEnd: 0 });
+    serializeLevelProperties(entry, { roadInfo: 99, time: 0, xStartPos: 0, levelEnd: 0, objectGroups: [] });
     expect(new DataView(entry.buffer).getInt16(0, false)).toBe(5);
   });
 });

@@ -195,9 +195,11 @@
               [editRoadInfo]="editRoadInfo()"
               [editTime]="editTime()"
               [editLevelEnd]="editLevelEnd()"
+              [editObjectGroups]="editObjectGroups()"
               [propertiesDirty]="propertiesDirty()"
               [workerBusy]="workerBusy()"
               (propsInput)="onPropertiesTabInput($event)"
+              (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.event)"
               (saveProperties)="saveLevelProperties()"
             ></app-properties-tab>
           </mat-tab>

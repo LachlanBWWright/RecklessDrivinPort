@@ -36,17 +36,30 @@
 
       <mat-divider class="section-divider"></mat-divider>
       <h4 class="section-subtitle">Object Group References <span class="badge">10 slots</span></h4>
+      <p class="muted hint-text">Each slot references a group in Pack 128 (kPackOgrp). Set ResID to 0 to disable that slot.</p>
 
       <table class="data-table plain-table">
         <thead>
           <tr><th>#</th><th>ResID (kPackOgrp)</th><th>numObjs</th></tr>
         </thead>
         <tbody>
-          @for (grp of selectedLevel.objectGroups; track $index) {
+          @for (grp of editObjectGroups; track $index) {
             <tr [class.row-inactive]="grp.resID === 0">
               <td>{{ $index }}</td>
-              <td [class.inactive-cell]="grp.resID === 0">{{ grp.resID }}</td>
-              <td [class.inactive-cell]="grp.resID === 0">{{ grp.numObjs }}</td>
+              <td>
+                <input class="obj-group-input"
+                  type="number" min="-32768" max="32767"
+                  [value]="grp.resID"
+                  (change)="objGroupInput.emit({index: $index, field: 'resID', event: $event})"
+                  [class.inactive-cell]="grp.resID === 0" />
+              </td>
+              <td>
+                <input class="obj-group-input"
+                  type="number" min="-32768" max="32767"
+                  [value]="grp.numObjs"
+                  (change)="objGroupInput.emit({index: $index, field: 'numObjs', event: $event})"
+                  [class.inactive-cell]="grp.resID === 0" />
+              </td>
             </tr>
           }
         </tbody>
