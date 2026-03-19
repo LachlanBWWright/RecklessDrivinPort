@@ -545,13 +545,11 @@
                         <h4 class="audio-detail-title">Sound #{{ selectedAudioId() }}</h4>
                         @if (selectedAudioSndInfo(); as info) {
                           <div class="audio-meta">
-                            <span class="badge">Format {{ info.format }}</span>
                             <span class="badge">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
-                            <span class="badge">{{ (info.length / info.sampleRate) | number:'1.1-1' }}s</span>
+                            <span class="badge">{{ info.numChannels === 2 ? 'Stereo' : 'Mono' }}</span>
+                            <span class="badge">{{ (info.numFrames / info.sampleRate) | number:'1.1-1' }}s</span>
                             <span class="badge">
                               @if (info.encode === 0) { PCM 8-bit }
-                              @else if (info.encode === 254 && info.comprFmt) { {{ info.comprFmt }} (compressed) }
-                              @else if (info.encode === 254) { cmpSH }
                               @else if (info.encode === 255) { PCM 16-bit }
                               @else { encode={{ info.encode }} }
                             </span>
@@ -683,6 +681,235 @@
                   <div class="no-data-content">
                     <mat-icon class="no-data-icon">image_not_supported</mat-icon>
                     <p>Screen and icon resources will appear here once a resources.dat is loaded.</p>
+                  </div>
+                }
+              </mat-card-content>
+            </mat-card>
+          </mat-tab>
+
+          <!-- ===== RESOURCE BROWSER TAB ===== -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>data_object</mat-icon>&nbsp;Resources
+            </ng-template>
+            <mat-card class="tab-panel-card">
+              <mat-card-header>
+                <mat-card-title>Resource Browser</mat-card-title>
+                <mat-card-subtitle>Browse and edit all resources in resources.dat — struct fields, string lists, raw bytes</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                @if (allResourceEntries().length > 0) {
+                  <div class="res-browser-layout">
+                    <!-- Left column: resource type list -->
+                    <div class="res-type-list">
+                      @for (group of allResourceTypes(); track group.type) {
+                        <mat-expansion-panel [expanded]="selectedResType() === group.type" class="res-type-panel">
+                          <mat-expansion-panel-header>
+                            <mat-panel-title class="res-type-title">
+                              <code>{{ group.type }}</code>
+                            </mat-panel-title>
+                            <mat-panel-description>
+                              <span class="badge">{{ group.entries.length }}</span>
+                            </mat-panel-description>
+                          </mat-expansion-panel-header>
+                          <div class="res-entry-list">
+                            @for (entry of group.entries; track entry.id) {
+                              <button class="res-entry-btn"
+                                [class.res-entry-btn--selected]="selectedResType() === group.type && selectedResId() === entry.id"
+                                (click)="selectResource(group.type, entry.id)">
+                                #{{ entry.id }}
+                                <span class="res-entry-size">{{ entry.size }}B</span>
+                              </button>
+                            }
+                          </div>
+                        </mat-expansion-panel>
+                      }
+                    </div>
+
+                    <!-- Right column: editor panel -->
+                    <div class="res-editor-panel">
+                      @if (resBrowserBusy()) {
+                        <div class="res-loading-row">
+                          <mat-spinner diameter="20"></mat-spinner>
+                          <span class="muted">Loading…</span>
+                        </div>
+                      }
+                      @if (selectedResType() !== null && selectedResId() !== null) {
+                        <div class="res-editor-header">
+                          <h3 class="res-editor-title">
+                            <code>{{ selectedResType() }}</code> #{{ selectedResId() }}
+                          </h3>
+                          <div class="res-editor-actions">
+                            <button mat-icon-button (click)="downloadSelectedResource()"
+                              matTooltip="Download raw bytes" [disabled]="!selectedResBytes()">
+                              <mat-icon>download</mat-icon>
+                            </button>
+                            <button mat-icon-button (click)="triggerUploadResource()"
+                              matTooltip="Replace with uploaded file" [disabled]="resBrowserBusy()">
+                              <mat-icon>upload</mat-icon>
+                            </button>
+                          </div>
+                        </div>
+
+                        @if (resBrowserStatus()) {
+                          <p class="res-status-error">{{ resBrowserStatus() }}</p>
+                        }
+
+                        <!-- STR# string list editor -->
+                        @if (selectedResType() === 'STR#' && selectedResStrings() !== null) {
+                          <div class="str-list-editor">
+                            @for (str of selectedResStrings()!; track $index) {
+                              <div class="str-list-row">
+                                <span class="str-idx">{{ $index }}</span>
+                                <input class="str-input mat-body-1"
+                                  [value]="str"
+                                  (input)="updateResString($index, $any($event.target).value)" />
+                                <button mat-icon-button (click)="removeResString($index)" matTooltip="Remove string">
+                                  <mat-icon>delete</mat-icon>
+                                </button>
+                              </div>
+                            }
+                            <div class="str-list-actions">
+                              <button mat-stroked-button (click)="addResString()">
+                                <mat-icon>add</mat-icon> Add String
+                              </button>
+                              <button mat-raised-button color="primary" (click)="saveStrList()" [disabled]="resBrowserBusy()">
+                                <mat-icon>save</mat-icon> Save STR#
+                              </button>
+                            </div>
+                          </div>
+                        }
+
+                        <!-- STR / TEXT text editor -->
+                        @else if ((selectedResType() === 'STR ' || selectedResType() === 'TEXT') && selectedResText() !== null) {
+                          <div class="res-text-editor-wrap">
+                            <textarea class="res-text-editor"
+                              [value]="selectedResText()!"
+                              (input)="selectedResText.set($any($event.target).value)"
+                              rows="12"></textarea>
+                            <button mat-raised-button color="primary" (click)="saveResText()" [disabled]="resBrowserBusy()">
+                              <mat-icon>save</mat-icon> Save Text
+                            </button>
+                          </div>
+                        }
+
+                        <!-- Pack resource: entry list + entry editor -->
+                        @else if (selectedResType() === 'Pack' && selectedPackEntries() !== null) {
+                          <div class="pack-layout">
+                            <div class="pack-entry-list">
+                              <span class="muted pack-entries-label">Entries ({{ selectedPackEntries()!.length }})</span>
+                              @for (entry of selectedPackEntries()!; track entry.id) {
+                                <button class="res-entry-btn"
+                                  [class.res-entry-btn--selected]="selectedPackEntryId() === entry.id"
+                                  (click)="selectPackEntry(selectedResId()!, entry.id)">
+                                  #{{ entry.id }}
+                                  <span class="res-entry-size">{{ entry.size }}B</span>
+                                </button>
+                              }
+                            </div>
+                            @if (selectedPackEntryId() !== null && selectedPackEntryBytes() !== null) {
+                              <div class="pack-entry-editor">
+                                <div class="pack-entry-header">
+                                  <span class="pack-entry-title">Entry #{{ selectedPackEntryId() }}</span>
+                                  <div class="pack-entry-actions">
+                                    <button mat-icon-button (click)="downloadSelectedPackEntry()" matTooltip="Download entry bytes">
+                                      <mat-icon>download</mat-icon>
+                                    </button>
+                                    <button mat-icon-button (click)="triggerUploadPackEntry()" matTooltip="Replace entry bytes" [disabled]="resBrowserBusy()">
+                                      <mat-icon>upload</mat-icon>
+                                    </button>
+                                  </div>
+                                </div>
+                                @if (selectedPackEntryFields().length > 0) {
+                                  <div class="res-fields-table">
+                                    @for (field of selectedPackEntryFields(); track $index) {
+                                      <div class="res-field-row">
+                                        <label class="res-field-name">{{ field.name }}</label>
+                                        <input class="res-field-input"
+                                          type="number"
+                                          [step]="field.type === 'f32' ? 'any' : '1'"
+                                          [value]="field.value"
+                                          (change)="onPackEntryFieldInput($index, $event)" />
+                                        <span class="res-field-type">{{ field.type }}</span>
+                                      </div>
+                                    }
+                                    <button mat-raised-button color="primary" (click)="savePackEntryFields()" [disabled]="resBrowserBusy()">
+                                      <mat-icon>save</mat-icon> Save Entry
+                                    </button>
+                                  </div>
+                                } @else {
+                                  <pre class="hex-dump">{{ getResHexDump(selectedPackEntryBytes()!) }}</pre>
+                                  <p class="muted">No schema for Pack #{{ selectedResId() }}. Use upload/download to edit raw bytes.</p>
+                                }
+                              </div>
+                            } @else {
+                              <p class="muted res-editor-placeholder">Select an entry to edit it.</p>
+                            }
+                          </div>
+                        }
+
+                        <!-- Known struct schema: editable field table -->
+                        @else if (selectedResFields().length > 0) {
+                          <div class="res-fields-table">
+                            @for (field of selectedResFields(); track $index) {
+                              <div class="res-field-row">
+                                <label class="res-field-name">{{ field.name }}</label>
+                                <input class="res-field-input"
+                                  type="number"
+                                  [step]="field.type === 'f32' ? 'any' : '1'"
+                                  [value]="field.value"
+                                  (change)="onResFieldInput($index, $event)" />
+                                <span class="res-field-type">{{ field.type }}</span>
+                              </div>
+                            }
+                            @if (selectedResFieldsTruncated()) {
+                              <p class="muted">… (additional bytes not shown; only first {{ selectedResFields().length }} auto-detected fields displayed)</p>
+                            }
+                            <button mat-raised-button color="primary" (click)="saveResFields()" [disabled]="resBrowserBusy()">
+                              <mat-icon>save</mat-icon> Save Fields
+                            </button>
+                          </div>
+                        }
+
+                        <!-- snd resource: audio metadata + play button -->
+                        @else if (selectedResIsAudio() && selectedResBytes() !== null) {
+                          <div class="res-audio-view">
+                            @if (selectedResSndInfo(); as info) {
+                              <dl class="res-meta-list">
+                                <dt>Sample Rate</dt><dd>{{ info.sampleRate }} Hz</dd>
+                                <dt>Channels</dt><dd>{{ info.numChannels }}</dd>
+                                <dt>Frames</dt><dd>{{ info.numFrames }}</dd>
+                                <dt>Sample Size</dt><dd>{{ info.sampleSize }}-bit</dd>
+                                <dt>Encoding</dt><dd>{{ info.encode }}</dd>
+                              </dl>
+                            }
+                            <button mat-raised-button color="primary" (click)="playSndResource()">
+                              <mat-icon>play_arrow</mat-icon> Play
+                            </button>
+                          </div>
+                        }
+
+                        <!-- Generic hex dump for unknown types -->
+                        @else if (selectedResBytes() !== null) {
+                          <div class="res-hex-view">
+                            <pre class="hex-dump">{{ getResHexDump(selectedResBytes()!) }}</pre>
+                            <p class="muted">{{ selectedResBytes()!.length }} bytes — no named schema. Use upload/download to edit raw bytes.</p>
+                          </div>
+                        }
+
+                        @else if (!resBrowserBusy()) {
+                          <p class="muted res-editor-placeholder">Loading resource data…</p>
+                        }
+
+                      } @else {
+                        <p class="muted res-editor-placeholder">Select a resource type and entry from the list to view and edit it.</p>
+                      }
+                    </div>
+                  </div>
+                } @else {
+                  <div class="no-data-content">
+                    <mat-icon class="no-data-icon">data_object</mat-icon>
+                    <p>Load a resources.dat file to browse all resources.</p>
                   </div>
                 }
               </mat-card-content>

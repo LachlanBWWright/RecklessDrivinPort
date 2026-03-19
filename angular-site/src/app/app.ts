@@ -13,7 +13,7 @@ import type {
   TrackMidpointRef,
 } from './level-editor.service';
 import { KonvaEditorService } from './konva-editor.service';
-import { decodeIMA4, parseSndHeader, buildWav } from './snd-codec';
+import { decodeIMA4, parseSndHeader, buildWav, SndInfo } from './snd-codec';
 
 /** Worker response envelope sent from pack.worker.ts */
 interface WorkerResponse {
@@ -875,9 +875,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   });
 
   /** Parsed Mac snd resource metadata for the selected audio resource. */
-  readonly selectedResSndInfo = computed<{
-    format: number; sampleRate: number; length: number; encode: number; comprFmt?: string;
-  } | null>(() => {
+  readonly selectedResSndInfo = computed<SndInfo | null>(() => {
     if (!this.selectedResIsAudio()) return null;
     const bytes = this.selectedResBytes();
     if (!bytes || bytes.length < 4) return null;
@@ -1712,7 +1710,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Update a binary field value in the current resource. */
   onResFieldInput(fieldIdx: number, event: Event): void {
     const target = event.target as EventTarget & { value?: string };
-    const val = Number.parseInt(target?.value ?? '', 10);
+    const raw = target?.value ?? '';
+    const val = (this.selectedResFields()[fieldIdx]?.type === 'f32') ? parseFloat(raw) : Number.parseInt(raw, 10);
     if (Number.isNaN(val)) return;
     const fields = this.selectedResFields();
     const bytes = this.selectedResBytes();
@@ -1748,7 +1747,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Update a binary field value in the selected pack entry. */
   onPackEntryFieldInput(fieldIdx: number, event: Event): void {
     const target = event.target as EventTarget & { value?: string };
-    const val = Number.parseInt(target?.value ?? '', 10);
+    const raw = target?.value ?? '';
+    const val = (this.selectedPackEntryFields()[fieldIdx]?.type === 'f32') ? parseFloat(raw) : Number.parseInt(raw, 10);
     if (Number.isNaN(val)) return;
     const fields = this.selectedPackEntryFields();
     const bytes = this.selectedPackEntryBytes();
@@ -1856,6 +1856,25 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Format raw bytes as a hex dump (16 bytes per line, with ASCII sidebar).
+   * Used in the resource browser to display unknown resource types.
+   */
+  getResHexDump(bytes: Uint8Array, maxBytes = 512): string {
+    const limit = Math.min(bytes.length, maxBytes);
+    const lines: string[] = [];
+    for (let i = 0; i < limit; i += 16) {
+      const row = bytes.subarray(i, Math.min(i + 16, limit));
+      const hex = Array.from(row).map(b => b.toString(16).padStart(2, '0')).join(' ').padEnd(47, ' ');
+      const ascii = Array.from(row).map(b => (b >= 32 && b < 127) ? String.fromCharCode(b) : '.').join('');
+      lines.push(`${i.toString(16).padStart(4, '0')}  ${hex}  ${ascii}`);
+    }
+    if (bytes.length > maxBytes) {
+      lines.push(`… (${bytes.length - maxBytes} more bytes)`);
+    }
+    return lines.join('\n');
   }
 
   selectLevel(id: number): void {
@@ -3586,9 +3605,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Raw bytes of the selected audio resource (for playback/export/preview). */
   selectedAudioBytes = signal<Uint8Array | null>(null);
   /** Parsed snd metadata for the currently selected audio entry. */
-  readonly selectedAudioSndInfo = computed<{
-    format: number; sampleRate: number; length: number; encode: number; comprFmt?: string;
-  } | null>(() => {
+  readonly selectedAudioSndInfo = computed<SndInfo | null>(() => {
     const bytes = this.selectedAudioBytes();
     if (!bytes || bytes.length < 4) return null;
     return parseSndHeader(bytes);
@@ -3620,7 +3637,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (!result.bytes) continue;
         const info = parseSndHeader(new Uint8Array(result.bytes));
         if (!info || info.sampleRate <= 0) continue;
-        const durationMs = (info.length / info.sampleRate) * 1000;
+        const durationMs = (info.numFrames / info.sampleRate) * 1000;
         // Patch the durationMs into the matching entry
         this.audioEntries.update((prev) =>
           prev.map((e) => e.id === id ? { ...e, durationMs } : e),
@@ -3716,55 +3733,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Fallback: wrap raw bytes as 8-bit mono 22050 Hz WAV
       return buildWav(bytes, 22050, 1, 8);
     }
-    // For IMA4 compressed sounds: decode to 16-bit PCM then wrap
-    if (info.encode === 0xFE && info.comprFmt === 'ima4') {
-      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      // Find the headerOff via bufferCmd
-      const fmtVal  = view.getUint16(0, false);
-      const cmdBase = fmtVal === 2 ? 6 : (4 + view.getUint16(2, false) * 6 + 2);
-      const numCmds = view.getUint16(cmdBase - 2, false);
-      for (let c = 0; c < numCmds; c++) {
-        const cmdOff = cmdBase + c * 8;
-        if (cmdOff + 8 > bytes.length) break;
-        const cmdCode = view.getUint16(cmdOff, false) & 0x7FFF;
-        if (cmdCode === 0x51) { // bufferCmd
-          const headerOff  = view.getUint32(cmdOff + 4, false);
-          const numPackets = view.getUint32(headerOff + 4, false);
-          const dataStart  = headerOff + 66;
-          if (dataStart >= bytes.length) break;
-          const pktsAvail  = Math.floor((bytes.length - dataStart) / 34);
-          const pkts       = Math.min(numPackets, pktsAvail);
-          if (pkts <= 0) break;
-          const f32 = decodeIMA4(bytes.subarray(dataStart), pkts);
-          // Convert Float32 to 16-bit PCM
-          const pcm16 = new Int16Array(f32.length);
-          for (let s = 0; s < f32.length; s++) pcm16[s] = Math.max(-32768, Math.min(32767, Math.round(f32[s] * 32768)));
-          return buildWav(new Uint8Array(pcm16.buffer), Math.round(info.sampleRate), 1, 16);
-        }
+    // IMA4 compressed (encode=0xFE) - decode to 16-bit PCM
+    if (info.encode === 0xFE) {
+      const dataStart = info.pcmOffset;
+      const pktsAvail = Math.floor((bytes.length - dataStart) / 34);
+      if (pktsAvail > 0) {
+        const f32 = decodeIMA4(bytes.subarray(dataStart), pktsAvail);
+        const pcm16 = new Int16Array(f32.length);
+        for (let s = 0; s < f32.length; s++) pcm16[s] = Math.max(-32768, Math.min(32767, Math.round(f32[s] * 32768)));
+        return buildWav(new Uint8Array(pcm16.buffer), Math.round(info.sampleRate), info.numChannels, 16);
       }
-      // Fallback if parsing fails
       return buildWav(bytes, Math.round(info.sampleRate), 1, 8);
     }
-    // Find the sound data offset: scan for bufferCmd
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    let dataOffset = bytes.length;
-    const numCmds = view.getUint16(6, false);
-    const cmdBase = info.format === 2 ? 6 : 8;
-    for (let c = 0; c < numCmds; c++) {
-      const cmdOff = cmdBase + c * 8;
-      if (cmdOff + 8 > bytes.length) break;
-      const cmdCode = view.getUint16(cmdOff, false) & 0x7fff;
-      if (cmdCode === 0x0051 || cmdCode === 0x8051) { // bufferCmd
-        const hOff = view.getUint32(cmdOff + 4, false);
-        const enc  = bytes[hOff + 20] ?? 0;
-        dataOffset = hOff + (enc === 0xFF ? 64 : 22); // extSH data at +64, stdSH at +22
-        break;
-      }
-    }
-    const pcmStart = Math.min(dataOffset, bytes.length);
+    // Use the pcmOffset from SndInfo directly (works for both stdSH and extSH)
+    const pcmStart = Math.min(info.pcmOffset, bytes.length);
     const pcmData = bytes.slice(pcmStart);
-    const bitsPerSample = info.encode === 0xFF ? 16 : 8;
-    return buildWav(pcmData, Math.round(info.sampleRate), 1, bitsPerSample);
+    return buildWav(pcmData, Math.round(info.sampleRate), info.numChannels, info.sampleSize);
   }
 
   /**
