@@ -4,7 +4,7 @@ import { packHandleDecompress } from './lzrw.service';
 import { decompressedPackEntries } from './pack-parser.service';
 
 function findPack(id: number): Uint8Array | null {
-  const buf = new Uint8Array(readFileSync('public/resources.dat'));
+  const buf = new Uint8Array(readFileSync(new URL('../../../port/resources/resources.dat', import.meta.url)));
   const HEADER_SIZE = 16;
   let offset = 0;
   while (offset + HEADER_SIZE <= buf.length) {
