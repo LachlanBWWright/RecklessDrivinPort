@@ -1,4 +1,4 @@
-import { cryptPackHandle, decompressedPackEntries, encodePackHandle } from './pack-parser.service';
+import { cryptPackHandle, decompressedPackEntries, encodePackHandle, parsePackHandle } from './pack-parser.service';
 import { packHandleCompress, packHandleDecompress } from './lzrw.service';
 
 /** Build a minimal decompressed pack with n entries. */
@@ -61,6 +61,29 @@ describe('encodePackHandle / decompressedPackEntries round-trip', () => {
     expect(entries.length).toBe(2);
     expect(Array.from(entries[0].data)).toEqual([10, 20, 30]);
     expect(Array.from(entries[1].data)).toEqual([40, 50]);
+  });
+
+  it('preserves entry data round-trip (encrypted, resourceId 143)', () => {
+    const originalEntries = [
+      { id: 1, data: new Uint8Array([0xAA, 0xBB, 0xCC]) },
+      { id: 2, data: new Uint8Array([0x11, 0x22]) },
+    ];
+    // resourceId 143 = encrypted level 4 (kPackLevel4)
+    const handle = encodePackHandle(originalEntries, 143);
+    const entries = parsePackHandle(handle, 143);
+    expect(entries.length).toBe(2);
+    expect(Array.from(entries[0].data)).toEqual([0xAA, 0xBB, 0xCC]);
+    expect(Array.from(entries[1].data)).toEqual([0x11, 0x22]);
+  });
+
+  it('preserves entry data round-trip (encrypted, resourceId 149)', () => {
+    const originalEntries = [
+      { id: 1, data: new Uint8Array(50).fill(0x55) },
+    ];
+    const handle = encodePackHandle(originalEntries, 149);
+    const entries = parsePackHandle(handle, 149);
+    expect(entries.length).toBe(1);
+    expect(Array.from(entries[0].data)).toEqual(Array.from(new Uint8Array(50).fill(0x55)));
   });
 });
 

@@ -4242,6 +4242,24 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           if (pos + 2 > bytes.length) break outer;
           const rgnSize = view.getUint16(pos, false); pos += rgnSize; break;
         }
+        case 0x0003: pos += 2; break; // TxFont
+        case 0x0004: pos += 2; break; // TxFace
+        case 0x0005: pos += 2; break; // TxMode
+        case 0x0006: pos += 4; break; // SpExtra
+        case 0x0007: pos += 4; break; // PnSize
+        case 0x0008: pos += 2; break; // PnMode
+        case 0x0009: pos += 8; break; // PnPat
+        case 0x000A: pos += 8; break; // FillPat
+        case 0x000B: pos += 4; break; // OvSize
+        case 0x000C: pos += 4; break; // Origin
+        case 0x000D: pos += 2; break; // TxSize
+        case 0x000E: pos += 4; break; // FgColor (long)
+        case 0x000F: pos += 4; break; // BkColor (long)
+        case 0x0010: pos += 8; break; // TxRatio
+        case 0x001A: pos += 6; break; // RGBFgCol
+        case 0x001B: pos += 6; break; // RGBBkCol
+        case 0x001C: break;           // HiliteMode (no data)
+        case 0x001D: pos += 6; break; // HiliteColor
         case 0x001E: break; // DefHilite (no data)
         case 0x001F: pos += 6; break; // OpColor
         case 0x0C00: pos += 24; break; // HeaderOp (v2)
@@ -4382,8 +4400,24 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           rendered = true;
           break outer;
         }
-        default:
-          break outer; // Unknown opcode; stop
+        default: {
+          // PICT v2 opcode data-length rules:
+          //   0x0100–0x7FFF: (opcode >> 8) * 2 bytes of inline data
+          //   0x8000–0x80FF: no data
+          //   0x8100–0xFFFF: next 4 bytes give data length (longword)
+          // For genuinely unknown low-range (0x0000–0x00FF) opcodes we stop.
+          if (isV2 && opcode >= 0x0100 && opcode <= 0x7FFF) {
+            pos += (opcode >> 8) * 2;
+          } else if (isV2 && opcode >= 0x8000 && opcode <= 0x80FF) {
+            // no data
+          } else if (isV2 && opcode >= 0x8100) {
+            if (pos + 4 > bytes.length) break outer;
+            const longLen = view.getUint32(pos, false); pos += 4 + longLen;
+          } else {
+            break outer; // Truly unknown low-range opcode; stop
+          }
+          break;
+        }
       }
     }
 
