@@ -699,6 +699,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _prevPanMouseX = 0;
   private _prevPanMouseY = 0;
   private _isPanning = false;
+  /** True while barrier draw gesture is active (mouse held during draw mode). */
+  private _barrierDrawing = false;
+  /** World-coordinate points collected during the current barrier draw gesture. */
+  private _barrierDrawPath: { wx: number; wy: number }[] = [];
   /** RAF gate: true while a hover-detection frame is already queued. */
   private _hoverRafPending = false;
   /** Pending waypoint position during a live drag (committed to signal on mouseup). */
@@ -733,6 +737,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   showGrid = signal(true);
   /** True while road barrier edges are visible. */
   showBarriers = signal(true);
+  /** True while the barrier-draw tool is active. */
+  barrierDrawMode = signal(false);
+  /** Which barrier side the draw tool affects: v0=left outer, v1=left inner, v2=right inner, v3=right outer. */
+  barrierDrawSide = signal<'v0' | 'v1' | 'v2' | 'v3'>('v0');
 
   // ---- Undo / Redo ----
   /** Snapshot stack for undo. Each entry is a deep copy of the objects array. */
@@ -1357,6 +1365,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (kc) kc.style.cursor = 'grabbing';
         return;
       }
+      if (button === 0 && this.barrierDrawMode() && this.showBarriers()) {
+        // Start barrier draw gesture
+        const [wx, wy] = this.canvasToWorld(cssX, cssY);
+        this._barrierDrawing = true;
+        this._barrierDrawPath = [{ wx, wy }];
+        const kc = document.getElementById('konva-container');
+        if (kc) kc.style.cursor = 'crosshair';
+        return;
+      }
       if (button === 0) {
         // Check for start-marker drag (the player start position triangle at Y=0)
         const [wx, wy] = this.canvasToWorld(cssX, cssY);
@@ -1381,6 +1398,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.canvasPanY.update(y => y - dy / zoom);
         return;
       }
+      if (this._barrierDrawing) {
+        const [wx, wy] = this.canvasToWorld(cssX, cssY);
+        this._barrierDrawPath.push({ wx, wy });
+        // Update preview line (every N points to reduce noise)
+        if (this._barrierDrawPath.length % 3 === 0) {
+          const pts: number[] = [];
+          for (const p of this._barrierDrawPath) { pts.push(p.wx, -p.wy); }
+          this.konva.setBarrierDrawPreview(pts);
+          this.konva.flush();
+        }
+        return;
+      }
       if (this._draggingStartMarker) {
         const [wx] = this.canvasToWorld(cssX, cssY);
         this.editXStartPos.set(Math.round(wx));
@@ -1395,6 +1424,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this.isPanning.set(false);
           const kc = document.getElementById('konva-container');
           if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : 'default';
+        }
+        if (this._barrierDrawing) {
+          this._barrierDrawing = false;
+          this.konva.clearBarrierDrawPreview();
+          this._applyBarrierDrawPath();
+          const kc = document.getElementById('konva-container');
+          if (kc) kc.style.cursor = 'crosshair';
         }
         if (this._draggingStartMarker) {
           this._draggingStartMarker = false;
@@ -3245,6 +3281,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  toggleBarrierDrawMode(): void {
+    const next = !this.barrierDrawMode();
+    this.barrierDrawMode.set(next);
+    const kc = document.getElementById('konva-container');
+    if (kc) kc.style.cursor = next ? 'crosshair' : 'default';
+    if (!next) {
+      // Cancel any in-progress draw
+      this._barrierDrawing = false;
+      this._barrierDrawPath = [];
+      this.konva.clearBarrierDrawPreview();
+    }
+  }
+
   /**
    * Merge the two inner lane boundaries (v1 and v2) into a single shared line,
    * collapsing the median and producing one continuous road band from v0 to v3.
@@ -3309,6 +3358,72 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this._roadOffscreenKey = '';
     this.roadSegsVersion.update((v) => v + 1);
     this.snackBar.open(`✓ Split middle barriers — ${SPLIT_HALF * 2} world-unit median added.`, undefined, { duration: 2500 });
+  }
+
+  /**
+   * Apply the current barrier draw path to road segments.
+   *
+   * For each road segment whose Y position falls within the Y range covered by
+   * the drawn path, the barrier value for the selected side (v0/v1/v2/v3) is
+   * set to the X value of the drawn path at that segment's Y position.
+   *
+   * The drawn path is a sequence of world-space {wx, wy} points collected during
+   * the mouse gesture.  We linearly interpolate between consecutive points to
+   * compute the exact x at each segment's y.
+   */
+  private _applyBarrierDrawPath(): void {
+    const path = this._barrierDrawPath;
+    this._barrierDrawPath = [];
+    if (path.length < 2) return;
+    const level = this.selectedLevel();
+    if (!level || level.roadSegs.length === 0) return;
+
+    const side = this.barrierDrawSide();
+
+    // Build a lookup: for each Y in the path, what's the X?
+    // Sort path by wy so we can binary-search.
+    const sorted = [...path].sort((a, b) => a.wy - b.wy);
+    const minWy = sorted[0].wy;
+    const maxWy = sorted[sorted.length - 1].wy;
+
+    /**
+     * Linear-interpolate the X of the drawn path at a given worldY.
+     * Uses the sorted array and finds the two surrounding points.
+     */
+    const xAtY = (wy: number): number => {
+      if (wy <= sorted[0].wy)    return sorted[0].wx;
+      if (wy >= sorted[sorted.length - 1].wy) return sorted[sorted.length - 1].wx;
+      let lo = 0, hi = sorted.length - 1;
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (sorted[mid].wy < wy) lo = mid; else hi = mid;
+      }
+      const t = (wy - sorted[lo].wy) / (sorted[hi].wy - sorted[lo].wy);
+      return sorted[lo].wx + t * (sorted[hi].wx - sorted[lo].wx);
+    };
+
+    this._pushUndo();
+    const segs = level.roadSegs.map((seg, i) => {
+      const segWy = i * 2;  // world Y of segment i
+      if (segWy < minWy || segWy > maxWy) return seg;
+      const newX = Math.round(xAtY(segWy));
+      switch (side) {
+        case 'v0': return { ...seg, v0: newX };
+        case 'v1': return { ...seg, v1: newX };
+        case 'v2': return { ...seg, v2: newX };
+        case 'v3': return { ...seg, v3: newX };
+        default:   return seg;
+      }
+    });
+
+    this.parsedLevels.update((levels) =>
+      levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
+    );
+    this._lastBarriersSerialized = '';
+    this._roadOffscreenKey = '';
+    this.roadSegsVersion.update((v) => v + 1);
+    this.scheduleCanvasRedraw();
+    this.snackBar.open(`✓ Barrier draw applied to ${side}.`, undefined, { duration: 1500 });
   }
 
   // ---- Mark canvas helpers ----

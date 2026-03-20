@@ -21,6 +21,8 @@ export class EditorCanvasComponent {
   @Input() showTrackDown = true;
   @Input() showGrid = true;
   @Input() showBarriers = true;
+  @Input() barrierDrawMode = false;
+  @Input() barrierDrawSide: 'v0' | 'v1' | 'v2' | 'v3' = 'v0';
   @Input() canUndo = false;
   @Input() canRedo = false;
   @Input() trackUpCount = 0;
@@ -69,6 +71,8 @@ export class EditorCanvasComponent {
   @Output() saveBarriers = new EventEmitter<void>();
   @Output() mergeMiddleBarriers = new EventEmitter<void>();
   @Output() splitMiddleBarriers = new EventEmitter<void>();
+  @Output() toggleBarrierDrawMode = new EventEmitter<void>();
+  @Output() barrierDrawSideChange = new EventEmitter<'v0' | 'v1' | 'v2' | 'v3'>();
   @Output() markSelected = new EventEmitter<number>();
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();

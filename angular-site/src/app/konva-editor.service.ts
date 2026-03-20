@@ -89,6 +89,7 @@ export class KonvaEditorService implements OnDestroy {
   private marksWorldGroup: Konva.Group | null = null;
   private barrierLayer: Konva.Layer | null = null;
   private barrierWorldGroup: Konva.Group | null = null;
+  private _barrierDrawPreviewLine: Konva.Line | null = null;
   // Background offscreen-bitmap layer (prototype)
   private bgLayer: Konva.Layer | null = null;
   private bgImageNode: Konva.Image | null = null;
@@ -546,7 +547,40 @@ export class KonvaEditorService implements OnDestroy {
 
   clearBarriers(): void {
     this.barrierWorldGroup?.destroyChildren();
+    this._barrierDrawPreviewLine = null;
     this._markLayerDirty(this.barrierLayer);
+  }
+
+  /**
+   * Show or update the barrier draw preview line.
+   * Points are interleaved [x0, y0, x1, y1, ...] in world coordinates
+   * (world Y increases upward; the group transform handles the flip).
+   */
+  setBarrierDrawPreview(worldPoints: number[]): void {
+    if (!this.barrierWorldGroup || !this.barrierLayer) return;
+    const sx = this._zoom * (this._cssW / this._logicalW);
+    if (!this._barrierDrawPreviewLine) {
+      this._barrierDrawPreviewLine = new Konva.Line({
+        stroke: 'rgba(0, 200, 255, 0.9)',
+        strokeWidth: 3 / sx,
+        listening: false,
+        dash: [8 / sx, 4 / sx],
+      });
+      this.barrierWorldGroup.add(this._barrierDrawPreviewLine);
+    }
+    this._barrierDrawPreviewLine.strokeWidth(3 / sx);
+    this._barrierDrawPreviewLine.dash([8 / sx, 4 / sx]);
+    this._barrierDrawPreviewLine.points(worldPoints);
+    this._barrierDrawPreviewLine.moveToTop();
+    this._markLayerDirty(this.barrierLayer);
+  }
+
+  clearBarrierDrawPreview(): void {
+    if (this._barrierDrawPreviewLine) {
+      this._barrierDrawPreviewLine.destroy();
+      this._barrierDrawPreviewLine = null;
+      this._markLayerDirty(this.barrierLayer);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────

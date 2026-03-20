@@ -65,6 +65,19 @@
               matTooltip="Split middle barriers: insert median between v1 and v2, creating dual carriageway [D]">
         <mat-icon>call_split</mat-icon> Split
       </button>
+      <button mat-stroked-button [class.btn-active]="barrierDrawMode" (click)="toggleBarrierDrawMode.emit()"
+              matTooltip="Draw tool: click and drag on the canvas to reshape a barrier side">
+        <mat-icon>edit</mat-icon> Draw
+      </button>
+      @if (barrierDrawMode) {
+        <mat-button-toggle-group [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
+                                 matTooltip="Select which barrier side to draw">
+          <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
+          <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
+          <mat-button-toggle value="v2" matTooltip="Right inner barrier (v2)">Ri</mat-button-toggle>
+          <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
+        </mat-button-toggle-group>
+      }
     }
     @if (showTrackOverlay) {
       <button mat-stroked-button [disabled]="workerBusy" (click)="saveTrack.emit()" matTooltip="Save track waypoints">

@@ -28,6 +28,7 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatListModule } from '@angular/material/list';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatGridListModule } from '@angular/material/grid-list';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 import { App } from './app';
 import { EditorCanvasComponent } from './editor-canvas.component';
@@ -44,7 +45,7 @@ const MATERIAL_MODULES = [
   MatTableModule, MatBadgeModule, MatProgressSpinnerModule, MatProgressBarModule,
   MatMenuModule, MatSnackBarModule, MatDialogModule, MatCheckboxModule,
   MatRadioModule, MatExpansionModule, MatListModule, MatSidenavModule,
-  MatGridListModule,
+  MatGridListModule, MatButtonToggleModule,
 ];
 
 @NgModule({
