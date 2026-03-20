@@ -1283,13 +1283,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const nextHandle = Math.min(e.segIdx + step, segs.length - 1);
 
       if (e.side === 'left') {
-        const delta = e.worldX - seg.v0;
+        // Only move the outer left barrier (v0); do NOT move v1 to avoid forking the road.
         seg.v0 = e.worldX;
-        seg.v1 = seg.v1 + delta;
       } else if (e.side === 'right') {
-        const delta = e.worldX - seg.v3;
+        // Only move the outer right barrier (v3); do NOT move v2 to avoid forking the road.
         seg.v3 = e.worldX;
-        seg.v2 = seg.v2 + delta;
       } else if (e.side === 'v1') {
         seg.v1 = Math.min(e.worldX, seg.v2);
       } else if (e.side === 'v2') {
@@ -1305,10 +1303,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           const s = { ...segs[i] };
           if (e.side === 'left') {
             s.v0 = Math.round(prevSeg.v0 + t * (seg.v0 - prevSeg.v0));
-            s.v1 = Math.round(prevSeg.v1 + t * (seg.v1 - prevSeg.v1));
           } else if (e.side === 'right') {
             s.v3 = Math.round(prevSeg.v3 + t * (seg.v3 - prevSeg.v3));
-            s.v2 = Math.round(prevSeg.v2 + t * (seg.v2 - prevSeg.v2));
           } else if (e.side === 'v1') {
             s.v1 = Math.round(prevSeg.v1 + t * (seg.v1 - prevSeg.v1));
           } else if (e.side === 'v2') {
@@ -1324,10 +1320,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           const s = { ...segs[i] };
           if (e.side === 'left') {
             s.v0 = Math.round(seg.v0 + t * (nextSeg.v0 - seg.v0));
-            s.v1 = Math.round(seg.v1 + t * (nextSeg.v1 - seg.v1));
           } else if (e.side === 'right') {
             s.v3 = Math.round(seg.v3 + t * (nextSeg.v3 - seg.v3));
-            s.v2 = Math.round(seg.v2 + t * (nextSeg.v2 - seg.v2));
           } else if (e.side === 'v1') {
             s.v1 = Math.round(seg.v1 + t * (nextSeg.v1 - seg.v1));
           } else if (e.side === 'v2') {
@@ -4745,14 +4739,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Apply fresh level list received from the worker after a save operation. */
   private applyLevelsResult(levels: ParsedLevel[]): void {
-    this.parsedLevels.set(levels);
+    // Preserve in-memory road segments: barrier drags update parsedLevels directly (in-memory)
+    // but are NOT flushed to the worker until download time. If the worker returns stale levels
+    // (e.g., after a sprite/tile edit), we must keep the locally-edited road segs.
+    const existingById = new Map(this.parsedLevels().map(l => [l.resourceId, l]));
+    const merged = levels.map(l => {
+      const cur = existingById.get(l.resourceId);
+      return cur ? { ...l, roadSegs: cur.roadSegs } : l;
+    });
+    this.parsedLevels.set(merged);
     this._roadOffscreenKey = ''; // road segs may have changed; invalidate the road cache
     this.roadSegsVersion.update((v) => v + 1);
     const curId = this.selectedLevelId();
-    if (curId !== null && levels.some((l) => l.resourceId === curId)) {
+    if (curId !== null && merged.some((l) => l.resourceId === curId)) {
       this.selectLevel(curId);
-    } else if (levels.length > 0) {
-      this.selectLevel(levels[0].resourceId);
+    } else if (merged.length > 0) {
+      this.selectLevel(merged[0].resourceId);
     } else {
       this.selectedLevelId.set(null);
     }

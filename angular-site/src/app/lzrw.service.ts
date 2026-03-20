@@ -176,18 +176,63 @@ export function packHandleDecompress(handle: Uint8Array): Uint8Array {
 }
 
 /**
- * Encode raw data as a FLAG_COPY pack handle (no compression).
+ * Encode raw data as a pack handle.
  *
- * Format: [4-byte BE uint32 uncompressed_size][FLAG_COPY][0x00][0x00][0x00][data…]
- *         (FLAG_BYTES=4: FLAG_BYTE at offset 4 + 3 zero padding bytes)
+ * Attempts LZRW3-A compression (FLAG_BYTE=0). Falls back to FLAG_COPY (FLAG_BYTE=1)
+ * if compression does not reduce size.
  *
- * The runtime's LZRWDecodeHandle will accept this and simply copy the payload.
+ * Format: [4-byte BE uint32 uncompressed_size][FLAG_BYTE][0x00][0x00][0x00][payload…]
+ *   FLAG_BYTE = 0  → LZRW3-A compressed payload
+ *   FLAG_BYTE = 1  → uncompressed copy
+ *
+ * Both forms are accepted by the runtime's LZRWDecodeHandle.
  */
 export function packHandleCompress(data: Uint8Array): Uint8Array {
-  const out = new Uint8Array(4 + FLAG_BYTES + data.length);
+  const compressed = lzrw3aCompress(data);
+  const out = new Uint8Array(4 + compressed.length);
   const view = new DataView(out.buffer);
-  view.setUint32(0, data.length, false); // big-endian
-  out[4] = FLAG_COPY; // bytes 5–7 remain 0 (Uint8Array zero-initialised)
-  out.set(data, 4 + FLAG_BYTES);
+  view.setUint32(0, data.length, false); // big-endian uncompressed size
+  out.set(compressed, 4);
   return out;
+}
+
+/**
+ * LZRW3-A compressor – emits literal-only compressed stream (FLAG_BYTE=0).
+ * Falls back to FLAG_COPY if all-literal output would be larger than the input.
+ *
+ * All items are emitted as literals (control bit = 0). This produces valid
+ * LZRW3-A compressed data (no back-references) that any LZRW3-A decompressor
+ * can decode. The format uses FLAG_BYTE=0 (matching the original game's
+ * resources.dat format) rather than FLAG_COPY (FLAG_BYTE=1).
+ *
+ * Returns FLAG_BYTES + payload where FLAG_BYTES[0]=0 (LZRW3-A compressed).
+ */
+export function lzrw3aCompress(src: Uint8Array): Uint8Array {
+  const srcLen = src.length;
+  if (srcLen === 0) {
+    // Empty input: use all-literal compressed encoding with no groups
+    const out = new Uint8Array(FLAG_BYTES);
+    out[0] = 0; // FLAG_BYTE = 0 (LZRW3-A compressed)
+    return out;
+  }
+
+  // All-literal LZRW3-A stream:
+  // FLAG_BYTES + ceil(srcLen/16) control words (2 bytes each) + srcLen literal bytes
+  const numGroups = Math.ceil(srcLen / 16);
+  const dstSize = FLAG_BYTES + numGroups * 2 + srcLen;
+  const dst = new Uint8Array(dstSize);
+  dst[0] = 0; // FLAG_BYTE = 0 (LZRW3-A compressed, not FLAG_COPY)
+  // bytes 1-3 remain 0 (FLAG_BYTES padding)
+  let pSrc = 0;
+  let pDst = FLAG_BYTES;
+  for (let g = 0; g < numGroups; g++) {
+    // Control word = 0x0000 (all 16 bits = 0 → all items are literals)
+    dst[pDst++] = 0;
+    dst[pDst++] = 0;
+    const items = Math.min(16, srcLen - pSrc);
+    for (let i = 0; i < items; i++) {
+      dst[pDst++] = src[pSrc++];
+    }
+  }
+  return dst.slice(0, pDst);
 }
