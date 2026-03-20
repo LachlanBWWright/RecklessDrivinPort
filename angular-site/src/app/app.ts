@@ -987,6 +987,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private roadTextureCanvases = new Map<number, HTMLCanvasElement>();
   /** Version signal bumped when road textures are loaded (triggers canvas redraw). */
   roadTexturesVersion = signal(0);
+  /** Version signal bumped when road segment data changes (invalidates road offscreen cache). */
+  private roadSegsVersion = signal(0);
 
   /** Tile viewer: all decoded texture tile entries for the Tiles tab. */
   tileTileEntries = signal<{ texId: number; width: number; height: number }[]>([]);
@@ -1014,6 +1016,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.visibleTypeFilter();
       this.spritePreviewsVersion();
       this.roadTexturesVersion();
+      this.roadSegsVersion();
       this.showTrackOverlay();
       this.showObjects();
       this.showMarks();
@@ -1339,6 +1342,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       );
       this._lastBarriersSerialized = ''; // force barriers redraw after drag
       this._roadOffscreenKey = '';       // invalidate road texture cache so road preview updates
+      this.roadSegsVersion.update((v) => v + 1); // signal-based invalidation for road cache key
       this.scheduleCanvasRedraw();       // trigger immediate redraw so barriers update visually
     };
 
@@ -3224,6 +3228,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     );
     this._lastBarriersSerialized = '';
     this._roadOffscreenKey = '';
+    this.roadSegsVersion.update((v) => v + 1);
     this.snackBar.open('✓ Merged middle barriers — median removed.', undefined, { duration: 2000 });
   }
 
@@ -3258,6 +3263,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     );
     this._lastBarriersSerialized = '';
     this._roadOffscreenKey = '';
+    this.roadSegsVersion.update((v) => v + 1);
     this.snackBar.open(`✓ Split middle barriers — ${SPLIT_HALF * 2} world-unit median added.`, undefined, { duration: 2500 });
   }
 
@@ -4691,6 +4697,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private applyLevelsResult(levels: ParsedLevel[]): void {
     this.parsedLevels.set(levels);
     this._roadOffscreenKey = ''; // road segs may have changed; invalidate the road cache
+    this.roadSegsVersion.update((v) => v + 1);
     const curId = this.selectedLevelId();
     if (curId !== null && levels.some((l) => l.resourceId === curId)) {
       this.selectLevel(curId);
@@ -4953,7 +4960,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // Key excludes panY so vertical panning doesn't cause re-renders.
     // Instead we re-render only when panY moves outside the pre-rendered overhang.
-    const staticKey = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${panX.toFixed(0)}|${this.roadTexturesVersion()}`;
+    // roadSegsVersion is bumped whenever road segment data changes so that barrier
+    // drags and merge/split operations invalidate the cached road bitmap automatically.
+    const staticKey = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${panX.toFixed(0)}|${this.roadTexturesVersion()}|${this.roadSegsVersion()}`;
 
     // How far (in canvas pixels) has panY moved from the offscreen centre?
     const offscreenCentreCanvasY = OVERHANG + H / 2;
