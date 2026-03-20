@@ -1532,6 +1532,56 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (!this.hasEditorData()) return;
     try {
       this.workerBusy.set(true);
+
+      // Flush all in-memory edits to the worker before serializing.
+      // Road-segment edits (onBarrierDragEnd), mark drags (onMarkEndpointDragEnd),
+      // track edits, object edits, and property edits all update Angular signals but
+      // are NOT automatically dispatched to the pack worker's resources state.
+      // We fire all APPLY_* messages concurrently (the single-threaded worker queues
+      // them in order) so that the subsequent SERIALIZE sees the latest editor state.
+      this.resourcesStatus.set('Saving pending edits before download…');
+      const syncPromises: Promise<unknown>[] = [];
+
+      // Sync road segments (barriers) for every loaded level.
+      for (const level of this.parsedLevels()) {
+        syncPromises.push(this.dispatchWorker<unknown>('APPLY_ROAD_SEGS', {
+          resourceId: level.resourceId,
+          roadSegs: level.roadSegs,
+        }));
+      }
+
+      // Sync current-level marks, track, objects, and properties (only available
+      // for the selected level because those signals are per-selection).
+      const selId = this.selectedLevelId();
+      if (selId !== null) {
+        syncPromises.push(this.dispatchWorker<unknown>('APPLY_MARKS', {
+          resourceId: selId,
+          marks: this.marks(),
+        }));
+        syncPromises.push(this.dispatchWorker<unknown>('APPLY_TRACK', {
+          resourceId: selId,
+          trackUp:   this.editTrackUp(),
+          trackDown: this.editTrackDown(),
+        }));
+        syncPromises.push(this.dispatchWorker<unknown>('APPLY_OBJECTS', {
+          resourceId: selId,
+          objects: this.objects(),
+        }));
+        if (this.propertiesDirty()) {
+          const props: LevelProperties = {
+            roadInfo:     this.editRoadInfo(),
+            time:         this.editTime(),
+            xStartPos:    this.editXStartPos(),
+            levelEnd:     this.editLevelEnd(),
+            objectGroups: this.editObjectGroups(),
+          };
+          syncPromises.push(this.dispatchWorker<unknown>('APPLY_PROPS', { resourceId: selId, props }));
+        }
+      }
+
+      // Wait for all pending edits to land in the worker before serializing.
+      await Promise.all(syncPromises);
+
       this.resourcesStatus.set('Serializing resources…');
       const buf = await this.dispatchWorker<ArrayBuffer>('SERIALIZE');
       const blob = new Blob([buf], { type: 'application/octet-stream' });
