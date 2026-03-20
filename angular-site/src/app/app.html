@@ -83,13 +83,18 @@
             <button mat-raised-button color="accent"
               [disabled]="gameRestarting()"
               (click)="restartGameWithCustomResources()"
-              matTooltip="Restart the game with your custom resources.dat — no page reload needed">
+              matTooltip="Reload the page to apply the custom resources.dat">
               @if (gameRestarting()) {
                 <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
               } @else {
                 <mat-icon>restart_alt</mat-icon>
               }
               Restart Game
+            </button>
+            <button mat-stroked-button color="warn"
+              (click)="clearCustomResources()"
+              matTooltip="Remove the custom resources.dat and revert to the built-in defaults">
+              <mat-icon>delete</mat-icon> Clear
             </button>
           }
           @if (customResourcesName()) {

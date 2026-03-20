@@ -174,4 +174,84 @@ describe('App', () => {
     const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('.nav-tab');
     expect(tabs.length).toBe(2);
   });
+
+  // ── Road cache invalidation ──────────────────────────────────────────────
+
+  it('should clear road offscreen key when mergeMiddleBarriers is called', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    // Set up a level with a median so mergeMiddleBarriers has something to merge
+    const roadSegs = Array.from({ length: 5 }, () => ({ v0: -100, v1: -20, v2: 20, v3: 100 }));
+    app.parsedLevels.set([{
+      resourceId: 140,
+      objects: [],
+      marks: [],
+      roadSegs,
+      roadSegCount: roadSegs.length,
+      properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
+      objectGroups: [],
+      trackUp: [],
+      trackDown: [],
+      rawEntry1: new Uint8Array(0),
+      rawEntry2: new Uint8Array(0),
+      encrypted: false,
+    }]);
+    app.selectedLevelId.set(140);
+
+    // Simulate a stale road key
+    (app as unknown as Record<string, unknown>)['_roadOffscreenKey'] = 'stale-key';
+
+    app.mergeMiddleBarriers();
+
+    expect((app as unknown as Record<string, unknown>)['_roadOffscreenKey']).toBe('');
+  });
+
+  it('should clear road offscreen key when splitMiddleBarriers is called', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    const roadSegs = Array.from({ length: 5 }, () => ({ v0: -100, v1: -10, v2: 10, v3: 100 }));
+    app.parsedLevels.set([{
+      resourceId: 140,
+      objects: [],
+      marks: [],
+      roadSegs,
+      roadSegCount: roadSegs.length,
+      properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
+      objectGroups: [],
+      trackUp: [],
+      trackDown: [],
+      rawEntry1: new Uint8Array(0),
+      rawEntry2: new Uint8Array(0),
+      encrypted: false,
+    }]);
+    app.selectedLevelId.set(140);
+
+    (app as unknown as Record<string, unknown>)['_roadOffscreenKey'] = 'stale-key';
+
+    app.splitMiddleBarriers();
+
+    expect((app as unknown as Record<string, unknown>)['_roadOffscreenKey']).toBe('');
+  });
+
+  // ── Custom resources persistence ─────────────────────────────────────────
+
+  it('restartGameWithCustomResources should set gameRestarting to true', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.customResourcesLoaded.set(true);
+
+    // restartGameWithCustomResources calls window.location.reload() after a setTimeout.
+    // In jsdom that setTimeout is async; we only check that gameRestarting flips synchronously.
+    app.restartGameWithCustomResources();
+
+    expect(app.gameRestarting()).toBe(true);
+  });
+
+  it('clearCustomResources should reset loaded state', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.customResourcesLoaded.set(true);
+    app.customResourcesName.set('my-resources.dat');
+
+    app.clearCustomResources();
+
+    expect(app.customResourcesLoaded()).toBe(false);
+    expect(app.customResourcesName()).toBeNull();
+  });
 });

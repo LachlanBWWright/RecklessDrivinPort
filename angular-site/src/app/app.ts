@@ -46,6 +46,10 @@ interface EmscriptenModuleInterface {
   callMain?: (args: string[]) => void;
   /** Direct C _main(argc, argv) — fallback if callMain not present. */
   _main?: (argc: number, argv: number) => void;
+  /** Add an async startup dependency so main() waits until it is removed. */
+  addRunDependency?: (id: string) => void;
+  /** Remove a startup dependency previously added with addRunDependency. */
+  removeRunDependency?: (id: string) => void;
 }
 
 declare global {
@@ -905,6 +909,73 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Name of custom resources.dat file, shown in UI. */
   customResourcesName = signal<string | null>(null);
 
+  // ── IndexedDB persistence for custom resources.dat ─────────────────────────
+  // The game is compiled with Emscripten ASYNCIFY, which makes calling callMain()
+  // a second time unsafe (the ASYNCIFY state machine is not designed to be re-entered).
+  // We therefore restart by reloading the page, persisting the custom bytes in IndexedDB
+  // so the preRun hook can inject them into MEMFS before the game's main() runs.
+  private static readonly _IDB_NAME  = 'reckless-drivin';
+  private static readonly _IDB_STORE = 'custom-resources';
+  private static readonly _IDB_KEY   = 'resources-dat';
+
+  private static _openCustomResourcesDb(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(App._IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(App._IDB_STORE)) {
+          req.result.createObjectStore(App._IDB_STORE);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror  = () => reject(req.error);
+    });
+  }
+
+  private static async _saveCustomResourcesDb(bytes: Uint8Array, name: string): Promise<void> {
+    const db = await App._openCustomResourcesDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(App._IDB_STORE, 'readwrite');
+      tx.objectStore(App._IDB_STORE).put({ bytes, name }, App._IDB_KEY);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror    = () => { db.close(); reject(tx.error); };
+    });
+  }
+
+  static async _loadCustomResourcesDb(): Promise<{ bytes: Uint8Array; name: string } | null> {
+    return new Promise((resolve) => {
+      const req = indexedDB.open(App._IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(App._IDB_STORE)) {
+          req.result.createObjectStore(App._IDB_STORE);
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(App._IDB_STORE)) { db.close(); resolve(null); return; }
+        const tx     = db.transaction(App._IDB_STORE, 'readonly');
+        const getReq = tx.objectStore(App._IDB_STORE).get(App._IDB_KEY);
+        getReq.onsuccess = () => { db.close(); resolve((getReq.result as { bytes: Uint8Array; name: string }) ?? null); };
+        getReq.onerror   = () => { db.close(); resolve(null); };
+      };
+      req.onerror = () => resolve(null);
+    });
+  }
+
+  static async _clearCustomResourcesDb(): Promise<void> {
+    return new Promise((resolve) => {
+      const req = indexedDB.open(App._IDB_NAME, 1);
+      req.onsuccess = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(App._IDB_STORE)) { db.close(); resolve(); return; }
+        const tx = db.transaction(App._IDB_STORE, 'readwrite');
+        tx.objectStore(App._IDB_STORE).delete(App._IDB_KEY);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror    = () => { db.close(); resolve(); };
+      };
+      req.onerror = () => resolve();
+    });
+  }
+
   private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
   private objectSpritePreviews = new Map<number, HTMLCanvasElement | null>();
 
@@ -958,6 +1029,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.marks();
       this.selectedMarkIndex();
       this.editXStartPos();
+      // Track the full selectedLevel (includes roadSegs) so any road-segment
+      // mutation (barrier drag, merge/split) automatically triggers a redraw
+      // without requiring explicit scheduleCanvasRedraw() calls.
+      this.selectedLevel();
       const section = this.editorSection();
       if (section === 'objects') {
         this.scheduleCanvasRedraw();
@@ -991,6 +1066,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     this.initPackWorker();
+    // Restore any previously saved custom resources.dat from IndexedDB.
+    // This allows the custom resources to persist after a page reload triggered by the
+    // "Restart Game" button (which uses window.location.reload() instead of callMain()).
+    if (typeof indexedDB !== 'undefined') {
+      App._loadCustomResourcesDb().then((entry) => {
+        if (entry) {
+          this.customResourcesLoaded.set(true);
+          this.customResourcesName.set(entry.name);
+        }
+      }).catch(() => { /* ignore */ });
+    }
   }
 
   ngAfterViewInit(): void {
@@ -1252,6 +1338,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
       );
       this._lastBarriersSerialized = ''; // force barriers redraw after drag
+      this._roadOffscreenKey = '';       // invalidate road texture cache so road preview updates
       this.scheduleCanvasRedraw();       // trigger immediate redraw so barriers update visually
     };
 
@@ -3136,6 +3223,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
     );
     this._lastBarriersSerialized = '';
+    this._roadOffscreenKey = '';
     this.snackBar.open('✓ Merged middle barriers — median removed.', undefined, { duration: 2000 });
   }
 
@@ -3169,6 +3257,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
     );
     this._lastBarriersSerialized = '';
+    this._roadOffscreenKey = '';
     this.snackBar.open(`✓ Split middle barriers — ${SPLIT_HALF * 2} world-unit median added.`, undefined, { duration: 2500 });
   }
 
@@ -4601,6 +4690,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Apply fresh level list received from the worker after a save operation. */
   private applyLevelsResult(levels: ParsedLevel[]): void {
     this.parsedLevels.set(levels);
+    this._roadOffscreenKey = ''; // road segs may have changed; invalidate the road cache
     const curId = this.selectedLevelId();
     if (curId !== null && levels.some((l) => l.resourceId === curId)) {
       this.selectLevel(curId);
@@ -4743,7 +4833,37 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this._pendingCustomResources = null;
         }
       },
-      preRun: [],
+      preRun: [
+        // Inject custom resources.dat from IndexedDB (if present) before the game's
+        // main() runs.  This is the correct injection point: the FS is initialised but
+        // the game has not yet opened resources.dat, so writing here takes effect on
+        // first load.  We use addRunDependency / removeRunDependency to pause module
+        // startup while the async IndexedDB read completes.
+        () => {
+          const mod = window.Module;
+          if (!mod?.addRunDependency || typeof indexedDB === 'undefined') return;
+          mod.addRunDependency('customResourcesDat');
+          App._loadCustomResourcesDb().then((entry) => {
+            if (entry) {
+              const FS = (window as unknown as Record<string, unknown>)['FS'] as {
+                writeFile: (path: string, data: Uint8Array) => void;
+              } | undefined;
+              if (FS) {
+                try {
+                  FS.writeFile('/resources.dat', entry.bytes);
+                  console.log(`[Angular] Injected custom resources.dat (${Math.round(entry.bytes.length / 1024)} KB) from IndexedDB`);
+                } catch (err) {
+                  console.warn('[Angular] Failed to inject custom resources.dat into MEMFS', err);
+                }
+              }
+            }
+          }).catch((err) => {
+            console.warn('[Angular] Failed to read custom resources.dat from IndexedDB', err);
+          }).finally(() => {
+            window.Module?.removeRunDependency?.('customResourcesDat');
+          });
+        },
+      ],
       postRun: [],
     };
   }
@@ -5330,93 +5450,67 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   gameRestarting = signal(false);
 
   /**
-   * Restart the game in place, using the custom resources.dat already written
-   * to the Emscripten MEMFS.  Works without a full page reload by calling the
-   * Emscripten module's callMain() entry point.
+   * Restart the game by reloading the page so the custom resources.dat is
+   * applied cleanly.  The bytes are already persisted in IndexedDB by
+   * _mountCustomResourcesFs(), so the Emscripten preRun hook will inject them
+   * into MEMFS before the game's main() runs on the next page load.
    *
-   * Note: This is a FULL GAME RESTART, not just a resource reload.
-   * callMain() re-runs the C main() which re-initializes SDL, audio, and all
-   * global game state from scratch.  Any in-progress game session will be lost.
+   * Note: callMain() cannot be used here because the game is compiled with
+   * Emscripten ASYNCIFY, which does not support re-entering main() while a
+   * previous ASYNCIFY suspend/resume context is still active.  Attempting to
+   * do so causes the game to hang at the first blocking C call (loading screen).
    */
   restartGameWithCustomResources(): void {
-    const mod = window.Module;
-    if (!mod) {
-      this.statusText.set('WASM module not ready. Please wait and try again.');
-      return;
-    }
     this.gameRestarting.set(true);
-    this.statusText.set('Restarting game with custom resources…');
-    try {
-      // Attempt graceful restart via Emscripten callMain if available.
-      // This re-runs the C main() function which reloads all resources from FS.
-      if (typeof mod.pauseMainLoop === 'function') {
-        mod.pauseMainLoop();
-      }
-      if (typeof mod.callMain === 'function') {
-        setTimeout(() => {
-          try {
-            mod?.callMain?.([]);
-            this.statusText.set('Game restarted with custom resources.dat ✓');
-          } catch (err) {
-            console.warn('[Angular] callMain failed, falling back to page reload', err);
-            window.location.reload();
-          }
-          this.gameRestarting.set(false);
-        }, 100);
-      } else if (typeof mod._main === 'function') {
-        // Some builds expose _main directly as _main(argc, argv).
-        // argc=0, argv=0 (null pointer) is the safest minimal invocation for a
-        // game that doesn't use command-line arguments; wrapped in try/catch as
-        // a fallback before the full page reload.
-        setTimeout(() => {
-          try {
-            mod?._main?.(0, 0);
-            this.statusText.set('Game restarted with custom resources.dat ✓');
-          } catch (err) {
-            console.warn('[Angular] _main failed, falling back to page reload', err);
-            window.location.reload();
-          }
-          this.gameRestarting.set(false);
-        }, 100);
-      } else {
-        // No restart API – fall back to page reload.
-        // Store the loaded file in sessionStorage so it auto-applies on next load.
-        this.statusText.set('Applying custom resources requires a page reload…');
-        setTimeout(() => window.location.reload(), 500);
-        this.gameRestarting.set(false);
-      }
-    } catch (e) {
-      console.error('[Angular] Game restart failed', e);
-      this.gameRestarting.set(false);
-      this.statusText.set('Failed to restart game. Please refresh the page manually.');
-    }
+    this.statusText.set('Reloading page to apply custom resources.dat…');
+    // Small delay so the status text is rendered before the reload.
+    setTimeout(() => window.location.reload(), 150);
   }
 
   /**
-   * Mount a custom resources.dat into the Emscripten MEMFS at /resources/resources.dat.
-   * The game reads from this path so the custom data takes effect on next restart.
+   * Mount a custom resources.dat into the Emscripten MEMFS at /resources.dat
+   * (the path the WASM game reads from, set by RESOURCES_DAT_PATH at build time).
+   * Also persists the bytes in IndexedDB so the preRun hook can re-inject them
+   * on the next page load triggered by restartGameWithCustomResources().
    */
   private _mountCustomResourcesFs(bytes: Uint8Array): void {
+    // Persist in IndexedDB so the custom resources survive a page reload.
+    const name = this.customResourcesName() ?? 'resources.dat';
+    if (typeof indexedDB !== 'undefined') {
+      App._saveCustomResourcesDb(bytes, name).catch((err) => {
+        console.warn('[Angular] Failed to save custom resources.dat to IndexedDB', err);
+      });
+    }
+
+    // Write into the live MEMFS so the current session reflects the update.
     try {
       const FS = (window as unknown as Record<string, unknown>)['FS'] as {
-        mkdir: (path: string) => void;
         writeFile: (path: string, data: Uint8Array) => void;
       } | undefined;
       if (!FS) {
-        console.warn('[Angular] Emscripten FS not available yet');
+        console.warn('[Angular] Emscripten FS not available yet – bytes will be injected on next page load via IndexedDB');
         this._pendingCustomResources = bytes;
         return;
       }
-      try { FS.mkdir('/resources'); } catch { /* already exists */ }
-      FS.writeFile('/resources/resources.dat', bytes);
-      this.customResourcesLoaded.set(true);
-      this.statusText.set(
-        `Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB). ` +
-        'Click "Restart Game" to apply the new resources without a page reload.',
-      );
-      console.log('[Angular] Custom resources.dat written to MEMFS');
+      // The WASM build sets RESOURCES_DAT_PATH="/resources.dat" (no sub-directory).
+      FS.writeFile('/resources.dat', bytes);
+      console.log('[Angular] Custom resources.dat written to MEMFS at /resources.dat');
     } catch (e) {
-      console.error('[Angular] Failed to mount custom resources.dat', e);
+      console.warn('[Angular] Could not write custom resources.dat to live MEMFS (will take effect on page reload)', e);
     }
+
+    this.customResourcesLoaded.set(true);
+    this.statusText.set(
+      `Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB). ` +
+      'Click "Restart Game" to reload the page with the new resources.',
+    );
+  }
+
+  /** Remove any persisted custom resources.dat from IndexedDB and reset UI state. */
+  clearCustomResources(): void {
+    App._clearCustomResourcesDb().catch(() => { /* ignore */ });
+    this.customResourcesLoaded.set(false);
+    this.customResourcesName.set(null);
+    this.statusText.set('Custom resources.dat cleared — game will use default resources on next reload.');
   }
 }
