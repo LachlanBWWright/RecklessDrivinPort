@@ -413,6 +413,11 @@ main {
 .editor-tabs {
   width: 100%;
 
+  .editor-tab-label {
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+
   ::ng-deep .mat-mdc-tab-header {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -442,6 +447,23 @@ main {
      The canvas uses its own custom range-input scrollbars. */
   ::ng-deep .mat-mdc-tab-body-content {
     overflow: hidden !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .editor-tabs {
+    ::ng-deep .mat-mdc-tab-header-pagination {
+      display: none !important;
+    }
+
+    ::ng-deep .mat-mdc-tab {
+      min-width: 56px;
+      padding: 0 10px;
+    }
+
+    .editor-tab-label {
+      display: none;
+    }
   }
 }
 

@@ -190,9 +190,9 @@
         <mat-tab-group class="editor-tabs" [(selectedIndex)]="editorSectionIndex" animationDuration="150ms">
 
           <!-- ===== PROPERTIES TAB ===== -->
-          <mat-tab>
+          <mat-tab aria-label="Properties">
             <ng-template mat-tab-label>
-              <mat-icon>settings</mat-icon>&nbsp;Properties
+              <mat-icon>settings</mat-icon><span class="editor-tab-label">Properties</span>
             </ng-template>
             <app-properties-tab
               [selectedLevel]="selectedLevel()"
@@ -210,9 +210,9 @@
           </mat-tab>
 
           <!-- ===== OBJECTS TAB ===== -->
-          <mat-tab>
+          <mat-tab aria-label="Objects & Tracks">
             <ng-template mat-tab-label>
-              <mat-icon>view_in_ar</mat-icon>&nbsp;Objects &amp; Tracks
+              <mat-icon>view_in_ar</mat-icon><span class="editor-tab-label">Objects &amp; Tracks</span>
             </ng-template>
             @if (selectedLevel()) {
               <mat-card class="tab-panel-card objects-panel-card">
@@ -351,9 +351,9 @@
           </mat-tab>
 
           <!-- ===== SPRITES TAB ===== -->
-          <mat-tab>
+          <mat-tab aria-label="Sprites">
             <ng-template mat-tab-label>
-              <mat-icon>palette</mat-icon>&nbsp;Sprites
+              <mat-icon>palette</mat-icon><span class="editor-tab-label">Sprites</span>
             </ng-template>
             <mat-card class="tab-panel-card">
               <mat-card-header>
@@ -435,9 +435,9 @@
           </mat-tab>
 
           <!-- ===== TILES TAB ===== -->
-          <mat-tab>
+          <mat-tab aria-label="Tiles">
             <ng-template mat-tab-label>
-              <mat-icon>grid_view</mat-icon>&nbsp;Tiles
+              <mat-icon>grid_view</mat-icon><span class="editor-tab-label">Tiles</span>
             </ng-template>
             <mat-card class="tab-panel-card">
               <mat-card-header>
@@ -510,9 +510,9 @@
           </mat-tab>
 
           <!-- ===== AUDIO TAB ===== -->
-          <mat-tab>
+          <mat-tab aria-label="Audio">
             <ng-template mat-tab-label>
-              <mat-icon>music_note</mat-icon>&nbsp;Audio
+              <mat-icon>music_note</mat-icon><span class="editor-tab-label">Audio</span>
             </ng-template>
             <mat-card class="tab-panel-card">
               <mat-card-header>
@@ -559,23 +559,35 @@
                           <mat-icon class="waveform-icon">graphic_eq</mat-icon>
                           <span>{{ selectedAudioBytes()!.length | number }} bytes</span>
                         </div>
-                        <div class="audio-actions">
-                          <button mat-raised-button color="primary"
-                            (click)="playAudioEntry()"
-                            [disabled]="!selectedAudioBytes()">
-                            <mat-icon>play_arrow</mat-icon> Play
-                          </button>
-                          <button mat-stroked-button (click)="exportAudioWav()"
-                            [disabled]="!selectedAudioBytes()">
-                            <mat-icon>download</mat-icon> Export WAV
-                          </button>
-                          <!-- WAV upload to replace the sound -->
-                          <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none"
-                            (change)="onAudioWavUpload($event)" />
-                          <button mat-stroked-button (click)="audioWavInput.click()" [disabled]="workerBusy()"
-                            matTooltip="Upload a WAV file to replace this sound">
-                            <mat-icon>upload</mat-icon> Replace WAV
-                          </button>
+                        <div class="audio-actions" style="display:flex;flex-direction:column;gap:8px;">
+                           <div style="display:flex;align-items:center;gap:12px;">
+                             <button mat-raised-button color="primary"
+                                (click)="togglePlayPause()"
+                                [disabled]="audioDecodeInProgress() || (!audioControllable() && !selectedAudioBytes())">
+                                  <mat-icon matButtonIcon>{{ audioPlaying() ? 'pause' : 'play_arrow' }}</mat-icon>
+                                  {{ audioPlaying() ? 'Pause' : 'Play' }}
+                              </button>
+                              <div class="audio-progress-row" style="display:inline-flex;align-items:center;margin-left:12px;">
+                                <input type="range" min="0" [max]="audioDuration()" step="0.01"
+                                  [value]="audioCurrentTime()"
+                                  (input)="seekAudio($any($event.target).valueAsNumber)"
+                                  [disabled]="!audioControllable()" style="width:240px;margin-right:8px;" />
+                                <span class="audio-time">{{ formatTime(audioCurrentTime()) }} / {{ formatTime(audioDuration()) }}</span>
+                              </div>
+                           </div>
+                           <div style="display:flex;align-items:center;gap:12px;">
+                             <button mat-stroked-button (click)="exportAudioWav()"
+                               [disabled]="!selectedAudioBytes()">
+                               <mat-icon>download</mat-icon> Export WAV
+                             </button>
+                             <!-- WAV upload to replace the sound -->
+                             <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none"
+                               (change)="onAudioWavUpload($event)" />
+                             <button mat-stroked-button (click)="audioWavInput.click()" [disabled]="workerBusy()"
+                               matTooltip="Upload a WAV file to replace this sound">
+                               <mat-icon>upload</mat-icon> Replace WAV
+                             </button>
+                           </div>
                         </div>
                       </div>
                     } @else if (selectedAudioId() !== null) {
@@ -599,9 +611,9 @@
           </mat-tab>
 
           <!-- ===== SCREENS / HUD TAB ===== -->
-          <mat-tab>
+          <mat-tab aria-label="Screens">
             <ng-template mat-tab-label>
-              <mat-icon>image</mat-icon>&nbsp;Screens
+              <mat-icon>image</mat-icon><span class="editor-tab-label">Screens</span>
             </ng-template>
             <mat-card class="tab-panel-card">
               <mat-card-header>
@@ -687,10 +699,11 @@
             </mat-card>
           </mat-tab>
 
-          <!-- ===== RESOURCE BROWSER TAB ===== -->
-          <mat-tab>
+          @if (false) {
+          <!-- ===== RESOURCE BROWSER TAB (disabled) ===== -->
+          <mat-tab aria-label="Resources">
             <ng-template mat-tab-label>
-              <mat-icon>data_object</mat-icon>&nbsp;Resources
+              <mat-icon>data_object</mat-icon><span class="editor-tab-label">Resources</span>
             </ng-template>
             <mat-card class="tab-panel-card">
               <mat-card-header>
@@ -876,16 +889,40 @@
                           <div class="res-audio-view">
                             @if (selectedResSndInfo(); as info) {
                               <dl class="res-meta-list">
-                                <dt>Sample Rate</dt><dd>{{ info.sampleRate }} Hz</dd>
-                                <dt>Channels</dt><dd>{{ info.numChannels }}</dd>
-                                <dt>Frames</dt><dd>{{ info.numFrames }}</dd>
-                                <dt>Sample Size</dt><dd>{{ info.sampleSize }}-bit</dd>
-                                <dt>Encoding</dt><dd>{{ info.encode }}</dd>
+                                <dt>Sample Rate</dt><dd>{{ info?.sampleRate }} Hz</dd>
+                                <dt>Channels</dt><dd>{{ info?.numChannels }}</dd>
+                                <dt>Frames</dt><dd>{{ info?.numFrames }}</dd>
+                                <dt>Sample Size</dt><dd>{{ info?.sampleSize }}-bit</dd>
+                                <dt>Encoding</dt><dd>{{ info?.encode }}</dd>
                               </dl>
                             }
-                            <button mat-raised-button color="primary" (click)="playSndResource()">
-                              <mat-icon>play_arrow</mat-icon> Play
-                            </button>
+                            <div class="audio-actions" style="display:flex;flex-direction:column;gap:8px;">
+                              <div style="display:flex;align-items:center;gap:12px;">
+                                <button mat-raised-button color="primary"
+                                  (click)="togglePlayPause()"
+                                  [disabled]="audioDecodeInProgress() || (!audioControllable() && !selectedResBytes())">
+                                  <mat-icon matButtonIcon>{{ audioPlaying() ? 'pause' : 'play_arrow' }}</mat-icon>
+                                  {{ audioPlaying() ? 'Pause' : 'Play' }}
+                                </button>
+                                <div class="audio-progress-row" style="display:inline-flex;align-items:center;margin-left:12px;">
+                                  <input type="range" min="0" [max]="audioDuration()" step="0.01"
+                                    [value]="audioCurrentTime()"
+                                    (input)="seekAudio($any($event.target).valueAsNumber)"
+                                    [disabled]="!audioControllable()" style="width:240px;margin-right:8px;" />
+                                  <span class="audio-time">{{ formatTime(audioCurrentTime()) }} / {{ formatTime(audioDuration()) }}</span>
+                                </div>
+                              </div>
+                              <div style="display:flex;align-items:center;gap:12px;">
+                                <button mat-stroked-button (click)="exportAudioWav()" [disabled]="!selectedResBytes()">
+                                  <mat-icon>download</mat-icon> Export WAV
+                                </button>
+                                <!-- WAV upload to replace the sound -->
+                                <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none" (change)="onAudioWavUpload($event)" />
+                                <button mat-stroked-button (click)="audioWavInput.click()" [disabled]="workerBusy()" matTooltip="Upload a WAV file to replace this sound">
+                                  <mat-icon>upload</mat-icon> Replace WAV
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         }
 
@@ -914,7 +951,8 @@
                 }
               </mat-card-content>
             </mat-card>
-          </mat-tab>
+            </mat-tab>
+          }
 
 
         </mat-tab-group>

@@ -17,13 +17,18 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   align-items: start;
+  /* Small top/bottom padding so floating labels and hints aren't clipped
+     against the header or the divider */
+  padding-top: 8px;
   /* Add bottom padding so mat-hint text doesn't clip into the divider below */
   padding-bottom: 28px;
   margin-bottom: 8px;
 }
 
-mat-card-content {
-  overflow: hidden;
+/* Allow content inside the card to show any floating labels/hints
+   that may extend outside the content box so they don't get clipped. */
+.tab-panel-card mat-card-content {
+  overflow: visible;
 }
 
 .prop-field { width: 100%; }

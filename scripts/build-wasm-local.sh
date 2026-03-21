@@ -13,6 +13,7 @@
 #    --port PORT     Use PORT for the local server (default: 8080)
 #    --skip-wasm     Skip Emscripten WASM build (use existing build_wasm/ outputs)
 #    --skip-angular  Skip Angular build (use existing dist/ outputs)
+#    --clean         Remove build_wasm/ before configuring (fresh WASM build)
 #    --no-cleanup    Don't remove previous gh-pages-local/ dir first
 #    --help          Show this help
 #
@@ -54,6 +55,7 @@ SERVE=false
 PORT=8080
 SKIP_WASM=false
 SKIP_ANGULAR=false
+CLEAN_WASM=false
 NO_CLEANUP=false
 
 while [[ $# -gt 0 ]]; do
@@ -62,6 +64,7 @@ while [[ $# -gt 0 ]]; do
     --port)        PORT="${2:?--port requires an argument}"; shift ;;
     --skip-wasm)   SKIP_WASM=true ;;
     --skip-angular)SKIP_ANGULAR=true ;;
+    --clean)       CLEAN_WASM=true ;;
     --no-cleanup)  NO_CLEANUP=true ;;
     --help|-h)
       sed -n '/^#  Usage:/,/^# ====/p' "$0" | sed 's/^# \?//'
@@ -236,6 +239,27 @@ fi
 if ! $SKIP_WASM; then
   step "Building WASM with Emscripten"
   cd "$REPO_ROOT"
+
+  # Manual clean or contamination check
+  if [[ -d "$BUILD_WASM_DIR" ]]; then
+    if $CLEAN_WASM; then
+      info "Cleaning existing WASM build directory…"
+      rm -rf "$BUILD_WASM_DIR"
+    elif [[ -f "$BUILD_WASM_DIR/CMakeCache.txt" ]]; then
+      # Check if the cached emcc matches our active emcc
+      # This prevents "The C compiler identification is unknown" or path mismatch errors
+      CACHED_EMCC=$(grep "CMAKE_C_COMPILER:FILEPATH" "$BUILD_WASM_DIR/CMakeCache.txt" | cut -d= -f2 || true)
+      ACTIVE_EMCC=$(command -v emcc || true)
+      
+      if [[ -n "$CACHED_EMCC" && -n "$ACTIVE_EMCC" && "$CACHED_EMCC" != "$ACTIVE_EMCC" ]]; then
+        warn "Detected Emscripten path mismatch in build cache."
+        warn "  Cached: $CACHED_EMCC"
+        warn "  Active: $ACTIVE_EMCC"
+        info "Automatically cleaning build directory to prevent configuration errors…"
+        rm -rf "$BUILD_WASM_DIR"
+      fi
+    fi
+  fi
 
   info "Configuring CMake for WASM…"
   emcmake cmake -B "$BUILD_WASM_DIR" -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON

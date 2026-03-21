@@ -1060,6 +1060,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  /** Format seconds as M:SS (handles NaN and Infinity). */
+  formatTime(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds <= 0) return '0:00';
+    const s = Math.floor(seconds);
+    const mm = Math.floor(s / 60);
+    const ss = s % 60;
+    return `${mm}:${ss.toString().padStart(2, '0')}`;
+  }
+
   /** Schedule a canvas redraw on the next animation frame, cancelling any pending redraw. */
   private scheduleCanvasRedraw(): void {
     if (typeof window === 'undefined') {
@@ -1488,6 +1497,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // Ensure any managed audio playback is stopped and RAF cancelled
+    try { this.stopAudio(); } catch { /* ignore */ }
     if (this.wasmScript?.parentNode) {
       (this.wasmScript.parentNode as HTMLElement).removeChild(this.wasmScript);
     }
@@ -1960,6 +1971,142 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Web Audio context, lazily created for snd resource playback. */
   private _audioCtx: AudioContext | null = null;
 
+  // Managed playback state for controllable audio (pause/seek)
+  audioPlaying = signal(false);
+  audioCurrentTime = signal(0);
+  audioDuration = signal(0);
+  readonly audioControllable = computed(() => this._lastAudioBuffer !== null);
+  // True while an async decode / preparation for managed playback is in progress
+  audioDecodeInProgress = signal(false);
+
+  private _audioSource: AudioBufferSourceNode | null = null;
+  private _lastAudioBuffer: AudioBuffer | null = null;
+  private _audioStartTime = 0; // audioCtx.currentTime when playback started minus offset
+  private _audioPauseOffset = 0; // seconds offset where paused
+  private _audioRaf: number | null = null;
+
+  /** Create a BufferSource from buffer and wire the ended handler. */
+  private _createSourceFromBuffer(buffer: AudioBuffer, onended?: () => void): AudioBufferSourceNode {
+    if (!this._audioCtx) throw new Error('No AudioContext');
+    const src = this._audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(this._audioCtx.destination);
+    src.onended = () => {
+      try { onended?.(); } finally { if (this._audioSource === src) this._audioSource = null; }
+    };
+    return src;
+  }
+
+  /** Start playback of an AudioBuffer at optional offset (seconds). */
+  private _startAudioBuffer(buffer: AudioBuffer, offset = 0): void {
+    if (!this._audioCtx) return;
+    try { this._audioSource?.stop(); } catch { /* ignore */ }
+    this._audioSource = this._createSourceFromBuffer(buffer, () => {
+      this.audioPlaying.set(false);
+      this.audioCurrentTime.set(this.audioDuration());
+      if (this._audioRaf !== null) { cancelAnimationFrame(this._audioRaf); this._audioRaf = null; }
+      this._audioPauseOffset = 0;
+    });
+    const startAt = Math.max(0, Math.min(offset, buffer.duration));
+    this._audioStartTime = this._audioCtx.currentTime - startAt;
+    this._audioPauseOffset = startAt;
+    this._audioSource.start(0, startAt);
+    this.audioDuration.set(buffer.duration);
+    this.audioPlaying.set(true);
+    this._updateAudioProgressRaf();
+  }
+
+  async togglePlayPause(): Promise<void> {
+    if (!this._audioCtx) return;
+    if (this.audioPlaying()) {
+      // Pause
+      if (this._audioSource) {
+        try {
+          const offset = this._audioCtx!.currentTime - this._audioStartTime;
+          this._audioPauseOffset = Math.max(0, Math.min(offset, this.audioDuration()));
+          this._audioSource.stop();
+        } catch { /* ignore */ }
+        this._audioSource = null;
+      }
+      this.audioPlaying.set(false);
+      if (this._audioRaf !== null) { cancelAnimationFrame(this._audioRaf); this._audioRaf = null; }
+      return;
+    }
+
+    // If we don't yet have a managed AudioBuffer, attempt to prepare one from
+    // the currently-selected audio bytes. Prefer the audio-editor selection
+    // (kPackSnds) then the resource browser selection. Those helper methods
+    // will set _lastAudioBuffer on success or fall back to legacy player.
+    if (!this._lastAudioBuffer) {
+      // Prevent rapid re-entry while a decode is already underway
+      if (this.audioDecodeInProgress()) return;
+      this.audioDecodeInProgress.set(true);
+      try {
+        if (this.selectedAudioBytes()) {
+          await this.playAudioEntry();
+          return;
+        }
+        if (this.selectedResBytes()) {
+          await this.playSndResource();
+          return;
+        }
+        return;
+      } finally {
+        // Always clear the in-progress flag so the UI doesn't stay disabled
+        this.audioDecodeInProgress.set(false);
+      }
+    }
+
+    // Resume managed playback from pause offset
+    const buf = this._lastAudioBuffer;
+    if (!buf) return;
+    const offset = this._audioPauseOffset || 0;
+    try { await this._audioCtx!.resume().catch(() => {}); } catch { /* ignore */ }
+    this._startAudioBuffer(buf, offset);
+  }
+
+  stopAudio(): void {
+    if (this._audioSource) {
+      try { this._audioSource.stop(); } catch { /* ignore */ }
+      this._audioSource = null;
+    }
+    this._lastAudioBuffer = null;
+    this.audioPlaying.set(false);
+    this.audioCurrentTime.set(0);
+    this.audioDuration.set(0);
+    this._audioPauseOffset = 0;
+    if (this._audioRaf !== null) { cancelAnimationFrame(this._audioRaf); this._audioRaf = null; }
+  }
+
+  seekAudio(seconds: number): void {
+    const buf = this._lastAudioBuffer;
+    if (!buf || !this._audioCtx) return;
+    const clamped = Math.max(0, Math.min(seconds, buf.duration));
+    const wasPlaying = this.audioPlaying();
+    if (this._audioSource) {
+      try { this._audioSource.stop(); } catch { /* ignore */ }
+      this._audioSource = null;
+    }
+    this._audioPauseOffset = clamped;
+    this.audioCurrentTime.set(clamped);
+    if (wasPlaying) {
+      this._startAudioBuffer(buf, clamped);
+    }
+  }
+
+  private _updateAudioProgressRaf(): void {
+    if (!this._audioCtx) return;
+    if (!this.audioPlaying() || !this._lastAudioBuffer) return;
+    const now = this._audioCtx.currentTime - this._audioStartTime;
+    const cur = Math.max(0, Math.min(now, this.audioDuration()));
+    this.audioCurrentTime.set(cur);
+    if (this.audioPlaying()) {
+      this._audioRaf = requestAnimationFrame(() => this._updateAudioProgressRaf());
+    } else {
+      this._audioRaf = null;
+    }
+  }
+
   /** Play the currently selected 'snd ' resource via the Web Audio API. */
   async playSndResource(): Promise<void> {
     const bytes = this.selectedResBytes();
@@ -1975,14 +2122,71 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     try {
+      const info = parseSndHeader(bytes);
+      if (info) {
+        try {
+          // Preferred: create an AudioBuffer and use managed playback where possible.
+          // Handle stdSH (8-bit unsigned mono)
+          if (info.encode === 0x00) {
+            const data = bytes.subarray(info.pcmOffset, info.pcmOffset + info.numFrames);
+            const floatBuf = new Float32Array(data.length);
+            for (let i = 0; i < data.length; i++) floatBuf[i] = (data[i] - 128) / 128;
+            const audioBuffer = this._audioCtx.createBuffer(1, floatBuf.length, Math.max(1, Math.round(info.sampleRate)));
+            audioBuffer.getChannelData(0).set(floatBuf);
+            // Use managed playback: set last buffer and start via helper
+            this._lastAudioBuffer = audioBuffer;
+            this._startAudioBuffer(audioBuffer, 0);
+            return;
+          // Handle IMA4 compressed (use decoder)
+          } else if (info.encode === 0xFE) {
+            const dataStart = info.pcmOffset;
+            const pktsAvail = Math.floor((bytes.length - dataStart) / 34);
+            if (pktsAvail > 0) {
+              const f32 = decodeIMA4(bytes.subarray(dataStart), pktsAvail);
+              const audioBuffer = this._audioCtx.createBuffer(1, f32.length, Math.max(1, Math.round(info.sampleRate)));
+              audioBuffer.getChannelData(0).set(f32);
+              this._lastAudioBuffer = audioBuffer;
+              this._startAudioBuffer(audioBuffer, 0);
+              return;
+            }
+            // Fallthrough to fallback below
+          // Handle extSH (16-bit big-endian, possibly multi-channel)
+          } else if (info.encode === 0xFF) {
+            const sampleCount = info.numFrames;
+            const ch = info.numChannels || 1;
+            const audioBuffer = this._audioCtx.createBuffer(ch, sampleCount, Math.max(1, Math.round(info.sampleRate)));
+            const view = new DataView(bytes.buffer, bytes.byteOffset + info.pcmOffset, bytes.length - info.pcmOffset);
+            for (let s = 0; s < sampleCount; s++) {
+              for (let c = 0; c < ch; c++) {
+                const idx = (s * ch + c) * 2;
+                if (idx + 2 > view.byteLength) break;
+                const sample = view.getInt16(idx, false); // big-endian
+                audioBuffer.getChannelData(c)[s] = sample / 32768.0;
+              }
+            }
+            this._lastAudioBuffer = audioBuffer;
+            this._startAudioBuffer(audioBuffer, 0);
+            return;
+          }
+          // Unknown encode – fall through to legacy fallback
+        } catch (err) {
+          // If any decoding/AudioBuffer creation failed, fall back to legacy player below.
+        }
+      }
+
+      // Final fallback: legacy one-shot player. Mark that controlled UI is not available.
+      this._lastAudioBuffer = null;
       const played = tryPlaySndResource(bytes, this._audioCtx);
       if (!played) {
         this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+      } else {
+        this.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', { duration: 4000 });
       }
-    } catch (e) {
-      this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', { duration: 4000 });
+      } catch (e) {
+        this._lastAudioBuffer = null;
+        this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', { duration: 4000 });
+      }
     }
-  }
 
   /** Render an ICN# resource (32×32 1-bit) as an RGBA canvas for preview. */
   renderIconResource(bytes: Uint8Array | null): HTMLCanvasElement | null {
@@ -4046,9 +4250,36 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     try {
-      const played = tryPlaySndResource(bytes, this._audioCtx);
-      if (!played) {
-        this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+      // Pack 134 entries use a custom tSound layout. Prefer the parser / converter
+      // that understands those entries and produces a WAV blob which the Audio
+      // API can decode. Fall back to the generic tryPlaySndResource parser for
+      // legacy Mac 'snd ' resource layouts.
+      const sndInfo = parseSndHeader(bytes);
+      if (sndInfo) {
+        // Convert to WAV then ask the AudioContext to decode it.
+        const wavBytes = this._sndToWav(bytes);
+        try {
+          // decodeAudioData expects an ArrayBuffer; guard against SharedArrayBuffer
+          const ab = wavBytes.buffer.slice(wavBytes.byteOffset, wavBytes.byteOffset + wavBytes.byteLength) as ArrayBuffer;
+          const audioBuf = await this._audioCtx.decodeAudioData(ab);
+          // Use managed playback: store decoded AudioBuffer and start via helpers
+          this._lastAudioBuffer = audioBuf;
+          this._startAudioBuffer(audioBuf, 0);
+          } catch (err) {
+            // Some browsers reject decodeAudioData for raw WAV blobs; fall back to
+            // the legacy player which may handle raw PCM directly. Mark that
+            // advanced controls are unavailable when falling back.
+            this._lastAudioBuffer = null;
+            const played = tryPlaySndResource(bytes, this._audioCtx);
+            if (!played) throw err ?? new Error('Unsupported snd format');
+            // Inform the user that we're in one-shot fallback mode
+            this.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', { duration: 4000 });
+          }
+      } else {
+        const played = tryPlaySndResource(bytes, this._audioCtx);
+        if (!played) {
+          this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+        }
       }
     } catch (e) {
       this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', { duration: 4000 });
