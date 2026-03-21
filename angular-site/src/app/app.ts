@@ -5373,20 +5373,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     };
 
     // Obtain patterns (fall back to theme colours if textures not yet loaded).
-    // For background and road surface, use world-origin alignment (large tiles, looks fine).
-    // For kerb/border strips, anchor to the mid-viewport road edge so the texture tracks
-    // the road boundary as it curves rather than tiling relative to world X=0.
+    // Background and road surface use world-origin alignment (large 128-unit tiles).
     const bgPat = ri ? (makePattern(ri.backgroundTex, 128) ?? theme.bg) : theme.bg;
     const fgPat = ri ? (makePattern(ri.foregroundTex, 128) ?? theme.road) : theme.road;
     // Centre line: cyan for water, yellow for asphalt
     const CENTRE_COLOUR = theme.water ? 'rgba(80, 255, 180, 0.85)' : 'rgba(255, 248, 140, 0.85)';
 
-    // Batch fill quads by pattern to minimise Canvas API calls.
-    // Instead of calling fill() for every quad, we accumulate subpaths per fill style
-    // and flush with a single fill() per style after all segments are processed.
-    // This reduces fill() calls from O(6 × segments) to O(4) per frame.
+    // Kerb texture canvases (for group-based anchored rendering)
+    const KERB_TEX_WORLD = 16;   // one kerb tile covers 16 world units
+    const lbTexCanvas  = ri ? this.roadTextureCanvases.get(ri.roadLeftBorder)  : null;
+    const rbTexCanvas  = ri ? this.roadTextureCanvases.get(ri.roadRightBorder) : null;
 
-    /** Append quad canvas coords to a batch array. Returns false if fully off-screen. */
+    /** Append quad canvas coords to a batch array. */
     const addQuad = (
       batch: number[],
       x0: number, y0: number, x1: number, y1: number,
@@ -5416,39 +5414,58 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.fill();
     };
 
+    /**
+     * Flush a kerb group: create a pattern anchored to avgAnchorX and fill.
+     * Using road-edge anchoring per group ensures the kerb texture stays locked
+     * to the road boundary as it curves, not to world X=0.
+     */
+    const flushKerbGroup = (
+      batch: number[],
+      texCanvas: HTMLCanvasElement | null | undefined,
+      avgAnchorX: number,
+      fallbackFill: string,
+    ): void => {
+      if (batch.length === 0) return;
+      let fill: CanvasPattern | string = fallbackFill;
+      if (texCanvas) {
+        try {
+          const pat = ctx.createPattern(texCanvas, 'repeat');
+          if (pat) {
+            const scale = zoom * texCanvas.width / KERB_TEX_WORLD;
+            const tileW = texCanvas.width * scale;
+            const tileH = texCanvas.height * scale;
+            const tx = ((W / 2 + (avgAnchorX - panX) * zoom) % tileW + tileW) % tileW;
+            const ty = (((H / 2 + yOverhang) + panY * zoom) % tileH + tileH) % tileH;
+            pat.setTransform(new DOMMatrix([scale, 0, 0, scale, tx, ty]));
+            fill = pat;
+          }
+        } catch { /* use fallback */ }
+      }
+      flushBatch(fill, batch);
+      batch.length = 0;
+    };
+
     // Draw road geometry using actual textures – only render segments visible in viewport.
-    // Each road segment at index i has world Y = i*2.  Cull segments outside the viewport
-    // with a generous margin (2 extra segment heights = 4 world units margin).
     const visibleWorldMinY = panY - (H / 2 + yOverhang) / zoom - 4;
     const visibleWorldMaxY = panY + (H / 2 + yOverhang) / zoom + 4;
     const firstSeg = Math.max(0, Math.floor(visibleWorldMinY / 2));
     const lastSeg  = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
 
-    // Adaptive step: merge adjacent segments when zoom is very small to keep rendering fast.
-    // Each segment occupies 2 world-Y units; at zoom < 0.25 one segment = < 0.5 canvas px,
-    // so merging 4 at a time is visually indistinguishable and 4× faster.
+    // Adaptive step: merge adjacent segments at low zoom for performance.
     const step = Math.max(1, Math.ceil(1.5 / zoom));
 
-    // Compute mid-viewport road edge positions for kerb pattern anchoring.
-    // Anchoring U=0 to the outer edge of the kerb makes the texture track the road boundary
-    // as it curves, rather than tiling based on world X position.
-    const midSeg = level.roadSegs[Math.floor((firstSeg + lastSeg) / 2)] ?? level.roadSegs[0];
-    const lbPat = ri
-      ? (makePattern(ri.roadLeftBorder,  16, midSeg.v0 - KERB_WIDTH) ?? theme.kerbA) : theme.kerbA;
-    const rbPat = ri
-      ? (makePattern(ri.roadRightBorder, 16, midSeg.v3) ?? theme.kerbB) : theme.kerbB;
-
-    const batchQuads: [CanvasPattern | string, number[]][] = [
-      [bgPat, []], [fgPat, []], [lbPat, []], [rbPat, []],
-    ];
-    const bgBatch = batchQuads[0][1];
-    const fgBatch = batchQuads[1][1];
-    const lbBatch = batchQuads[2][1];
-    const rbBatch = batchQuads[3][1];
-
-    // Compute world extents at canvas edges for background fill (extends beyond road edges)
+    // Compute world extents at canvas edges for background fill
     const worldMinX = panX - W / (2 * zoom) - 200;
     const worldMaxX = panX + W / (2 * zoom) + 200;
+
+    const bgBatch: number[] = [];
+    const fgBatch: number[] = [];
+    // Separate kerb batches that are flushed per group with per-group anchoring
+    const lbBatch: number[] = [];
+    const rbBatch: number[] = [];
+    let lbGroupAnchorSum = 0;
+    let rbGroupAnchorSum = 0;
+    let kerbGroupCount   = 0;
     for (let index = firstSeg; index <= lastSeg; index += step) {
       const cur = level.roadSegs[index];
       const nxtIdx = Math.min(index + step, level.roadSegs.length - 1);
@@ -5459,39 +5476,51 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Off-road (background texture) – extend to canvas edges
       addQuad(bgBatch, worldMinX, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  worldMinX, y1);
 
-      // Left border/kerb
+      // Left border/kerb – accumulate into group batch; anchor to outer edge (v0-KERB_WIDTH)
       addQuad(lbBatch, cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1);
+      lbGroupAnchorSum += cur.v0 - KERB_WIDTH;
 
       // Left road lane: v0 to v1 (road surface)
       addQuad(fgBatch, cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1);
 
       // Median / center gap: v1 to v2 (background with kerbs on both edges)
-      // Only draw if there is actually space (v1 == v2 means single-road / no median)
       const medianW = Math.min(cur.v2 - cur.v1, nxt.v2 - nxt.v1);
       if (medianW > 0) {
         const halfKerb = Math.min(KERB_WIDTH, medianW / 2);
-        // Right edge of left lane → left edge of median
+        // Inner kerbs use the same lb/rb batches but we don't adjust anchor tracking.
+        // The outer-kerb anchors are close enough for the narrow median strips.
         addQuad(rbBatch, cur.v1, y0,  cur.v1 + halfKerb, y0,  nxt.v1 + halfKerb, y1,  nxt.v1, y1);
-        // Center of median (background fill)
         if (medianW > halfKerb * 2) {
           addQuad(bgBatch, cur.v1 + halfKerb, y0,  cur.v2 - halfKerb, y0,  nxt.v2 - halfKerb, y1,  nxt.v1 + halfKerb, y1);
         }
-        // Right edge of median → left edge of right lane
         addQuad(lbBatch, cur.v2 - halfKerb, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v2 - halfKerb, y1);
       }
 
       // Right road lane: v2 to v3 (road surface)
       addQuad(fgBatch, cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1);
 
-      // Right border/kerb
+      // Right border/kerb – anchor to outer edge (v3)
       addQuad(rbBatch, cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1);
+      rbGroupAnchorSum += cur.v3;
 
       // Off-road far right – extend to canvas edges
       addQuad(bgBatch, cur.v3 + KERB_WIDTH, y0,  worldMaxX, y0,  worldMaxX, y1,  nxt.v3 + KERB_WIDTH, y1);
+
+      kerbGroupCount++;
     }
 
-    // Flush all batches (4 fill() calls for up to thousands of quads)
-    for (const [fill, batch] of batchQuads) flushBatch(fill, batch);
+    // ─── Flush layers in back-to-front order ────────────────────────────────────
+    // 1. Background (grass/off-road) – painted first
+    flushBatch(bgPat, bgBatch);
+    // 2. Kerb strips – painted over background; use per-group road-edge anchoring
+    if (kerbGroupCount > 0) {
+      const lbAvg = lbGroupAnchorSum / kerbGroupCount;
+      const rbAvg = rbGroupAnchorSum / kerbGroupCount;
+      flushKerbGroup(lbBatch, lbTexCanvas, lbAvg, theme.kerbA);
+      flushKerbGroup(rbBatch, rbTexCanvas, rbAvg, theme.kerbB);
+    }
+    // 3. Road surface (top layer)
+    flushBatch(fgPat, fgBatch);
 
     // Centre dashed line (between lanes: midpoint of v1→v2) – only in viewport
     ctx.strokeStyle = CENTRE_COLOUR;
