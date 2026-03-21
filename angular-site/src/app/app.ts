@@ -3081,12 +3081,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // Draw barriers (road boundaries)
     if (level && this.showBarriers() && level.roadSegs.length > 0) {
-      // Build a comprehensive cache key by sampling ~20 evenly-spaced segments
-      // (all four boundary values) so that any road change triggers a rebuild.
-      // Also include panY so viewport-culled polylines are rebuilt when scrolling.
+      // Build a cache key: sample ~20 evenly-spaced segments plus zoom and quantised panY.
+      // PanY is quantised to 8 world units to avoid rebuilding on every scroll pixel;
+      // the BARRIER_CULL_MARGIN is large enough that 8-unit granularity is imperceptible.
       const segs = level.roadSegs;
       const N    = Math.max(1, Math.floor(segs.length / 20));
-      let barrierKey = `${segs.length}:${zoom.toFixed(2)}:${panY.toFixed(0)}`;
+      const panYQ = Math.round(panY / 8) * 8;
+      let barrierKey = `${segs.length}:${zoom.toFixed(2)}:${panYQ}`;
       for (let ki = 0; ki < segs.length; ki += N) {
         const s = segs[ki];
         barrierKey += `:${s.v0},${s.v1},${s.v2},${s.v3}`;
