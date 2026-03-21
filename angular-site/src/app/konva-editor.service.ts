@@ -59,7 +59,6 @@ import type {
   KonvaDragEndEvent,
   KonvaWaypointDragEndEvent,
   KonvaMarkDragEndEvent,
-  KonvaBarrierDragEndEvent,
   KonvaWorldNode,
 } from './konva-editor.types';
 import {
@@ -103,7 +102,6 @@ export class KonvaEditorService implements OnDestroy {
   onMarkEndpointDragEnd?: (e: KonvaMarkDragEndEvent) => void;
   onMarkClick?: (markIdx: number) => void;
   onStageDblClick?: (worldX: number, worldY: number) => void;
-  onBarrierDragEnd?: (e: KonvaBarrierDragEndEvent) => void;
   onStageRightClick?: (worldX: number, worldY: number) => void;
 
   /**
@@ -537,9 +535,8 @@ export class KonvaEditorService implements OnDestroy {
   ): void {
     if (!this.barrierWorldGroup || !this.barrierLayer) return;
     buildBarriers(
-      this.barrierWorldGroup, this.barrierLayer, roadSegs, this._panMode,
+      this.barrierWorldGroup, this.barrierLayer, roadSegs,
       this._cssW, this._cssH, this._logicalW, this._logicalH, zoom, panY,
-      (segIdx, side, newX) => this.onBarrierDragEnd?.({ segIdx, side, worldX: newX }),
     );
     this._applyGroupTransform();
     this._markLayerDirty(this.barrierLayer);

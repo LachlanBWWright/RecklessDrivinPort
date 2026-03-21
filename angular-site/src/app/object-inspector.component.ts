@@ -8,17 +8,17 @@ import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from 
 })
 export class ObjectInspectorComponent {
   @Input() selectedIndex: number | null = null;
-  @Input() editX = 0;
-  @Input() editY = 0;
-  @Input() editDir = 0;
+  @Input() editDirDeg = 0;
   @Input() editTypeRes = 128;
+  @Input() availableTypeIds: number[] = [];
   @Input() spriteUrl: string | null = null;
   @Input() typePalette: {hex: string, typeId: number}[] = [];
   @Input() visibleTypeFilter: Set<number> = new Set();
   @Input() workerBusy = false;
   @Input() typeDimLabel = '';
 
-  @Output() fieldInput = new EventEmitter<{field: 'x' | 'y' | 'dir' | 'typeRes', event: Event}>();
+  @Output() dirDegInput = new EventEmitter<{event: Event}>();
+  @Output() typeResChange = new EventEmitter<number>();
   @Output() typeVisibilityToggle = new EventEmitter<number>();
   @Output() showAll = new EventEmitter<void>();
   @Output() hideAll = new EventEmitter<void>();

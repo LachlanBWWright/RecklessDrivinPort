@@ -36,28 +36,22 @@
 
 
     <div class="inspector-fields">
-      <div class="xy-row">
-        <mat-form-field appearance="outline" class="inspector-field xy-field">
-          <mat-label>X (pixels)</mat-label>
-          <input matInput type="number" [value]="editX" (input)="fieldInput.emit({field: 'x', event: $event})" />
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="inspector-field xy-field">
-          <mat-label>Y (pixels)</mat-label>
-          <input matInput type="number" [value]="editY" (input)="fieldInput.emit({field: 'y', event: $event})" />
-        </mat-form-field>
-      </div>
-
       <mat-form-field appearance="outline" class="inspector-field">
-        <mat-label>Direction (rad)</mat-label>
-        <input matInput type="number" step="0.01" min="-3.14159" max="3.14159"
-          [value]="editDir" (input)="fieldInput.emit({field: 'dir', event: $event})" />
+        <mat-label>Direction (°)</mat-label>
+        <input matInput type="number" step="1" min="-180" max="180"
+          [value]="editDirDeg" (input)="dirDegInput.emit({event: $event})" />
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="inspector-field">
         <mat-label>Type ID</mat-label>
-        <input matInput type="number" [value]="editTypeRes"
-          (input)="fieldInput.emit({field: 'typeRes', event: $event})" />
+        <mat-select [value]="editTypeRes" (selectionChange)="typeResChange.emit($event.value)">
+          @for (tid of availableTypeIds; track tid) {
+            <mat-option [value]="tid">{{ tid }}</mat-option>
+          }
+          @if (!availableTypeIds.includes(editTypeRes)) {
+            <mat-option [value]="editTypeRes">{{ editTypeRes }} (custom)</mat-option>
+          }
+        </mat-select>
         <mat-hint>128 = player car</mat-hint>
       </mat-form-field>
     </div>

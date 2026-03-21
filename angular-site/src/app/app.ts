@@ -656,7 +656,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   editObjX = signal(0);
   editObjY = signal(0);
   editObjDir = signal(0);
+  /** editObjDir expressed in degrees for display in the inspector. */
+  readonly editObjDirDeg = computed(() => parseFloat((this.editObjDir() * 180 / Math.PI).toFixed(2)));
   editObjTypeRes = signal(128);
+  /** Sorted list of available typeRes IDs (populated after loading resources). */
+  availableTypeIds = signal<number[]>([]);
   visibleTypeFilter = signal<Set<number>>(new Set(this.typePalette.map((item) => item.typeId)));
   /** Text typed into the object-list search box. */
   objectSearchTerm = signal('');
@@ -737,10 +741,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   showGrid = signal(true);
   /** True while road barrier edges are visible. */
   showBarriers = signal(true);
-  /** True while the barrier-draw tool is active. */
-  barrierDrawMode = signal(false);
-  /** Which barrier side the draw tool affects: v0=left outer, v1=left inner, v2=right inner, v3=right outer. */
-  barrierDrawSide = signal<'v0' | 'v1' | 'v2' | 'v3'>('v0');
+  /** Which barrier side the draw tool affects: v0=left outer, v1=left inner, i=merge inner, v2=right inner, v3=right outer. */
+  barrierDrawSide = signal<'v0' | 'v1' | 'i' | 'v2' | 'v3'>('v0');
 
   // ---- Undo / Redo ----
   /** Snapshot stack for undo. Each entry is a deep copy of the objects array. */
@@ -1289,74 +1291,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.selectedMarkIndex.set(markIdx);
     };
 
-    this.konva.onBarrierDragEnd = (e) => {
-      const level = this.selectedLevel();
-      if (!level) return;
-      this._pushUndo();
-      const segs = level.roadSegs.slice();
-      const seg = { ...segs[e.segIdx] };
-      const step = 10; // BARRIER_HANDLE_STEP
-      const prevHandle = e.segIdx - step;
-      const nextHandle = Math.min(e.segIdx + step, segs.length - 1);
-
-      if (e.side === 'left') {
-        // Only move the outer left barrier (v0); do NOT move v1 to avoid forking the road.
-        seg.v0 = e.worldX;
-      } else if (e.side === 'right') {
-        // Only move the outer right barrier (v3); do NOT move v2 to avoid forking the road.
-        seg.v3 = e.worldX;
-      } else if (e.side === 'v1') {
-        seg.v1 = Math.min(e.worldX, seg.v2);
-      } else if (e.side === 'v2') {
-        seg.v2 = Math.max(e.worldX, seg.v1);
-      }
-      segs[e.segIdx] = seg;
-
-      // Interpolate between previous and next handles
-      if (prevHandle >= 0) {
-        const prevSeg = segs[prevHandle];
-        for (let i = prevHandle + 1; i < e.segIdx; i++) {
-          const t = (i - prevHandle) / (e.segIdx - prevHandle);
-          const s = { ...segs[i] };
-          if (e.side === 'left') {
-            s.v0 = Math.round(prevSeg.v0 + t * (seg.v0 - prevSeg.v0));
-          } else if (e.side === 'right') {
-            s.v3 = Math.round(prevSeg.v3 + t * (seg.v3 - prevSeg.v3));
-          } else if (e.side === 'v1') {
-            s.v1 = Math.round(prevSeg.v1 + t * (seg.v1 - prevSeg.v1));
-          } else if (e.side === 'v2') {
-            s.v2 = Math.round(prevSeg.v2 + t * (seg.v2 - prevSeg.v2));
-          }
-          segs[i] = s;
-        }
-      }
-      if (nextHandle < segs.length && nextHandle > e.segIdx) {
-        const nextSeg = segs[nextHandle];
-        for (let i = e.segIdx + 1; i < nextHandle && i < segs.length; i++) {
-          const t = (i - e.segIdx) / (nextHandle - e.segIdx);
-          const s = { ...segs[i] };
-          if (e.side === 'left') {
-            s.v0 = Math.round(seg.v0 + t * (nextSeg.v0 - seg.v0));
-          } else if (e.side === 'right') {
-            s.v3 = Math.round(seg.v3 + t * (nextSeg.v3 - seg.v3));
-          } else if (e.side === 'v1') {
-            s.v1 = Math.round(seg.v1 + t * (nextSeg.v1 - seg.v1));
-          } else if (e.side === 'v2') {
-            s.v2 = Math.round(seg.v2 + t * (nextSeg.v2 - seg.v2));
-          }
-          segs[i] = s;
-        }
-      }
-
-      this.parsedLevels.update((levels) =>
-        levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
-      );
-      this._lastBarriersSerialized = ''; // force barriers redraw after drag
-      this._roadOffscreenKey = '';       // invalidate road texture cache so road preview updates
-      this.roadSegsVersion.update((v) => v + 1); // signal-based invalidation for road cache key
-      this.scheduleCanvasRedraw();       // trigger immediate redraw so barriers update visually
-    };
-
     // ── Pan via Konva stage mouse events ───────────────────────────────────
     // The Konva container intercepts ALL mouse events before they reach the
     // underlying #object-canvas.  We must handle panning through Konva's own
@@ -1374,8 +1308,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (kc) kc.style.cursor = 'grabbing';
         return;
       }
-      if (button === 0 && this.barrierDrawMode() && this.showBarriers()) {
-        // Start barrier draw gesture
+      if (button === 0 && this.showBarriers()) {
+        // Start barrier draw gesture (draw mode is always active when barriers are visible)
         const [wx, wy] = this.canvasToWorld(cssX, cssY);
         this._barrierDrawing = true;
         this._barrierDrawPath = [{ wx, wy }];
@@ -2374,6 +2308,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   selectObject(index: number, centerCanvas = false): void {
     this.selectedObjIndex.set(index);
+    // Cancel any in-progress barrier draw when an object is selected.
+    if (this._barrierDrawing) {
+      this._barrierDrawing = false;
+      this._barrierDrawPath = [];
+    }
+    const kc = document.getElementById('konva-container');
+    if (kc) kc.style.cursor = 'default';
+    this.konva.clearBarrierDrawPreview();
     const objs = this.objects();
     if (index >= 0 && index < objs.length) {
       const obj = objs[index];
@@ -2405,6 +2347,24 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.applyObjEdit();
   }
 
+  /** Handler for direction input in degrees (converts to radians internally). */
+  onObjDirDegInput(event: Event): void {
+    const target = event.target as EventTarget & { value?: string };
+    const deg = parseFloat(target?.value ?? '');
+    if (Number.isNaN(deg)) return;
+    const rad = deg * Math.PI / 180;
+    // Normalise to [-π, π] using atan2 of the unit vector – handles all edge cases.
+    const wrapped = Math.atan2(Math.sin(rad), Math.cos(rad));
+    this.editObjDir.set(wrapped);
+    this.applyObjEdit();
+  }
+
+  /** Handler for typeRes selection change from the dropdown. */
+  onObjTypeResChange(typeRes: number): void {
+    this.editObjTypeRes.set(typeRes);
+    this.applyObjEdit();
+  }
+
   applyObjEdit(): void {
     const idx = this.selectedObjIndex();
     if (idx === null) return;
@@ -2423,7 +2383,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   addObject(): void {
     this._pushUndo();
     const objs = [...this.objects()];
-    objs.push({ x: 0, y: 0, dir: 0, typeRes: 128 });
+    objs.push({ x: Math.round(this.canvasPanX()), y: Math.round(this.canvasPanY()), dir: 0, typeRes: 128 });
     this.objects.set(objs);
     this.selectObject(objs.length - 1);
   }
@@ -2893,21 +2853,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         } else {
           this._joinAdjacentMarkNubs();
         }
-        return;
-      }
-    }
-    // Barrier merge/split shortcuts (only when showBarriers is active)
-    if (this.showBarriers()) {
-      // M = merge middle barriers (remove median)
-      if (event.key === 'm' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        this.mergeMiddleBarriers();
-        return;
-      }
-      // D = split/diverge middle barriers (add median)
-      if (event.key === 'd' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        this.splitMiddleBarriers();
         return;
       }
     }
@@ -3462,108 +3407,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  async saveBarriers(): Promise<void> {
-    const level = this.selectedLevel();
-    const id = this.selectedLevelId();
-    if (!level || id === null) return;
-    try {
-      this.workerBusy.set(true);
-      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_ROAD_SEGS', {
-        resourceId: id,
-        roadSegs: level.roadSegs,
-      });
-      this.applyLevelsResult(result.levels);
-      const msg = `Saved ${level.roadSegs.length} road segments for level ${id - 139}.`;
-      this.resourcesStatus.set(msg);
-      this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Save failed';
-      this.editorError.set(msg);
-      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
-    } finally {
-      this.workerBusy.set(false);
-    }
-  }
-
-  toggleBarrierDrawMode(): void {
-    const next = !this.barrierDrawMode();
-    this.barrierDrawMode.set(next);
-    const kc = document.getElementById('konva-container');
-    if (kc) kc.style.cursor = next ? 'crosshair' : 'default';
-    if (!next) {
-      // Cancel any in-progress draw
-      this._barrierDrawing = false;
-      this._barrierDrawPath = [];
-      this.konva.clearBarrierDrawPreview();
-    }
-  }
-
-  /**
-   * Merge the two inner lane boundaries (v1 and v2) into a single shared line,
-   * collapsing the median and producing one continuous road band from v0 to v3.
-   *
-   * Before: v0 ─ [left lane] ─ v1 ┄┄median┄┄ v2 ─ [right lane] ─ v3
-   * After:  v0 ─────────── [single wide road] ─────────────────── v3
-   *         (v1 = v2 = midpoint of old v1/v2 for each segment)
-   */
-  mergeMiddleBarriers(): void {
-    const level = this.selectedLevel();
-    if (!level || level.roadSegs.length === 0) return;
-    // Check if there is anything to merge (at least one segment with a median)
-    const hasMedian = level.roadSegs.some((s) => s.v2 - s.v1 > 2);
-    if (!hasMedian) {
-      this.snackBar.open('No median to merge — v1 and v2 are already equal.', undefined, { duration: 2500 });
-      return;
-    }
-    this._pushUndo();
-    const segs = level.roadSegs.map((s) => {
-      const mid = Math.round((s.v1 + s.v2) / 2);
-      return { ...s, v1: mid, v2: mid };
-    });
-    this.parsedLevels.update((levels) =>
-      levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
-    );
-    this._lastBarriersSerialized = '';
-    this._roadOffscreenKey = '';
-    this.roadSegsVersion.update((v) => v + 1);
-    this.snackBar.open('✓ Merged middle barriers — median removed.', undefined, { duration: 2000 });
-  }
-
-  /**
-   * Split the shared inner boundary into two separate lines, inserting a median
-   * between the two lanes.  The road becomes a dual-carriageway.
-   *
-   * Before: v0 ─────────── [single wide road] ─────────────────── v3
-   *         (v1 ≈ v2)
-   * After:  v0 ─ [left lane] ─ v1 ┄┄median┄┄ v2 ─ [right lane] ─ v3
-   *
-   * A median half-width of SPLIT_HALF is inserted around the current midpoint.
-   */
-  splitMiddleBarriers(): void {
-    const level = this.selectedLevel();
-    if (!level || level.roadSegs.length === 0) return;
-    const SPLIT_HALF = 30; // world units on each side of the midpoint
-    this._pushUndo();
-    const segs = level.roadSegs.map((s) => {
-      const mid = Math.round((s.v1 + s.v2) / 2);
-      const v1New = mid - SPLIT_HALF;
-      const v2New = mid + SPLIT_HALF;
-      // Keep v1 inside [v0, v2] and v2 inside [v1, v3]
-      return {
-        ...s,
-        v1: Math.max(s.v0, Math.min(v1New, s.v3 - 1)),
-        v2: Math.min(s.v3, Math.max(v2New, s.v0 + 1)),
-      };
-    });
-    this.parsedLevels.update((levels) =>
-      levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
-    );
-    this._lastBarriersSerialized = '';
-    this._roadOffscreenKey = '';
-    this.roadSegsVersion.update((v) => v + 1);
-    this.snackBar.open(`✓ Split middle barriers — ${SPLIT_HALF * 2} world-unit median added.`, undefined, { duration: 2500 });
-  }
-
   /**
    * Apply the current barrier draw path to road segments.
    *
@@ -3614,6 +3457,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       switch (side) {
         case 'v0': return { ...seg, v0: newX };
         case 'v1': return { ...seg, v1: newX };
+        case 'i':  return { ...seg, v1: newX, v2: newX };
         case 'v2': return { ...seg, v2: newX };
         case 'v3': return { ...seg, v3: newX };
         default:   return seg;
@@ -3884,6 +3728,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       for (const [typeRes, def] of result.objectTypesArr) {
         if (def) this.objectTypeDefinitions.set(typeRes, def);
       }
+      this.availableTypeIds.set([...this.objectTypeDefinitions.keys()].sort((a, b) => a - b));
 
       // Clear previews — fresh ones will arrive shortly from DECODE_SPRITE_PREVIEWS
       this.objectSpritePreviews.clear();

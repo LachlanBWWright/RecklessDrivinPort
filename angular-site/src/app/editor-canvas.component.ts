@@ -21,8 +21,7 @@ export class EditorCanvasComponent {
   @Input() showTrackDown = true;
   @Input() showGrid = true;
   @Input() showBarriers = true;
-  @Input() barrierDrawMode = false;
-  @Input() barrierDrawSide: 'v0' | 'v1' | 'v2' | 'v3' = 'v0';
+  @Input() barrierDrawSide: 'v0' | 'v1' | 'i' | 'v2' | 'v3' = 'v0';
   @Input() canUndo = false;
   @Input() canRedo = false;
   @Input() trackUpCount = 0;
@@ -55,7 +54,6 @@ export class EditorCanvasComponent {
   @Output() frameAll = new EventEmitter<void>();
   @Output() centerSelected = new EventEmitter<void>();
   @Output() toggleTracks = new EventEmitter<void>();
-  @Output() saveTrack = new EventEmitter<void>();
   @Output() zoomIn = new EventEmitter<void>();
   @Output() zoomOut = new EventEmitter<void>();
   @Output() resetView = new EventEmitter<void>();
@@ -68,11 +66,7 @@ export class EditorCanvasComponent {
   @Output() toggleTrackDown = new EventEmitter<void>();
   @Output() toggleGrid = new EventEmitter<void>();
   @Output() toggleBarriers = new EventEmitter<void>();
-  @Output() saveBarriers = new EventEmitter<void>();
-  @Output() mergeMiddleBarriers = new EventEmitter<void>();
-  @Output() splitMiddleBarriers = new EventEmitter<void>();
-  @Output() toggleBarrierDrawMode = new EventEmitter<void>();
-  @Output() barrierDrawSideChange = new EventEmitter<'v0' | 'v1' | 'v2' | 'v3'>();
+  @Output() barrierDrawSideChange = new EventEmitter<'v0' | 'v1' | 'i' | 'v2' | 'v3'>();
   @Output() markSelected = new EventEmitter<number>();
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();
