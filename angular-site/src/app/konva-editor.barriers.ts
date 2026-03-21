@@ -8,6 +8,40 @@ import Konva from 'konva';
  */
 const BARRIER_CULL_MARGIN = 200;
 
+/** Stable node IDs used to reuse Konva Line nodes across rebuilds. */
+const LINE_IDS = {
+  v0: 'barrier-v0',
+  v3: 'barrier-v3',
+  v1: 'barrier-v1',
+  v2: 'barrier-v2',
+} as const;
+
+/**
+ * Ensure a Konva Line with the given id exists in the group.
+ * Creates it on first call, reuses it on subsequent calls.
+ */
+function getOrCreateLine(
+  group: Konva.Group,
+  id: string,
+  attrs: {
+    stroke: string;
+    strokeWidth: number;
+    listening: false;
+    dash?: number[];
+  },
+): Konva.Line {
+  const existing = group.findOne(`#${id}`);
+  if (existing instanceof Konva.Line) {
+    existing.stroke(attrs.stroke);
+    existing.strokeWidth(attrs.strokeWidth);
+    if (attrs.dash) existing.dash(attrs.dash);
+    return existing;
+  }
+  const line = new Konva.Line({ ...attrs, id });
+  group.add(line);
+  return line;
+}
+
 export function buildBarriers(
   barrierWorldGroup: Konva.Group | null,
   barrierLayer: Konva.Layer | null,
@@ -17,8 +51,11 @@ export function buildBarriers(
   panY: number,
 ): void {
   if (!barrierWorldGroup || !barrierLayer) return;
-  barrierWorldGroup.destroyChildren();
-  if (roadSegs.length === 0) return;
+
+  if (roadSegs.length === 0) {
+    barrierWorldGroup.destroyChildren();
+    return;
+  }
 
   const sx = zoom * (cssW / logicalW);
   const sy = zoom * (cssH / logicalH);
@@ -47,45 +84,57 @@ export function buildBarriers(
     v2Points.push(roadSegs[i].v2, -y);
   }
 
-  const leftLine = new Konva.Line({
-    points: leftPoints,
-    stroke: 'rgba(255, 100, 50, 0.7)',
-    strokeWidth: 2 / sx,
-    listening: false,
-  });
-  const rightLine = new Konva.Line({
-    points: rightPoints,
-    stroke: 'rgba(255, 100, 50, 0.7)',
-    strokeWidth: 2 / sx,
-    listening: false,
-  });
-  barrierWorldGroup.add(leftLine);
-  barrierWorldGroup.add(rightLine);
+  const lineW = 2 / sx;
+  const innerLineW = 1.5 / sx;
+  const innerDash = [6 / sx, 4 / sx];
 
-  // Draw v1/v2 lines (inner lane boundaries) - lighter color
-  // Only show the v1/v2 lines when there actually IS a median (v1 ≠ v2).
-  // If all visible segments have v1 == v2 the road is a single road and the
-  // dashed lines would be on top of each other — skip them in that case.
+  // Reuse existing Konva Line nodes instead of destroying and recreating.
+  // This avoids the GC pressure of ~4 Konva.Line destructions per scroll frame.
+  const leftLine = getOrCreateLine(barrierWorldGroup, LINE_IDS.v0, {
+    stroke: 'rgba(255, 100, 50, 0.7)',
+    strokeWidth: lineW,
+    listening: false,
+  });
+  leftLine.points(leftPoints);
+
+  const rightLine = getOrCreateLine(barrierWorldGroup, LINE_IDS.v3, {
+    stroke: 'rgba(255, 100, 50, 0.7)',
+    strokeWidth: lineW,
+    listening: false,
+  });
+  rightLine.points(rightPoints);
+
+  // Check for median (v1 ≠ v2) to decide whether to show inner lines
   let hasMedian = false;
   for (let i = segFirst; i <= segLast; i++) {
     if (roadSegs[i].v2 - roadSegs[i].v1 > 2) { hasMedian = true; break; }
   }
+
   if (hasMedian) {
-    const v1Line = new Konva.Line({
-      points: v1Points,
+    const v1Line = getOrCreateLine(barrierWorldGroup, LINE_IDS.v1, {
       stroke: 'rgba(255, 200, 50, 0.7)',
-      strokeWidth: 1.5 / sx,
+      strokeWidth: innerLineW,
       listening: false,
-      dash: [6 / sx, 4 / sx],
+      dash: innerDash,
     });
-    const v2Line = new Konva.Line({
-      points: v2Points,
+    v1Line.points(v1Points);
+
+    const v2Line = getOrCreateLine(barrierWorldGroup, LINE_IDS.v2, {
       stroke: 'rgba(255, 200, 50, 0.7)',
-      strokeWidth: 1.5 / sx,
+      strokeWidth: innerLineW,
       listening: false,
-      dash: [6 / sx, 4 / sx],
+      dash: innerDash,
     });
-    barrierWorldGroup.add(v1Line);
-    barrierWorldGroup.add(v2Line);
+    v2Line.points(v2Points);
+
+    // Make sure inner lines are visible
+    v1Line.visible(true);
+    v2Line.visible(true);
+  } else {
+    // Hide inner lines rather than destroying them (cheaper to re-show later)
+    const v1Line = barrierWorldGroup.findOne(`#${LINE_IDS.v1}`);
+    const v2Line = barrierWorldGroup.findOne(`#${LINE_IDS.v2}`);
+    v1Line?.visible(false);
+    v2Line?.visible(false);
   }
 }

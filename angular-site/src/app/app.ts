@@ -476,15 +476,15 @@ const MAC_8BIT_PALETTE: readonly number[] = [
   0,153,255,   0,153,204,   0,153,153,   0,153,102,   0,153,51,    0,153,0,
   0,102,255,   0,102,204,   0,102,153,   0,102,102,   0,102,51,    0,102,0,
   0,51,255,    0,51,204,    0,51,153,    0,51,102,    0,51,51,     0,51,0,
-  0,0,255,     0,0,204,     0,0,153,     0,0,102,     0,0,51,
-  // 20 grayscale steps (entry 216..235) + 20 additional system colors (236..255)
+  0,0,255,     0,0,204,     0,0,153,     0,0,102,     0,0,51,      0,0,0,
+  // 40 system/grayscale entries (indices 216..255)
   0,0,0,         17,17,17,      34,34,34,      51,51,51,      68,68,68,      85,85,85,
   102,102,102,   119,119,119,   136,136,136,   153,153,153,   170,170,170,   187,187,187,
   204,204,204,   221,221,221,   238,238,238,   255,165,0,     255,128,0,     128,0,128,
   128,128,0,     0,128,128,     0,128,0,       128,0,0,       0,0,128,       210,180,140,
   160,82,45,     139,69,19,     105,105,105,   112,128,144,   119,136,153,   47,79,79,
   72,61,139,     139,0,139,     0,100,0,       165,42,42,     188,143,143,   173,153,127,
-  244,164,96,    210,105,30,    255,218,185,
+  244,164,96,    210,105,30,    255,218,185,   0,0,0,
 ];
 
 
@@ -1068,6 +1068,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.selectedMarkIndex();
       if (typeof window !== 'undefined') {
         window.requestAnimationFrame(() => this.redrawMarkCanvas());
+      }
+    });
+
+    // Reactively update the Konva container cursor when the draw mode changes.
+    effect(() => {
+      const mode = this.drawMode();
+      if (typeof document === 'undefined') return;
+      const kc = document.getElementById('konva-container');
+      if (!kc) return;
+      if (!this.spaceDown() && !this._isPanning) {
+        kc.style.cursor = mode !== 'none' ? 'crosshair' : 'default';
       }
     });
   }
