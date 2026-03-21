@@ -53,7 +53,24 @@
     <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
       <mat-icon>edit_location</mat-icon>
     </button>
-    @if (showBarriers) {
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Draw mode selector: 'none' = select/pan; other values enable barrier drawing -->
+    <mat-button-toggle-group [value]="drawMode" (change)="drawModeChange.emit($event.value)"
+                             matTooltip="Select draw mode">
+      <mat-button-toggle value="none" matTooltip="Select / pan (no drawing)">
+        <mat-icon>pan_tool</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="freehand" [disabled]="!showBarriers" matTooltip="Freehand barrier draw">
+        <mat-icon>gesture</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="straight" [disabled]="!showBarriers" matTooltip="Straight-line barrier draw">
+        <mat-icon>show_chart</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="curve" [disabled]="!showBarriers" matTooltip="Smoothed curve barrier draw">
+        <mat-icon>timeline</mat-icon>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+    @if (showBarriers && drawMode !== 'none') {
       <mat-button-toggle-group [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
                                matTooltip="Select which barrier side to draw">
         <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>

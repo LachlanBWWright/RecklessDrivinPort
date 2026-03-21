@@ -1,6 +1,8 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import type { ObjectPos, MarkSeg, TrackWaypointRef } from './level-editor.service';
 
+export type DrawMode = 'none' | 'freehand' | 'straight' | 'curve';
+
 @Component({
   selector: 'app-editor-canvas',
   templateUrl: './editor-canvas.component.html',
@@ -22,6 +24,8 @@ export class EditorCanvasComponent {
   @Input() showGrid = true;
   @Input() showBarriers = true;
   @Input() barrierDrawSide: 'v0' | 'v1' | 'i' | 'v2' | 'v3' = 'v0';
+  /** Current draw mode.  'none' = select/pan only; other values activate barrier drawing. */
+  @Input() drawMode: DrawMode = 'none';
   @Input() canUndo = false;
   @Input() canRedo = false;
   @Input() trackUpCount = 0;
@@ -67,6 +71,7 @@ export class EditorCanvasComponent {
   @Output() toggleGrid = new EventEmitter<void>();
   @Output() toggleBarriers = new EventEmitter<void>();
   @Output() barrierDrawSideChange = new EventEmitter<'v0' | 'v1' | 'i' | 'v2' | 'v3'>();
+  @Output() drawModeChange = new EventEmitter<DrawMode>();
   @Output() markSelected = new EventEmitter<number>();
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();

@@ -707,6 +707,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _barrierDrawing = false;
   /** World-coordinate points collected during the current barrier draw gesture. */
   private _barrierDrawPath: { wx: number; wy: number }[] = [];
+  /** Start point for straight-line barrier draw mode (set on mousedown, cleared on mouseup). */
+  private _barrierDrawStart: { wx: number; wy: number } | null = null;
   /** RAF gate: true while a hover-detection frame is already queued. */
   private _hoverRafPending = false;
   /** Pending waypoint position during a live drag (committed to signal on mouseup). */
@@ -743,6 +745,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   showBarriers = signal(true);
   /** Which barrier side the draw tool affects: v0=left outer, v1=left inner, i=merge inner, v2=right inner, v3=right outer. */
   barrierDrawSide = signal<'v0' | 'v1' | 'i' | 'v2' | 'v3'>('v0');
+  /**
+   * Draw mode for the barrier/road editor canvas.
+   * 'none'     = select/pan (no drawing; objects can be clicked/dragged normally)
+   * 'freehand' = draw by dragging (path follows mouse)
+   * 'straight' = click two endpoints; a straight line is applied between them
+   * 'curve'    = freehand path with smoothing applied on commit
+   */
+  drawMode = signal<'none' | 'freehand' | 'straight' | 'curve'>('none');
 
   // ---- Undo / Redo ----
   /** Snapshot stack for undo. Each entry is a deep copy of the objects array. */
@@ -1308,11 +1318,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (kc) kc.style.cursor = 'grabbing';
         return;
       }
-      if (button === 0 && this.showBarriers()) {
-        // Start barrier draw gesture (draw mode is always active when barriers are visible)
+      if (button === 0 && this.showBarriers() && this.drawMode() !== 'none') {
+        // Start barrier draw gesture (only when a draw mode is selected)
         const [wx, wy] = this.canvasToWorld(cssX, cssY);
         this._barrierDrawing = true;
-        this._barrierDrawPath = [{ wx, wy }];
+        if (this.drawMode() === 'straight') {
+          // Straight-line mode: record start point; path will be finalised on mouseup
+          this._barrierDrawStart = { wx, wy };
+          this._barrierDrawPath = [{ wx, wy }];
+        } else {
+          this._barrierDrawStart = null;
+          this._barrierDrawPath = [{ wx, wy }];
+        }
         const kc = document.getElementById('konva-container');
         if (kc) kc.style.cursor = 'crosshair';
         return;
@@ -1343,13 +1360,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
       if (this._barrierDrawing) {
         const [wx, wy] = this.canvasToWorld(cssX, cssY);
-        this._barrierDrawPath.push({ wx, wy });
-        // Update preview line (every N points to reduce noise)
-        if (this._barrierDrawPath.length % 3 === 0) {
-          const pts: number[] = [];
-          for (const p of this._barrierDrawPath) { pts.push(p.wx, -p.wy); }
-          this.konva.setBarrierDrawPreview(pts);
+        if (this.drawMode() === 'straight' && this._barrierDrawStart) {
+          // Straight-line mode: track start→current end in path and show preview
+          this._barrierDrawPath = [this._barrierDrawStart, { wx, wy }];
+          const start = this._barrierDrawStart;
+          this.konva.setBarrierDrawPreview([start.wx, -start.wy, wx, -wy]);
           this.konva.flush();
+        } else {
+          this._barrierDrawPath.push({ wx, wy });
+          // Update preview line (every N points to reduce noise)
+          if (this._barrierDrawPath.length % 3 === 0) {
+            const pts: number[] = [];
+            for (const p of this._barrierDrawPath) { pts.push(p.wx, -p.wy); }
+            this.konva.setBarrierDrawPreview(pts);
+            this.konva.flush();
+          }
         }
         return;
       }
@@ -1366,14 +1391,25 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this._isPanning = false;
           this.isPanning.set(false);
           const kc = document.getElementById('konva-container');
-          if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : 'default';
+          if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : (this.drawMode() !== 'none' ? 'crosshair' : 'default');
         }
         if (this._barrierDrawing) {
           this._barrierDrawing = false;
           this.konva.clearBarrierDrawPreview();
-          this._applyBarrierDrawPath();
+          if (this.drawMode() === 'straight') {
+            // Straight-line mode: _barrierDrawPath is [start, end] set during mousemove.
+            // _applyBarrierDrawPath() handles 2-point paths as a straight line.
+            this._barrierDrawStart = null;
+            this._applyBarrierDrawPath();
+          } else if (this.drawMode() === 'curve') {
+            // Curve mode: smooth the accumulated path before applying
+            this._smoothBarrierDrawPath();
+            this._applyBarrierDrawPath();
+          } else {
+            this._applyBarrierDrawPath();
+          }
           const kc = document.getElementById('konva-container');
-          if (kc) kc.style.cursor = 'crosshair';
+          if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : (this.drawMode() !== 'none' ? 'crosshair' : 'default');
         }
         if (this._draggingStartMarker) {
           this._draggingStartMarker = false;
@@ -2868,9 +2904,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (event.key === ' ') {
       this.spaceDown.set(false);
       this.konva.setPanMode(false);
-      // Restore cursor
+      // Restore cursor based on current draw mode
       const kc = document.getElementById('konva-container');
-      if (kc) kc.style.cursor = 'crosshair';
+      if (kc) kc.style.cursor = this.drawMode() !== 'none' ? 'crosshair' : 'default';
       if (this._isPanning) {
         this._isPanning = false;
         this.isPanning.set(false);
@@ -3405,6 +3441,27 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     } finally {
       this.workerBusy.set(false);
     }
+  }
+
+  /**
+   * Apply a moving-average smoothing to the barrier draw path.
+   * Used by curve draw mode to reduce jaggedness before committing.
+   */
+  private _smoothBarrierDrawPath(): void {
+    const path = this._barrierDrawPath;
+    if (path.length < 5) return;
+    const radius = 3;
+    const smoothed: { wx: number; wy: number }[] = [];
+    for (let i = 0; i < path.length; i++) {
+      let sumX = 0, sumY = 0, count = 0;
+      for (let k = Math.max(0, i - radius); k <= Math.min(path.length - 1, i + radius); k++) {
+        sumX += path[k].wx;
+        sumY += path[k].wy;
+        count++;
+      }
+      smoothed.push({ wx: sumX / count, wy: sumY / count });
+    }
+    this._barrierDrawPath = smoothed;
   }
 
   /**
@@ -5279,28 +5336,24 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
      * @param texId        – key into roadTextureCanvases
      * @param texWorldSize – how many world units one tile of this texture covers
      *                       (128 for main road/grass textures; 16 for border/kerb textures).
-     *                       Combined with tc.width (pixel size of the texture canvas), the
-     *                       scale factor is: zoom * tc.width / texWorldSize canvas-pixels per
-     *                       texture-pixel (NOT a 1:1 pixel=world-unit relationship).
+     * @param anchorWorldX – optional world X to anchor the pattern's left edge to (default 0).
+     *                       Pass the outer edge of the kerb strip so the texture is attached
+     *                       to the road boundary rather than the global world origin.
      */
-    const makePattern = (texId: number, texWorldSize: number): CanvasPattern | string | null => {
+    const makePattern = (texId: number, texWorldSize: number, anchorWorldX = 0): CanvasPattern | string | null => {
       const tc = this.roadTextureCanvases.get(texId);
       if (!tc) return null;
       try {
         const pat = ctx.createPattern(tc, 'repeat');
         if (!pat) return null;
-        // Scale: one world unit = zoom canvas pixels; one texture tile covers texWorldSize
-        // world units → texWorldSize * zoom canvas pixels for the full tile.
-        // tc.width texture pixels must fill that many canvas pixels → scale per pixel.
         const scale = zoom * tc.width / texWorldSize;
-        // Tile size in canvas pixels
         const tileW = tc.width * scale;
         const tileH = tc.height * scale;
-        // Translate so that world origin (0,0) aligns with a tile boundary.
-        // Canvas-Y of world Y=0: cy = (H/2 + yOverhang) - (0 - panY)*zoom = H/2 + yOverhang + panY*zoom
-        const tx = ((W / 2 - panX * zoom) % tileW + tileW) % tileW;
+        // Anchor the pattern's U=0 to anchorWorldX (for kerbs: the outer road edge).
+        // This makes the texture track the road boundary instead of the world X origin,
+        // so the kerb visually bends with the road rather than tiling globally.
+        const tx = ((W / 2 + (anchorWorldX - panX) * zoom) % tileW + tileW) % tileW;
         const ty = (((H / 2 + yOverhang) + panY * zoom) % tileH + tileH) % tileH;
-        // DOMMatrix: [a, b, c, d, e, f] = [scaleX, 0, 0, scaleY, translateX, translateY]
         pat.setTransform(new DOMMatrix([scale, 0, 0, scale, tx, ty]));
         return pat;
       } catch {
@@ -5308,11 +5361,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
     };
 
-    // Obtain patterns (fall back to theme colours if textures not yet loaded)
-    const bgPat   = ri ? (makePattern(ri.backgroundTex, 128)  ?? theme.bg)   : theme.bg;
-    const fgPat   = ri ? (makePattern(ri.foregroundTex, 128)  ?? theme.road)  : theme.road;
-    const lbPat   = ri ? (makePattern(ri.roadLeftBorder, 16)  ?? theme.kerbA) : theme.kerbA;
-    const rbPat   = ri ? (makePattern(ri.roadRightBorder, 16) ?? theme.kerbB) : theme.kerbB;
+    // Obtain patterns (fall back to theme colours if textures not yet loaded).
+    // For background and road surface, use world-origin alignment (large tiles, looks fine).
+    // For kerb/border strips, anchor to the mid-viewport road edge so the texture tracks
+    // the road boundary as it curves rather than tiling relative to world X=0.
+    const bgPat = ri ? (makePattern(ri.backgroundTex, 128) ?? theme.bg) : theme.bg;
+    const fgPat = ri ? (makePattern(ri.foregroundTex, 128) ?? theme.road) : theme.road;
     // Centre line: cyan for water, yellow for asphalt
     const CENTRE_COLOUR = theme.water ? 'rgba(80, 255, 180, 0.85)' : 'rgba(255, 248, 140, 0.85)';
 
@@ -5320,13 +5374,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Instead of calling fill() for every quad, we accumulate subpaths per fill style
     // and flush with a single fill() per style after all segments are processed.
     // This reduces fill() calls from O(6 × segments) to O(4) per frame.
-    const batchQuads: [CanvasPattern | string, number[]][] = [
-      [bgPat, []], [fgPat, []], [lbPat, []], [rbPat, []],
-    ];
-    const bgBatch = batchQuads[0][1];
-    const fgBatch = batchQuads[1][1];
-    const lbBatch = batchQuads[2][1];
-    const rbBatch = batchQuads[3][1];
 
     /** Append quad canvas coords to a batch array. Returns false if fully off-screen. */
     const addQuad = (
@@ -5370,6 +5417,24 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Each segment occupies 2 world-Y units; at zoom < 0.25 one segment = < 0.5 canvas px,
     // so merging 4 at a time is visually indistinguishable and 4× faster.
     const step = Math.max(1, Math.ceil(1.5 / zoom));
+
+    // Compute mid-viewport road edge positions for kerb pattern anchoring.
+    // Anchoring U=0 to the outer edge of the kerb makes the texture track the road boundary
+    // as it curves, rather than tiling based on world X position.
+    const midSeg = level.roadSegs[Math.floor((firstSeg + lastSeg) / 2)] ?? level.roadSegs[0];
+    const lbPat = ri
+      ? (makePattern(ri.roadLeftBorder,  16, midSeg.v0 - KERB_WIDTH) ?? theme.kerbA) : theme.kerbA;
+    const rbPat = ri
+      ? (makePattern(ri.roadRightBorder, 16, midSeg.v3) ?? theme.kerbB) : theme.kerbB;
+
+    const batchQuads: [CanvasPattern | string, number[]][] = [
+      [bgPat, []], [fgPat, []], [lbPat, []], [rbPat, []],
+    ];
+    const bgBatch = batchQuads[0][1];
+    const fgBatch = batchQuads[1][1];
+    const lbBatch = batchQuads[2][1];
+    const rbBatch = batchQuads[3][1];
+
     // Compute world extents at canvas edges for background fill (extends beyond road edges)
     const worldMinX = panX - W / (2 * zoom) - 200;
     const worldMaxX = panX + W / (2 * zoom) + 200;
