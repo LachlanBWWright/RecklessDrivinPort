@@ -188,6 +188,8 @@ jobs:
           cp build_wasm/reckless_drivin.js   gh-pages/
           cp build_wasm/reckless_drivin.wasm gh-pages/
           cp build_wasm/reckless_drivin.data gh-pages/
+          # Copy the default resource pack for the level editor and game loader.
+          cp port/resources/resources.dat gh-pages/
           # Copy Angular pre-built static files (output directory from ng build)
           ANGULAR_DIST="angular-site/dist/reckless-drivin/browser"
           if [ -d "$ANGULAR_DIST" ]; then
