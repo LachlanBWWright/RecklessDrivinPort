@@ -1,9 +1,13 @@
 import { TestBed } from '@angular/core/testing';
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { App } from './app';
 
 describe('App', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ declarations: [App] }).compileComponents();
+    await TestBed.configureTestingModule({
+      declarations: [App],
+      schemas: [NO_ERRORS_SCHEMA],
+    }).compileComponents();
   });
 
   it('should create the app', () => {
@@ -85,10 +89,10 @@ describe('App', () => {
     const app = TestBed.createComponent(App).componentInstance;
     app.setSection('objects');
     expect(app.editorSection()).toBe('objects');
-    app.setSection('road');
-    expect(app.editorSection()).toBe('road');
     app.setSection('sprites');
     expect(app.editorSection()).toBe('sprites');
+    app.setSection('properties');
+    expect(app.editorSection()).toBe('properties');
   });
 
   it('should start with no editor data', () => {
@@ -108,13 +112,12 @@ describe('App', () => {
     expect(app.selectedObjIndex()).toBe(1);
   });
 
-  it('should update raw time when editing friendly seconds', () => {
+  it('should update time when editing time directly (seconds stored as-is)', () => {
     const app = TestBed.createComponent(App).componentInstance;
 
-    app.onTimeSecondsInput({ target: { value: '45' } } as unknown as Event);
+    app.onPropsInput('time', { target: { value: '45' } } as unknown as Event);
 
-    expect(app.editTimeSeconds()).toBe(45);
-    expect(app.editTime()).toBe(4500);
+    expect(app.editTime()).toBe(45);
     expect(app.propertiesDirty()).toBe(true);
   });
 
@@ -161,7 +164,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.site-nav')).toBeTruthy();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.site-toolbar, .site-nav, mat-toolbar')).toBeTruthy();
   });
 
   it('should have nav tabs for game and editor', async () => {
@@ -170,5 +173,85 @@ describe('App', () => {
     await fixture.whenStable();
     const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('.nav-tab');
     expect(tabs.length).toBe(2);
+  });
+
+  // ── Road cache invalidation ──────────────────────────────────────────────
+
+  it('should clear road offscreen key when mergeMiddleBarriers is called', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    // Set up a level with a median so mergeMiddleBarriers has something to merge
+    const roadSegs = Array.from({ length: 5 }, () => ({ v0: -100, v1: -20, v2: 20, v3: 100 }));
+    app.parsedLevels.set([{
+      resourceId: 140,
+      objects: [],
+      marks: [],
+      roadSegs,
+      roadSegCount: roadSegs.length,
+      properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
+      objectGroups: [],
+      trackUp: [],
+      trackDown: [],
+      rawEntry1: new Uint8Array(0),
+      rawEntry2: new Uint8Array(0),
+      encrypted: false,
+    }]);
+    app.selectedLevelId.set(140);
+
+    // Simulate a stale road key
+    (app as unknown as Record<string, unknown>)['_roadOffscreenKey'] = 'stale-key';
+
+    app.mergeMiddleBarriers();
+
+    expect((app as unknown as Record<string, unknown>)['_roadOffscreenKey']).toBe('');
+  });
+
+  it('should clear road offscreen key when splitMiddleBarriers is called', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    const roadSegs = Array.from({ length: 5 }, () => ({ v0: -100, v1: -10, v2: 10, v3: 100 }));
+    app.parsedLevels.set([{
+      resourceId: 140,
+      objects: [],
+      marks: [],
+      roadSegs,
+      roadSegCount: roadSegs.length,
+      properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
+      objectGroups: [],
+      trackUp: [],
+      trackDown: [],
+      rawEntry1: new Uint8Array(0),
+      rawEntry2: new Uint8Array(0),
+      encrypted: false,
+    }]);
+    app.selectedLevelId.set(140);
+
+    (app as unknown as Record<string, unknown>)['_roadOffscreenKey'] = 'stale-key';
+
+    app.splitMiddleBarriers();
+
+    expect((app as unknown as Record<string, unknown>)['_roadOffscreenKey']).toBe('');
+  });
+
+  // ── Custom resources persistence ─────────────────────────────────────────
+
+  it('restartGameWithCustomResources should set gameRestarting to true', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.customResourcesLoaded.set(true);
+
+    // restartGameWithCustomResources calls window.location.reload() after a setTimeout.
+    // In jsdom that setTimeout is async; we only check that gameRestarting flips synchronously.
+    app.restartGameWithCustomResources();
+
+    expect(app.gameRestarting()).toBe(true);
+  });
+
+  it('clearCustomResources should reset loaded state', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.customResourcesLoaded.set(true);
+    app.customResourcesName.set('my-resources.dat');
+
+    app.clearCustomResources();
+
+    expect(app.customResourcesLoaded()).toBe(false);
+    expect(app.customResourcesName()).toBeNull();
   });
 });

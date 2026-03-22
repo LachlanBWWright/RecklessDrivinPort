@@ -26,7 +26,7 @@ That means:
 - **Load default resources.dat** works in dev mode
 - the **game panel also works in dev mode** as soon as you have built the WASM bundle once
 
-### Tested dev flow
+### Exact tested dev flow (level editor)
 
 These are the exact commands that should work from a fresh clone:
 
@@ -41,12 +41,20 @@ Then in the browser:
 1. open `http://localhost:4200/`
 2. switch to **Level Editor**
 3. click **Load default resources.dat**
+4. wait for the spinning indicator to disappear — LZRW3-A decompression runs in a
+   **background web worker** so the page stays responsive while packs are parsed
 
-If that fails, stop and restart `npm start` so the prestart asset sync runs again.
+If the spinner appears but data never loads, stop `npm start`, rerun it, and try again —
+the prestart sync may not have run in a previous session.
+
+> **Important:** the `prestart` step copies `resources.dat` into `angular-site/public/`
+> before the dev server launches. If you ran `npx ng serve` directly (bypassing
+> `npm start`), the file will not be in place and **Load default resources.dat** will
+> fail. Always use `npm start`.
 
 Notes:
 
-- The Angular site now lives at the repo top level in `angular-site/`.
+- The Angular site lives at the repo top level in `angular-site/`.
 - The site uses a **relative base href** (`./`), so the same build works:
   - locally at `/`
   - on GitHub Pages at `/RecklessDrivinPort/`
@@ -123,7 +131,7 @@ Useful variants:
 
 ## Requirements
 
-### Angular site only
+### Angular site only (level editor, no game)
 
 - Node.js 20+
 - npm
@@ -132,8 +140,10 @@ Useful variants:
 
 - Node.js 20+
 - npm
-- cmake
+- cmake 3.13+
 - Emscripten SDK (`emcc` in PATH, `$EMSDK`, `~/emsdk`, or `./emsdk`)
+
+The `build-wasm-local.sh` script auto-discovers Emscripten from those locations.
 
 ## Common commands
 
@@ -156,10 +166,11 @@ cmake --build build --parallel
 ## Where things are
 
 - `angular-site/` — Angular frontend, level editor, tests
-- `port/resources/resources.dat` — default game resources
-- `build_wasm/` — local Emscripten output
-- `gh-pages-local/` — assembled local web output
-- `angular-site/public/resources.dat` and `angular-site/public/reckless_drivin.*` — generated dev assets copied by `npm start` / `npm run sync:dev-assets`
+- `angular-site/src/app/pack.worker.ts` — background web worker for LZRW3-A pack parsing
+- `port/resources/resources.dat` — default game resources (tracked in git)
+- `build_wasm/` — local Emscripten output (gitignored)
+- `gh-pages-local/` — assembled local web output (gitignored)
+- `angular-site/public/resources.dat` and `angular-site/public/reckless_drivin.*` — generated dev assets copied by `npm start` / `npm run sync:dev-assets` (gitignored)
 
 ## Troubleshooting
 
@@ -179,7 +190,7 @@ cd angular-site
 npm run sync:dev-assets
 ```
 
-### `Failed to load resources` / `Invalid resources.dat: truncated payload ...`
+### `Failed to load resources` / `Invalid resources.dat: truncated payload …`
 
 That usually means the dev server served HTML instead of the binary file.
 
@@ -191,6 +202,13 @@ npm start
 ```
 
 The prestart step copies `port/resources/resources.dat` into the dev assets before Angular launches.
+
+### Level editor spinner never goes away
+
+The LZRW3-A decompression runs in a background web worker. If the spinner is
+stuck, open DevTools → Console and look for worker errors. The most common cause
+is opening the page from a file path (`file://`) instead of a local server — always
+use `npm start` which runs a proper dev server.
 
 ### Manual upload gives pack/LZRW problems
 

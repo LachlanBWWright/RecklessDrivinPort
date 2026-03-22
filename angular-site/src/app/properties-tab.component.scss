@@ -1,0 +1,114 @@
+/* Properties tab styles */
+:host { display: block; }
+
+/* Ensure the card has inner padding so content doesn't touch edges */
+.tab-panel-card {
+  padding: 16px; /* consistent inner spacing */
+  box-sizing: border-box;
+}
+
+/* Content area — use a responsive grid for the small form fields */
+.props-card-content {
+  padding: 0; /* card already padded above */
+}
+
+.props-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: start;
+  /* Small top/bottom padding so floating labels and hints aren't clipped
+     against the header or the divider */
+  padding-top: 8px;
+  /* Add bottom padding so mat-hint text doesn't clip into the divider below */
+  padding-bottom: 28px;
+  margin-bottom: 8px;
+}
+
+/* Allow content inside the card to show any floating labels/hints
+   that may extend outside the content box so they don't get clipped. */
+.tab-panel-card mat-card-content {
+  overflow: visible;
+}
+
+.prop-field { width: 100%; }
+
+/* Ensure mat-form-field rows are tall enough for hints */
+.prop-field .mat-mdc-form-field-subscript-wrapper {
+  overflow: visible;
+}
+
+/* Table: make sure it fits the card and long content wraps or scrolls */
+.data-table {
+  width: 100%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table table,
+.plain-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* helps prevent overflow by allowing cells to wrap */
+}
+
+.plain-table td,
+.plain-table th {
+  padding: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Allow cells that must wrap (like long resource identifiers) to break */
+.plain-table td.break {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Badges should not overflow the title area */
+.badge {
+  display: inline-block;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+/* Small spacing tweak for actions */
+mat-card-actions {
+  padding-top: 12px;
+  display: flex;
+  gap: 12px; /* space between the save button and the status text */
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Re-use styles defined in app.scss via global stylesheet for mat-card, badges,
+   data-table etc. No additional styles needed here. */
+
+.obj-group-input {
+  width: 80px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font-size: 12px;
+  text-align: right;
+
+  &:focus {
+    outline: none;
+    border-color: rgba(99, 102, 241, 0.7);
+  }
+
+  &.inactive-cell {
+    opacity: 0.45;
+  }
+}
+
+.hint-text {
+  font-size: 12px;
+  margin: 0 0 8px;
+}

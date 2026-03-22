@@ -1,0 +1,91 @@
+<div class="inspector-container">
+  <div class="inspector-top">
+    <div class="inspector-title-row">
+      <span class="inspector-title">Inspector</span>
+    </div>
+    @if (selectedIndex !== null) {
+      <div class="inspector-top-buttons">
+        <button mat-stroked-button class="top-btn" (click)="deselect.emit()" aria-label="Deselect object">
+          <mat-icon>arrow_back</mat-icon>
+        </button>
+        <button mat-stroked-button color="warn" class="top-btn" (click)="removeSelected.emit()" aria-label="Remove object">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    }
+
+    @if (selectedIndex !== null) {
+    <!-- Move object label above the sprite to avoid overlap with fields below -->
+    <div class="inspector-sprite-row inspector-sprite-vertical">
+      <div class="inspector-obj-info">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+          <span class="inspector-obj-label">Object #{{ selectedIndex }}</span>
+          @if (typeDimLabel) {
+            <span class="type-dim-badge">{{ typeDimLabel }}</span>
+          }
+        </div>
+      </div>
+      @if (spriteUrl; as url) {
+        <div class="inspector-sprite-wrapper">
+          <img [src]="url" class="obj-inspector-sprite" alt="sprite preview" />
+        </div>
+      }
+    </div>
+
+    <mat-divider class="inspector-divider"></mat-divider>
+
+
+    <div class="inspector-fields">
+      <mat-form-field appearance="outline" class="inspector-field">
+        <mat-label>Direction (°)</mat-label>
+        <input matInput type="number" step="1" min="-180" max="180"
+          [value]="editDirDeg" (input)="dirDegInput.emit({event: $event})" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="inspector-field">
+        <mat-label>Type ID</mat-label>
+        <mat-select [value]="editTypeRes" (selectionChange)="typeResChange.emit($event.value)">
+          @for (tid of availableTypeIds; track tid) {
+            <mat-option [value]="tid">{{ tid }}</mat-option>
+          }
+          @if (!availableTypeIds.includes(editTypeRes)) {
+            <mat-option [value]="editTypeRes">{{ editTypeRes }} (custom)</mat-option>
+          }
+        </mat-select>
+        <mat-hint>128 = player car</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <mat-divider class="inspector-divider"></mat-divider>
+
+    <div class="type-filter-section">
+      <div class="type-filter-header">
+        <span class="filter-label">Filter by type</span>
+        <div class="filter-actions">
+          <button mat-button (click)="showAll.emit()" class="filter-btn">All</button>
+          <button mat-button (click)="hideAll.emit()" class="filter-btn">None</button>
+        </div>
+      </div>
+      <div class="type-chip-list">
+        @for (type of typePalette; track type.typeId) {
+          <button type="button" class="type-chip"
+            [class.type-chip--inactive]="!visibleTypeFilter.has(type.typeId)"
+            [matTooltip]="'Type ' + type.typeId"
+            (click)="typeVisibilityToggle.emit(type.typeId)">
+            <span class="type-chip-swatch" [style.background]="type.hex"></span>
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- Actions moved to top; keep the auto-apply note here -->
+    <div class="inspector-actions">
+      <span class="auto-apply-note muted">Changes apply automatically</span>
+    </div>
+
+  } @else {
+    <div class="inspector-empty">
+      <p class="muted inspector-empty-text">No object selected</p>
+    </div>
+  }
+</div>

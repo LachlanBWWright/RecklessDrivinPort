@@ -1,0 +1,132 @@
+<!-- Canvas toolbar -->
+<div class="canvas-toolbar">
+  <div class="canvas-controls">
+    <!-- Undo / Redo -->
+    <button mat-icon-button (click)="undo.emit()" [disabled]="!canUndo" matTooltip="Undo (Ctrl+Z)">
+      <mat-icon>undo</mat-icon>
+    </button>
+    <button mat-icon-button (click)="redo.emit()" [disabled]="!canRedo" matTooltip="Redo (Ctrl+Y)">
+      <mat-icon>redo</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Object actions -->
+    <button mat-stroked-button (click)="addObject.emit()" matTooltip="Add new object">
+      <mat-icon>add</mat-icon> Object
+    </button>
+    <button mat-icon-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+    <button mat-icon-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected (Del)">
+      <mat-icon>delete</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- View controls -->
+    <button mat-icon-button (click)="frameAll.emit()" matTooltip="Frame all objects">
+      <mat-icon>fit_screen</mat-icon>
+    </button>
+    <button mat-icon-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
+      <mat-icon>center_focus_strong</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Visibility toggles -->
+    <button mat-icon-button [class.btn-active]="showRoad" (click)="toggleRoad.emit()" matTooltip="Toggle road preview">
+      <mat-icon>road</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showObjects" (click)="toggleObjects.emit()" matTooltip="Toggle objects">
+      <mat-icon>directions_car</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()" matTooltip="Toggle track overlay">
+      <mat-icon>route</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackUp" (click)="toggleTrackUp.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-up waypoints">
+      <mat-icon class="has-custom-color" style="color:#42a5f5">arrow_upward</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showTrackDown" (click)="toggleTrackDown.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-down waypoints">
+      <mat-icon class="has-custom-color" style="color:#ef5350">arrow_downward</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showGrid" (click)="toggleGrid.emit()" matTooltip="Toggle background grid">
+      <mat-icon>grid_on</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showBarriers" (click)="toggleBarriers.emit()" matTooltip="Toggle road barriers">
+      <mat-icon>fence</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
+      <mat-icon>edit_location</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Draw mode selector: 'none' = select/pan; other values enable barrier drawing -->
+    <mat-button-toggle-group [value]="drawMode" (change)="drawModeChange.emit($event.value)"
+                             matTooltip="Select draw mode">
+      <mat-button-toggle value="none" matTooltip="Select / pan (no drawing)">
+        <mat-icon>pan_tool</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="freehand" [disabled]="!showBarriers" matTooltip="Freehand barrier draw">
+        <mat-icon>gesture</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="straight" [disabled]="!showBarriers" matTooltip="Straight-line barrier draw">
+        <mat-icon>show_chart</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="curve" [disabled]="!showBarriers" matTooltip="Smoothed curve barrier draw">
+        <mat-icon>timeline</mat-icon>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+    @if (showBarriers && drawMode !== 'none') {
+      <mat-button-toggle-group [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
+                               matTooltip="Select which barrier side to draw">
+        <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
+        <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
+        <mat-button-toggle value="i" matTooltip="Merge inner barriers: snap both v1 and v2 to the same drawn x">I</mat-button-toggle>
+        <mat-button-toggle value="v2" matTooltip="Right inner barrier (v2)">Ri</mat-button-toggle>
+        <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
+      </mat-button-toggle-group>
+    }
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Zoom controls -->
+    <button mat-icon-button (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
+    <button mat-icon-button (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
+    <button mat-icon-button (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
+  </div>
+</div>
+
+<div class="object-canvas-col">
+  
+  <div class="canvas-with-scrollbars">
+    <canvas id="object-canvas" class="object-canvas" width="900" height="700"
+      tabindex="0"
+      (mousedown)="canvasMouseDown.emit($event)"
+      (mousemove)="canvasMouseMove.emit($event)"
+      (mouseup)="canvasMouseUp.emit($event)"
+      (dblclick)="canvasDblClick.emit($event)"
+      (keydown)="canvasKeyDown.emit($event)"
+      (keyup)="canvasKeyUp.emit($event)"
+      (wheel)="canvasWheel.emit($event)"
+      (contextmenu)="canvasContextMenu.emit($event); $event.preventDefault()"
+      [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'default'))"
+    ></canvas>
+    <!-- Vertical scrollbar: direct mapping - value=min(=0) → see start(Y=0), value=max → see end -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
+      aria-label="Vertical scroll position"
+      [min]="0" [max]="scrollYMax" [step]="10"
+      [value]="panY"
+      (input)="onVertScrollInput($event)"
+    />
+    <!-- Horizontal scrollbar -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
+      [min]="scrollXMin" [max]="scrollXMax" [step]="5"
+      [value]="panX"
+      (input)="onHorizScrollInput($event)"
+    />
+  </div>
+  <div class="canvas-status-bar">
+    <span class="zoom-info">{{ (zoom * 100).toFixed(0) }}%</span>
+    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
+    <span class="pan-info">({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})</span>
+    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
+    <span class="legend-item" style="color:#42a5f5">■ Up</span>
+    <span class="legend-item" style="color:#ef5350">■ Down</span>
+    
+    <span class="legend-item" style="color:#00e5ff">▲ Start X</span>
+  </div>
+
+    
+</div>

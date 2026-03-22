@@ -13,6 +13,7 @@
 #    --port PORT     Use PORT for the local server (default: 8080)
 #    --skip-wasm     Skip Emscripten WASM build (use existing build_wasm/ outputs)
 #    --skip-angular  Skip Angular build (use existing dist/ outputs)
+#    --clean         Remove build_wasm/ before configuring (fresh WASM build)
 #    --no-cleanup    Don't remove previous gh-pages-local/ dir first
 #    --help          Show this help
 #
@@ -54,6 +55,7 @@ SERVE=false
 PORT=8080
 SKIP_WASM=false
 SKIP_ANGULAR=false
+CLEAN_WASM=false
 NO_CLEANUP=false
 
 while [[ $# -gt 0 ]]; do
@@ -62,6 +64,7 @@ while [[ $# -gt 0 ]]; do
     --port)        PORT="${2:?--port requires an argument}"; shift ;;
     --skip-wasm)   SKIP_WASM=true ;;
     --skip-angular)SKIP_ANGULAR=true ;;
+    --clean)       CLEAN_WASM=true ;;
     --no-cleanup)  NO_CLEANUP=true ;;
     --help|-h)
       sed -n '/^#  Usage:/,/^# ====/p' "$0" | sed 's/^# \?//'
@@ -146,11 +149,41 @@ find_and_activate_emsdk() {
     return 0
   fi
 
-  error "Emscripten (emsdk) not found.  Install it from https://emscripten.org/docs/getting_started/downloads.html"
-  error "Then either:"
-  error "  • source ~/emsdk/emsdk_env.sh   (to activate in your shell)"
-  error "  • set EMSDK=<path_to_emsdk>     (to let this script find it)"
-  error "  • run with --skip-wasm           (to skip the WASM build)"
+  # ── Auto-install Emscripten SDK ──────────────────────────────────────────
+  warn "Emscripten (emsdk) not found in any standard location."
+  info "Attempting automatic installation into $REPO_ROOT/emsdk …"
+
+  # Require git
+  if ! command -v git &>/dev/null; then
+    error "git is required to install emsdk automatically but was not found in PATH."
+    error "Install git and re-run, or manually install emsdk: https://emscripten.org/docs/getting_started/downloads.html"
+    exit 1
+  fi
+
+  local EMSDK_INSTALL_DIR="$REPO_ROOT/emsdk"
+
+  if [[ ! -d "$EMSDK_INSTALL_DIR" ]]; then
+    info "Cloning emsdk repository…"
+    git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$EMSDK_INSTALL_DIR"
+  else
+    info "Updating existing emsdk clone at $EMSDK_INSTALL_DIR…"
+    git -C "$EMSDK_INSTALL_DIR" pull --ff-only || true
+  fi
+
+  info "Installing latest Emscripten toolchain…"
+  "$EMSDK_INSTALL_DIR/emsdk" install latest
+  "$EMSDK_INSTALL_DIR/emsdk" activate latest
+
+  # shellcheck source=/dev/null
+  source "$EMSDK_INSTALL_DIR/emsdk_env.sh"
+
+  if command -v emcc &>/dev/null; then
+    success "Emscripten auto-installed and activated: $(emcc --version 2>&1 | head -1)"
+    return 0
+  fi
+
+  error "Emscripten auto-installation failed. Please install manually:"
+  error "  https://emscripten.org/docs/getting_started/downloads.html"
   exit 1
 }
 
@@ -206,6 +239,27 @@ fi
 if ! $SKIP_WASM; then
   step "Building WASM with Emscripten"
   cd "$REPO_ROOT"
+
+  # Manual clean or contamination check
+  if [[ -d "$BUILD_WASM_DIR" ]]; then
+    if $CLEAN_WASM; then
+      info "Cleaning existing WASM build directory…"
+      rm -rf "$BUILD_WASM_DIR"
+    elif [[ -f "$BUILD_WASM_DIR/CMakeCache.txt" ]]; then
+      # Check if the cached emcc matches our active emcc
+      # This prevents "The C compiler identification is unknown" or path mismatch errors
+      CACHED_EMCC=$(grep "CMAKE_C_COMPILER:FILEPATH" "$BUILD_WASM_DIR/CMakeCache.txt" | cut -d= -f2 || true)
+      ACTIVE_EMCC=$(command -v emcc || true)
+      
+      if [[ -n "$CACHED_EMCC" && -n "$ACTIVE_EMCC" && "$CACHED_EMCC" != "$ACTIVE_EMCC" ]]; then
+        warn "Detected Emscripten path mismatch in build cache."
+        warn "  Cached: $CACHED_EMCC"
+        warn "  Active: $ACTIVE_EMCC"
+        info "Automatically cleaning build directory to prevent configuration errors…"
+        rm -rf "$BUILD_WASM_DIR"
+      fi
+    fi
+  fi
 
   info "Configuring CMake for WASM…"
   emcmake cmake -B "$BUILD_WASM_DIR" -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
