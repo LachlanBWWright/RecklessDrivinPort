@@ -1482,15 +1482,15 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
         SndVoice *v = &s_voices[vi];
         if (!v->active || !v->samples || v->num_samples == 0) continue;
 
-        /* Determine the effective loop boundary.  When a loop is defined, we
-         * wrap at loop_end (not at num_samples), preventing audible clicks
-         * caused by playing the trailing audio past the intended loop point.
-         * These values are derived from the SoundHeader at voice-play time and
-         * are immutable during callback execution (the mutex is held for the
-         * duration of this entire loop, so no other thread can modify them). */
-        int      has_loop = (v->loop_end > v->loop_start &&
-                             v->loop_end <= v->num_samples);
-        uint32_t end_pos  = has_loop ? v->loop_end : v->num_samples;
+        /* Reckless Drivin' requeues continuous sounds (engine + skid) via
+         * callBackCmd in source/sound.c rather than relying on SoundHeader loop
+         * points.  Treating every header loopStart/loopEnd pair as an automatic
+         * loop causes one-shot effects such as the missile launch sound to
+         * repeat forever after a single PlaySound() call.  Keep playback
+         * one-shot here and let explicit callback-driven requeueing handle the
+         * genuinely continuous channels. */
+        int      has_loop = 0;
+        uint32_t end_pos  = v->num_samples;
 
         for (int i = 0; i < n_frames; i++) {
             uint32_t idx = (uint32_t)v->pos;

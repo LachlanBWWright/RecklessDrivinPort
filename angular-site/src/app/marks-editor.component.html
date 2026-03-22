@@ -1,0 +1,80 @@
+<!-- Marks (checkpoint) editor — expansion panel -->
+<mat-expansion-panel class="marks-panel" [expanded]="false">
+  <mat-expansion-panel-header>
+    <mat-panel-title>
+      <mat-icon>edit_location</mat-icon>&nbsp;Checkpoint / Mark Segments
+    </mat-panel-title>
+    <mat-panel-description><span class="badge">{{ marks.length }}</span></mat-panel-description>
+  </mat-expansion-panel-header>
+
+  <div class="marks-controls">
+    <button mat-stroked-button (click)="addMark.emit()" [disabled]="workerBusy">
+      <mat-icon>add</mat-icon> Add Mark
+    </button>
+    <button mat-stroked-button color="warn" [disabled]="selectedMarkIndex === null || workerBusy" (click)="removeMark.emit()">
+      <mat-icon>remove</mat-icon> Remove
+    </button>
+    <button mat-raised-button color="primary" (click)="saveMarks.emit()" [disabled]="workerBusy">
+      <mat-icon>save</mat-icon> Save Marks
+    </button>
+  </div>
+  <p class="marks-hint">
+    Drag yellow nubs on canvas to reposition mark endpoints. <kbd>N</kbd> joins/splits nearest nubs (auto-detects if colocated). When two nubs share a position they move together. <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo.
+  </p>
+
+  @if (selectedMarkIndex !== null) {
+    <div class="mark-fields-row">
+      <mat-form-field appearance="outline" class="mark-field">
+        <mat-label>P1 X</mat-label>
+        <input matInput type="number" [value]="marks[selectedMarkIndex!].x1"
+          (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x1', event: $event})" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="mark-field">
+        <mat-label>P1 Y</mat-label>
+        <input matInput type="number" [value]="marks[selectedMarkIndex!].y1"
+          (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y1', event: $event})" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="mark-field">
+        <mat-label>P2 X</mat-label>
+        <input matInput type="number" [value]="marks[selectedMarkIndex!].x2"
+          (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x2', event: $event})" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="mark-field">
+        <mat-label>P2 Y</mat-label>
+        <input matInput type="number" [value]="marks[selectedMarkIndex!].y2"
+          (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y2', event: $event})" />
+      </mat-form-field>
+    </div>
+  }
+
+  <div class="marks-table-container">
+    <!-- Visual drag editor (mini canvas) -->
+    <canvas id="mark-canvas" class="mark-canvas" width="500" height="200"
+      (mousedown)="markCanvasMouseDown.emit($event)"
+      (mousemove)="markCanvasMouseMove.emit($event)"
+      (mouseup)="markCanvasMouseUp.emit($event)"
+      (mouseleave)="markCanvasMouseUp.emit($event)"
+    ></canvas>
+    <!-- Plain HTML table — no mat-table overhead -->
+    <table class="marks-table">
+      <thead>
+        <tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr>
+      </thead>
+      <tbody>
+        @for (mark of marks; track $index) {
+          <tr [class.selected-row]="selectedMarkIndex === $index"
+              (click)="markSelected.emit($index)" style="cursor:pointer">
+            <td>{{ $index }}</td>
+            <td>{{ mark.x1 }}</td>
+            <td>{{ mark.y1 }}</td>
+            <td>{{ mark.x2 }}</td>
+            <td>{{ mark.y2 }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (marks.length === 0) {
+      <p class="marks-empty">No mark segments. Click <strong>Add Mark</strong> to create one.</p>
+    }
+  </div>
+</mat-expansion-panel>
