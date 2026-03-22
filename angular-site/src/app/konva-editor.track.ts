@@ -11,6 +11,7 @@ export function buildTrackWaypoints(
   zoom: number,
   onWaypointDragEnd?: (track: 'up'|'down', segIdx: number, worldX: number, worldY: number) => void,
   onWaypointRightClick?: (track: 'up'|'down', segIdx: number, worldX: number, worldY: number) => void,
+  onWaypointDoubleClick?: (track: 'up'|'down', segIdx: number) => void,
 ): void {
   if (!trackWorldGroup || !trackLayer) return;
 
@@ -22,6 +23,7 @@ export function buildTrackWaypoints(
       const circle = new Konva.Circle({ x: pt.x, y: -pt.y, radius: WAYPOINT_WORLD_R, fill: color, stroke: 'rgba(0,0,0,0.5)', strokeWidth: 1.5 / sx, draggable: !panMode, id: `wp-${track}-${i}` });
       circle.on('dragend', () => { onWaypointDragEnd?.(track, i, Math.round(circle.x()), Math.round(-circle.y())); });
       circle.on('contextmenu', (e) => { e.evt.preventDefault(); e.cancelBubble = true; onWaypointRightClick?.(track, i, circle.x(), -circle.y()); });
+      circle.on('dblclick', (e) => { e.cancelBubble = true; onWaypointDoubleClick?.(track, i); });
       circle.on('mouseenter', () => { circle.radius(WAYPOINT_WORLD_R * 1.4); circle.stroke('#fff'); trackLayer.draw(); document.body.style.cursor = 'grab'; });
       circle.on('mouseleave', () => { circle.radius(WAYPOINT_WORLD_R); circle.stroke('rgba(0,0,0,0.5)'); trackLayer.draw(); document.body.style.cursor = ''; });
       circle.on('dragstart', () => { document.body.style.cursor = 'grabbing'; });

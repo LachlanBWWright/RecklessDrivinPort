@@ -45,13 +45,27 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   /** Palette colours extracted from the sprite */
   palette: { r: number; g: number; b: number; a: number }[] = [];
+  readonly presetPalette: { r: number; g: number; b: number; a: number }[] = [
+    { r: 0, g: 0, b: 0, a: 255 }, { r: 255, g: 255, b: 255, a: 255 }, { r: 224, g: 64, b: 64, a: 255 },
+    { r: 255, g: 167, b: 38, a: 255 }, { r: 255, g: 235, b: 59, a: 255 }, { r: 102, g: 187, b: 106, a: 255 },
+    { r: 38, g: 198, b: 218, a: 255 }, { r: 66, g: 165, b: 245, a: 255 }, { r: 126, g: 87, b: 194, a: 255 },
+    { r: 236, g: 64, b: 122, a: 255 }, { r: 121, g: 85, b: 72, a: 255 }, { r: 158, g: 158, b: 158, a: 255 },
+    { r: 76, g: 175, b: 80, a: 255 }, { r: 0, g: 121, b: 107, a: 255 }, { r: 30, g: 136, b: 229, a: 255 },
+    { r: 57, g: 73, b: 171, a: 255 }, { r: 216, g: 27, b: 96, a: 255 }, { r: 255, g: 112, b: 67, a: 255 },
+    { r: 141, g: 110, b: 99, a: 255 }, { r: 84, g: 110, b: 122, a: 255 }, { r: 255, g: 179, b: 0, a: 255 },
+    { r: 124, g: 179, b: 66, a: 255 }, { r: 41, g: 182, b: 246, a: 255 }, { r: 171, g: 71, b: 188, a: 255 },
+  ];
 
   /** Is the mouse button currently down */
   private mouseDown = false;
 
   /** Undo stack – stores pixel array snapshots */
   private undoStack: Uint8ClampedArray[] = [];
-  private readonly MAX_UNDO = 20;
+  private redoStack: Uint8ClampedArray[] = [];
+  private readonly MAX_UNDO = 40;
+  private rawCanvas: HTMLCanvasElement | null = null;
+  private checkerCanvas: HTMLCanvasElement | null = null;
+  private _pendingDrawRaf: number | null = null;
 
   // ---- Tool icons for display (Material icon names) ----
   toolIcons: Record<SpriteEditorTool, string> = {
@@ -87,10 +101,11 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     this.frameId = frame.frameId;
     this.pixels = frame.pixels.slice() as Uint8ClampedArray;
     this.undoStack = [];
+    this.redoStack = [];
     this.extractPalette();
     this.fitZoom();
     // Draw after a tick so the canvas is in the DOM
-    setTimeout(() => this.draw(), 0);
+    setTimeout(() => this.queueDraw(), 0);
   }
 
   private fitZoom(): void {
@@ -135,22 +150,37 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Checkerboard for transparency
-    for (let py = 0; py < h; py++) {
-      for (let px = 0; px < w; px++) {
-        const i = (py * w + px) * 4;
-        const a = this.pixels[i + 3];
-        if (a === 0) {
-          ctx.fillStyle = ((px + py) & 1) ? '#aaa' : '#888';
-        } else {
-          const r = this.pixels[i];
-          const g = this.pixels[i + 1];
-          const b = this.pixels[i + 2];
-          ctx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
-        }
-        ctx.fillRect(px * z, py * z, z, z);
+    if (!this.checkerCanvas) {
+      this.checkerCanvas = document.createElement('canvas');
+      this.checkerCanvas.width = 8;
+      this.checkerCanvas.height = 8;
+      const checkerCtx = this.checkerCanvas.getContext('2d');
+      if (checkerCtx) {
+        checkerCtx.fillStyle = '#888';
+        checkerCtx.fillRect(0, 0, 8, 8);
+        checkerCtx.fillStyle = '#aaa';
+        checkerCtx.fillRect(0, 0, 4, 4);
+        checkerCtx.fillRect(4, 4, 4, 4);
       }
+    }
+    if (this.checkerCanvas) {
+      const checkerPattern = ctx.createPattern(this.checkerCanvas, 'repeat');
+      if (checkerPattern) {
+        ctx.fillStyle = checkerPattern;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    if (!this.rawCanvas || this.rawCanvas.width !== w || this.rawCanvas.height !== h) {
+      this.rawCanvas = document.createElement('canvas');
+      this.rawCanvas.width = w;
+      this.rawCanvas.height = h;
+    }
+    const rawCtx = this.rawCanvas.getContext('2d');
+    if (rawCtx) {
+      rawCtx.putImageData(new ImageData(new Uint8ClampedArray(this.pixels), w, h), 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.rawCanvas, 0, 0, w * z, h * z);
     }
 
     // Grid lines when zoom >= 4 – all lines in a single path for performance
@@ -199,7 +229,7 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
       case 'eyedropper': this.pickColor(px, py); break;
       case 'fill': this.floodFill(px, py); break;
     }
-    this.draw();
+    this.queueDraw();
   }
 
   private drawPixel(cx: number, cy: number): void {
@@ -278,19 +308,29 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     if (!this.pixels) return;
     this.undoStack.push(this.pixels.slice() as Uint8ClampedArray);
     if (this.undoStack.length > this.MAX_UNDO) this.undoStack.shift();
+    this.redoStack = [];
   }
 
   undo(): void {
     if (this.undoStack.length === 0) return;
+    if (this.pixels) this.redoStack.push(this.pixels.slice() as Uint8ClampedArray);
     const prev = this.undoStack.pop();
     if (prev) this.pixels = prev;
-    this.draw();
+    this.queueDraw();
+  }
+
+  redo(): void {
+    if (this.redoStack.length === 0) return;
+    if (this.pixels) this.undoStack.push(this.pixels.slice() as Uint8ClampedArray);
+    const next = this.redoStack.pop();
+    if (next) this.pixels = next;
+    this.queueDraw();
   }
 
   // ---- Zoom ----
 
-  zoomIn(): void  { this.zoom = Math.min(24, this.zoom + 1); this.draw(); }
-  zoomOut(): void { this.zoom = Math.max(1,  this.zoom - 1); this.draw(); }
+  zoomIn(): void  { this.zoom = Math.min(24, this.zoom + 1); this.queueDraw(); }
+  zoomOut(): void { this.zoom = Math.max(1,  this.zoom - 1); this.queueDraw(); }
 
   // ---- Color input ----
 
@@ -309,6 +349,18 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   selectPaletteColor(c: { r: number; g: number; b: number; a: number }): void {
     this.color = [c.r, c.g, c.b, c.a];
     this.tool = 'pencil';
+  }
+
+  queueDraw(): void {
+    if (typeof window === 'undefined') {
+      this.draw();
+      return;
+    }
+    if (this._pendingDrawRaf !== null) return;
+    this._pendingDrawRaf = window.requestAnimationFrame(() => {
+      this._pendingDrawRaf = null;
+      this.draw();
+    });
   }
 
   // ---- Save / Close ----

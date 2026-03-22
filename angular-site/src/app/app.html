@@ -299,8 +299,8 @@
                           </div>
                           <div class="objects-side-help">
                             <p class="muted"><strong>Objects:</strong> Drag to move · Dbl-click canvas to add · <kbd>Del</kbd> removes · <kbd>Ctrl+D</kbd> dupes</p>
-                            <p class="muted"><strong>Marks:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">edit_location</mat-icon> · Drag yellow nubs to reposition · <kbd>N</kbd> joins/splits nearest nubs · Use Save Marks to persist</p>
-                            <p class="muted"><strong>Barriers:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">fence</mat-icon> · Select draw mode (<mat-icon style="font-size:14px;vertical-align:middle">gesture</mat-icon> freehand, <mat-icon style="font-size:14px;vertical-align:middle">show_chart</mat-icon> straight line, <mat-icon style="font-size:14px;vertical-align:middle">timeline</mat-icon> curve) · Then drag on canvas to reshape · Select L/Li/I/Ri/R for barrier side · <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo</p>
+                            <p class="muted"><strong>Marks:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">edit_location</mat-icon> · Drag yellow nubs to reposition · <kbd>N</kbd> joins/splits nearest nubs · Use <em>Create by Click</em> to chain new marks · Auto-generate side or centre road markings in the sidebar · Use Save Marks to persist</p>
+                            <p class="muted"><strong>Barriers:</strong> Toggle <mat-icon style="font-size:14px;vertical-align:middle">fence</mat-icon> · Select draw mode (<mat-icon style="font-size:14px;vertical-align:middle">gesture</mat-icon> freehand, <mat-icon style="font-size:14px;vertical-align:middle">show_chart</mat-icon> straight line, <mat-icon style="font-size:14px;vertical-align:middle">timeline</mat-icon> curve) · Curve mode now uses start, end, and bend clicks · Select L/Li/I/Ri/R for barrier side · <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo</p>
                             <p class="muted"><strong>Draw mode <mat-icon style="font-size:14px;vertical-align:middle">pan_tool</mat-icon> None:</strong> objects/marks can be selected and dragged without accidentally triggering barrier draws</p>
                             <p class="muted"><strong>Navigation:</strong> <kbd>Space</kbd>+drag pans · Scroll/zoom wheel · <kbd>+</kbd>/<kbd>-</kbd> zoom · Arrow keys pan · <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo</p>
                           </div>
@@ -313,11 +313,13 @@
                         [editTypeRes]="editObjTypeRes()"
                         [availableTypeIds]="availableTypeIds()"
                         [spriteUrl]="selectedObjIndex() !== null ? getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes) : null"
+                        [getSpriteUrl]="getSpritePreviewDataUrlBound"
+                        [getFallbackColor]="getObjFallbackColorBound"
                         [typePalette]="typePalette"
                         [visibleTypeFilter]="visibleTypeFilter()"
                         [workerBusy]="workerBusy()"
                         [typeDimLabel]="getObjTypeDimensionLabel(editObjTypeRes())"
-                        (dirDegInput)="onObjDirDegInput($event.event)"
+                        (dirDegInput)="onObjDirDegInput($event)"
                         (typeResChange)="onObjTypeResChange($event)"
                         (typeVisibilityToggle)="toggleTypeVisibility($event)"
                         (showAll)="showAllObjectTypes()"
@@ -336,6 +338,27 @@
                         (objectSelected)="selectObject($event, true)"
                         (searchTermChange)="objectSearchTerm.set($event)"
                       ></app-object-list>
+
+                      <app-marks-editor
+                        [marks]="marks()"
+                        [selectedMarkIndex]="selectedMarkIndex()"
+                        [workerBusy]="workerBusy()"
+                        [markCreateMode]="markCreateMode()"
+                        [pendingMarkPointCount]="pendingMarkPointCount()"
+                        [roadMaxY]="selectedLevel()!.roadSegs.length > 0 ? (selectedLevel()!.roadSegs.length - 1) * 2 : 0"
+                        (markSelected)="selectedMarkIndex.set($event)"
+                        (addMark)="addMark()"
+                        (startMarkCreate)="startMarkCreateMode()"
+                        (confirmMarkCreate)="confirmMarkCreateMode()"
+                        (generateSideMarks)="generateSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset)"
+                        (generateCentreMarks)="generateCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashFrequency)"
+                        (removeMark)="removeSelectedMark()"
+                        (saveMarks)="saveMarks()"
+                        (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
+                        (markCanvasMouseDown)="onMarkCanvasMouseDown($event)"
+                        (markCanvasMouseMove)="onMarkCanvasMouseMove($event)"
+                        (markCanvasMouseUp)="onMarkCanvasMouseUp($event)"
+                      ></app-marks-editor>
 
                     </div>
                   </div>
