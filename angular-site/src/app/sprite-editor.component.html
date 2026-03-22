@@ -53,17 +53,16 @@
             <button mat-icon-button (click)="undo()" matTooltip="Undo (Ctrl+Z)">
               <mat-icon>undo</mat-icon>
             </button>
+            <button mat-icon-button (click)="redo()" matTooltip="Redo">
+              <mat-icon>redo</mat-icon>
+            </button>
           </div>
 
           <!-- Brush size -->
           <div class="se-section-title">Brush size</div>
-          <div class="se-tool-row">
-            @for (s of [1,2,4,8]; track s) {
-              <button mat-mini-fab class="se-size-btn"
-                [class.active]="brushSize === s"
-                [color]="brushSize === s ? 'primary' : undefined"
-                (click)="brushSize = s">{{ s }}</button>
-            }
+          <div class="se-slider-row">
+            <input class="se-range-input" type="range" min="1" max="12" step="1" [(ngModel)]="brushSize" />
+            <span class="se-slider-value">{{ brushSize }} px</span>
           </div>
 
           <!-- Current colour -->
@@ -92,6 +91,17 @@
             }
             @if (palette.length === 0) {
               <p class="se-muted">No colours extracted.</p>
+            }
+          </div>
+
+          <div class="se-section-title">Preset colours</div>
+          <div class="se-palette se-palette--presets">
+            @for (c of presetPalette; track $index) {
+              <div class="se-palette-cell"
+                [style.background]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
+                [matTooltip]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
+                (click)="selectPaletteColor(c)"
+              ></div>
             }
           </div>
 

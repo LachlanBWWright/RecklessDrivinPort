@@ -2042,8 +2042,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async togglePlayPause(): Promise<void> {
-    if (!this._audioCtx) return;
     if (this.audioPlaying()) {
+      if (!this._audioCtx) return;
       // Pause
       if (this._audioSource) {
         try {
@@ -2084,7 +2084,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // Resume managed playback from pause offset
     const buf = this._lastAudioBuffer;
-    if (!buf) return;
+    if (!buf || !this._audioCtx) return;
     const offset = this._audioPauseOffset || 0;
     try { await this._audioCtx!.resume().catch(() => {}); } catch { /* ignore */ }
     this._startAudioBuffer(buf, offset);
@@ -2302,6 +2302,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.dragTrackWaypoint.set(null);
       // Set a smart default zoom/pan so the road appears at correct game proportions.
       this.resetViewToRoad(level);
+      this.scheduleCanvasRedraw();
+      if (typeof window !== 'undefined') {
+        window.requestAnimationFrame(() => this.scheduleCanvasRedraw());
+      }
     }
   }
 
@@ -2439,9 +2443,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Handler for direction input in degrees (converts to radians internally). */
-  onObjDirDegInput(event: Event): void {
-    const target = event.target as EventTarget & { value?: string };
-    const deg = parseFloat(target?.value ?? '');
+  onObjDirDegInput(value: string | Event): void {
+    const deg = typeof value === 'string'
+      ? parseFloat(value)
+      : parseFloat(((value.target as EventTarget & { value?: string } | null)?.value) ?? '');
     if (Number.isNaN(deg)) return;
     const rad = deg * Math.PI / 180;
     // Normalise to [-π, π] using atan2 of the unit vector – handles all edge cases.
@@ -3957,6 +3962,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       // Clear previews — fresh ones will arrive shortly from DECODE_SPRITE_PREVIEWS
       this.objectSpritePreviews.clear();
+      this._spritePreviewDataUrls.clear();
 
       this.parsedLevels.set(result.levels);
       this.spriteAssets.set(result.sprites);
@@ -4012,6 +4018,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const clamped = new Uint8ClampedArray(pixels);
         const canvas = this.renderSpritePixels(clamped, width, height);
         this.objectSpritePreviews.set(typeRes, canvas);
+        this._spritePreviewDataUrls.delete(typeRes);
       }
       // Bump the version signal so the object canvas redraws with sprite previews.
       this.spritePreviewsVersion.update((v) => v + 1);
@@ -4081,6 +4088,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.tileTileEntries.set(tileEntries);
       // Bump version to trigger canvas redraw with real textures
       this.roadTexturesVersion.update((v) => v + 1);
+      this._roadOffscreenKey = '';
+      this.scheduleCanvasRedraw();
     } catch {
       // Non-fatal: road falls back to flat colours.
     }
@@ -5602,6 +5611,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       batch.length = 0;
     };
 
+    const flushKerbBatches = (): void => {
+      if (kerbGroupCount <= 0) return;
+      const lbAvg = lbGroupAnchorSum / kerbGroupCount;
+      const rbAvg = rbGroupAnchorSum / kerbGroupCount;
+      flushKerbGroup(lbBatch, lbTexCanvas, lbAvg, theme.kerbA);
+      flushKerbGroup(rbBatch, rbTexCanvas, rbAvg, theme.kerbB);
+      lbGroupAnchorSum = 0;
+      rbGroupAnchorSum = 0;
+      kerbGroupCount = 0;
+    };
+
     // Draw road geometry using actual textures – only render segments visible in viewport.
     const visibleWorldMinY = panY - (H / 2 + yOverhang) / zoom - 4;
     const visibleWorldMaxY = panY + (H / 2 + yOverhang) / zoom + 4;
@@ -5623,19 +5643,36 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     let lbGroupAnchorSum = 0;
     let rbGroupAnchorSum = 0;
     let kerbGroupCount   = 0;
+    let lastLbAnchor: number | null = null;
+    let lastRbAnchor: number | null = null;
+    const KERB_ANCHOR_DELTA = 8;
+    const KERB_GROUP_SEGMENTS = 12;
     for (let index = firstSeg; index <= lastSeg; index += step) {
       const cur = level.roadSegs[index];
       const nxtIdx = Math.min(index + step, level.roadSegs.length - 1);
       const nxt = level.roadSegs[nxtIdx];
       const y0  = index * 2;
       const y1  = nxtIdx * 2;
+      const lbAnchor = cur.v0 - KERB_WIDTH;
+      const rbAnchor = cur.v3;
+
+      if (
+        kerbGroupCount > 0 &&
+        (
+          kerbGroupCount >= KERB_GROUP_SEGMENTS ||
+          (lastLbAnchor !== null && Math.abs(lbAnchor - lastLbAnchor) > KERB_ANCHOR_DELTA) ||
+          (lastRbAnchor !== null && Math.abs(rbAnchor - lastRbAnchor) > KERB_ANCHOR_DELTA)
+        )
+      ) {
+        flushKerbBatches();
+      }
 
       // Off-road (background texture) – extend to canvas edges
       addQuad(bgBatch, worldMinX, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  worldMinX, y1);
 
       // Left border/kerb – accumulate into group batch; anchor to outer edge (v0-KERB_WIDTH)
       addQuad(lbBatch, cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1);
-      lbGroupAnchorSum += cur.v0 - KERB_WIDTH;
+      lbGroupAnchorSum += lbAnchor;
 
       // Left road lane: v0 to v1 (road surface)
       addQuad(fgBatch, cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1);
@@ -5658,24 +5695,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       // Right border/kerb – anchor to outer edge (v3)
       addQuad(rbBatch, cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1);
-      rbGroupAnchorSum += cur.v3;
+      rbGroupAnchorSum += rbAnchor;
 
       // Off-road far right – extend to canvas edges
       addQuad(bgBatch, cur.v3 + KERB_WIDTH, y0,  worldMaxX, y0,  worldMaxX, y1,  nxt.v3 + KERB_WIDTH, y1);
 
       kerbGroupCount++;
+      lastLbAnchor = lbAnchor;
+      lastRbAnchor = rbAnchor;
     }
 
     // ─── Flush layers in back-to-front order ────────────────────────────────────
     // 1. Background (grass/off-road) – painted first
     flushBatch(bgPat, bgBatch);
     // 2. Kerb strips – painted over background; use per-group road-edge anchoring
-    if (kerbGroupCount > 0) {
-      const lbAvg = lbGroupAnchorSum / kerbGroupCount;
-      const rbAvg = rbGroupAnchorSum / kerbGroupCount;
-      flushKerbGroup(lbBatch, lbTexCanvas, lbAvg, theme.kerbA);
-      flushKerbGroup(rbBatch, rbTexCanvas, rbAvg, theme.kerbB);
-    }
+    flushKerbBatches();
     // 3. Road surface (top layer)
     flushBatch(fgPat, fgBatch);
 
@@ -5933,10 +5967,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Return the sprite preview as a data URL for use in <img> tags. */
+  private _spritePreviewDataUrls = new Map<number, string>();
   getSpritePreviewDataUrl(typeRes: number): string | null {
+    const cached = this._spritePreviewDataUrls.get(typeRes);
+    if (cached) return cached;
     const canvas = this.objectSpritePreviews.get(typeRes) ?? null;
     if (!canvas) return null;
-    try { return canvas.toDataURL(); } catch { return null; }
+    try {
+      const url = canvas.toDataURL();
+      this._spritePreviewDataUrls.set(typeRes, url);
+      return url;
+    } catch {
+      return null;
+    }
   }
 
   /** Deterministic fallback colour for an object type when no sprite preview is available. */

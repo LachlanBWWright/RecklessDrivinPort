@@ -220,6 +220,13 @@ export function lzrw3aCompress(src: Uint8Array): Uint8Array {
   // FLAG_BYTES + ceil(srcLen/16) control words (2 bytes each) + srcLen literal bytes
   const numGroups = Math.ceil(srcLen / 16);
   const dstSize = FLAG_BYTES + numGroups * 2 + srcLen;
+  const copySize = FLAG_BYTES + srcLen;
+  if (dstSize >= copySize) {
+    const copy = new Uint8Array(copySize);
+    copy[0] = FLAG_COPY;
+    copy.set(src, FLAG_BYTES);
+    return copy;
+  }
   const dst = new Uint8Array(dstSize);
   dst[0] = 0; // FLAG_BYTE = 0 (LZRW3-A compressed, not FLAG_COPY)
   // bytes 1-3 remain 0 (FLAG_BYTES padding)

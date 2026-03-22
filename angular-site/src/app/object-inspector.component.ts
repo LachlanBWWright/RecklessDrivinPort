@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, OnChanges, SimpleChanges } from '@angular/core';
 
 @Component({
   selector: 'app-object-inspector',
@@ -6,22 +6,31 @@ import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from 
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ObjectInspectorComponent {
+export class ObjectInspectorComponent implements OnChanges {
   @Input() selectedIndex: number | null = null;
   @Input() editDirDeg = 0;
   @Input() editTypeRes = 128;
   @Input() availableTypeIds: number[] = [];
   @Input() spriteUrl: string | null = null;
+  @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
+  @Input() getFallbackColor: (typeRes: number) => string = () => '#888';
   @Input() typePalette: {hex: string, typeId: number}[] = [];
   @Input() visibleTypeFilter: Set<number> = new Set();
   @Input() workerBusy = false;
   @Input() typeDimLabel = '';
+  dirDegText = '0';
 
-  @Output() dirDegInput = new EventEmitter<{event: Event}>();
+  @Output() dirDegInput = new EventEmitter<string>();
   @Output() typeResChange = new EventEmitter<number>();
   @Output() typeVisibilityToggle = new EventEmitter<number>();
   @Output() showAll = new EventEmitter<void>();
   @Output() hideAll = new EventEmitter<void>();
   @Output() removeSelected = new EventEmitter<void>();
   @Output() deselect = new EventEmitter<void>();
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['editDirDeg']) {
+      this.dirDegText = Number.isFinite(this.editDirDeg) ? this.editDirDeg.toString() : '0';
+    }
+  }
 }

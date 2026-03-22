@@ -4,11 +4,11 @@
       <span class="inspector-title">Inspector</span>
     </div>
     @if (selectedIndex !== null) {
-      <div class="inspector-top-buttons">
-        <button mat-stroked-button class="top-btn" (click)="deselect.emit()" aria-label="Deselect object">
+    <div class="inspector-top-buttons">
+        <button mat-icon-button class="top-btn" (click)="deselect.emit()" aria-label="Deselect object">
           <mat-icon>arrow_back</mat-icon>
         </button>
-        <button mat-stroked-button color="warn" class="top-btn" (click)="removeSelected.emit()" aria-label="Remove object">
+        <button mat-icon-button color="warn" class="top-btn" (click)="removeSelected.emit()" aria-label="Remove object">
           <mat-icon>delete</mat-icon>
         </button>
       </div>
@@ -38,18 +38,51 @@
     <div class="inspector-fields">
       <mat-form-field appearance="outline" class="inspector-field">
         <mat-label>Direction (°)</mat-label>
-        <input matInput type="number" step="1" min="-180" max="180"
-          [value]="editDirDeg" (input)="dirDegInput.emit({event: $event})" />
+        <input matInput type="text" inputmode="decimal"
+          [(ngModel)]="dirDegText"
+          (change)="dirDegInput.emit(dirDegText)"
+          (blur)="dirDegInput.emit(dirDegText)" />
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="inspector-field">
         <mat-label>Type ID</mat-label>
         <mat-select [value]="editTypeRes" (selectionChange)="typeResChange.emit($event.value)">
+          <mat-select-trigger>
+            <span class="inspector-type-option">
+              @if (getSpriteUrl(editTypeRes); as url) {
+                <img [src]="url" class="inspector-type-thumb" alt="" />
+              } @else {
+                <span class="inspector-type-thumb inspector-type-thumb--fallback"
+                  [style.background]="getFallbackColor(editTypeRes)"></span>
+              }
+              <span>{{ editTypeRes }}</span>
+            </span>
+          </mat-select-trigger>
           @for (tid of availableTypeIds; track tid) {
-            <mat-option [value]="tid">{{ tid }}</mat-option>
+            <mat-option [value]="tid">
+              <span class="inspector-type-option">
+                @if (getSpriteUrl(tid); as url) {
+                  <img [src]="url" class="inspector-type-thumb" alt="" />
+                } @else {
+                  <span class="inspector-type-thumb inspector-type-thumb--fallback"
+                    [style.background]="getFallbackColor(tid)"></span>
+                }
+                <span>{{ tid }}</span>
+              </span>
+            </mat-option>
           }
           @if (!availableTypeIds.includes(editTypeRes)) {
-            <mat-option [value]="editTypeRes">{{ editTypeRes }} (custom)</mat-option>
+            <mat-option [value]="editTypeRes">
+              <span class="inspector-type-option">
+                @if (getSpriteUrl(editTypeRes); as url) {
+                  <img [src]="url" class="inspector-type-thumb" alt="" />
+                } @else {
+                  <span class="inspector-type-thumb inspector-type-thumb--fallback"
+                    [style.background]="getFallbackColor(editTypeRes)"></span>
+                }
+                <span>{{ editTypeRes }} (custom)</span>
+              </span>
+            </mat-option>
           }
         </mat-select>
         <mat-hint>128 = player car</mat-hint>
