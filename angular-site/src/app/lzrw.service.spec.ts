@@ -46,6 +46,12 @@ describe('lzrw3aDecompress', () => {
     expect(handle[4] === 0 || handle[4] === 1).toBe(true);
   });
 
+  it('prefers FLAG_COPY when literal encoding would be larger', () => {
+    const data = new Uint8Array([1, 2, 3, 4, 5]);
+    const handle = packHandleCompress(data);
+    expect(handle[4]).toBe(1);
+  });
+
   it('round-trip with larger data (256 bytes)', () => {
     const original = new Uint8Array(256);
     for (let i = 0; i < 256; i++) original[i] = i & 0xff;

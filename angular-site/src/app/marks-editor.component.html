@@ -11,6 +11,12 @@
     <button mat-stroked-button (click)="addMark.emit()" [disabled]="workerBusy">
       <mat-icon>add</mat-icon> Add Mark
     </button>
+    <button mat-stroked-button color="accent"
+      (click)="markCreateMode ? confirmMarkCreate.emit() : startMarkCreate.emit()"
+      [disabled]="workerBusy">
+      <mat-icon>{{ markCreateMode ? 'check' : 'timeline' }}</mat-icon>
+      {{ markCreateMode ? 'Confirm Create' : 'Create by Click' }}
+    </button>
     <button mat-stroked-button color="warn" [disabled]="selectedMarkIndex === null || workerBusy" (click)="removeMark.emit()">
       <mat-icon>remove</mat-icon> Remove
     </button>
@@ -20,7 +26,78 @@
   </div>
   <p class="marks-hint">
     Drag yellow nubs on canvas to reposition mark endpoints. <kbd>N</kbd> joins/splits nearest nubs (auto-detects if colocated). When two nubs share a position they move together. <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo.
+    @if (markCreateMode) {
+      <br><strong>Create mode:</strong> click successive points on the main editor canvas to chain new segments. {{ pendingMarkPointCount }} point(s) queued.
+    }
   </p>
+
+  <div class="marks-generator-grid">
+    <div class="generator-card">
+      <div class="generator-title">Side markings</div>
+      <div class="generator-fields">
+        <mat-form-field appearance="outline">
+          <mat-label>Roads</mat-label>
+          <mat-select [(ngModel)]="sideRoadSelection">
+            <mat-option value="single">Single road</mat-option>
+            <mat-option value="left">Left split road</mat-option>
+            <mat-option value="right">Right split road</mat-option>
+            <mat-option value="both">All available roads</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Y start</mat-label>
+          <input matInput type="number" [(ngModel)]="sideYStart" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Y end</mat-label>
+          <input matInput type="number" [(ngModel)]="sideYEnd" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Inset</mat-label>
+          <input matInput type="number" [(ngModel)]="sideInset" />
+        </mat-form-field>
+      </div>
+      <button mat-stroked-button
+        (click)="generateSideMarks.emit({ roadSelection: sideRoadSelection, yStart: sideYStart, yEnd: sideYEnd, inset: sideInset })"
+        [disabled]="workerBusy">
+        <mat-icon>border_outer</mat-icon> Generate side marks
+      </button>
+    </div>
+
+    <div class="generator-card">
+      <div class="generator-title">Centre dashed markings</div>
+      <div class="generator-fields">
+        <mat-form-field appearance="outline">
+          <mat-label>Roads</mat-label>
+          <mat-select [(ngModel)]="centreRoadSelection">
+            <mat-option value="single">Single road</mat-option>
+            <mat-option value="left">Left split road</mat-option>
+            <mat-option value="right">Right split road</mat-option>
+            <mat-option value="both">All available roads</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Y start</mat-label>
+          <input matInput type="number" [(ngModel)]="centreYStart" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Y end</mat-label>
+          <input matInput type="number" [(ngModel)]="centreYEnd" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Dash frequency</mat-label>
+          <input matInput type="number" [(ngModel)]="dashFrequency" />
+        </mat-form-field>
+      </div>
+      <button mat-stroked-button
+        (click)="generateCentreMarks.emit({ roadSelection: centreRoadSelection, yStart: centreYStart, yEnd: centreYEnd, dashFrequency: dashFrequency })"
+        [disabled]="workerBusy">
+        <mat-icon>linear_scale</mat-icon> Generate centre dashes
+      </button>
+    </div>
+  </div>
+
+  <p class="marks-hint">Road Y range: 0 → {{ roadMaxY }}</p>
 
   @if (selectedMarkIndex !== null) {
     <div class="mark-fields-row">

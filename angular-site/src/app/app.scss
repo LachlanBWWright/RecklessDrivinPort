@@ -148,7 +148,24 @@ main {
     font-size: 0.9rem;
     margin-top: 8px;
   }
-  a { color: var(--accent2); text-decoration: none; &:hover { text-decoration: underline; } }
+  a {
+    color: var(--accent2);
+    text-decoration: underline;
+    text-underline-offset: 0.14em;
+    text-decoration-thickness: 1px;
+    font-weight: 600;
+
+    &:hover {
+      color: #7cc4ff;
+      text-decoration-thickness: 2px;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent2);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+  }
 }
 
 /* ======================================================
@@ -697,20 +714,22 @@ main {
 .inspector-title-row { display:flex; justify-content:center; padding:10px 12px; }
 .inspector-title { font-size: 0.98rem; font-weight:700; color:var(--on-surface); }
 .inspector-top-buttons { display:flex; justify-content:center; gap:12px; padding-bottom:8px; }
-.inspector-top-buttons button.top-btn, .inspector-top-buttons button.top-btn.mat-stroked-button {
-  height:36px;
-  width:36px;
-  min-width: 36px !important;
+.inspector-top-buttons button.top-btn,
+.inspector-top-buttons button.top-btn.mat-mdc-icon-button {
+  height:40px !important;
+  width:40px !important;
+  min-width: 40px !important;
   padding: 0 !important;
-  border-radius: 50% !important; /* make circular */
+  border-radius: 50% !important;
   display:flex;
   align-items:center;
   justify-content:center;
   box-sizing: border-box;
+  border: 1px solid var(--border);
+  background: var(--surface2);
 }
-.inspector-top-buttons .top-btn.mat-stroked-button {
-  /* tighten stroked button internals */
-  line-height: 1;
+.inspector-top-buttons .top-btn mat-icon {
+  margin: 0;
 }
 
 
@@ -833,6 +852,27 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.inspector-type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inspector-type-thumb {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  image-rendering: pixelated;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface2);
+}
+
+.inspector-type-thumb--fallback {
+  display: inline-block;
 }
 
 .type-chip {

@@ -316,7 +316,7 @@ elif $SKIP_WASM; then
   warn "No reckless_drivin.data found – the local site will run without the game bundle"
 fi
 
-# Copy resources.dat if present (the editor needs this)
+# Copy resources.dat so the deployed site can load the default editor/game data.
 RESOURCES_DAT="$REPO_ROOT/port/resources/resources.dat"
 if [[ -f "$RESOURCES_DAT" ]]; then
   cp "$RESOURCES_DAT" "$OUTPUT_DIR/resources.dat"
