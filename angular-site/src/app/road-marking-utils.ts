@@ -238,7 +238,7 @@ export function generateCentreDashMarkings(
   };
 
   addGroup((seg, y) => {
-    if (!isMerged(seg) || !shouldUseLeftRoad(options.roadSelection)) return null;
+    if (isMerged(seg) || !shouldUseLeftRoad(options.roadSelection)) return null;
     return { x: (seg.v0 + seg.v1) / 2, y };
   });
 
@@ -251,7 +251,7 @@ export function generateCentreDashMarkings(
   });
 
   addGroup((seg, y) => {
-    if (!isMerged(seg) || !shouldUseRightRoad(options.roadSelection)) return null;
+    if (isMerged(seg) || !shouldUseRightRoad(options.roadSelection)) return null;
     return { x: (seg.v2 + seg.v3) / 2, y };
   });
 
