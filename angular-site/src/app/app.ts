@@ -6,6 +6,7 @@ import type {
   ObjectPos,
   EditableSpriteAsset,
   MarkSeg,
+  RoadSeg,
   ObjectTypeDefinition,
   RoadInfoData,
   DecodedSpriteFrame,
@@ -13,6 +14,13 @@ import type {
   TrackMidpointRef,
 } from './level-editor.service';
 import { KonvaEditorService } from './konva-editor.service';
+import {
+  clampBarrierPoint,
+  generateCentreDashMarkings,
+  generateSideMarkings,
+  sampleQuadraticBezier,
+  type MarkingRoadSelection,
+} from './road-marking-utils';
 import { decodeIMA4, parseSndHeader, buildWav, SndInfo } from './snd-codec';
 
 /** Worker response envelope sent from pack.worker.ts */
@@ -750,7 +758,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
    * 'none'     = select/pan (no drawing; objects can be clicked/dragged normally)
    * 'freehand' = draw by dragging (path follows mouse)
    * 'straight' = click two endpoints; a straight line is applied between them
-   * 'curve'    = freehand path with smoothing applied on commit
+   * 'curve'    = click start, end, and bend points for a quadratic-style curve
    */
   drawMode = signal<'none' | 'freehand' | 'straight' | 'curve'>('none');
 
@@ -789,10 +797,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   // ---- Mark editor ----
   marks = signal<MarkSeg[]>([]);
   selectedMarkIndex = signal<number | null>(null);
+  markCreateMode = signal(false);
+  pendingMarkPointCount = signal(0);
   private _lastDraggedNubKey: { markIdx: number; endpoint: 'p1' | 'p2' } | null = null;
+  private _pendingMarkPoints: { x: number; y: number }[] = [];
+  private _markCreateHoverPoint: { x: number; y: number } | null = null;
   dragMarkEndpoint = signal<{ markIdx: number; endpoint: 'p1' | 'p2' } | null>(null);
   /** True while user is dragging the player start X marker on the canvas. */
   private _draggingStartMarker = false;
+  private _curveStartPoint: { wx: number; wy: number } | null = null;
+  private _curveEndPoint: { wx: number; wy: number } | null = null;
 
   // ---- Sprite pixel grid ----
   spriteGridZoom = signal(4);
@@ -1051,6 +1065,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.hoverTrackMidpoint();
       this.marks();
       this.selectedMarkIndex();
+      this.markCreateMode();
+      this.pendingMarkPointCount();
       this.editXStartPos();
       // Track the full selectedLevel (includes roadSegs) so any road-segment
       // mutation (barrier drag, merge/split) automatically triggers a redraw
@@ -1066,6 +1082,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     effect(() => {
       this.marks();
       this.selectedMarkIndex();
+      this.markCreateMode();
+      this.pendingMarkPointCount();
       if (typeof window !== 'undefined') {
         window.requestAnimationFrame(() => this.redrawMarkCanvas());
       }
@@ -1074,6 +1092,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Reactively update the Konva container cursor when the draw mode changes.
     effect(() => {
       const mode = this.drawMode();
+      if (mode !== 'curve') {
+        this._curveStartPoint = null;
+        this._curveEndPoint = null;
+        this.konva.clearBarrierDrawPreview();
+      }
       if (typeof document === 'undefined') return;
       const kc = document.getElementById('konva-container');
       if (!kc) return;
@@ -1230,6 +1253,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     };
 
     this.konva.onStageDblClick = (wx, wy) => {
+      if (this.markCreateMode() || this.drawMode() !== 'none') return;
       const objs = [...this.objects()];
       // Use currently selected object's typeRes if available, otherwise default to 128
       const selIdx = this.selectedObjIndex();
@@ -1263,6 +1287,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this.editTrackDown.set(arr);
         }
       }
+    };
+
+    this.konva.onWaypointDoubleClick = (track, segIdx) => {
+      this._insertWaypointAfter(track, segIdx);
     };
 
     this.konva.onWaypointRightClick = (track, segIdx, _wx, _wy) => {
@@ -1317,7 +1345,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // underlying #object-canvas.  We must handle panning through Konva's own
     // stage mouse callbacks.  The stage.getPointerPosition() returns CSS-pixel
     // coordinates equivalent to MouseEvent.offsetX/offsetY on the canvas.
-    this.konva.onStageMouseDown = (cssX, cssY, button) => {
+    this.konva.onStageMouseDown = (cssX, cssY, button, targetIsStage) => {
       const isPanGesture = button === 1 || (button === 0 && this.spaceDown());
       if (isPanGesture) {
         this._isPanning = true;
@@ -1329,9 +1357,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (kc) kc.style.cursor = 'grabbing';
         return;
       }
-      if (button === 0 && this.showBarriers() && this.drawMode() !== 'none') {
+      if (button === 0 && this.markCreateMode() && targetIsStage) {
+        const [wx, wy] = this.canvasToWorld(cssX, cssY);
+        this._addMarkCreatePoint(Math.round(wx), Math.round(wy));
+        return;
+      }
+      if (button === 0 && this.showBarriers() && this.drawMode() !== 'none' && targetIsStage) {
         // Start barrier draw gesture (only when a draw mode is selected)
         const [wx, wy] = this.canvasToWorld(cssX, cssY);
+        if (this.drawMode() === 'curve') {
+          this._handleCurveDrawClick(wx, wy);
+          return;
+        }
         this._barrierDrawing = true;
         if (this.drawMode() === 'straight') {
           // Straight-line mode: record start point; path will be finalised on mouseup
@@ -1367,6 +1404,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         // Screen down  → world down ⟹ panY decreases (world +Y is up)
         this.canvasPanX.update(x => x - dx / zoom);
         this.canvasPanY.update(y => y - dy / zoom);
+        return;
+      }
+      if (this.markCreateMode() && this._pendingMarkPoints.length > 0) {
+        const [wx, wy] = this.canvasToWorld(cssX, cssY);
+        this._markCreateHoverPoint = { x: Math.round(wx), y: Math.round(wy) };
+        this.scheduleCanvasRedraw();
+        return;
+      }
+      if (this.drawMode() === 'curve') {
+        const [wx, wy] = this.canvasToWorld(cssX, cssY);
+        this._updateCurvePreview(wx, wy);
         return;
       }
       if (this._barrierDrawing) {
@@ -1411,10 +1459,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             // Straight-line mode: _barrierDrawPath is [start, end] set during mousemove.
             // _applyBarrierDrawPath() handles 2-point paths as a straight line.
             this._barrierDrawStart = null;
-            this._applyBarrierDrawPath();
-          } else if (this.drawMode() === 'curve') {
-            // Curve mode: smooth the accumulated path before applying
-            this._smoothBarrierDrawPath();
             this._applyBarrierDrawPath();
           } else {
             this._applyBarrierDrawPath();
@@ -2616,11 +2660,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const mx = (trackUp[i].x + trackUp[i + 1].x) / 2;
         const my = (trackUp[i].y + trackUp[i + 1].y) / 2;
         if (dist2d(mx, my, wx, wy) < midHitR) {
-          this._pushUndo();
-          const copy = [...trackUp];
-          copy.splice(i + 1, 0, { x: Math.round(mx), y: Math.round(my), flags: 0, velo: 0 });
-          this.editTrackUp.set(copy);
-          this.hoverTrackMidpoint.set(null);
+          this._insertWaypointAfter('up', i);
           return;
         }
       }
@@ -2628,11 +2668,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const mx = (trackDown[i].x + trackDown[i + 1].x) / 2;
         const my = (trackDown[i].y + trackDown[i + 1].y) / 2;
         if (dist2d(mx, my, wx, wy) < midHitR) {
-          this._pushUndo();
-          const copy = [...trackDown];
-          copy.splice(i + 1, 0, { x: Math.round(mx), y: Math.round(my), flags: 0, velo: 0 });
-          this.editTrackDown.set(copy);
-          this.hoverTrackMidpoint.set(null);
+          this._insertWaypointAfter('down', i);
           return;
         }
       }
@@ -2792,6 +2828,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onCanvasDoubleClick(event: MouseEvent): void {
+    if (this.markCreateMode() || this.drawMode() !== 'none') return;
     const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
     const objs = [...this.objects()];
     objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: 128 });
@@ -2858,6 +2895,27 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.editTrackDown.set(insertBetweenClosestSegment(trackDown, wx, wy));
     }
     this._roadOffscreenKey = '';
+  }
+
+  private _insertWaypointAfter(track: 'up' | 'down', segIdx: number): void {
+    const source = track === 'up' ? this.editTrackUp() : this.editTrackDown();
+    if (segIdx < 0 || segIdx >= source.length - 1) return;
+    const cur = source[segIdx];
+    const next = source[segIdx + 1];
+    const inserted = {
+      x: Math.round((cur.x + next.x) / 2),
+      y: Math.round((cur.y + next.y) / 2),
+      flags: 0,
+      velo: 0,
+    };
+    this._pushUndo();
+    const copy = [...source];
+    copy.splice(segIdx + 1, 0, inserted);
+    if (track === 'up') this.editTrackUp.set(copy);
+    else this.editTrackDown.set(copy);
+    this.hoverTrackMidpoint.set(null);
+    this._roadOffscreenKey = '';
+    this.snackBar.open(`Inserted ${track} waypoint at midpoint.`, undefined, { duration: 1500 });
   }
 
   onCanvasKeyDown(event: KeyboardEvent): void {
@@ -3304,12 +3362,69 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedMarkIndex.set(ms.length - 1);
   }
 
+  startMarkCreateMode(): void {
+    this.drawMode.set('none');
+    this.markCreateMode.set(true);
+    this._pendingMarkPoints = [];
+    this.pendingMarkPointCount.set(0);
+    this._markCreateHoverPoint = null;
+    this.snackBar.open('Click points on the canvas to chain new markings. Click Confirm when done.', undefined, { duration: 2500 });
+  }
+
+  confirmMarkCreateMode(): void {
+    this.markCreateMode.set(false);
+    this._pendingMarkPoints = [];
+    this.pendingMarkPointCount.set(0);
+    this._markCreateHoverPoint = null;
+    this.scheduleCanvasRedraw();
+  }
+
+  generateSideRoadMarks(roadSelection: MarkingRoadSelection, yStart: number, yEnd: number, inset: number): void {
+    const level = this.selectedLevel();
+    if (!level) return;
+    const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset });
+    this._appendGeneratedMarks(generated, 'side road');
+  }
+
+  generateCentreRoadMarks(roadSelection: MarkingRoadSelection, yStart: number, yEnd: number, dashFrequency: number): void {
+    const level = this.selectedLevel();
+    if (!level) return;
+    const generated = generateCentreDashMarkings(level.roadSegs, { roadSelection, yStart, yEnd, dashFrequency });
+    this._appendGeneratedMarks(generated, 'centre dashed');
+  }
+
   removeSelectedMark(): void {
     const idx = this.selectedMarkIndex();
     if (idx === null) return;
     const ms = this.marks().filter((_, i) => i !== idx);
     this.marks.set(ms);
     this.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
+  }
+
+  private _appendGeneratedMarks(generated: MarkSeg[], label: string): void {
+    if (generated.length === 0) {
+      this.snackBar.open(`No ${label} markings were generated for that range.`, undefined, { duration: 2000 });
+      return;
+    }
+    this._pushUndo();
+    const marks = [...this.marks(), ...generated];
+    this.marks.set(marks);
+    this.selectedMarkIndex.set(marks.length - 1);
+    this.snackBar.open(`Added ${generated.length} ${label} marking segments.`, undefined, { duration: 2200 });
+  }
+
+  private _addMarkCreatePoint(x: number, y: number): void {
+    const last = this._pendingMarkPoints[this._pendingMarkPoints.length - 1];
+    if (last) {
+      this._pushUndo();
+      const marks = [...this.marks(), { x1: last.x, y1: last.y, x2: x, y2: y }];
+      this.marks.set(marks);
+      this.selectedMarkIndex.set(marks.length - 1);
+    }
+    this._pendingMarkPoints.push({ x, y });
+    this.pendingMarkPointCount.set(this._pendingMarkPoints.length);
+    this._markCreateHoverPoint = { x, y };
+    this.scheduleCanvasRedraw();
   }
 
   /** Returns true if the selected mark has any endpoint colocated with another mark endpoint. */
@@ -3455,25 +3570,51 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  /**
-   * Apply a moving-average smoothing to the barrier draw path.
-   * Used by curve draw mode to reduce jaggedness before committing.
-   */
-  private _smoothBarrierDrawPath(): void {
-    const path = this._barrierDrawPath;
-    if (path.length < 5) return;
-    const radius = 3;
-    const smoothed: { wx: number; wy: number }[] = [];
-    for (let i = 0; i < path.length; i++) {
-      let sumX = 0, sumY = 0, count = 0;
-      for (let k = Math.max(0, i - radius); k <= Math.min(path.length - 1, i + radius); k++) {
-        sumX += path[k].wx;
-        sumY += path[k].wy;
-        count++;
-      }
-      smoothed.push({ wx: sumX / count, wy: sumY / count });
+  private _handleCurveDrawClick(wx: number, wy: number): void {
+    if (!this._curveStartPoint) {
+      this._curveStartPoint = { wx, wy };
+      this._curveEndPoint = null;
+      this.konva.setBarrierDrawPreview([wx, -wy]);
+      this.konva.flush();
+      this.snackBar.open('Curve start set. Click the curve end point next.', undefined, { duration: 1500 });
+      return;
     }
-    this._barrierDrawPath = smoothed;
+    if (!this._curveEndPoint) {
+      this._curveEndPoint = { wx, wy };
+      this._updateCurvePreview(wx, wy);
+      this.snackBar.open('Curve end set. Move to adjust the bend, then click again to apply.', undefined, { duration: 1800 });
+      return;
+    }
+
+    const points = sampleQuadraticBezier(
+      { x: this._curveStartPoint.wx, y: this._curveStartPoint.wy },
+      { x: wx, y: wy },
+      { x: this._curveEndPoint.wx, y: this._curveEndPoint.wy },
+    );
+    this._barrierDrawPath = points.map((point) => ({ wx: point.x, wy: point.y }));
+    this._applyBarrierDrawPath();
+    this._curveStartPoint = null;
+    this._curveEndPoint = null;
+    this.konva.clearBarrierDrawPreview();
+  }
+
+  private _updateCurvePreview(wx: number, wy: number): void {
+    if (!this._curveStartPoint) return;
+    if (!this._curveEndPoint) {
+      this.konva.setBarrierDrawPreview([this._curveStartPoint.wx, -this._curveStartPoint.wy, wx, -wy]);
+      this.konva.flush();
+      return;
+    }
+    const preview = sampleQuadraticBezier(
+      { x: this._curveStartPoint.wx, y: this._curveStartPoint.wy },
+      { x: wx, y: wy },
+      { x: this._curveEndPoint.wx, y: this._curveEndPoint.wy },
+      24,
+    );
+    const pts: number[] = [];
+    for (const point of preview) pts.push(point.x, -point.y);
+    this.konva.setBarrierDrawPreview(pts);
+    this.konva.flush();
   }
 
   /**
@@ -3523,14 +3664,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const segWy = i * 2;  // world Y of segment i
       if (segWy < minWy || segWy > maxWy) return seg;
       const newX = Math.round(xAtY(segWy));
-      switch (side) {
-        case 'v0': return { ...seg, v0: newX };
-        case 'v1': return { ...seg, v1: newX };
-        case 'i':  return { ...seg, v1: newX, v2: newX };
-        case 'v2': return { ...seg, v2: newX };
-        case 'v3': return { ...seg, v3: newX };
-        default:   return seg;
-      }
+      return clampBarrierPoint(seg as RoadSeg, side, newX);
     });
 
     this.parsedLevels.update((levels) =>
@@ -3585,10 +3719,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillStyle = '#555';
       ctx.font = '13px monospace';
       ctx.fillText('No mark segments. Click "+ Add Mark" to add one.', 20, H / 2);
-      return;
+      if (!this.markCreateMode() || this._pendingMarkPoints.length === 0) return;
     }
 
-    const { minX, minY, rangeX, rangeY } = this.markBounds(ms);
+    const boundsSource = ms.length > 0
+      ? ms
+      : [{ x1: this._pendingMarkPoints[0].x, y1: this._pendingMarkPoints[0].y, x2: this._pendingMarkPoints[0].x, y2: this._pendingMarkPoints[0].y }];
+    const { minX, minY, rangeX, rangeY } = this.markBounds(boundsSource);
 
     const toC = (wx: number, wy: number) =>
       this.markWorldToCanvas(wx, wy, canvas, minX, minY, rangeX, rangeY);
@@ -3616,6 +3753,25 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         ctx.font = '10px monospace';
         ctx.fillText(`P1(${m.x1},${m.y1})`, ax + 8, ay - 4);
         ctx.fillText(`P2(${m.x2},${m.y2})`, bx + 8, by - 4);
+      }
+    }
+
+    if (this.markCreateMode() && this._pendingMarkPoints.length > 0) {
+      const last = this._pendingMarkPoints[this._pendingMarkPoints.length - 1];
+      const [lx, ly] = toC(last.x, last.y);
+      ctx.fillStyle = '#00e5ff';
+      ctx.beginPath();
+      ctx.arc(lx, ly, 6, 0, Math.PI * 2);
+      ctx.fill();
+      if (this._markCreateHoverPoint) {
+        const [hx, hy] = toC(this._markCreateHoverPoint.x, this._markCreateHoverPoint.y);
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.7)';
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.lineTo(hx, hy);
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
     }
   }
@@ -5735,6 +5891,26 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         });
       }
     });
+
+    if (this.markCreateMode() && this._pendingMarkPoints.length > 0) {
+      const last = this._pendingMarkPoints[this._pendingMarkPoints.length - 1];
+      const [px, py] = this.worldToCanvas(last.x, last.y);
+      ctx.fillStyle = '#00e5ff';
+      ctx.beginPath();
+      ctx.arc(px, py, 8, 0, Math.PI * 2);
+      ctx.fill();
+      if (this._markCreateHoverPoint) {
+        const [hx, hy] = this.worldToCanvas(this._markCreateHoverPoint.x, this._markCreateHoverPoint.y);
+        ctx.strokeStyle = 'rgba(0,229,255,0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 6]);
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(hx, hy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
   }
 
   private getObjectSpritePreview(typeRes: number): HTMLCanvasElement | null {

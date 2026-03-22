@@ -99,17 +99,19 @@ export class KonvaEditorService implements OnDestroy {
   onObjectClick?: (index: number) => void;
   onWaypointDragEnd?: (e: KonvaWaypointDragEndEvent) => void;
   onWaypointRightClick?: (track: 'up' | 'down', segIdx: number, worldX: number, worldY: number) => void;
+  onWaypointDoubleClick?: (track: 'up' | 'down', segIdx: number) => void;
   onMarkEndpointDragEnd?: (e: KonvaMarkDragEndEvent) => void;
   onMarkClick?: (markIdx: number) => void;
   onStageDblClick?: (worldX: number, worldY: number) => void;
   onStageRightClick?: (worldX: number, worldY: number) => void;
 
   /**
-   * Fired when the user presses the mouse button on the stage (not on a node).
+   * Fired when the user presses the mouse button on the stage.
    * cssX/cssY are in Konva CSS-pixel coordinates (origin = top-left of stage).
-   * button = MouseEvent.button value.
+   * button = MouseEvent.button value. targetIsStage is true only when the empty
+   * stage was clicked rather than a draggable/editor node.
    */
-  onStageMouseDown?: (cssX: number, cssY: number, button: number) => void;
+  onStageMouseDown?: (cssX: number, cssY: number, button: number, targetIsStage: boolean) => void;
   /**
    * Fired on every mouse move over the stage (regardless of target).
    * Used by the host to update pan position during Space+drag.
@@ -243,7 +245,7 @@ export class KonvaEditorService implements OnDestroy {
     this.stage.on('mousedown', (e) => {
       const pos = this.stage?.getPointerPosition();
       if (!pos) return;
-      this.onStageMouseDown?.(pos.x, pos.y, e.evt.button);
+      this.onStageMouseDown?.(pos.x, pos.y, e.evt.button, e.target === this.stage);
     });
 
     this.stage.on('mousemove', () => {
@@ -439,6 +441,7 @@ export class KonvaEditorService implements OnDestroy {
       this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
       (track, segIdx, wx, wy) => this.onWaypointDragEnd?.({ track, segIdx, worldX: wx, worldY: wy }),
       (track, segIdx, wx, wy) => this.onWaypointRightClick?.(track, segIdx, wx, wy),
+      (track, segIdx) => this.onWaypointDoubleClick?.(track, segIdx),
     );
 
     this._applyGroupTransform();
