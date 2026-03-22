@@ -28,9 +28,9 @@ reckless_drivin
 nohup.out
 
 # Angular site build artifacts (node_modules, cache)
-port/angular-site/node_modules/
-port/angular-site/.angular/
-port/angular-site/dist/
+angular-site/node_modules/
+angular-site/.angular/
+angular-site/dist/
 
 # Android gradle caches
 port/android/.gradle/
@@ -40,3 +40,4 @@ docs/
 port/wasm/
 # gh-pages folder is built by CI
 gh-pages/
+gh-pages-local/
