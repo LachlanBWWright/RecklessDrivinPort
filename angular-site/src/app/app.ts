@@ -54,6 +54,8 @@ interface EmscriptenModuleInterface {
   _set_wasm_master_volume?: (vol: number) => void;
   /** Pause the Emscripten main loop before a restart. */
   pauseMainLoop?: () => void;
+  /** Resume the Emscripten main loop after a pause. */
+  resumeMainLoop?: () => void;
   /** Re-run C main() with new argv — restarts the game in-place. */
   callMain?: (args: string[]) => void;
   /** Direct C _main(argc, argv) — fallback if callMain not present. */
@@ -1541,6 +1543,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   setTab(tab: AppTab): void {
     this.activeTab.set(tab);
+    this.syncGameLoopWithActiveTab();
   }
 
   setSection(section: EditorSection): void {
@@ -5316,6 +5319,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.overlayVisible.set(false);
         console.log('[Angular] WASM runtime initialized');
         this.applyVolumeToWasm(this.masterVolume());
+        this.syncGameLoopWithActiveTab();
         // Reload WASM filesystem if a custom resources.dat was queued before init finished
         if (this._pendingCustomResources) {
           this._mountCustomResourcesFs(this._pendingCustomResources);
@@ -5998,6 +6002,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const mod = window.Module;
     if (mod && typeof mod._set_wasm_master_volume === 'function') {
       mod._set_wasm_master_volume(pct / 100.0);
+    }
+  }
+
+  /**
+   * Keep the game loop aligned with the visible app tab.
+   * The game should pause while the editor is active so it does not keep running
+   * in the background behind the editor UI.
+   */
+  private syncGameLoopWithActiveTab(): void {
+    const mod = window.Module;
+    if (!mod) return;
+    if (this.activeTab() === 'editor') {
+      mod.pauseMainLoop?.();
+    } else {
+      mod.resumeMainLoop?.();
     }
   }
 

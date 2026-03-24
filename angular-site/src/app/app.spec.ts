@@ -33,6 +33,29 @@ describe('App', () => {
     expect(app.activeTab()).toBe('game');
   });
 
+  it('should pause the game loop on the editor tab and resume on the game tab', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    const originalModule = window.Module;
+    let pauseCount = 0;
+    let resumeCount = 0;
+
+    window.Module = {
+      pauseMainLoop: () => { pauseCount += 1; },
+      resumeMainLoop: () => { resumeCount += 1; },
+    } as unknown as NonNullable<typeof window.Module>;
+
+    try {
+      app.setTab('editor');
+      expect(pauseCount).toBe(1);
+      expect(resumeCount).toBe(0);
+
+      app.setTab('game');
+      expect(resumeCount).toBe(1);
+    } finally {
+      window.Module = originalModule;
+    }
+  });
+
   it('should hide game panel when on editor tab', async () => {
     const fixture = TestBed.createComponent(App);
     fixture.componentInstance.setTab('editor');
