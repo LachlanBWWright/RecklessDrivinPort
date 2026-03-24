@@ -20,29 +20,6 @@
       <mat-icon>delete</mat-icon>
     </button>
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
-    <!-- Mark actions -->
-    <button mat-icon-button (click)="addMark.emit()" [disabled]="workerBusy" matTooltip="Add mark">
-      <mat-icon>add_location</mat-icon>
-    </button>
-    <button mat-icon-button [class.btn-active]="markCreateMode"
-      (click)="markCreateMode ? confirmMarkCreate.emit() : startMarkCreate.emit()"
-      [disabled]="workerBusy"
-      [matTooltip]="markCreateMode ? 'Confirm create (' + pendingMarkPointCount + ' pts)' : 'Create mark by click'">
-      <mat-icon>{{ markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon>
-    </button>
-    <button mat-icon-button (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
-      <mat-icon>remove_circle_outline</mat-icon>
-    </button>
-    <button mat-icon-button (click)="saveMarks.emit()" [disabled]="workerBusy" matTooltip="Save marks">
-      <mat-icon>save</mat-icon>
-    </button>
-    <!-- Generate Marks popup button -->
-    <button mat-icon-button [class.btn-active]="showMarkingPopup"
-      (click)="toggleMarkingPopup()"
-      [matTooltip]="showMarkingPopup ? 'Close marking generator' : 'Generate road markings'">
-      <mat-icon>auto_awesome</mat-icon>
-    </button>
-    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
     <!-- View controls -->
     <button mat-icon-button (click)="frameAll.emit()" matTooltip="Frame all objects">
       <mat-icon>fit_screen</mat-icon>
@@ -73,9 +50,32 @@
     <button mat-icon-button [class.btn-active]="showBarriers" (click)="toggleBarriers.emit()" matTooltip="Toggle road barriers">
       <mat-icon>fence</mat-icon>
     </button>
+    <!-- Marks toggle + mark management (visible when marks enabled) -->
     <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
       <mat-icon>edit_location</mat-icon>
     </button>
+    @if (showMarks) {
+      <button mat-icon-button (click)="addMark.emit()" [disabled]="workerBusy" matTooltip="Add mark">
+        <mat-icon>add_location</mat-icon>
+      </button>
+      <button mat-icon-button [class.btn-active]="markCreateMode"
+        (click)="markCreateMode ? confirmMarkCreate.emit() : startMarkCreate.emit()"
+        [disabled]="workerBusy"
+        [matTooltip]="markCreateMode ? 'Confirm create (' + pendingMarkPointCount + ' pts)' : 'Create mark by click'">
+        <mat-icon>{{ markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon>
+      </button>
+      <button mat-icon-button (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
+        <mat-icon>remove_circle_outline</mat-icon>
+      </button>
+      <button mat-icon-button (click)="saveMarks.emit()" [disabled]="workerBusy" matTooltip="Save marks">
+        <mat-icon>save</mat-icon>
+      </button>
+      <button mat-icon-button [class.btn-active]="showMarkingPopup"
+        (click)="toggleMarkingPopup()"
+        [matTooltip]="showMarkingPopup ? 'Close marking generator' : 'Generate road markings'">
+        <mat-icon>auto_awesome</mat-icon>
+      </button>
+    }
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
     <!-- Draw mode selector: 'none' = select/pan; other values enable barrier drawing -->
     <mat-button-toggle-group [value]="drawMode" (change)="drawModeChange.emit($event.value)"
@@ -240,7 +240,7 @@
         </div>
         <div class="info-popup-body">
           <p><strong>Objects:</strong> Drag to move &middot; Dbl-click canvas to add &middot; <kbd>Del</kbd> removes &middot; <kbd>Ctrl+D</kbd> dupes</p>
-          <p><strong>Marks:</strong> Toggle <mat-icon class="inline-icon">edit_location</mat-icon> &middot; Drag yellow nubs to reposition &middot; <kbd>N</kbd> joins/splits nubs &middot; Use toolbar buttons to add/remove/save &middot; Use <mat-icon class="inline-icon">auto_awesome</mat-icon> to generate</p>
+          <p><strong>Marks:</strong> Toggle <mat-icon class="inline-icon">edit_location</mat-icon> to show mark tools &middot; Drag yellow nubs to reposition &middot; <kbd>N</kbd> joins/splits nubs &middot; Use toolbar buttons to add/remove/save &middot; Use <mat-icon class="inline-icon">auto_awesome</mat-icon> to generate</p>
           <p><strong>Barriers:</strong> Toggle <mat-icon class="inline-icon">fence</mat-icon> &middot; Select draw mode (<mat-icon class="inline-icon">gesture</mat-icon> freehand, <mat-icon class="inline-icon">show_chart</mat-icon> straight, <mat-icon class="inline-icon">timeline</mat-icon> curve) &middot; Select L/Li/I/Ri/R &middot; <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd></p>
           <p><strong>Draw mode <mat-icon class="inline-icon">pan_tool</mat-icon> None:</strong> select/drag objects &amp; marks without triggering barrier draws</p>
           <p><strong>Navigation:</strong> <kbd>Space</kbd>+drag pans &middot; Scroll/zoom wheel &middot; <kbd>+</kbd>/<kbd>-</kbd> zoom &middot; Arrow keys pan</p>
