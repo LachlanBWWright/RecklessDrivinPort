@@ -805,6 +805,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   selectedMarkIndex = signal<number | null>(null);
   markCreateMode = signal(false);
   pendingMarkPointCount = signal(0);
+  /** Preview marks shown on canvas with distinct styling (blue dashed) when generating. */
+  markingPreview = signal<MarkSeg[]>([]);
   private _lastDraggedNubKey: { markIdx: number; endpoint: 'p1' | 'p2' } | null = null;
   private _pendingMarkPoints: { x: number; y: number }[] = [];
   private _markCreateHoverPoint: { x: number; y: number } | null = null;
@@ -1073,6 +1075,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.selectedMarkIndex();
       this.markCreateMode();
       this.pendingMarkPointCount();
+      this.markingPreview();
       this.editXStartPos();
       // Track the full selectedLevel (includes roadSegs) so any road-segment
       // mutation (barrier drag, merge/split) automatically triggers a redraw
@@ -1280,6 +1283,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     };
 
     this.konva.onWaypointDragEnd = (e) => {
+      // Deselect any selected object when a path waypoint is moved
+      this.selectedObjIndex.set(null);
       if (e.track === 'up') {
         const arr = [...this.editTrackUp()];
         if (e.segIdx < arr.length) {
@@ -1314,6 +1319,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // ── Mark segment endpoint drag ─────────────────────────────────────────
     this.konva.onMarkEndpointDragEnd = (e) => {
+      // Deselect any selected object when a mark endpoint is moved
+      this.selectedObjIndex.set(null);
       this._pushUndo();
       const ms = [...this.marks()];
       if (e.markIdx >= ms.length) return;
@@ -2290,6 +2297,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   selectLevel(id: number): void {
     this.selectedLevelId.set(id);
     this._roadOffscreenKey = ''; // invalidate road bitmap cache
+    this._hasZoomedOnce = false; // reset so new level starts with monocolored background
     const level = this.parsedLevels().find((l) => l.resourceId === id);
     if (level) {
       this.editRoadInfo.set(level.properties.roadInfo);
@@ -2997,6 +3005,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   onCanvasWheel(event: WheelEvent): void {
     event.preventDefault();
+    this._hasZoomedOnce = true;
     const oldZoom = this.canvasZoom();
 
     // Normalise deltaY: WheelEvent.deltaMode can be pixels (0), lines (1), or pages (2).
@@ -3035,10 +3044,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   zoomIn(): void {
+    this._hasZoomedOnce = true;
     this.canvasZoom.set(Math.min(10, this.canvasZoom() + 0.25));
   }
 
   zoomOut(): void {
+    this._hasZoomedOnce = true;
     this.canvasZoom.set(Math.max(0.1, this.canvasZoom() - 0.25));
   }
 
@@ -3099,6 +3110,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, W, H);
 
+    // Only draw the detailed road and grid once the user has zoomed in/out at least once.
+    // Until then, show only the solid background colour for instant initial render.
+    if (!this._hasZoomedOnce) {
+      // Minimal render: just axes to help orient the user
+      const [ox2, oy2] = this.worldToCanvas(0, 0);
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(ox2, 0); ctx.lineTo(ox2, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, oy2); ctx.lineTo(W, oy2); ctx.stroke();
+      return;
+    }
+
     // Draw grid (subtle, over the background) — all lines in a single path for performance
     if (this.showGrid()) {
       ctx.strokeStyle = 'rgba(0,0,0,0.18)';
@@ -3147,6 +3170,25 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Draw marks (checkpoint lines) over road
     if (level && this.showMarks()) {
       this.drawMarksOnCanvas(ctx);
+    }
+
+    // Draw marking preview (blue dashed) when generating
+    const preview = this.markingPreview();
+    if (preview.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(66,165,245,0.85)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 3]);
+      for (const m of preview) {
+        const [x1, y1] = this.worldToCanvas(m.x1, m.y1);
+        const [x2, y2] = this.worldToCanvas(m.x2, m.y2);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
     }
 
     // Draw barriers (road boundaries)
@@ -3404,6 +3446,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (!level) return;
     const generated = generateCentreDashMarkings(level.roadSegs, { roadSelection, yStart, yEnd, dashFrequency });
     this._appendGeneratedMarks(generated, 'centre dashed');
+  }
+
+  previewSideRoadMarks(roadSelection: MarkingRoadSelection, yStart: number, yEnd: number, inset: number): void {
+    const level = this.selectedLevel();
+    if (!level) return;
+    const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset });
+    this.markingPreview.set(generated);
+  }
+
+  previewCentreRoadMarks(roadSelection: MarkingRoadSelection, yStart: number, yEnd: number, dashFrequency: number): void {
+    const level = this.selectedLevel();
+    if (!level) return;
+    const generated = generateCentreDashMarkings(level.roadSegs, { roadSelection, yStart, yEnd, dashFrequency });
+    this.markingPreview.set(generated);
   }
 
   removeSelectedMark(): void {
@@ -5417,6 +5473,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _roadOffscreenPanY = 0;
   /** Canvas-pixel overhang above and below the viewport in the oversized offscreen canvas. */
   private static readonly ROAD_OVERHANG_PX = 700;
+  /**
+   * True after the user has performed at least one zoom interaction.
+   * Before first zoom, only a solid background colour is drawn (skips the
+   * expensive road-texture pass) for a faster initial render.
+   */
+  private _hasZoomedOnce = false;
 
   /**
    * Draw road via an oversized offscreen bitmap cache.

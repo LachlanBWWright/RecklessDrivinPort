@@ -892,6 +892,9 @@ main {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  /* Fixed height matching the approximate height of the filled inspector state
+     so the sidebar doesn't shift in size when selection changes. */
+  min-height: 260px;
   padding: 24px 16px;
   text-align: center;
   color: var(--muted);
@@ -905,6 +908,23 @@ main {
 .inspector-empty-text {
   font-style: italic;
   text-align: center;
+}
+
+/* Direction arrow suffix in inspector direction field */
+.dir-arrow-suffix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 4px;
+}
+
+.dir-arrow-icon {
+  font-size: 18px !important;
+  height: 18px !important;
+  width: 18px !important;
+  color: var(--accent2);
+  transition: transform 0.18s ease;
+  display: block;
 }
 
 /* Remove horizontal padding around tab contents so they span full width */

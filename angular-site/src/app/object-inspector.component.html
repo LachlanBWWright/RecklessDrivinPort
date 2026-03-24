@@ -42,6 +42,9 @@
           [(ngModel)]="dirDegText"
           (change)="dirDegInput.emit(dirDegText)"
           (blur)="dirDegInput.emit(dirDegText)" />
+        <span matSuffix class="dir-arrow-suffix">
+          <mat-icon class="dir-arrow-icon" [style.transform]="dirArrowRotation">north</mat-icon>
+        </span>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="inspector-field">
@@ -98,28 +101,6 @@
       </mat-form-field>
     </div>
 
-    <mat-divider class="inspector-divider"></mat-divider>
-
-    <div class="type-filter-section">
-      <div class="type-filter-header">
-        <span class="filter-label">Filter by type</span>
-        <div class="filter-actions">
-          <button mat-button (click)="showAll.emit()" class="filter-btn">All</button>
-          <button mat-button (click)="hideAll.emit()" class="filter-btn">None</button>
-        </div>
-      </div>
-      <div class="type-chip-list">
-        @for (type of typePalette; track type.typeId) {
-          <button type="button" class="type-chip"
-            [class.type-chip--inactive]="!visibleTypeFilter.has(type.typeId)"
-            [matTooltip]="'Type ' + type.typeId"
-            (click)="typeVisibilityToggle.emit(type.typeId)">
-            <span class="type-chip-swatch" [style.background]="type.hex"></span>
-          </button>
-        }
-      </div>
-    </div>
-
     <!-- Actions moved to top; keep the auto-apply note here -->
     <div class="inspector-actions">
       <span class="auto-apply-note muted">Changes apply automatically</span>
@@ -131,3 +112,4 @@
     </div>
   }
 </div>
+

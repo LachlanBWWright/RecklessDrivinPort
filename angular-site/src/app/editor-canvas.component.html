@@ -20,6 +20,29 @@
       <mat-icon>delete</mat-icon>
     </button>
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Mark actions -->
+    <button mat-icon-button (click)="addMark.emit()" [disabled]="workerBusy" matTooltip="Add mark">
+      <mat-icon>add_location</mat-icon>
+    </button>
+    <button mat-icon-button [class.btn-active]="markCreateMode"
+      (click)="markCreateMode ? confirmMarkCreate.emit() : startMarkCreate.emit()"
+      [disabled]="workerBusy"
+      [matTooltip]="markCreateMode ? 'Confirm create (' + pendingMarkPointCount + ' pts)' : 'Create mark by click'">
+      <mat-icon>{{ markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon>
+    </button>
+    <button mat-icon-button (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
+      <mat-icon>remove_circle_outline</mat-icon>
+    </button>
+    <button mat-icon-button (click)="saveMarks.emit()" [disabled]="workerBusy" matTooltip="Save marks">
+      <mat-icon>save</mat-icon>
+    </button>
+    <!-- Generate Marks popup button -->
+    <button mat-icon-button [class.btn-active]="showMarkingPopup"
+      (click)="toggleMarkingPopup()"
+      [matTooltip]="showMarkingPopup ? 'Close marking generator' : 'Generate road markings'">
+      <mat-icon>auto_awesome</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
     <!-- View controls -->
     <button mat-icon-button (click)="frameAll.emit()" matTooltip="Frame all objects">
       <mat-icon>fit_screen</mat-icon>
@@ -85,12 +108,16 @@
     <button mat-icon-button (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
     <button mat-icon-button (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
     <button mat-icon-button (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Info button -->
+    <button mat-icon-button [class.btn-active]="showInfoPopup" (click)="showInfoPopup = !showInfoPopup" matTooltip="Editor help &amp; info">
+      <mat-icon>info</mat-icon>
+    </button>
   </div>
 </div>
 
 <div class="object-canvas-col">
-  
-  <div class="canvas-with-scrollbars">
+  <div class="canvas-with-scrollbars" style="position:relative">
     <canvas id="object-canvas" class="object-canvas" width="900" height="700"
       tabindex="0"
       (mousedown)="canvasMouseDown.emit($event)"
@@ -116,17 +143,118 @@
       [value]="panX"
       (input)="onHorizScrollInput($event)"
     />
+
+    <!-- Marking generation popup overlay -->
+    @if (showMarkingPopup) {
+      <div class="canvas-popup marking-popup">
+        <div class="popup-header">
+          <span class="popup-title">Generate Road Markings</span>
+          <button mat-icon-button class="popup-close-btn" (click)="toggleMarkingPopup()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <div class="marking-tab-bar">
+          <button type="button" class="marking-tab-btn" [class.marking-tab-btn--active]="markingTab === 'side'"
+            (click)="markingTab = 'side'; clearMarkingPreview.emit()">
+            <mat-icon>border_outer</mat-icon> Side Marks
+          </button>
+          <button type="button" class="marking-tab-btn" [class.marking-tab-btn--active]="markingTab === 'dash'"
+            (click)="markingTab = 'dash'; clearMarkingPreview.emit()">
+            <mat-icon>linear_scale</mat-icon> Centre Dashes
+          </button>
+        </div>
+        @if (markingTab === 'side') {
+          <div class="popup-fields">
+            <mat-form-field appearance="outline" class="popup-field">
+              <mat-label>Roads</mat-label>
+              <mat-select [(ngModel)]="sideRoadSelection">
+                <mat-option value="single">Single road</mat-option>
+                <mat-option value="left">Left split road</mat-option>
+                <mat-option value="right">Right split road</mat-option>
+                <mat-option value="both">All available roads</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="popup-field">
+              <mat-label>Y start</mat-label>
+              <input matInput type="number" [(ngModel)]="sideYStart" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="popup-field">
+              <mat-label>Y end</mat-label>
+              <input matInput type="number" [(ngModel)]="sideYEnd" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="popup-field">
+              <mat-label>Inset</mat-label>
+              <input matInput type="number" [(ngModel)]="sideInset" />
+            </mat-form-field>
+          </div>
+        } @else {
+          <div class="popup-fields">
+            <mat-form-field appearance="outline" class="popup-field">
+              <mat-label>Roads</mat-label>
+              <mat-select [(ngModel)]="centreRoadSelection">
+                <mat-option value="single">Single road</mat-option>
+                <mat-option value="left">Left split road</mat-option>
+                <mat-option value="right">Right split road</mat-option>
+                <mat-option value="both">All available roads</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="popup-field">
+              <mat-label>Y start</mat-label>
+              <input matInput type="number" [(ngModel)]="centreYStart" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="popup-field">
+              <mat-label>Y end</mat-label>
+              <input matInput type="number" [(ngModel)]="centreYEnd" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="popup-field">
+              <mat-label>Dash frequency</mat-label>
+              <input matInput type="number" [(ngModel)]="dashFrequency" />
+            </mat-form-field>
+          </div>
+        }
+        <p class="popup-hint">Road Y range: 0 &#8594; {{ roadMaxY }}</p>
+        <div class="popup-actions">
+          <button mat-stroked-button (click)="onPreview()" [disabled]="workerBusy" matTooltip="Preview marks (blue) on canvas">
+            <mat-icon>visibility</mat-icon> Preview
+          </button>
+          @if (hasMarkingPreview) {
+            <button mat-stroked-button (click)="clearMarkingPreview.emit()">
+              <mat-icon>visibility_off</mat-icon> Clear
+            </button>
+          }
+          <button mat-raised-button color="primary" (click)="onGenerate()" [disabled]="workerBusy">
+            <mat-icon>add</mat-icon> Generate
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Info popup overlay -->
+    @if (showInfoPopup) {
+      <div class="canvas-popup info-popup">
+        <div class="popup-header">
+          <span class="popup-title">Level {{ levelNum }} &mdash; {{ objectCount }} objects</span>
+          <button mat-icon-button class="popup-close-btn" (click)="showInfoPopup = false">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <div class="info-popup-body">
+          <p><strong>Objects:</strong> Drag to move &middot; Dbl-click canvas to add &middot; <kbd>Del</kbd> removes &middot; <kbd>Ctrl+D</kbd> dupes</p>
+          <p><strong>Marks:</strong> Toggle <mat-icon class="inline-icon">edit_location</mat-icon> &middot; Drag yellow nubs to reposition &middot; <kbd>N</kbd> joins/splits nubs &middot; Use toolbar buttons to add/remove/save &middot; Use <mat-icon class="inline-icon">auto_awesome</mat-icon> to generate</p>
+          <p><strong>Barriers:</strong> Toggle <mat-icon class="inline-icon">fence</mat-icon> &middot; Select draw mode (<mat-icon class="inline-icon">gesture</mat-icon> freehand, <mat-icon class="inline-icon">show_chart</mat-icon> straight, <mat-icon class="inline-icon">timeline</mat-icon> curve) &middot; Select L/Li/I/Ri/R &middot; <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd></p>
+          <p><strong>Draw mode <mat-icon class="inline-icon">pan_tool</mat-icon> None:</strong> select/drag objects &amp; marks without triggering barrier draws</p>
+          <p><strong>Navigation:</strong> <kbd>Space</kbd>+drag pans &middot; Scroll/zoom wheel &middot; <kbd>+</kbd>/<kbd>-</kbd> zoom &middot; Arrow keys pan</p>
+        </div>
+      </div>
+    }
   </div>
   <div class="canvas-status-bar">
     <span class="zoom-info">{{ (zoom * 100).toFixed(0) }}%</span>
     <mat-divider [vertical]="true" class="status-divider"></mat-divider>
     <span class="pan-info">({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})</span>
     <mat-divider [vertical]="true" class="status-divider"></mat-divider>
-    <span class="legend-item" style="color:#42a5f5">■ Up</span>
-    <span class="legend-item" style="color:#ef5350">■ Down</span>
-    
-    <span class="legend-item" style="color:#00e5ff">▲ Start X</span>
+    <span class="legend-item" style="color:#42a5f5">&#9632; Up</span>
+    <span class="legend-item" style="color:#ef5350">&#9632; Down</span>
+    <span class="legend-item" style="color:#00e5ff">&#9650; Start X</span>
   </div>
-
-    
 </div>

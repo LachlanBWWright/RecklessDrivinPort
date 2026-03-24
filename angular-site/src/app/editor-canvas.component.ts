@@ -1,5 +1,6 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import type { ObjectPos, MarkSeg, TrackWaypointRef } from './level-editor.service';
+import type { MarkingRoadSelection } from './road-marking-utils';
 
 export type DrawMode = 'none' | 'freehand' | 'straight' | 'curve';
 
@@ -43,6 +44,15 @@ export class EditorCanvasComponent {
   @Input() dragTrackWaypoint: TrackWaypointRef | null = null;
   @Input() hoverTrackWaypoint: TrackWaypointRef | null = null;
   @Input() spaceDown = false;
+  /** Road Y range max, used for marking generation popup. */
+  @Input() roadMaxY = 0;
+  /** Total object count for info popup. */
+  @Input() objectCount = 0;
+  /** Whether there are currently previewed marks on the canvas. */
+  @Input() hasMarkingPreview = false;
+  /** Mark create mode state for toolbar buttons. */
+  @Input() markCreateMode = false;
+  @Input() pendingMarkPointCount = 0;
 
   @Output() canvasMouseDown = new EventEmitter<MouseEvent>();
   @Output() canvasMouseMove = new EventEmitter<MouseEvent>();
@@ -76,12 +86,58 @@ export class EditorCanvasComponent {
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();
   @Output() saveMarks = new EventEmitter<void>();
+  @Output() startMarkCreate = new EventEmitter<void>();
+  @Output() confirmMarkCreate = new EventEmitter<void>();
   @Output() markFieldInput = new EventEmitter<{idx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event}>();
   @Output() markCanvasMouseDown = new EventEmitter<MouseEvent>();
   @Output() markCanvasMouseMove = new EventEmitter<MouseEvent>();
   @Output() markCanvasMouseUp = new EventEmitter<MouseEvent>();
   @Output() panXChange = new EventEmitter<number>();
   @Output() panYChange = new EventEmitter<number>();
+  @Output() generateSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number }>();
+  @Output() generateCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashFrequency: number }>();
+  @Output() previewSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number }>();
+  @Output() previewCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashFrequency: number }>();
+  @Output() clearMarkingPreview = new EventEmitter<void>();
+
+  // ── Marking popup local state ─────────────────────────────────────────────
+  showMarkingPopup = false;
+  showInfoPopup = false;
+  markingTab: 'side' | 'dash' = 'side';
+
+  sideRoadSelection: MarkingRoadSelection = 'both';
+  sideYStart = 0;
+  sideYEnd = 400;
+  sideInset = 10;
+
+  centreRoadSelection: MarkingRoadSelection = 'both';
+  centreYStart = 0;
+  centreYEnd = 400;
+  dashFrequency = 32;
+
+  toggleMarkingPopup(): void {
+    this.showMarkingPopup = !this.showMarkingPopup;
+    if (!this.showMarkingPopup) {
+      this.clearMarkingPreview.emit();
+    }
+  }
+
+  onPreview(): void {
+    if (this.markingTab === 'side') {
+      this.previewSideMarks.emit({ roadSelection: this.sideRoadSelection, yStart: this.sideYStart, yEnd: this.sideYEnd, inset: this.sideInset });
+    } else {
+      this.previewCentreMarks.emit({ roadSelection: this.centreRoadSelection, yStart: this.centreYStart, yEnd: this.centreYEnd, dashFrequency: this.dashFrequency });
+    }
+  }
+
+  onGenerate(): void {
+    if (this.markingTab === 'side') {
+      this.generateSideMarks.emit({ roadSelection: this.sideRoadSelection, yStart: this.sideYStart, yEnd: this.sideYEnd, inset: this.sideInset });
+    } else {
+      this.generateCentreMarks.emit({ roadSelection: this.centreRoadSelection, yStart: this.centreYStart, yEnd: this.centreYEnd, dashFrequency: this.dashFrequency });
+    }
+    this.clearMarkingPreview.emit();
+  }
 
   /** Typed handler for the vertical range-input scrollbar. */
   onVertScrollInput(event: Event): void {
