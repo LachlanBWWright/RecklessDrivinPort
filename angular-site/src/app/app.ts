@@ -22,6 +22,10 @@ import {
   type MarkingRoadSelection,
 } from './road-marking-utils';
 import { decodeIMA4, parseSndHeader, buildWav, SndInfo } from './snd-codec';
+import {
+  worldDirToCanvasForwardVector,
+  worldDirToCanvasRotationRad,
+} from './object-direction-utils';
 
 /** Worker response envelope sent from pack.worker.ts */
 interface WorkerResponse {
@@ -3206,7 +3210,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           // Draw sprite rotated to match direction (game Y-axis is up, so negate for canvas)
           ctx.save();
           ctx.translate(cx, cy);
-          ctx.rotate(-obj.dir);
+          ctx.rotate(worldDirToCanvasRotationRad(obj.dir));
           ctx.drawImage(preview, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
           ctx.restore();
         } else {
@@ -3231,7 +3235,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       // In world space Y is "up the track"; dir=0 means pointing up (+Y world = −Y canvas)
-      ctx.lineTo(cx + Math.sin(obj.dir) * arrowLen, cy - Math.cos(obj.dir) * arrowLen);
+      const arrow = worldDirToCanvasForwardVector(obj.dir, arrowLen);
+      ctx.lineTo(cx + arrow.dx, cy + arrow.dy);
       ctx.stroke();
 
       // Selection ring

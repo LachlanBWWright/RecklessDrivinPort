@@ -46,41 +46,50 @@
 
       <mat-form-field appearance="outline" class="inspector-field">
         <mat-label>Type ID</mat-label>
-        <mat-select [value]="editTypeRes" (selectionChange)="typeResChange.emit($event.value)">
+        <mat-select
+          [value]="editTypeRes"
+          panelClass="type-id-select-panel"
+          (selectionChange)="typeResChange.emit($event.value)">
           <mat-select-trigger>
-            <span class="inspector-type-option">
-              @if (getSpriteUrl(editTypeRes); as url) {
-                <img [src]="url" class="inspector-type-thumb" alt="" />
-              } @else {
-                <span class="inspector-type-thumb inspector-type-thumb--fallback"
-                  [style.background]="getFallbackColor(editTypeRes)"></span>
-              }
+            <span class="inspector-type-option inspector-type-option--trigger">
               <span>{{ editTypeRes }}</span>
-            </span>
-          </mat-select-trigger>
-          @for (tid of availableTypeIds; track tid) {
-            <mat-option [value]="tid">
-              <span class="inspector-type-option">
-                @if (getSpriteUrl(tid); as url) {
-                  <img [src]="url" class="inspector-type-thumb" alt="" />
-                } @else {
-                  <span class="inspector-type-thumb inspector-type-thumb--fallback"
-                    [style.background]="getFallbackColor(tid)"></span>
-                }
-                <span>{{ tid }}</span>
-              </span>
-            </mat-option>
-          }
-          @if (!availableTypeIds.includes(editTypeRes)) {
-            <mat-option [value]="editTypeRes">
-              <span class="inspector-type-option">
+              <span class="inspector-type-thumb-wrap">
                 @if (getSpriteUrl(editTypeRes); as url) {
                   <img [src]="url" class="inspector-type-thumb" alt="" />
                 } @else {
                   <span class="inspector-type-thumb inspector-type-thumb--fallback"
                     [style.background]="getFallbackColor(editTypeRes)"></span>
                 }
+              </span>
+            </span>
+          </mat-select-trigger>
+          @for (tid of availableTypeIds; track tid) {
+            <mat-option [value]="tid">
+              <span class="inspector-type-option inspector-type-option--menu">
+                <span>{{ tid }}</span>
+                <span class="inspector-type-thumb-wrap">
+                  @if (getSpriteUrl(tid); as url) {
+                    <img [src]="url" class="inspector-type-thumb" alt="" />
+                  } @else {
+                    <span class="inspector-type-thumb inspector-type-thumb--fallback"
+                      [style.background]="getFallbackColor(tid)"></span>
+                  }
+                </span>
+              </span>
+            </mat-option>
+          }
+          @if (!availableTypeIds.includes(editTypeRes)) {
+            <mat-option [value]="editTypeRes">
+              <span class="inspector-type-option inspector-type-option--menu">
                 <span>{{ editTypeRes }} (custom)</span>
+                <span class="inspector-type-thumb-wrap">
+                  @if (getSpriteUrl(editTypeRes); as url) {
+                    <img [src]="url" class="inspector-type-thumb" alt="" />
+                  } @else {
+                    <span class="inspector-type-thumb inspector-type-thumb--fallback"
+                      [style.background]="getFallbackColor(editTypeRes)"></span>
+                  }
+                </span>
               </span>
             </mat-option>
           }

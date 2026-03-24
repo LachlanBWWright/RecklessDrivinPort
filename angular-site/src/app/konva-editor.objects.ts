@@ -2,6 +2,7 @@ import Konva from 'konva';
 import type { ObjectPos } from './level-editor.service';
 import { FALLBACK_CIRCLE_WORLD_R } from './konva-editor.types';
 import type { KonvaWorldNode } from './konva-editor.types';
+import { worldDirToKonvaRotationDeg } from './object-direction-utils';
 
 export function buildObjects(
   worldGroup: Konva.Group | null,
@@ -41,7 +42,7 @@ export function buildObjects(
       const group = new Konva.Group({
         x:         obj.x,
         y:         -obj.y,
-        rotation:  (-obj.dir * 180) / Math.PI,
+        rotation:  worldDirToKonvaRotationDeg(obj.dir),
         draggable: !panMode,
         id:        `obj-${i}`,
       });

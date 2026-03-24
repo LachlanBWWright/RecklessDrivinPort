@@ -854,27 +854,6 @@ main {
   gap: 4px;
 }
 
-.inspector-type-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.inspector-type-thumb {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  image-rendering: pixelated;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface2);
-}
-
-.inspector-type-thumb--fallback {
-  display: inline-block;
-}
-
 .type-chip {
   width: 22px;
   height: 22px;
