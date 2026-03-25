@@ -1052,6 +1052,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   constructor() {
     // Redraw object canvas when objects, selection, zoom, pan, sprite previews, or track overlay changes.
     effect(() => {
+      // Read activeTab first so that signal subscriptions below are still registered
+      // (Angular effects always run the full body once, so we still need all reads),
+      // but we avoid scheduling redundant redraws when the editor is not visible.
+      const tab = this.activeTab();
+      const section = this.editorSection();
       this.objects();
       this.selectedObjIndex();
       this.canvasZoom();
@@ -1083,8 +1088,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // mutation (barrier drag, merge/split) automatically triggers a redraw
       // without requiring explicit scheduleCanvasRedraw() calls.
       this.selectedLevel();
-      const section = this.editorSection();
-      if (section === 'objects') {
+      if (tab === 'editor' && section === 'objects') {
         this.scheduleCanvasRedraw();
       }
     });
@@ -5676,8 +5680,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const [ax1, ay1] = wtc(x1, y1);
       const [ax2, ay2] = wtc(x2, y2);
       const [ax3, ay3] = wtc(x3, y3);
-      if (ay0 < -H && ay1 < -H && ay2 < -H && ay3 < -H) return;
-      if (ay0 > canvasH + H && ay1 > canvasH + H && ay2 > canvasH + H && ay3 > canvasH + H) return;
+      if (ay0 < 0 && ay1 < 0 && ay2 < 0 && ay3 < 0) return;
+      if (ay0 > canvasH && ay1 > canvasH && ay2 > canvasH && ay3 > canvasH) return;
       batch.push(ax0, ay0, ax1, ay1, ax2, ay2, ax3, ay3);
     };
 
