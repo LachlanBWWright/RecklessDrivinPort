@@ -5563,13 +5563,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         offCtx.clearRect(0, 0, W, offH);
         // Render using the viewport H and an explicit yOverhang so the road extends
         // above and below the viewport into the cache overhang region.
+        let renderOk = false;
         try {
           this.drawObjectRoadPreview(offCtx, level, theme, panX, panY, zoom, W, H, OVERHANG);
+          renderOk = true;
         } catch (err) {
           console.error('[road render]', err);
+          // Fill offscreen with a plain background so partial draws don't show garbage.
+          offCtx.fillStyle = theme.bg;
+          offCtx.fillRect(0, 0, W, offH);
         }
-        // Always update the key so we don't re-render on every frame even if drawing failed.
-        this._roadOffscreenKey = staticKey;
+        // Only cache the key on successful render; on failure leave the key stale so
+        // the next frame retries.  This prevents a permanent blank background when an
+        // intermittent exception occurs (e.g. browser resource exhaustion).
+        if (renderOk) {
+          this._roadOffscreenKey = staticKey;
+        }
       }
     }
 
@@ -5651,13 +5660,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Background and road surface use world-origin alignment (large 128-unit tiles).
     const bgPat = ri ? (makePattern(ri.backgroundTex, 128) ?? theme.bg) : theme.bg;
     const fgPat = ri ? (makePattern(ri.foregroundTex, 128) ?? theme.road) : theme.road;
+    // Kerb patterns use 16-world-unit tiles, anchored to world origin for seamless tiling.
+    const KERB_TEX_WORLD = 16;
+    const lbPat = ri ? (makePattern(ri.roadLeftBorder,  KERB_TEX_WORLD) ?? theme.kerbA) : theme.kerbA;
+    const rbPat = ri ? (makePattern(ri.roadRightBorder, KERB_TEX_WORLD) ?? theme.kerbB) : theme.kerbB;
     // Centre line: cyan for water, yellow for asphalt
     const CENTRE_COLOUR = theme.water ? 'rgba(80, 255, 180, 0.85)' : 'rgba(255, 248, 140, 0.85)';
-
-    // Kerb texture canvases (for group-based anchored rendering)
-    const KERB_TEX_WORLD = 16;   // one kerb tile covers 16 world units
-    const lbTexCanvas  = ri ? this.roadTextureCanvases.get(ri.roadLeftBorder)  : null;
-    const rbTexCanvas  = ri ? this.roadTextureCanvases.get(ri.roadRightBorder) : null;
 
     /** Append quad canvas coords to a batch array. */
     const addQuad = (
@@ -5689,49 +5697,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.fill();
     };
 
-    /**
-     * Flush a kerb group: create a pattern anchored to avgAnchorX and fill.
-     * Using road-edge anchoring per group ensures the kerb texture stays locked
-     * to the road boundary as it curves, not to world X=0.
-     */
-    const flushKerbGroup = (
-      batch: number[],
-      texCanvas: HTMLCanvasElement | null | undefined,
-      avgAnchorX: number,
-      fallbackFill: string,
-    ): void => {
-      if (batch.length === 0) return;
-      let fill: CanvasPattern | string = fallbackFill;
-      if (texCanvas) {
-        try {
-          const pat = ctx.createPattern(texCanvas, 'repeat');
-          if (pat) {
-            // scale: one full texture width = KERB_TEX_WORLD world units (= the kerb strip width)
-            const scale = KERB_TEX_WORLD * zoom / texCanvas.width;
-            const tileW = KERB_TEX_WORLD * zoom;
-            const tileH = texCanvas.height * scale;
-            const tx = ((W / 2 + (avgAnchorX - panX) * zoom) % tileW + tileW) % tileW;
-            const ty = (((H / 2 + yOverhang) + panY * zoom) % tileH + tileH) % tileH;
-            pat.setTransform(new DOMMatrix([scale, 0, 0, scale, tx, ty]));
-            fill = pat;
-          }
-        } catch { /* use fallback */ }
-      }
-      flushBatch(fill, batch);
-      batch.length = 0;
-    };
-
-    const flushKerbBatches = (): void => {
-      if (kerbGroupCount <= 0) return;
-      const lbAvg = lbGroupAnchorSum / kerbGroupCount;
-      const rbAvg = rbGroupAnchorSum / kerbGroupCount;
-      flushKerbGroup(lbBatch, lbTexCanvas, lbAvg, theme.kerbA);
-      flushKerbGroup(rbBatch, rbTexCanvas, rbAvg, theme.kerbB);
-      lbGroupAnchorSum = 0;
-      rbGroupAnchorSum = 0;
-      kerbGroupCount = 0;
-    };
-
     // Draw road geometry using actual textures – only render segments visible in viewport.
     const visibleWorldMinY = panY - (H / 2 + yOverhang) / zoom - 4;
     const visibleWorldMaxY = panY + (H / 2 + yOverhang) / zoom + 4;
@@ -5747,42 +5712,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     const bgBatch: number[] = [];
     const fgBatch: number[] = [];
-    // Separate kerb batches that are flushed per group with per-group anchoring
     const lbBatch: number[] = [];
     const rbBatch: number[] = [];
-    let lbGroupAnchorSum = 0;
-    let rbGroupAnchorSum = 0;
-    let kerbGroupCount   = 0;
-    let lastLbAnchor: number | null = null;
-    let lastRbAnchor: number | null = null;
-    const KERB_ANCHOR_DELTA = 8;
-    const KERB_GROUP_SEGMENTS = 12;
     for (let index = firstSeg; index <= lastSeg; index += step) {
       const cur = level.roadSegs[index];
       const nxtIdx = Math.min(index + step, level.roadSegs.length - 1);
       const nxt = level.roadSegs[nxtIdx];
       const y0  = index * 2;
       const y1  = nxtIdx * 2;
-      const lbAnchor = cur.v0 - KERB_WIDTH;
-      const rbAnchor = cur.v3;
-
-      if (
-        kerbGroupCount > 0 &&
-        (
-          kerbGroupCount >= KERB_GROUP_SEGMENTS ||
-          (lastLbAnchor !== null && Math.abs(lbAnchor - lastLbAnchor) > KERB_ANCHOR_DELTA) ||
-          (lastRbAnchor !== null && Math.abs(rbAnchor - lastRbAnchor) > KERB_ANCHOR_DELTA)
-        )
-      ) {
-        flushKerbBatches();
-      }
 
       // Off-road (background texture) – extend to canvas edges
       addQuad(bgBatch, worldMinX, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  worldMinX, y1);
 
-      // Left border/kerb – accumulate into group batch; anchor to outer edge (v0-KERB_WIDTH)
+      // Left border/kerb
       addQuad(lbBatch, cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1);
-      lbGroupAnchorSum += lbAnchor;
 
       // Left road lane: v0 to v1 (road surface)
       addQuad(fgBatch, cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1);
@@ -5791,8 +5734,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const medianW = Math.min(cur.v2 - cur.v1, nxt.v2 - nxt.v1);
       if (medianW > 0) {
         const halfKerb = Math.min(KERB_WIDTH, medianW / 2);
-        // Inner kerbs use the same lb/rb batches but we don't adjust anchor tracking.
-        // The outer-kerb anchors are close enough for the narrow median strips.
         addQuad(rbBatch, cur.v1, y0,  cur.v1 + halfKerb, y0,  nxt.v1 + halfKerb, y1,  nxt.v1, y1);
         if (medianW > halfKerb * 2) {
           addQuad(bgBatch, cur.v1 + halfKerb, y0,  cur.v2 - halfKerb, y0,  nxt.v2 - halfKerb, y1,  nxt.v1 + halfKerb, y1);
@@ -5803,23 +5744,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Right road lane: v2 to v3 (road surface)
       addQuad(fgBatch, cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1);
 
-      // Right border/kerb – anchor to outer edge (v3)
+      // Right border/kerb
       addQuad(rbBatch, cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1);
-      rbGroupAnchorSum += rbAnchor;
 
       // Off-road far right – extend to canvas edges
       addQuad(bgBatch, cur.v3 + KERB_WIDTH, y0,  worldMaxX, y0,  worldMaxX, y1,  nxt.v3 + KERB_WIDTH, y1);
-
-      kerbGroupCount++;
-      lastLbAnchor = lbAnchor;
-      lastRbAnchor = rbAnchor;
     }
 
     // ─── Flush layers in back-to-front order ────────────────────────────────────
     // 1. Background (grass/off-road) – painted first
     flushBatch(bgPat, bgBatch);
-    // 2. Kerb strips – painted over background; use per-group road-edge anchoring
-    flushKerbBatches();
+    // 2. Kerb strips – painted over background
+    flushBatch(lbPat, lbBatch);
+    flushBatch(rbPat, rbBatch);
     // 3. Road surface (top layer)
     flushBatch(fgPat, fgBatch);
 

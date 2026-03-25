@@ -160,6 +160,9 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     if (canvas.width !== newW || canvas.height !== newH) {
       canvas.width  = newW;
       canvas.height = newH;
+      // Resizing the canvas resets the 2D context; any cached patterns must be
+      // re-created with the fresh context on the next draw call.
+      this._checkerPattern = null;
     }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
