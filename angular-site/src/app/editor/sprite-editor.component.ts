@@ -70,6 +70,8 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   private readonly MAX_UNDO = 40;
   private rawCanvas: HTMLCanvasElement | null = null;
   private checkerCanvas: HTMLCanvasElement | null = null;
+  /** Cached checker pattern – recreated only when checkerCanvas changes. */
+  private _checkerPattern: CanvasPattern | null = null;
   private _pendingDrawRaf: number | null = null;
 
   // ---- Tool icons for display (Material icon names) ----
@@ -150,8 +152,15 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     const w = this.spriteW;
     const h = this.spriteH;
     const z = this.zoom;
-    canvas.width  = w * z;
-    canvas.height = h * z;
+    // Only resize the canvas buffer when dimensions actually change.
+    // Unconditionally setting canvas.width/height forces the browser to
+    // reallocate the backing store on every frame, which is very expensive.
+    const newW = w * z;
+    const newH = h * z;
+    if (canvas.width !== newW || canvas.height !== newH) {
+      canvas.width  = newW;
+      canvas.height = newH;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -167,11 +176,16 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
         checkerCtx.fillRect(0, 0, 4, 4);
         checkerCtx.fillRect(4, 4, 4, 4);
       }
+      // Invalidate cached pattern whenever checkerCanvas is recreated
+      this._checkerPattern = null;
     }
     if (this.checkerCanvas) {
-      const checkerPattern = ctx.createPattern(this.checkerCanvas, 'repeat');
-      if (checkerPattern) {
-        ctx.fillStyle = checkerPattern;
+      // Cache the pattern – createPattern is expensive and the source never changes
+      if (!this._checkerPattern) {
+        this._checkerPattern = ctx.createPattern(this.checkerCanvas, 'repeat');
+      }
+      if (this._checkerPattern) {
+        ctx.fillStyle = this._checkerPattern;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }

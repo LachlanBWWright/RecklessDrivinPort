@@ -262,8 +262,23 @@ export class KonvaEditorService implements OnDestroy {
 
   resize(cssW: number, cssH: number): void {
     if (!this.stage) return;
-    if (cssW > 0) this._cssW = cssW;
-    if (cssH > 0) this._cssH = cssH;
+    if (cssW > 0) {
+      this._cssW = cssW;
+      // Keep logicalW in sync so scale factor (cssW/logicalW) stays 1:1
+      // when the canvas pixel buffer is sized to match its CSS display size.
+      this._logicalW = cssW;
+    }
+    if (cssH > 0) {
+      this._cssH = cssH;
+      this._logicalH = cssH;
+    }
+    // Update background image node to match new logical dimensions
+    if (this.bgImageNode) {
+      this.bgImageNode.width(this._logicalW);
+      this.bgImageNode.height(this._logicalH);
+      this.bgImageNode.offsetX(this._logicalW / 2);
+      this.bgImageNode.offsetY(this._logicalH / 2);
+    }
     this.stage.width(this._cssW);
     this.stage.height(this._cssH);
     this._applyGroupTransform();

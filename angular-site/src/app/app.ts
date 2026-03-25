@@ -1732,6 +1732,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedPackEntryId.set(null);
     this.selectedPackEntryBytes.set(null);
     this.resBrowserStatus.set('');
+    // Stop audio and clear the cached buffer so the next Play decodes the new selection.
+    this.stopAudio();
+    this._lastAudioBuffer = null;
+    this.audioCurrentTime.set(0);
+    this.audioDuration.set(0);
 
     try {
       this.resBrowserBusy.set(true);
@@ -2319,7 +2324,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   selectLevel(id: number): void {
     this.selectedLevelId.set(id);
     this._roadOffscreenKey = ''; // invalidate road bitmap cache
-    this._hasZoomedOnce = false; // reset so new level starts with monocolored background
     const level = this.parsedLevels().find((l) => l.resourceId === id);
     if (level) {
       this.editRoadInfo.set(level.properties.roadInfo);
@@ -3027,7 +3031,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   onCanvasWheel(event: WheelEvent): void {
     event.preventDefault();
-    this._hasZoomedOnce = true;
     const oldZoom = this.canvasZoom();
 
     // Normalise deltaY: WheelEvent.deltaMode can be pixels (0), lines (1), or pages (2).
@@ -3066,12 +3069,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   zoomIn(): void {
-    this._hasZoomedOnce = true;
     this.canvasZoom.set(Math.min(10, this.canvasZoom() + 0.25));
   }
 
   zoomOut(): void {
-    this._hasZoomedOnce = true;
     this.canvasZoom.set(Math.max(0.1, this.canvasZoom() - 0.25));
   }
 
@@ -3131,18 +3132,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const theme: RoadTheme = ROAD_THEMES[roadInfo] ?? DEFAULT_ROAD_THEME;
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, W, H);
-
-    // Only draw the detailed road and grid once the user has zoomed in/out at least once.
-    // Until then, show only the solid background colour for instant initial render.
-    if (!this._hasZoomedOnce) {
-      // Minimal render: just axes to help orient the user
-      const [ox2, oy2] = this.worldToCanvas(0, 0);
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(ox2, 0); ctx.lineTo(ox2, H); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, oy2); ctx.lineTo(W, oy2); ctx.stroke();
-      return;
-    }
 
     // Draw grid (subtle, over the background) — all lines in a single path for performance
     if (this.showGrid()) {
@@ -4388,6 +4377,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   async selectAudioEntry(id: number): Promise<void> {
     this.selectedAudioId.set(id);
+    // Stop any current playback and clear the cached buffer so the next play
+    // decodes the newly selected sound, not the previous one.
+    this.stopAudio();
+    this._lastAudioBuffer = null;
+    this.audioCurrentTime.set(0);
+    this.audioDuration.set(0);
     await this.loadSelectedAudioBytes(id);
   }
 
@@ -5509,12 +5504,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _roadOffscreenPanY = 0;
   /** Canvas-pixel overhang above and below the viewport in the oversized offscreen canvas. */
   private static readonly ROAD_OVERHANG_PX = 700;
-  /**
-   * True after the user has performed at least one zoom interaction.
-   * Before first zoom, only a solid background colour is drawn (skips the
-   * expensive road-texture pass) for a faster initial render.
-   */
-  private _hasZoomedOnce = false;
 
   /**
    * Draw road via an oversized offscreen bitmap cache.
