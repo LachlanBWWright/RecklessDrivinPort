@@ -65,4 +65,27 @@ describe('lzrw3aDecompress', () => {
     const result = packHandleDecompress(packHandleCompress(original));
     expect(result.every((b) => b === 0)).toBe(true);
   });
+
+  it('compresses repetitive data smaller than FLAG_COPY', () => {
+    // 512 bytes of repeating 3-byte pattern: back-references should yield < 512 bytes
+    const pattern = new Uint8Array([0x41, 0x42, 0x43]);
+    const original = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) original[i] = pattern[i % 3];
+    const handle = packHandleCompress(original);
+    // FLAG_COPY would be 4 + 512 = 516 bytes; compressed should be significantly smaller
+    const copySize = 4 + 512;
+    expect(handle.length).toBeLessThan(copySize);
+    // Must round-trip correctly
+    const result = packHandleDecompress(handle);
+    expect(Array.from(result)).toEqual(Array.from(original));
+  });
+
+  it('round-trip with large random-ish data', () => {
+    const original = new Uint8Array(1024);
+    // Pseudo-random but with some repetition
+    for (let i = 0; i < 1024; i++) original[i] = (i * 7 + (i >> 3)) & 0xFF;
+    const handle = packHandleCompress(original);
+    const result = packHandleDecompress(handle);
+    expect(Array.from(result)).toEqual(Array.from(original));
+  });
 });
