@@ -20,6 +20,8 @@ export class ObjectInspectorComponent implements OnChanges {
   @Input() workerBusy = false;
   @Input() typeDimLabel = '';
   dirDegText = '0';
+  /** True while the direction input element has focus – prevents ngOnChanges resetting typed text. */
+  dirDegFocused = false;
 
   @Output() dirDegInput = new EventEmitter<string>();
   @Output() typeResChange = new EventEmitter<number>();
@@ -37,7 +39,10 @@ export class ObjectInspectorComponent implements OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['editDirDeg']) {
+    // Only update the text input when the user is NOT actively editing it.
+    // Without this guard, every Angular change-detection cycle (triggered by
+    // canvas redraws etc.) would reset the typed value mid-edit.
+    if (changes['editDirDeg'] && !this.dirDegFocused) {
       this.dirDegText = Number.isFinite(this.editDirDeg) ? this.editDirDeg.toString() : '0';
     }
   }

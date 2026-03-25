@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, AfterViewInit, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnDestroy, OnInit, AfterViewInit, inject, signal, computed, effect, ChangeDetectionStrategy } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type {
   ParsedLevel,
@@ -617,6 +617,7 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
   templateUrl: './app.html',
   standalone: false,
   styleUrl: './app.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly typePalette = OBJ_PALETTE.map((hex, index) => ({ hex, typeId: index }));
@@ -1127,6 +1128,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Schedule a canvas redraw on the next animation frame, cancelling any pending redraw. */
   private scheduleCanvasRedraw(): void {
+    // Skip canvas redraws when the editor tab is not visible.
+    if (this.activeTab() !== 'editor') return;
     if (typeof window === 'undefined') {
       setTimeout(() => this.redrawObjectCanvas(), 0);
       return;
@@ -1230,11 +1233,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.konva.init('konva-container', canvas.width, canvas.height, cssW, cssH);
     this._konvaInitialized = true;
 
-    // Keep the Konva container + stage in sync if the canvas CSS display size changes
+    // Keep the Konva container + stage in sync if the canvas CSS display size changes.
+    // Also update the canvas pixel-buffer dimensions to match CSS size (1:1 DPR mapping)
+    // so that rendering fills the expanded height correctly.
     const resizeObserver = new ResizeObserver(() => {
       const r = canvas.getBoundingClientRect();
       const w = Math.max(1, Math.round(r.width));
       const h = Math.max(1, Math.round(r.height));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width  = w;
+        canvas.height = h;
+        // Invalidate the road offscreen cache since the canvas dimensions changed.
+        this._roadOffscreenKey = '';
+        this._roadOffscreen = null;
+      }
       if (konvaContainer) {
         konvaContainer.style.width = `${w}px`;
         konvaContainer.style.height = `${h}px`;
@@ -1553,6 +1565,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   setTab(tab: AppTab): void {
     this.activeTab.set(tab);
     this.syncGameLoopWithActiveTab();
+    // Resume canvas rendering when the editor tab becomes active.
+    if (tab === 'editor') {
+      window.requestAnimationFrame(() => this.redrawObjectCanvas());
+    }
   }
 
   setSection(section: EditorSection): void {
@@ -5554,7 +5570,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         offCtx.clearRect(0, 0, W, offH);
         // Render using the viewport H and an explicit yOverhang so the road extends
         // above and below the viewport into the cache overhang region.
-        this.drawObjectRoadPreview(offCtx, level, theme, panX, panY, zoom, W, H, OVERHANG);
+        try {
+          this.drawObjectRoadPreview(offCtx, level, theme, panX, panY, zoom, W, H, OVERHANG);
+        } catch (err) {
+          console.error('[road render]', err);
+        }
+        // Always update the key so we don't re-render on every frame even if drawing failed.
         this._roadOffscreenKey = staticKey;
       }
     }
@@ -5562,7 +5583,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Blit the slice of the oversized offscreen that corresponds to the current viewport.
     if (this._roadOffscreen) {
       const offscreenSrcY = offscreenCentreCanvasY - (panY - this._roadOffscreenPanY) * zoom - H / 2;
-      ctx.drawImage(this._roadOffscreen, 0, offscreenSrcY, W, H, 0, 0, W, H);
+      // Clamp srcY to valid range to avoid drawImage throwing on out-of-bounds source rect.
+      if (offscreenSrcY >= 0 && offscreenSrcY + H <= offH) {
+        ctx.drawImage(this._roadOffscreen, 0, offscreenSrcY, W, H, 0, 0, W, H);
+      } else {
+        // srcY out of range – fall back to a plain background colour this frame.
+        ctx.fillStyle = theme.bg;
+        ctx.fillRect(0, 0, W, H);
+      }
     }
   }
 
@@ -5683,8 +5711,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       let fill: CanvasPattern | string = fallbackFill;
       if (texCanvas) {
         try {
-          // Use repeat-y to prevent the kerb texture from tiling horizontally across the strip.
-          const pat = ctx.createPattern(texCanvas, 'repeat-y');
+          const pat = ctx.createPattern(texCanvas, 'repeat');
           if (pat) {
             // scale: one full texture width = KERB_TEX_WORLD world units (= the kerb strip width)
             const scale = KERB_TEX_WORLD * zoom / texCanvas.width;

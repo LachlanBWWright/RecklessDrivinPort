@@ -8,6 +8,7 @@ import {
   ElementRef,
   ViewChild,
   AfterViewInit,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import type { DecodedSpriteFrame } from './level-editor.service';
 
@@ -18,6 +19,7 @@ export type SpriteEditorTool = 'pencil' | 'fill' | 'eyedropper' | 'eraser';
   templateUrl: './sprite-editor.component.html',
   styleUrl: './sprite-editor.component.scss',
   standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   @Input() frame: DecodedSpriteFrame | null = null;

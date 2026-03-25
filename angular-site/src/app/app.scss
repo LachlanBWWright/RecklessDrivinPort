@@ -315,6 +315,7 @@ main {
   flex-direction: column;
   gap: 12px;
   align-self: stretch;
+  flex: 1; /* grow to fill remaining space in main */
 }
 
 /* Toolbar card */
@@ -436,6 +437,9 @@ main {
    ====================================================== */
 .editor-tabs {
   width: 100%;
+  flex: 1; /* grow to fill remaining space from .editor-section */
+  display: flex;
+  flex-direction: column;
 
   .editor-tab-label {
     margin-left: 6px;
@@ -465,12 +469,17 @@ main {
     border-color: var(--accent) !important;
   }
 
-  ::ng-deep .mat-mdc-tab-body-wrapper { border-radius: 0 0 8px 8px; }
+  ::ng-deep .mat-mdc-tab-body-wrapper {
+    border-radius: 0 0 8px 8px;
+    flex: 1; /* stretch tab body to fill remaining height */
+  }
 
   /* Prevent Angular Material tab body from adding a second native scrollbar.
      The canvas uses its own custom range-input scrollbars. */
   ::ng-deep .mat-mdc-tab-body-content {
     overflow: hidden !important;
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -497,6 +506,9 @@ main {
   border: 1px solid var(--border) !important;
   border-radius: 0 0 8px 8px !important;
   width: 100%;
+  flex: 1; /* grow to fill the tab body */
+  display: flex;
+  flex-direction: column;
 
   mat-card-header {
     border-bottom: 1px solid var(--border);
@@ -603,7 +615,12 @@ main {
    OBJECTS PANEL – Canvas layout
    ====================================================== */
 .objects-panel-card {
-  mat-card-content.objects-card-content { padding: 0 !important; }
+  mat-card-content.objects-card-content {
+    padding: 0 !important;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
   mat-card-content.props-card-content { padding: 16px 20px !important; }
 }
 
@@ -612,7 +629,7 @@ main {
   gap: 8px;
   align-items: stretch;
   width: 100%;
-  min-height: 500px;
+  flex: 1; /* fill the card content height */
 
   app-editor-canvas {
     flex: 1;
@@ -627,7 +644,7 @@ main {
     width: 290px;
     min-width: 270px;
     flex-shrink: 0;
-    max-height: min(calc(100vh - 180px), 780px);
+    /* Height tracks the canvas column height via stretch; overflow scrolls within */
     overflow-y: auto;
     border-left: 1px solid var(--border);
     background: var(--surface2);

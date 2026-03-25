@@ -40,8 +40,9 @@
         <mat-label>Direction (°)</mat-label>
         <input matInput type="text" inputmode="decimal"
           [(ngModel)]="dirDegText"
-          (change)="dirDegInput.emit(dirDegText)"
-          (blur)="dirDegInput.emit(dirDegText)" />
+          (focus)="dirDegFocused = true"
+          (blur)="dirDegFocused = false; dirDegInput.emit(dirDegText)"
+          (change)="dirDegInput.emit(dirDegText)" />
         <span matSuffix class="dir-arrow-suffix">
           <mat-icon class="dir-arrow-icon" [style.transform]="dirArrowRotation">north</mat-icon>
         </span>

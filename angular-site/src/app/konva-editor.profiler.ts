@@ -1,7 +1,7 @@
 /** Lightweight profiler helpers for KonvaEditorService.
  * Usage: const t = profiler.start('setObjects'); ... t.end();
  */
-let enabled = false;
+let enabled = true;
 
 class ProfilerTimer {
   private name: string;
