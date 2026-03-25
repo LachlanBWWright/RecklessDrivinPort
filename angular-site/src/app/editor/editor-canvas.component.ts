@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
-import type { ObjectPos, MarkSeg, TrackWaypointRef } from './level-editor.service';
-import type { MarkingRoadSelection } from './road-marking-utils';
+import type { ObjectPos, MarkSeg, TrackWaypointRef } from '../level-editor.service';
+import type { MarkingRoadSelection } from '../road-marking-utils';
 
 export type DrawMode = 'none' | 'freehand' | 'straight' | 'curve';
 

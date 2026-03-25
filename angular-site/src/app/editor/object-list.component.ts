@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
-import type { ObjectPos } from './level-editor.service';
+import type { ObjectPos } from '../level-editor.service';
 
 @Component({
   selector: 'app-object-list',

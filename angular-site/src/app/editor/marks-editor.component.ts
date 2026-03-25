@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
-import type { MarkSeg } from './level-editor.service';
+import type { MarkSeg } from '../level-editor.service';
 
 /**
  * Marks (checkpoint) editor panel.

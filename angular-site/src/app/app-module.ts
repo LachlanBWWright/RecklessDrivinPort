@@ -31,12 +31,12 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 import { App } from './app';
-import { EditorCanvasComponent } from './editor-canvas.component';
-import { MarksEditorComponent } from './marks-editor.component';
-import { ObjectInspectorComponent } from './object-inspector.component';
-import { ObjectListComponent } from './object-list.component';
-import { PropertiesTabComponent } from './properties-tab.component';
-import { SpriteEditorComponent } from './sprite-editor.component';
+import { EditorCanvasComponent } from './editor/editor-canvas.component';
+import { MarksEditorComponent } from './editor/marks-editor.component';
+import { ObjectInspectorComponent } from './editor/object-inspector.component';
+import { ObjectListComponent } from './editor/object-list.component';
+import { PropertiesTabComponent } from './editor/properties-tab.component';
+import { SpriteEditorComponent } from './editor/sprite-editor.component';
 
 const MATERIAL_MODULES = [
   MatButtonModule, MatIconModule, MatTooltipModule, MatInputModule,

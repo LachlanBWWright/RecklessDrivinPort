@@ -10,7 +10,7 @@ import {
   AfterViewInit,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import type { DecodedSpriteFrame } from './level-editor.service';
+import type { DecodedSpriteFrame } from '../level-editor.service';
 
 export type SpriteEditorTool = 'pencil' | 'fill' | 'eyedropper' | 'eraser';
 

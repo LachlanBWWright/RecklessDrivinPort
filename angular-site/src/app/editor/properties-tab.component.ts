@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
-import type { ParsedLevel, LevelProperties, ObjectGroupRef } from './level-editor.service';
+import type { ParsedLevel, LevelProperties, ObjectGroupRef } from '../level-editor.service';
 
 /**
  * Level Properties tab — extracted from app.html for better component separation.
