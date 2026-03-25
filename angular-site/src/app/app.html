@@ -17,6 +17,8 @@
 
 <main>
   <!-- =================== GAME TAB =================== -->
+  <!-- Game panel – always in DOM so WASM survives tab switches -->
+  <section id="panel-game" role="tabpanel" class="game-section" [class.tab-panel--hidden]="activeTab() !== 'game'">
   @if (activeTab() === 'game') {
     <mat-card class="hero-card">
       <mat-card-header>
@@ -33,8 +35,6 @@
     </mat-card>
   }
 
-  <!-- Game panel – always in DOM so WASM survives tab switches -->
-  <section id="panel-game" role="tabpanel" class="game-section" [class.tab-panel--hidden]="activeTab() !== 'game'">
     <mat-card class="game-card">
       <mat-card-header>
         <mat-card-title>Game</mat-card-title>
@@ -126,6 +126,10 @@
                 </button>
                 <button mat-raised-button color="primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
                   <mat-icon>download</mat-icon> Download Edited
+                </button>
+                <button mat-raised-button color="accent" (click)="saveEditedResourcesToGame()" [disabled]="!hasEditorData() || workerBusy()"
+                  matTooltip="Save all edits (including sprites) to the game and prepare for restart">
+                  <mat-icon>save</mat-icon> Save to Game
                 </button>
 
                 <div class="level-btns-inline">
@@ -541,6 +545,15 @@
                           <span>{{ selectedAudioBytes()!.length | number }} bytes</span>
                         </div>
                         <div class="audio-actions" style="display:flex;flex-direction:column;gap:8px;">
+                           <!-- Volume slider row -->
+                           <div style="display:flex;align-items:center;gap:10px;">
+                             <mat-icon style="font-size:18px;height:18px;width:18px;color:#8a8a8a">volume_up</mat-icon>
+                             <mat-slider min="0" max="100" step="1" discrete style="width:140px">
+                               <input matSliderThumb [value]="audioPlayerVolume()"
+                                 (valueChange)="setAudioPlayerVolume($event)" />
+                             </mat-slider>
+                             <span style="font-size:0.78rem;color:#8a8a8a;min-width:32px">{{ audioPlayerVolume() }}%</span>
+                           </div>
                            <div style="display:flex;align-items:center;gap:12px;">
                              <button mat-raised-button color="primary"
                                 (click)="togglePlayPause()"

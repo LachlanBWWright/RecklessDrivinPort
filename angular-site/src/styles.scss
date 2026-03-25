@@ -95,7 +95,8 @@ body {
   font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   display: flex;
   flex-direction: column;
-  min-height: max(100vh, 1500px);
+  height: 100dvh;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -104,7 +105,8 @@ app-root {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: max(100vh, 1500px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Prevent arrow key scrolling on canvas */

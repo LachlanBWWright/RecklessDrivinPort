@@ -95,14 +95,23 @@
    ====================================================== */
 main {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden; /* individual sections scroll internally */
+}
+
+/* Game tab: scrollable since the game + controls can exceed viewport */
+.game-section {
+  flex: 1;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 20px 0 40px;
   gap: 16px;
-  background: var(--bg);
 }
-
 /* ======================================================
    SHARED HELPERS
    ====================================================== */
@@ -171,15 +180,11 @@ main {
 /* ======================================================
    GAME SECTION
    ====================================================== */
-.game-section {
-  width: 100%;
-  max-width: 900px;
-}
-
 .game-card {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
   width: 100%;
+  max-width: 900px;
 
   mat-card-header {
     position: relative;
@@ -313,9 +318,11 @@ main {
   max-width: none; /* span full available page width */
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
   align-self: stretch;
   flex: 1; /* grow to fill remaining space in main */
+  min-height: 0;
+  overflow: hidden; /* internal sections handle their own scrolling */
 }
 
 /* Toolbar card */
@@ -438,8 +445,10 @@ main {
 .editor-tabs {
   width: 100%;
   flex: 1; /* grow to fill remaining space from .editor-section */
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 
   .editor-tab-label {
     margin-left: 6px;

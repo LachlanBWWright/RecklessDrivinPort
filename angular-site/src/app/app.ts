@@ -1706,6 +1706,73 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * Serialize the current in-memory resources, persist them in IndexedDB, and
+   * offer to restart the game so the changes (including sprite edits) take effect.
+   *
+   * This avoids the cumbersome download → re-upload workflow:  sprite edits are
+   * stored only in the worker's in-memory resources and are not visible in the
+   * live game until a full page-reload injects the new resources.dat from IDB.
+   */
+  async saveEditedResourcesToGame(): Promise<void> {
+    if (!this.hasEditorData()) return;
+    try {
+      this.workerBusy.set(true);
+      this.resourcesStatus.set('Flushing pending edits…');
+
+      // Sync all in-memory edits to the worker (same as downloadEditedResources).
+      const syncPromises: Promise<unknown>[] = [];
+      for (const level of this.parsedLevels()) {
+        syncPromises.push(this.dispatchWorker<unknown>('APPLY_ROAD_SEGS', {
+          resourceId: level.resourceId,
+          roadSegs: level.roadSegs,
+        }));
+      }
+      const selId = this.selectedLevelId();
+      if (selId !== null) {
+        syncPromises.push(this.dispatchWorker<unknown>('APPLY_MARKS', {
+          resourceId: selId, marks: this.marks(),
+        }));
+        syncPromises.push(this.dispatchWorker<unknown>('APPLY_TRACK', {
+          resourceId: selId, trackUp: this.editTrackUp(), trackDown: this.editTrackDown(),
+        }));
+        syncPromises.push(this.dispatchWorker<unknown>('APPLY_OBJECTS', {
+          resourceId: selId, objects: this.objects(),
+        }));
+        if (this.propertiesDirty()) {
+          const props: LevelProperties = {
+            roadInfo: this.editRoadInfo(), time: this.editTime(),
+            xStartPos: this.editXStartPos(), levelEnd: this.editLevelEnd(),
+            objectGroups: this.editObjectGroups(),
+          };
+          syncPromises.push(this.dispatchWorker<unknown>('APPLY_PROPS', { resourceId: selId, props }));
+        }
+      }
+      await Promise.all(syncPromises);
+
+      this.resourcesStatus.set('Serializing…');
+      const buf = await this.dispatchWorker<ArrayBuffer>('SERIALIZE');
+      const bytes = new Uint8Array(buf);
+
+      // Persist in IndexedDB so the preRun hook injects them on next page load.
+      const name = this.customResourcesName() ?? 'resources.dat';
+      await App._saveCustomResourcesDb(bytes, name);
+      this.customResourcesName.set(name);
+      this.customResourcesLoaded.set(true);
+
+      this.resourcesStatus.set('Saved to game. Restart the game to apply changes.');
+      this.snackBar.open('✓ Saved to game – click Restart Game to apply', 'Restart', {
+        duration: 8000, panelClass: 'snack-success',
+      }).onAction().subscribe(() => this.restartGameWithCustomResources());
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to save resources';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
   // ---- Level selection ----
 
   // ---- Resource browser methods ----
@@ -2036,11 +2103,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Web Audio context, lazily created for snd resource playback. */
   private _audioCtx: AudioContext | null = null;
+  /** Gain node for per-player volume control (0–1). Connected between sources and destination. */
+  private _audioGainNode: GainNode | null = null;
 
   // Managed playback state for controllable audio (pause/seek)
   audioPlaying = signal(false);
   audioCurrentTime = signal(0);
   audioDuration = signal(0);
+  /** Volume for the audio editor player (0–100). */
+  audioPlayerVolume = signal(80);
   readonly audioControllable = computed(() => this._lastAudioBuffer !== null);
   // True while an async decode / preparation for managed playback is in progress
   audioDecodeInProgress = signal(false);
@@ -2051,12 +2122,38 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _audioPauseOffset = 0; // seconds offset where paused
   private _audioRaf: number | null = null;
 
+  /** Ensure AudioContext and GainNode are created; return the gain node. */
+  private _ensureAudioCtx(): GainNode {
+    if (!this._audioCtx) {
+      this._audioCtx = new AudioContext({ latencyHint: 'interactive' });
+      this._audioGainNode = this._audioCtx.createGain();
+      this._audioGainNode.connect(this._audioCtx.destination);
+      this._audioGainNode.gain.value = this.audioPlayerVolume() / 100;
+    }
+    if (!this._audioGainNode) {
+      this._audioGainNode = this._audioCtx.createGain();
+      this._audioGainNode.connect(this._audioCtx.destination);
+      this._audioGainNode.gain.value = this.audioPlayerVolume() / 100;
+    }
+    return this._audioGainNode;
+  }
+
+  /** Update the audio player volume (0–100). */
+  setAudioPlayerVolume(pct: number): void {
+    const clamped = Math.max(0, Math.min(100, pct));
+    this.audioPlayerVolume.set(clamped);
+    if (this._audioGainNode) {
+      this._audioGainNode.gain.value = clamped / 100;
+    }
+  }
+
   /** Create a BufferSource from buffer and wire the ended handler. */
   private _createSourceFromBuffer(buffer: AudioBuffer, onended?: () => void): AudioBufferSourceNode {
     if (!this._audioCtx) throw new Error('No AudioContext');
+    const gainNode = this._ensureAudioCtx();
     const src = this._audioCtx.createBufferSource();
     src.buffer = buffer;
-    src.connect(this._audioCtx.destination);
+    src.connect(gainNode);
     src.onended = () => {
       try { onended?.(); } finally { if (this._audioSource === src) this._audioSource = null; }
     };
@@ -2177,13 +2274,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   async playSndResource(): Promise<void> {
     const bytes = this.selectedResBytes();
     if (!bytes) return;
-    if (!this._audioCtx) {
-      this._audioCtx = new AudioContext({ latencyHint: 'interactive' });
+    this._ensureAudioCtx();
+    const ctx = this._audioCtx!;
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch { /* ignore */ }
     }
-    if (this._audioCtx.state === 'suspended') {
-      try { await this._audioCtx.resume(); } catch { /* ignore */ }
-    }
-    if (this._audioCtx.state === 'suspended') {
+    if (ctx.state === 'suspended') {
       this.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', { duration: 4000 });
       return;
     }
@@ -2197,7 +2293,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             const data = bytes.subarray(info.pcmOffset, info.pcmOffset + info.numFrames);
             const floatBuf = new Float32Array(data.length);
             for (let i = 0; i < data.length; i++) floatBuf[i] = (data[i] - 128) / 128;
-            const audioBuffer = this._audioCtx.createBuffer(1, floatBuf.length, Math.max(1, Math.round(info.sampleRate)));
+            const audioBuffer = ctx.createBuffer(1, floatBuf.length, Math.max(1, Math.round(info.sampleRate)));
             audioBuffer.getChannelData(0).set(floatBuf);
             // Use managed playback: set last buffer and start via helper
             this._lastAudioBuffer = audioBuffer;
@@ -2209,7 +2305,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             const pktsAvail = Math.floor((bytes.length - dataStart) / 34);
             if (pktsAvail > 0) {
               const f32 = decodeIMA4(bytes.subarray(dataStart), pktsAvail);
-              const audioBuffer = this._audioCtx.createBuffer(1, f32.length, Math.max(1, Math.round(info.sampleRate)));
+              const audioBuffer = ctx.createBuffer(1, f32.length, Math.max(1, Math.round(info.sampleRate)));
               audioBuffer.getChannelData(0).set(f32);
               this._lastAudioBuffer = audioBuffer;
               this._startAudioBuffer(audioBuffer, 0);
@@ -2220,7 +2316,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           } else if (info.encode === 0xFF) {
             const sampleCount = info.numFrames;
             const ch = info.numChannels || 1;
-            const audioBuffer = this._audioCtx.createBuffer(ch, sampleCount, Math.max(1, Math.round(info.sampleRate)));
+            const audioBuffer = ctx.createBuffer(ch, sampleCount, Math.max(1, Math.round(info.sampleRate)));
             const view = new DataView(bytes.buffer, bytes.byteOffset + info.pcmOffset, bytes.length - info.pcmOffset);
             for (let s = 0; s < sampleCount; s++) {
               for (let c = 0; c < ch; c++) {
@@ -2242,7 +2338,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       // Final fallback: legacy one-shot player. Mark that controlled UI is not available.
       this._lastAudioBuffer = null;
-      const played = tryPlaySndResource(bytes, this._audioCtx);
+      const played = tryPlaySndResource(bytes, ctx);
       if (!played) {
         this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
       } else {
@@ -4413,13 +4509,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   async playAudioEntry(): Promise<void> {
     const bytes = this.selectedAudioBytes();
     if (!bytes) return;
-    if (!this._audioCtx) {
-      this._audioCtx = new AudioContext({ latencyHint: 'interactive' });
+    this._ensureAudioCtx();
+    const ctx = this._audioCtx!;
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch { /* ignore */ }
     }
-    if (this._audioCtx.state === 'suspended') {
-      try { await this._audioCtx.resume(); } catch { /* ignore */ }
-    }
-    if (this._audioCtx.state === 'suspended') {
+    if (ctx.state === 'suspended') {
       this.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', { duration: 4000 });
       return;
     }
@@ -4435,7 +4530,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         try {
           // decodeAudioData expects an ArrayBuffer; guard against SharedArrayBuffer
           const ab = wavBytes.buffer.slice(wavBytes.byteOffset, wavBytes.byteOffset + wavBytes.byteLength) as ArrayBuffer;
-          const audioBuf = await this._audioCtx.decodeAudioData(ab);
+          const audioBuf = await ctx.decodeAudioData(ab);
           // Use managed playback: store decoded AudioBuffer and start via helpers
           this._lastAudioBuffer = audioBuf;
           this._startAudioBuffer(audioBuf, 0);
@@ -4444,13 +4539,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             // the legacy player which may handle raw PCM directly. Mark that
             // advanced controls are unavailable when falling back.
             this._lastAudioBuffer = null;
-            const played = tryPlaySndResource(bytes, this._audioCtx);
+            const played = tryPlaySndResource(bytes, ctx);
             if (!played) throw err ?? new Error('Unsupported snd format');
             // Inform the user that we're in one-shot fallback mode
             this.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', { duration: 4000 });
           }
       } else {
-        const played = tryPlaySndResource(bytes, this._audioCtx);
+        const played = tryPlaySndResource(bytes, ctx);
         if (!played) {
           this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
         }
