@@ -227,13 +227,7 @@
                       [marks]="marks()"
                       [selectedMarkIndex]="selectedMarkIndex()"
                       [showTrackOverlay]="showTrackOverlay()"
-                      [showObjects]="showObjects()"
-                      [showRoad]="showRoad()"
-                      [showTrackUp]="showTrackUp()"
-                      [showTrackDown]="showTrackDown()"
-                      [showGrid]="showGrid()"
                       [showMarks]="showMarks()"
-                      [showBarriers]="showBarriers()"
                       [barrierDrawSide]="barrierDrawSide()"
                       [drawMode]="drawMode()"
                       [canUndo]="canUndo()"
@@ -272,13 +266,7 @@
                       (frameAll)="frameAllObjects()"
                       (centerSelected)="centerOnSelectedObject()"
                       (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
-                      (toggleObjects)="showObjects.set(!showObjects())"
-                      (toggleRoad)="showRoad.set(!showRoad())"
-                      (toggleTrackUp)="showTrackUp.set(!showTrackUp())"
-                      (toggleTrackDown)="showTrackDown.set(!showTrackDown())"
-                      (toggleGrid)="showGrid.set(!showGrid())"
                       (toggleMarks)="showMarks.set(!showMarks())"
-                      (toggleBarriers)="showBarriers.set(!showBarriers())"
                       (barrierDrawSideChange)="barrierDrawSide.set($event)"
                       (drawModeChange)="drawMode.set($event)"
                       (undo)="undo()"
@@ -290,7 +278,6 @@
                       (panYChange)="canvasPanY.set($event)"
                       (addMark)="addMark()"
                       (removeMark)="removeSelectedMark()"
-                      (saveMarks)="saveMarks()"
                       (startMarkCreate)="startMarkCreateMode()"
                       (confirmMarkCreate)="confirmMarkCreateMode()"
                       (generateSideMarks)="generateSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset)"
@@ -333,14 +320,6 @@
                         (objectSelected)="selectObject($event, true)"
                         (searchTermChange)="objectSearchTerm.set($event)"
                       ></app-object-list>
-
-                      <app-marks-editor
-                        [marks]="marks()"
-                        [selectedMarkIndex]="selectedMarkIndex()"
-                        [workerBusy]="workerBusy()"
-                        (markSelected)="selectedMarkIndex.set($event)"
-                        (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
-                      ></app-marks-editor>
 
                     </div>
                   </div>

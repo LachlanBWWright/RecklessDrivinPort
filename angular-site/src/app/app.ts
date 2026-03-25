@@ -807,6 +807,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   pendingMarkPointCount = signal(0);
   /** Preview marks shown on canvas with distinct styling (blue dashed) when generating. */
   markingPreview = signal<MarkSeg[]>([]);
+  private _markAutoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private _lastDraggedNubKey: { markIdx: number; endpoint: 'p1' | 'p2' } | null = null;
   private _pendingMarkPoints: { x: number; y: number }[] = [];
   private _markCreateHoverPoint: { x: number; y: number } | null = null;
@@ -1347,6 +1348,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
       this._lastDraggedNubKey = { markIdx: e.markIdx, endpoint: e.endpoint };
       this.marks.set(ms);
+      this.scheduleMarkAutoSave();
     };
 
     this.konva.onMarkClick = (markIdx) => {
@@ -3415,6 +3417,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     ms.push({ x1: -100, y1: 0, x2: 100, y2: 0 });
     this.marks.set(ms);
     this.selectedMarkIndex.set(ms.length - 1);
+    this.scheduleMarkAutoSave();
   }
 
   startMarkCreateMode(): void {
@@ -3468,6 +3471,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const ms = this.marks().filter((_, i) => i !== idx);
     this.marks.set(ms);
     this.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
+    this.scheduleMarkAutoSave();
   }
 
   private _appendGeneratedMarks(generated: MarkSeg[], label: string): void {
@@ -3480,6 +3484,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.marks.set(marks);
     this.selectedMarkIndex.set(marks.length - 1);
     this.snackBar.open(`Added ${generated.length} ${label} marking segments.`, undefined, { duration: 2200 });
+    this.scheduleMarkAutoSave();
   }
 
   private _addMarkCreatePoint(x: number, y: number): void {
@@ -3489,6 +3494,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const marks = [...this.marks(), { x1: last.x, y1: last.y, x2: x, y2: y }];
       this.marks.set(marks);
       this.selectedMarkIndex.set(marks.length - 1);
+      this.scheduleMarkAutoSave();
     }
     this._pendingMarkPoints.push({ x, y });
     this.pendingMarkPointCount.set(this._pendingMarkPoints.length);
@@ -3550,6 +3556,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
     }
     this.marks.set(ms);
+    this.scheduleMarkAutoSave();
   }
 
   /**
@@ -3605,6 +3612,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     ms[bestJ] = { ...ms[bestJ], [bestJEpX]: srcX, [bestJEpY]: srcY };
     this.marks.set(ms);
     this.snackBar.open('Joined nearest mark endpoints.', undefined, { duration: 2000 });
+    this.scheduleMarkAutoSave();
   }
 
   /** Valid field names: 'x1' | 'y1' | 'x2' | 'y2' */
@@ -3615,6 +3623,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const ms = [...this.marks()];
     ms[markIdx] = { ...ms[markIdx], [field]: val };
     this.marks.set(ms);
+    this.scheduleMarkAutoSave();
   }
 
   async saveMarks(): Promise<void> {
@@ -3629,14 +3638,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.applyLevelsResult(result.levels);
       const msg = `Saved ${this.marks().length} mark segments for level ${id - 139}.`;
       this.resourcesStatus.set(msg);
-      this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Save failed';
       this.editorError.set(msg);
-      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
       this.workerBusy.set(false);
     }
+  }
+
+  /** Debounce auto-save for marks: fires 800 ms after the last mark mutation. */
+  private scheduleMarkAutoSave(): void {
+    if (this._markAutoSaveTimer !== null) clearTimeout(this._markAutoSaveTimer);
+    this._markAutoSaveTimer = setTimeout(() => {
+      this._markAutoSaveTimer = null;
+      if (!this.workerBusy()) this.saveMarks();
+    }, 800);
   }
 
   private _handleCurveDrawClick(wx: number, wy: number): void {
@@ -5594,8 +5610,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       try {
         const pat = ctx.createPattern(tc, 'repeat');
         if (!pat) return null;
-        const scale = zoom * tc.width / texWorldSize;
-        const tileW = tc.width * scale;
+        // scale: maps texture pixels → canvas pixels so one full texture width = texWorldSize world units
+        const scale = texWorldSize * zoom / tc.width;
+        const tileW = texWorldSize * zoom; // = tc.width * scale
         const tileH = tc.height * scale;
         // Anchor the pattern's U=0 to anchorWorldX (for kerbs: the outer road edge).
         // This makes the texture track the road boundary instead of the world X origin,
@@ -5666,10 +5683,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       let fill: CanvasPattern | string = fallbackFill;
       if (texCanvas) {
         try {
-          const pat = ctx.createPattern(texCanvas, 'repeat');
+          // Use repeat-y to prevent the kerb texture from tiling horizontally across the strip.
+          const pat = ctx.createPattern(texCanvas, 'repeat-y');
           if (pat) {
-            const scale = zoom * texCanvas.width / KERB_TEX_WORLD;
-            const tileW = texCanvas.width * scale;
+            // scale: one full texture width = KERB_TEX_WORLD world units (= the kerb strip width)
+            const scale = KERB_TEX_WORLD * zoom / texCanvas.width;
+            const tileW = KERB_TEX_WORLD * zoom;
             const tileH = texCanvas.height * scale;
             const tx = ((W / 2 + (avgAnchorX - panX) * zoom) % tileW + tileW) % tileW;
             const ty = (((H / 2 + yOverhang) + panY * zoom) % tileH + tileH) % tileH;
@@ -6075,10 +6094,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private syncGameLoopWithActiveTab(): void {
     const mod = window.Module;
     if (!mod) return;
-    if (this.activeTab() === 'editor') {
-      mod.pauseMainLoop?.();
-    } else {
-      mod.resumeMainLoop?.();
+    try {
+      if (this.activeTab() === 'editor') {
+        mod.pauseMainLoop?.();
+      } else {
+        mod.resumeMainLoop?.();
+      }
+    } catch {
+      // Emscripten's main loop may not be initialised yet (e.g. during
+      // onRuntimeInitialized, before C main() starts the loop).  Ignore.
     }
   }
 

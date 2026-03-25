@@ -17,13 +17,7 @@ export class EditorCanvasComponent {
   @Input() marks: MarkSeg[] = [];
   @Input() selectedMarkIndex: number | null = null;
   @Input() showTrackOverlay = false;
-  @Input() showObjects = true;
   @Input() showMarks = true;
-  @Input() showRoad = true;
-  @Input() showTrackUp = true;
-  @Input() showTrackDown = true;
-  @Input() showGrid = true;
-  @Input() showBarriers = true;
   @Input() barrierDrawSide: 'v0' | 'v1' | 'i' | 'v2' | 'v3' = 'v0';
   /** Current draw mode.  'none' = select/pan only; other values activate barrier drawing. */
   @Input() drawMode: DrawMode = 'none';
@@ -73,19 +67,12 @@ export class EditorCanvasComponent {
   @Output() resetView = new EventEmitter<void>();
   @Output() undo = new EventEmitter<void>();
   @Output() redo = new EventEmitter<void>();
-  @Output() toggleObjects = new EventEmitter<void>();
   @Output() toggleMarks = new EventEmitter<void>();
-  @Output() toggleRoad = new EventEmitter<void>();
-  @Output() toggleTrackUp = new EventEmitter<void>();
-  @Output() toggleTrackDown = new EventEmitter<void>();
-  @Output() toggleGrid = new EventEmitter<void>();
-  @Output() toggleBarriers = new EventEmitter<void>();
   @Output() barrierDrawSideChange = new EventEmitter<'v0' | 'v1' | 'i' | 'v2' | 'v3'>();
   @Output() drawModeChange = new EventEmitter<DrawMode>();
   @Output() markSelected = new EventEmitter<number>();
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();
-  @Output() saveMarks = new EventEmitter<void>();
   @Output() startMarkCreate = new EventEmitter<void>();
   @Output() confirmMarkCreate = new EventEmitter<void>();
   @Output() markFieldInput = new EventEmitter<{idx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event}>();
@@ -105,21 +92,60 @@ export class EditorCanvasComponent {
   showInfoPopup = false;
   markingTab: 'side' | 'dash' = 'side';
 
-  sideRoadSelection: MarkingRoadSelection = 'both';
+  // Side marks – road checkboxes
+  sideCombined = true;
+  sideLeft = true;
+  sideRight = true;
   sideYStart = 0;
   sideYEnd = 400;
   sideInset = 10;
 
-  centreRoadSelection: MarkingRoadSelection = 'both';
+  // Centre marks – road checkboxes
+  centreCombined = true;
+  centreLeft = true;
+  centreRight = true;
   centreYStart = 0;
   centreYEnd = 400;
   dashFrequency = 32;
+
+  /** Debounce timer for auto-preview. */
+  private _previewDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  /** Convert three checkbox values to a MarkingRoadSelection value. */
+  private checkboxesToSelection(combined: boolean, left: boolean, right: boolean): MarkingRoadSelection {
+    if (combined && (left || right)) return 'both';   // cover all cases
+    if (combined) return 'single';
+    if (left && right) return 'both';
+    if (left) return 'left';
+    if (right) return 'right';
+    return 'both'; // fallback: all
+  }
+
+  get sideRoadSelection(): MarkingRoadSelection {
+    return this.checkboxesToSelection(this.sideCombined, this.sideLeft, this.sideRight);
+  }
+
+  get centreRoadSelection(): MarkingRoadSelection {
+    return this.checkboxesToSelection(this.centreCombined, this.centreLeft, this.centreRight);
+  }
 
   toggleMarkingPopup(): void {
     this.showMarkingPopup = !this.showMarkingPopup;
     if (!this.showMarkingPopup) {
       this.clearMarkingPreview.emit();
+    } else {
+      // Show immediate preview when popup opens
+      this.schedulePreview(0);
     }
+  }
+
+  /** Schedule a debounced auto-preview after form field changes. */
+  schedulePreview(delayMs = 300): void {
+    if (this._previewDebounce !== null) clearTimeout(this._previewDebounce);
+    this._previewDebounce = setTimeout(() => {
+      this._previewDebounce = null;
+      this.onPreview();
+    }, delayMs);
   }
 
   onPreview(): void {
@@ -128,6 +154,12 @@ export class EditorCanvasComponent {
     } else {
       this.previewCentreMarks.emit({ roadSelection: this.centreRoadSelection, yStart: this.centreYStart, yEnd: this.centreYEnd, dashFrequency: this.dashFrequency });
     }
+  }
+
+  onTabChange(tab: 'side' | 'dash'): void {
+    this.markingTab = tab;
+    this.clearMarkingPreview.emit();
+    this.schedulePreview(0);
   }
 
   onGenerate(): void {

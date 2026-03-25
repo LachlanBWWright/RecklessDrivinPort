@@ -275,14 +275,13 @@
 .canvas-popup {
   position: absolute;
   top: 12px;
-  left: 12px;
+  left: 0;
+  right: 28px; /* leave room for the vertical scrollbar */
   z-index: 50;
   background: #1a1a1a;
   border: 1px solid #3a3a3a;
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.7);
-  min-width: 300px;
-  max-width: 360px;
   pointer-events: all;
 }
 
@@ -341,9 +340,26 @@
   }
 }
 
+.popup-road-checkboxes {
+  display: flex;
+  gap: 16px;
+  padding: 6px 10px 2px;
+}
+
+.popup-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #ccc;
+  font-size: 0.82rem;
+  cursor: pointer;
+
+  input[type=checkbox] { accent-color: #e53935; cursor: pointer; }
+}
+
 .popup-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding: 8px 10px 4px;
 
@@ -382,7 +398,7 @@
   top: 12px;
   right: 28px;
   left: auto;
-  max-width: 420px;
+  width: min(420px, calc(100% - 28px));
 }
 
 .info-popup-body {

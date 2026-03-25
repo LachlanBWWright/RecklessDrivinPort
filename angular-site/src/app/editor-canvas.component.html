@@ -28,28 +28,6 @@
       <mat-icon>center_focus_strong</mat-icon>
     </button>
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
-    <!-- Visibility toggles -->
-    <button mat-icon-button [class.btn-active]="showRoad" (click)="toggleRoad.emit()" matTooltip="Toggle road preview">
-      <mat-icon>road</mat-icon>
-    </button>
-    <button mat-icon-button [class.btn-active]="showObjects" (click)="toggleObjects.emit()" matTooltip="Toggle objects">
-      <mat-icon>directions_car</mat-icon>
-    </button>
-    <button mat-icon-button [class.btn-active]="showTrackOverlay" (click)="toggleTracks.emit()" matTooltip="Toggle track overlay">
-      <mat-icon>route</mat-icon>
-    </button>
-    <button mat-icon-button [class.btn-active]="showTrackUp" (click)="toggleTrackUp.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-up waypoints">
-      <mat-icon class="has-custom-color" style="color:#42a5f5">arrow_upward</mat-icon>
-    </button>
-    <button mat-icon-button [class.btn-active]="showTrackDown" (click)="toggleTrackDown.emit()" [disabled]="!showTrackOverlay" matTooltip="Toggle track-down waypoints">
-      <mat-icon class="has-custom-color" style="color:#ef5350">arrow_downward</mat-icon>
-    </button>
-    <button mat-icon-button [class.btn-active]="showGrid" (click)="toggleGrid.emit()" matTooltip="Toggle background grid">
-      <mat-icon>grid_on</mat-icon>
-    </button>
-    <button mat-icon-button [class.btn-active]="showBarriers" (click)="toggleBarriers.emit()" matTooltip="Toggle road barriers">
-      <mat-icon>fence</mat-icon>
-    </button>
     <!-- Marks toggle + mark management (visible when marks enabled) -->
     <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
       <mat-icon>edit_location</mat-icon>
@@ -67,9 +45,6 @@
       <button mat-icon-button (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
         <mat-icon>remove_circle_outline</mat-icon>
       </button>
-      <button mat-icon-button (click)="saveMarks.emit()" [disabled]="workerBusy" matTooltip="Save marks">
-        <mat-icon>save</mat-icon>
-      </button>
       <button mat-icon-button [class.btn-active]="showMarkingPopup"
         (click)="toggleMarkingPopup()"
         [matTooltip]="showMarkingPopup ? 'Close marking generator' : 'Generate road markings'">
@@ -83,17 +58,17 @@
       <mat-button-toggle value="none" matTooltip="Select / pan (no drawing)">
         <mat-icon>pan_tool</mat-icon>
       </mat-button-toggle>
-      <mat-button-toggle value="freehand" [disabled]="!showBarriers" matTooltip="Freehand barrier draw">
+      <mat-button-toggle value="freehand" matTooltip="Freehand barrier draw">
         <mat-icon>gesture</mat-icon>
       </mat-button-toggle>
-      <mat-button-toggle value="straight" [disabled]="!showBarriers" matTooltip="Straight-line barrier draw">
+      <mat-button-toggle value="straight" matTooltip="Straight-line barrier draw">
         <mat-icon>show_chart</mat-icon>
       </mat-button-toggle>
-      <mat-button-toggle value="curve" [disabled]="!showBarriers" matTooltip="Bezier-style barrier draw: click start, end, then bend">
+      <mat-button-toggle value="curve" matTooltip="Bezier-style barrier draw: click start, end, then bend">
         <mat-icon>timeline</mat-icon>
       </mat-button-toggle>
     </mat-button-toggle-group>
-    @if (showBarriers && drawMode !== 'none') {
+    @if (drawMode !== 'none') {
       <mat-button-toggle-group [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
                                matTooltip="Select which barrier side to draw">
         <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
@@ -155,73 +130,69 @@
         </div>
         <div class="marking-tab-bar">
           <button type="button" class="marking-tab-btn" [class.marking-tab-btn--active]="markingTab === 'side'"
-            (click)="markingTab = 'side'; clearMarkingPreview.emit()">
+            (click)="onTabChange('side')">
             <mat-icon>border_outer</mat-icon> Side Marks
           </button>
           <button type="button" class="marking-tab-btn" [class.marking-tab-btn--active]="markingTab === 'dash'"
-            (click)="markingTab = 'dash'; clearMarkingPreview.emit()">
+            (click)="onTabChange('dash')">
             <mat-icon>linear_scale</mat-icon> Centre Dashes
           </button>
         </div>
         @if (markingTab === 'side') {
+          <div class="popup-road-checkboxes">
+            <label class="popup-checkbox-label">
+              <input type="checkbox" [(ngModel)]="sideCombined" (ngModelChange)="schedulePreview()" /> Combined
+            </label>
+            <label class="popup-checkbox-label">
+              <input type="checkbox" [(ngModel)]="sideLeft" (ngModelChange)="schedulePreview()" /> Left
+            </label>
+            <label class="popup-checkbox-label">
+              <input type="checkbox" [(ngModel)]="sideRight" (ngModelChange)="schedulePreview()" /> Right
+            </label>
+          </div>
           <div class="popup-fields">
             <mat-form-field appearance="outline" class="popup-field">
-              <mat-label>Roads</mat-label>
-              <mat-select [(ngModel)]="sideRoadSelection">
-                <mat-option value="single">Single road</mat-option>
-                <mat-option value="left">Left split road</mat-option>
-                <mat-option value="right">Right split road</mat-option>
-                <mat-option value="both">All available roads</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="popup-field">
               <mat-label>Y start</mat-label>
-              <input matInput type="number" [(ngModel)]="sideYStart" />
+              <input matInput type="number" [(ngModel)]="sideYStart" (ngModelChange)="schedulePreview()" />
             </mat-form-field>
             <mat-form-field appearance="outline" class="popup-field">
               <mat-label>Y end</mat-label>
-              <input matInput type="number" [(ngModel)]="sideYEnd" />
+              <input matInput type="number" [(ngModel)]="sideYEnd" (ngModelChange)="schedulePreview()" />
             </mat-form-field>
             <mat-form-field appearance="outline" class="popup-field">
               <mat-label>Inset</mat-label>
-              <input matInput type="number" [(ngModel)]="sideInset" />
+              <input matInput type="number" [(ngModel)]="sideInset" (ngModelChange)="schedulePreview()" />
             </mat-form-field>
           </div>
         } @else {
+          <div class="popup-road-checkboxes">
+            <label class="popup-checkbox-label">
+              <input type="checkbox" [(ngModel)]="centreCombined" (ngModelChange)="schedulePreview()" /> Combined
+            </label>
+            <label class="popup-checkbox-label">
+              <input type="checkbox" [(ngModel)]="centreLeft" (ngModelChange)="schedulePreview()" /> Left
+            </label>
+            <label class="popup-checkbox-label">
+              <input type="checkbox" [(ngModel)]="centreRight" (ngModelChange)="schedulePreview()" /> Right
+            </label>
+          </div>
           <div class="popup-fields">
             <mat-form-field appearance="outline" class="popup-field">
-              <mat-label>Roads</mat-label>
-              <mat-select [(ngModel)]="centreRoadSelection">
-                <mat-option value="single">Single road</mat-option>
-                <mat-option value="left">Left split road</mat-option>
-                <mat-option value="right">Right split road</mat-option>
-                <mat-option value="both">All available roads</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="popup-field">
               <mat-label>Y start</mat-label>
-              <input matInput type="number" [(ngModel)]="centreYStart" />
+              <input matInput type="number" [(ngModel)]="centreYStart" (ngModelChange)="schedulePreview()" />
             </mat-form-field>
             <mat-form-field appearance="outline" class="popup-field">
               <mat-label>Y end</mat-label>
-              <input matInput type="number" [(ngModel)]="centreYEnd" />
+              <input matInput type="number" [(ngModel)]="centreYEnd" (ngModelChange)="schedulePreview()" />
             </mat-form-field>
             <mat-form-field appearance="outline" class="popup-field">
               <mat-label>Dash frequency</mat-label>
-              <input matInput type="number" [(ngModel)]="dashFrequency" />
+              <input matInput type="number" [(ngModel)]="dashFrequency" (ngModelChange)="schedulePreview()" />
             </mat-form-field>
           </div>
         }
         <p class="popup-hint">Road Y range: 0 &#8594; {{ roadMaxY }}</p>
         <div class="popup-actions">
-          <button mat-stroked-button (click)="onPreview()" [disabled]="workerBusy" matTooltip="Preview marks (blue) on canvas">
-            <mat-icon>visibility</mat-icon> Preview
-          </button>
-          @if (hasMarkingPreview) {
-            <button mat-stroked-button (click)="clearMarkingPreview.emit()">
-              <mat-icon>visibility_off</mat-icon> Clear
-            </button>
-          }
           <button mat-raised-button color="primary" (click)="onGenerate()" [disabled]="workerBusy">
             <mat-icon>add</mat-icon> Generate
           </button>
@@ -240,8 +211,8 @@
         </div>
         <div class="info-popup-body">
           <p><strong>Objects:</strong> Drag to move &middot; Dbl-click canvas to add &middot; <kbd>Del</kbd> removes &middot; <kbd>Ctrl+D</kbd> dupes</p>
-          <p><strong>Marks:</strong> Toggle <mat-icon class="inline-icon">edit_location</mat-icon> to show mark tools &middot; Drag yellow nubs to reposition &middot; <kbd>N</kbd> joins/splits nubs &middot; Use toolbar buttons to add/remove/save &middot; Use <mat-icon class="inline-icon">auto_awesome</mat-icon> to generate</p>
-          <p><strong>Barriers:</strong> Toggle <mat-icon class="inline-icon">fence</mat-icon> &middot; Select draw mode (<mat-icon class="inline-icon">gesture</mat-icon> freehand, <mat-icon class="inline-icon">show_chart</mat-icon> straight, <mat-icon class="inline-icon">timeline</mat-icon> curve) &middot; Select L/Li/I/Ri/R &middot; <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd></p>
+          <p><strong>Marks:</strong> Toggle <mat-icon class="inline-icon">edit_location</mat-icon> to show mark tools &middot; Drag yellow nubs to reposition &middot; <kbd>N</kbd> joins/splits nubs &middot; Use toolbar buttons to add/remove &middot; Use <mat-icon class="inline-icon">auto_awesome</mat-icon> to generate</p>
+          <p><strong>Barriers:</strong> Select draw mode (<mat-icon class="inline-icon">gesture</mat-icon> freehand, <mat-icon class="inline-icon">show_chart</mat-icon> straight, <mat-icon class="inline-icon">timeline</mat-icon> curve) &middot; Select L/Li/I/Ri/R &middot; <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd></p>
           <p><strong>Draw mode <mat-icon class="inline-icon">pan_tool</mat-icon> None:</strong> select/drag objects &amp; marks without triggering barrier draws</p>
           <p><strong>Navigation:</strong> <kbd>Space</kbd>+drag pans &middot; Scroll/zoom wheel &middot; <kbd>+</kbd>/<kbd>-</kbd> zoom &middot; Arrow keys pan</p>
         </div>
@@ -258,3 +229,4 @@
     <span class="legend-item" style="color:#00e5ff">&#9650; Start X</span>
   </div>
 </div>
+

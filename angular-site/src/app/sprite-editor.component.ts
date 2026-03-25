@@ -58,6 +58,9 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   /** Is the mouse button currently down */
   private mouseDown = false;
+  /** Last painted pixel coordinates for Bresenham interpolation */
+  private _lastPx: number | null = null;
+  private _lastPy: number | null = null;
 
   /** Undo stack – stores pixel array snapshots */
   private undoStack: Uint8ClampedArray[] = [];
@@ -202,6 +205,8 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   onMouseDown(e: MouseEvent): void {
     this.mouseDown = true;
+    this._lastPx = null;
+    this._lastPy = null;
     this.saveUndo();
     this.applyTool(e);
   }
@@ -213,6 +218,8 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   onMouseUp(): void {
     this.mouseDown = false;
+    this._lastPx = null;
+    this._lastPy = null;
   }
 
   private applyTool(e: MouseEvent): void {
@@ -223,13 +230,44 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     const py = Math.floor((e.clientY - rect.top) / this.zoom);
     if (px < 0 || py < 0 || px >= this.spriteW || py >= this.spriteH) return;
 
-    switch (this.tool) {
-      case 'pencil': this.drawPixel(px, py); break;
-      case 'eraser': this.erasePixel(px, py); break;
-      case 'eyedropper': this.pickColor(px, py); break;
-      case 'fill': this.floodFill(px, py); break;
+    if (this.tool === 'pencil' || this.tool === 'eraser') {
+      // Interpolate using Bresenham's line algorithm between last and current position
+      if (this._lastPx !== null && this._lastPy !== null) {
+        this._bresenhamLine(this._lastPx, this._lastPy, px, py, this.tool);
+      } else {
+        if (this.tool === 'pencil') this.drawPixel(px, py);
+        else this.erasePixel(px, py);
+      }
+      this._lastPx = px;
+      this._lastPy = py;
+    } else {
+      switch (this.tool) {
+        case 'eyedropper': this.pickColor(px, py); break;
+        case 'fill': this.floodFill(px, py); break;
+      }
     }
     this.queueDraw();
+  }
+
+  /** Draw (or erase) all pixels along a Bresenham line from (x0,y0) to (x1,y1). */
+  private _bresenhamLine(x0: number, y0: number, x1: number, y1: number, tool: 'pencil' | 'eraser'): void {
+    const apply = tool === 'pencil'
+      ? (x: number, y: number) => this.drawPixel(x, y)
+      : (x: number, y: number) => this.erasePixel(x, y);
+
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+
+    while (true) {
+      apply(x0, y0);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 > -dy) { err -= dy; x0 += sx; }
+      if (e2 < dx)  { err += dx; y0 += sy; }
+    }
   }
 
   private drawPixel(cx: number, cy: number): void {

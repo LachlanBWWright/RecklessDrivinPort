@@ -3,6 +3,7 @@ import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, OnChan
 @Component({
   selector: 'app-object-inspector',
   templateUrl: './object-inspector.component.html',
+  styleUrl: './object-inspector.component.scss',
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
