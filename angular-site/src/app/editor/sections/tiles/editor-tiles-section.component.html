@@ -5,8 +5,8 @@
   </mat-card-header>
   <mat-card-content>
     @if (tileTileEntries.length > 0) {
-      <div class="tile-viewer">
-        <div class="pack-sprite-grid">
+      <div class="tile-viewer sprite-viewer-layout">
+        <div class="pack-sprite-grid sprite-list-column tile-list-column">
           @for (tile of tileTileEntries; track tile.texId) {
             @if (getTileDataUrl(tile.texId); as url) {
               <div class="pack-sprite-cell"

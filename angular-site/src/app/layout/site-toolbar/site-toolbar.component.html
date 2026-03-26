@@ -2,25 +2,25 @@
   @if (activeTab === 'editor') {
     <button mat-button class="nav-tab nav-tab--back" (click)="tabChange.emit('game')">
       <mat-icon>arrow_back</mat-icon>
-      Back to Game
+      <span class="nav-tab-label">Back to Game</span>
     </button>
 
     <div class="toolbar-editor-strip">
       <div class="toolbar-actions">
         @if (!hasEditorData) {
           <button mat-stroked-button (click)="loadDefaultResources.emit()" [disabled]="workerBusy">
-            <mat-icon>cloud_download</mat-icon> Load Default
+            <mat-icon>cloud_download</mat-icon> <span class="nav-tab-label">Load Default</span>
           </button>
           <input #fileInput type="file" accept=".dat" (change)="resourceFileSelected.emit($event)" [disabled]="workerBusy" style="display:none" />
           <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy">
-            <mat-icon>folder_open</mat-icon> Upload resources.dat
+            <mat-icon>folder_open</mat-icon> <span class="nav-tab-label">Upload resources.dat</span>
           </button>
         } @else {
           <button mat-stroked-button color="warn" (click)="clearEditorFile.emit()" [disabled]="workerBusy">
-            <mat-icon>delete</mat-icon> Clear File
+            <mat-icon>delete</mat-icon> <span class="nav-tab-label">Clear File</span>
           </button>
           <button mat-raised-button color="primary" (click)="downloadEditedResources.emit()" [disabled]="workerBusy">
-            <mat-icon>download</mat-icon> Download
+            <mat-icon>download</mat-icon> <span class="nav-tab-label">Download</span>
           </button>
         }
       </div>
@@ -35,7 +35,7 @@
           >
             @for (level of parsedLevels; track level.resourceId) {
               <mat-option [value]="level.resourceId">
-                Level {{ levelDisplayNum(level.resourceId) }}
+                <span class="level-option-label">Level </span>{{ levelDisplayNum(level.resourceId) }}
               </mat-option>
             }
           </mat-select>
@@ -63,7 +63,7 @@
             [attr.aria-selected]="activeEditorSection === section.id"
             (click)="editorSectionChange.emit(section.id)"
           >
-            <mat-icon>{{ section.icon }}</mat-icon> {{ section.label }}
+            <mat-icon>{{ section.icon }}</mat-icon> <span class="nav-tab-label">{{ section.label }}</span>
           </button>
         }
       </nav>
@@ -72,10 +72,10 @@
     <span class="toolbar-spacer"></span>
     <nav class="nav-tabs nav-tabs--site" role="tablist" aria-label="Site sections">
       <button mat-button class="nav-tab active" aria-selected="true" (click)="tabChange.emit('game')">
-        <mat-icon>sports_esports</mat-icon> Play Game
+        <mat-icon>sports_esports</mat-icon> <span class="nav-tab-label">Play Game</span>
       </button>
       <button mat-button class="nav-tab" aria-selected="false" (click)="tabChange.emit('editor')">
-        <mat-icon>map</mat-icon> Level Editor
+        <mat-icon>map</mat-icon> <span class="nav-tab-label">Level Editor</span>
       </button>
     </nav>
   }

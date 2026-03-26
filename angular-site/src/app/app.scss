@@ -157,22 +157,62 @@
   width: 0;
 }
 
+@media (max-width: 1299px) {
+  .site-toolbar {
+    .nav-tab-label,
+    .level-option-label {
+      display: none !important;
+    }
+
+    .nav-tab,
+    .toolbar-actions button,
+    .toolbar-editor-strip button {
+      padding: 0 !important;
+      min-width: 44px !important;
+      width: 44px !important;
+      height: 44px !important;
+      border-bottom: none !important;
+      border-radius: 999px !important;
+      justify-content: center !important;
+      align-items: center !important;
+    }
+
+    .nav-tab mat-icon,
+    .toolbar-actions button mat-icon,
+    .toolbar-editor-strip button mat-icon {
+      font-size: 20px !important;
+      width: 20px !important;
+      height: 20px !important;
+      margin: 0 !important;
+    }
+
+    .nav-tabs {
+      gap: 4px !important;
+    }
+  }
+}
+
 /* ======================================================
    MAIN LAYOUT
    ====================================================== */
 main {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  overflow: hidden; /* individual sections scroll internally */
+  overflow: visible;
 }
 
-/* Game tab: scrollable since the game + controls can exceed viewport */
+app-game-panel {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .game-section {
   flex: 1;
-  overflow-y: auto;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -209,7 +249,6 @@ main {
    ====================================================== */
 .hero-card {
   width: 100%;
-  max-width: 900px;
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
 
@@ -251,7 +290,9 @@ main {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
   width: 100%;
-  max-width: 900px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
 
   mat-card-header {
     position: relative;
@@ -265,6 +306,9 @@ main {
 
   mat-card-content {
     display: flex;
+    flex: 1 1 auto;
+    min-height: 300px;
+    align-items: stretch;
     justify-content: center;
     padding: 0 16px 16px !important;
   }
@@ -291,7 +335,11 @@ main {
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
-  width: min(640px, calc(100vw - 32px));
+  flex: 0 1 auto;
+  min-height: 300px;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
   aspect-ratio: 4 / 3;
   margin: 0 auto;
 
@@ -400,6 +448,20 @@ main {
   flex: 1; /* grow to fill remaining space in main */
   min-height: 0;
   overflow: hidden; /* internal sections handle their own scrolling */
+}
+
+app-editor-properties-section,
+app-editor-objects-section,
+app-editor-sprites-section,
+app-editor-tiles-section,
+app-editor-audio-section,
+app-editor-screens-section,
+app-properties-tab {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
 }
 
 /* Toolbar card */
@@ -605,6 +667,7 @@ main {
   border-radius: 0 0 8px 8px !important;
   width: 100%;
   flex: 1; /* grow to fill the tab body */
+  min-height: 0;
   display: flex;
   flex-direction: column;
 
@@ -621,7 +684,13 @@ main {
     gap: 6px;
     flex-wrap: wrap;
   }
-  mat-card-content { padding: 0 !important; }
+  mat-card-content {
+    padding: 0 !important;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
   mat-card-actions { padding: 14px 20px !important; display: flex; align-items: center; gap: 12px; }
 }
 
@@ -1048,38 +1117,39 @@ main {
 /* ======================================================
    SPRITES PANEL
    ====================================================== */
-.sprite-panel {
-  background: var(--surface2) !important;
-  border: 1px solid var(--border) !important;
-  margin-bottom: 8px;
-
-  ::ng-deep .mat-expansion-panel-header { background: var(--surface3) !important; }
-  ::ng-deep .mat-expansion-panel-body { padding: 16px; }
-  ::ng-deep .mat-panel-title { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 600; }
-}
-
 .pack-sprite-viewer {
   display: flex;
   gap: 24px;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex: 1 1 0;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.sprite-viewer-layout {
+  height: 100%;
 }
 
 .pack-sprite-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  flex: 1;
+  flex: 0 0 320px;
   min-width: 0;
-  max-height: 400px;
   overflow-y: auto;
   padding: 4px;
   border-radius: 6px;
   background: var(--bg);
   border: 1px solid var(--border);
+  align-self: stretch;
+  align-content: flex-start;
 
   &::-webkit-scrollbar { width: 6px; }
   &::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 3px; }
+}
+
+.sprite-list-column {
+  min-height: 0;
 }
 
 .pack-sprite-cell {
@@ -1118,6 +1188,9 @@ main {
   gap: 8px;
   align-items: flex-start;
   min-width: 220px;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .pack-sprite-large {
@@ -1536,25 +1609,38 @@ code {
 
 .tile-viewer {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-direction: row;
+  gap: 24px;
+  flex: 1 1 0;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.tile-list-column {
+  flex: 0 0 320px;
 }
 
 // ---- Audio editor tab ----
 .audio-editor-layout {
   display: flex;
   gap: 16px;
-  min-height: 300px;
+  flex: 1 1 0;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
 }
 
 .audio-entry-list {
   width: 180px;
   flex-shrink: 0;
+  flex: 0 0 180px;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 4px;
   overflow-y: auto;
-  max-height: 480px;
+  min-height: 0;
   border-right: 1px solid rgba(255,255,255,0.12);
   padding-right: 12px;
 }
@@ -1590,10 +1676,13 @@ code {
 
 .audio-detail {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 4px 0;
+  overflow: hidden;
 }
 
 .audio-detail-title {
@@ -1629,27 +1718,35 @@ code {
 .screens-layout {
   display: flex;
   gap: 16px;
-  min-height: 260px;
+  flex: 1 1 0;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
 }
 
 .icon-entry-list {
   width: 180px;
   flex-shrink: 0;
+  flex: 0 0 180px;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 4px;
   overflow-y: auto;
-  max-height: 480px;
+  min-height: 0;
   border-right: 1px solid rgba(255,255,255,0.12);
   padding-right: 12px;
 }
 
 .icon-detail {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 4px 0;
+  overflow: hidden;
 }
 
 .icon-large-preview {

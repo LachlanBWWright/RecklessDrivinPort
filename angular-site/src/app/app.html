@@ -17,6 +17,7 @@
 
 <main>
   <app-game-panel
+    [class.tab-panel--hidden]="activeTab() !== 'game'"
     [activeTab]="activeTab()"
     [statusText]="statusText()"
     [progressPct]="progressPct()"

@@ -1,8 +1,18 @@
 /* Properties tab styles */
-:host { display: block; }
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
 
 /* Ensure the card has inner padding so content doesn't touch edges */
 .tab-panel-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 16px; /* consistent inner spacing */
   box-sizing: border-box;
 }
@@ -10,6 +20,10 @@
 /* Content area — use a responsive grid for the small form fields */
 .props-card-content {
   padding: 0; /* card already padded above */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .props-form-grid {

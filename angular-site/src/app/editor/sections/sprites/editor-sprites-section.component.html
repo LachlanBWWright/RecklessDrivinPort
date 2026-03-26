@@ -4,82 +4,71 @@
   </mat-card-header>
   <mat-card-content>
     @if (packSpriteFrames.length > 0) {
-      <mat-expansion-panel [expanded]="true" class="sprite-panel">
-        <mat-expansion-panel-header>
-          <mat-panel-title>
-            <mat-icon>image</mat-icon>&nbsp;Game Sprites (Pack 129/137)
-          </mat-panel-title>
-          <mat-panel-description>
-            <span class="badge">{{ packSpriteFrames.length }} frames</span>
-          </mat-panel-description>
-        </mat-expansion-panel-header>
-
-        <div class="pack-sprite-viewer">
-          <div class="pack-sprite-grid">
-            @for (frame of packSpriteFrames; track $index) {
-              @if (getPackSpriteDataUrl(frame.id); as url) {
-                <div class="pack-sprite-cell"
-                  [class.selected]="selectedPackSpriteId === frame.id"
-                  (click)="selectedPackSpriteIdChange.emit(frame.id)"
-                  [matTooltip]="'Frame #' + frame.id + ' · ' + frame.bitDepth + '-bit · ' + frame.width + '×' + frame.height">
-                  <img [src]="url" class="pack-sprite-thumb" alt="" />
-                  <span class="pack-sprite-label">#{{ frame.id }}</span>
-                </div>
-              } @else {
-                <div class="pack-sprite-cell"
-                  [class.selected]="selectedPackSpriteId === frame.id"
-                  (click)="selectedPackSpriteIdChange.emit(frame.id)"
-                  [matTooltip]="'Frame #' + frame.id + ' · ' + frame.bitDepth + '-bit · ' + frame.width + '×' + frame.height">
-                  <span class="pack-sprite-label">#{{ frame.id }}</span>
-                </div>
-              }
+      <div class="pack-sprite-viewer sprite-viewer-layout">
+        <div class="pack-sprite-grid sprite-list-column">
+          @for (frame of packSpriteFrames; track $index) {
+            @if (getPackSpriteDataUrl(frame.id); as url) {
+              <div class="pack-sprite-cell"
+                [class.selected]="selectedPackSpriteId === frame.id"
+                (click)="selectedPackSpriteIdChange.emit(frame.id)"
+                [matTooltip]="'Frame #' + frame.id + ' · ' + frame.bitDepth + '-bit · ' + frame.width + '×' + frame.height">
+                <img [src]="url" class="pack-sprite-thumb" alt="" />
+                <span class="pack-sprite-label">#{{ frame.id }}</span>
+              </div>
+            } @else {
+              <div class="pack-sprite-cell"
+                [class.selected]="selectedPackSpriteId === frame.id"
+                (click)="selectedPackSpriteIdChange.emit(frame.id)"
+                [matTooltip]="'Frame #' + frame.id + ' · ' + frame.bitDepth + '-bit · ' + frame.width + '×' + frame.height">
+                <span class="pack-sprite-label">#{{ frame.id }}</span>
+              </div>
             }
-          </div>
-
-          @if (selectedPackSpriteId !== null) {
-            <div class="pack-sprite-detail">
-              @if (getPackSpriteDataUrl(selectedPackSpriteId); as url) {
-                <img [src]="url" class="pack-sprite-large" alt="sprite preview" />
-              } @else {
-                <div class="pack-sprite-large pack-sprite-large--placeholder">
-                  <mat-icon>image</mat-icon>
-                  <span>Preview loading…</span>
-                </div>
-              }
-              @if (selectedPackSpriteFrame; as selectedFrame) {
-                <mat-card class="sprite-meta-card">
-                  <mat-card-content>
-                    <p class="sprite-meta">
-                      <strong>Frame</strong> #{{ selectedPackSpriteId }}<br>
-                      <strong>Depth</strong> {{ selectedFrame.bitDepth }}-bit
-                      ({{ getSpriteFormatLabel(selectedFrame.bitDepth) }})<br>
-                      <strong>Size</strong> {{ selectedFrame.width }}×{{ selectedFrame.height }} px
-                    </p>
-                  </mat-card-content>
-                </mat-card>
-                <div class="sprite-actions">
-                  @if (selectedFrame.bitDepth === 16) {
-                    <button mat-raised-button color="primary"
-                      (click)="openSpriteEditor.emit(selectedPackSpriteId!)"
-                      [disabled]="workerBusy">
-                      <mat-icon>brush</mat-icon> Edit Pixels
-                    </button>
-                    <input #spritePngInput type="file" accept="image/png,image/*" style="display:none"
-                      (change)="spritePngUpload.emit({ event: $event, spriteId: selectedPackSpriteId! })" />
-                    <button mat-stroked-button (click)="spritePngInput.click()" [disabled]="workerBusy"
-                      matTooltip="Upload a PNG to replace this sprite (scaled to match dimensions)">
-                      <mat-icon>upload</mat-icon> Upload PNG
-                    </button>
-                  }
-                  <button mat-stroked-button (click)="exportSpritePng.emit()">
-                    <mat-icon>download</mat-icon> Export PNG
-                  </button>
-                </div>
-              }
-            </div>
           }
         </div>
-      </mat-expansion-panel>
+
+        @if (selectedPackSpriteId !== null) {
+          <div class="pack-sprite-detail">
+            @if (getPackSpriteDataUrl(selectedPackSpriteId); as url) {
+              <img [src]="url" class="pack-sprite-large" alt="sprite preview" />
+            } @else {
+              <div class="pack-sprite-large pack-sprite-large--placeholder">
+                <mat-icon>image</mat-icon>
+                <span>Preview loading…</span>
+              </div>
+            }
+            @if (selectedPackSpriteFrame; as selectedFrame) {
+              <mat-card class="sprite-meta-card">
+                <mat-card-content>
+                  <p class="sprite-meta">
+                    <strong>Frame</strong> #{{ selectedPackSpriteId }}<br>
+                    <strong>Depth</strong> {{ selectedFrame.bitDepth }}-bit
+                    ({{ getSpriteFormatLabel(selectedFrame.bitDepth) }})<br>
+                    <strong>Size</strong> {{ selectedFrame.width }}×{{ selectedFrame.height }} px
+                  </p>
+                </mat-card-content>
+              </mat-card>
+              <div class="sprite-actions">
+                @if (selectedFrame.bitDepth === 16) {
+                  <button mat-raised-button color="primary"
+                    (click)="openSpriteEditor.emit(selectedPackSpriteId!)"
+                    [disabled]="workerBusy">
+                    <mat-icon>brush</mat-icon> Edit Pixels
+                  </button>
+                  <input #spritePngInput type="file" accept="image/png,image/*" style="display:none"
+                    (change)="spritePngUpload.emit({ event: $event, spriteId: selectedPackSpriteId! })" />
+                  <button mat-stroked-button (click)="spritePngInput.click()" [disabled]="workerBusy"
+                    matTooltip="Upload a PNG to replace this sprite (scaled to match dimensions)">
+                    <mat-icon>upload</mat-icon> Upload PNG
+                  </button>
+                }
+                <button mat-stroked-button (click)="exportSpritePng.emit()">
+                  <mat-icon>download</mat-icon> Export PNG
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
     } @else {
       <div class="no-data-content">
         <mat-icon class="no-data-icon">image_not_supported</mat-icon>

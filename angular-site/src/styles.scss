@@ -1,5 +1,9 @@
 @use '@angular/material' as mat;
 
+:root {
+  --page-min-height: 800px;
+}
+
 html {
   @include mat.theme((
     color: (
@@ -95,8 +99,10 @@ body {
   font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
+  min-height: max(var(--page-min-height), 100dvh);
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -105,8 +111,8 @@ app-root {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  min-height: 100%;
+  overflow: visible;
 }
 
 /* Prevent arrow key scrolling on canvas */
