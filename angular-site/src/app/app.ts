@@ -1,4 +1,15 @@
-import { Component, OnDestroy, OnInit, AfterViewInit, inject, signal, computed, effect, ChangeDetectionStrategy, ViewEncapsulation } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  AfterViewInit,
+  inject,
+  signal,
+  computed,
+  effect,
+  ChangeDetectionStrategy,
+  ViewEncapsulation,
+} from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type {
   ParsedLevel,
@@ -77,9 +88,18 @@ declare global {
 export type AppTab = 'game' | 'editor';
 
 const OBJ_PALETTE = [
-  '#e53935', '#42a5f5', '#66bb6a', '#ffa726',
-  '#ab47bc', '#26c6da', '#d4e157', '#ff7043',
-  '#8d6e63', '#78909c', '#ec407a', '#29b6f6',
+  '#e53935',
+  '#42a5f5',
+  '#66bb6a',
+  '#ffa726',
+  '#ab47bc',
+  '#26c6da',
+  '#d4e157',
+  '#ff7043',
+  '#8d6e63',
+  '#78909c',
+  '#ec407a',
+  '#29b6f6',
 ];
 
 /** typeRes value that identifies the player car object. */
@@ -99,29 +119,95 @@ const PLAYER_CAR_TYPE_RES = 128;
  *   water – true if off-road is water (level 5)
  */
 interface RoadTheme {
-  bg: string; road: string; dirt: string;
-  kerbA: string; kerbB: string;
+  bg: string;
+  road: string;
+  dirt: string;
+  kerbA: string;
+  kerbB: string;
   water: boolean;
 }
 const ROAD_THEMES: Record<number, RoadTheme> = {
   // roadInfo 128 – grass (levels 1, 4)
-  128: { bg: '#0f7d1e', road: '#848484', dirt: '#4a6830', kerbA: '#6b8066', kerbB: '#d4e8d0', water: false },
+  128: {
+    bg: '#0f7d1e',
+    road: '#848484',
+    dirt: '#4a6830',
+    kerbA: '#6b8066',
+    kerbB: '#d4e8d0',
+    water: false,
+  },
   // roadInfo 129 – desert/earth (level 3)
-  129: { bg: '#8f4e28', road: '#bf8460', dirt: '#7a4a2a', kerbA: '#9f764b', kerbB: '#d9b888', water: false },
+  129: {
+    bg: '#8f4e28',
+    road: '#bf8460',
+    dirt: '#7a4a2a',
+    kerbA: '#9f764b',
+    kerbB: '#d9b888',
+    water: false,
+  },
   // roadInfo 130 – night/blue tarmac (levels 2, 6)
-  130: { bg: '#354ab5', road: '#505090', dirt: '#3a3a6e', kerbA: '#4c4c9e', kerbB: '#c0c0ff', water: false },
+  130: {
+    bg: '#354ab5',
+    road: '#505090',
+    dirt: '#3a3a6e',
+    kerbA: '#4c4c9e',
+    kerbB: '#c0c0ff',
+    water: false,
+  },
   // roadInfo 131 – snow/ice (level 7)
-  131: { bg: '#b8dde0', road: '#98aeb0', dirt: '#8099a0', kerbA: '#aacccc', kerbB: '#ffffff', water: false },
+  131: {
+    bg: '#b8dde0',
+    road: '#98aeb0',
+    dirt: '#8099a0',
+    kerbA: '#aacccc',
+    kerbB: '#ffffff',
+    water: false,
+  },
   // roadInfo 132 – snow with grass kerbs
-  132: { bg: '#b8dde0', road: '#98aeb0', dirt: '#8099a0', kerbA: '#6b8066', kerbB: '#d4e8d0', water: false },
+  132: {
+    bg: '#b8dde0',
+    road: '#98aeb0',
+    dirt: '#8099a0',
+    kerbA: '#6b8066',
+    kerbB: '#d4e8d0',
+    water: false,
+  },
   // roadInfo 133 – tropical/water (level 5)
-  133: { bg: '#0a7a1e', road: '#354ab5', dirt: '#2a6050', kerbA: '#207b44', kerbB: '#30bb66', water: true },
+  133: {
+    bg: '#0a7a1e',
+    road: '#354ab5',
+    dirt: '#2a6050',
+    kerbA: '#207b44',
+    kerbB: '#30bb66',
+    water: true,
+  },
   // roadInfo 134 – urban/grey (level 8)
-  134: { bg: '#5e5a5c', road: '#848484', dirt: '#4a4648', kerbA: '#606060', kerbB: '#c0c0c0', water: false },
+  134: {
+    bg: '#5e5a5c',
+    road: '#848484',
+    dirt: '#4a4648',
+    kerbA: '#606060',
+    kerbB: '#c0c0c0',
+    water: false,
+  },
   // roadInfo 135 – night desert/yellow road (level 10)
-  135: { bg: '#354ab5', road: '#d8c830', dirt: '#555580', kerbA: '#b8b050', kerbB: '#ffff88', water: false },
+  135: {
+    bg: '#354ab5',
+    road: '#d8c830',
+    dirt: '#555580',
+    kerbA: '#b8b050',
+    kerbB: '#ffff88',
+    water: false,
+  },
   // roadInfo 136 – forest/dirt track (level 9)
-  136: { bg: '#0a7a1e', road: '#a06840', dirt: '#4a6830', kerbA: '#5a7034', kerbB: '#99cc44', water: false },
+  136: {
+    bg: '#0a7a1e',
+    road: '#a06840',
+    dirt: '#4a6830',
+    kerbA: '#5a7034',
+    kerbB: '#99cc44',
+    water: false,
+  },
 };
 
 /** Default road theme for unknown roadInfo values. */
@@ -153,8 +239,16 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
  * Perpendicular distance from point (px,py) to segment (ax,ay)-(bx,by).
  * Returns Euclidean distance to the nearest point on the segment.
  */
-function distToSegment2d(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
-  const dx = bx - ax, dy = by - ay;
+function distToSegment2d(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const dx = bx - ax,
+    dy = by - ay;
   const lenSq = dx * dx + dy * dy;
   if (lenSq === 0) return dist2d(px, py, ax, ay);
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
@@ -168,7 +262,8 @@ function distToSegment2d(px: number, py: number, ax: number, ay: number, bx: num
  */
 function insertBetweenClosestSegment(
   arr: readonly { x: number; y: number; flags: number; velo: number }[],
-  wx: number, wy: number,
+  wx: number,
+  wy: number,
 ): { x: number; y: number; flags: number; velo: number }[] {
   const newPt = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
   if (arr.length <= 1) return [...arr, newPt];
@@ -176,7 +271,10 @@ function insertBetweenClosestSegment(
   let bestIdx = arr.length;
   for (let i = 0; i < arr.length - 1; i++) {
     const d = distToSegment2d(wx, wy, arr[i].x, arr[i].y, arr[i + 1].x, arr[i + 1].y);
-    if (d < bestDist) { bestDist = d; bestIdx = i + 1; }
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i + 1;
+    }
   }
   const copy = [...arr];
   copy.splice(bestIdx, 0, newPt);
@@ -186,7 +284,8 @@ function insertBetweenClosestSegment(
 /** Decode Mac PackBits RLE-compressed bytes into a fixed-size output buffer. */
 function decodePackBits(src: Uint8Array, expectedSize: number): Uint8Array {
   const out = new Uint8Array(expectedSize);
-  let si = 0, di = 0;
+  let si = 0,
+    di = 0;
   while (si < src.length && di < expectedSize) {
     const flag = src[si++];
     if (flag === undefined) break;
@@ -220,79 +319,79 @@ type ResFieldSchema = Omit<ResField, 'value'>;
 
 /** Known struct schemas for Mac OS resource types. */
 const RESOURCE_SCHEMAS: Record<string, ResFieldSchema[]> = {
-  'ALRT': [
-    { name: 'bounds.top',    offset: 0,  type: 's16' },
-    { name: 'bounds.left',   offset: 2,  type: 's16' },
-    { name: 'bounds.bottom', offset: 4,  type: 's16' },
-    { name: 'bounds.right',  offset: 6,  type: 's16' },
-    { name: 'itemsId',       offset: 8,  type: 's16' },
-    { name: 'stages',        offset: 10, type: 'u16' },
+  ALRT: [
+    { name: 'bounds.top', offset: 0, type: 's16' },
+    { name: 'bounds.left', offset: 2, type: 's16' },
+    { name: 'bounds.bottom', offset: 4, type: 's16' },
+    { name: 'bounds.right', offset: 6, type: 's16' },
+    { name: 'itemsId', offset: 8, type: 's16' },
+    { name: 'stages', offset: 10, type: 'u16' },
   ],
-  'DLOG': [
-    { name: 'bounds.top',    offset: 0,  type: 's16' },
-    { name: 'bounds.left',   offset: 2,  type: 's16' },
-    { name: 'bounds.bottom', offset: 4,  type: 's16' },
-    { name: 'bounds.right',  offset: 6,  type: 's16' },
-    { name: 'procId',        offset: 8,  type: 'u16' },
-    { name: 'visible',       offset: 10, type: 'u8'  },
-    { name: 'goAway',        offset: 12, type: 'u8'  },
-    { name: 'refCon',        offset: 14, type: 'u32' },
-    { name: 'itemsId',       offset: 18, type: 's16' },
+  DLOG: [
+    { name: 'bounds.top', offset: 0, type: 's16' },
+    { name: 'bounds.left', offset: 2, type: 's16' },
+    { name: 'bounds.bottom', offset: 4, type: 's16' },
+    { name: 'bounds.right', offset: 6, type: 's16' },
+    { name: 'procId', offset: 8, type: 'u16' },
+    { name: 'visible', offset: 10, type: 'u8' },
+    { name: 'goAway', offset: 12, type: 'u8' },
+    { name: 'refCon', offset: 14, type: 'u32' },
+    { name: 'itemsId', offset: 18, type: 's16' },
   ],
-  'WIND': [
-    { name: 'bounds.top',    offset: 0,  type: 's16' },
-    { name: 'bounds.left',   offset: 2,  type: 's16' },
-    { name: 'bounds.bottom', offset: 4,  type: 's16' },
-    { name: 'bounds.right',  offset: 6,  type: 's16' },
-    { name: 'procId',        offset: 8,  type: 'u16' },
-    { name: 'visible',       offset: 10, type: 'u8'  },
-    { name: 'goAway',        offset: 12, type: 'u8'  },
-    { name: 'refCon',        offset: 14, type: 'u32' },
-    { name: 'zoomState',     offset: 18, type: 'u16' },
+  WIND: [
+    { name: 'bounds.top', offset: 0, type: 's16' },
+    { name: 'bounds.left', offset: 2, type: 's16' },
+    { name: 'bounds.bottom', offset: 4, type: 's16' },
+    { name: 'bounds.right', offset: 6, type: 's16' },
+    { name: 'procId', offset: 8, type: 'u16' },
+    { name: 'visible', offset: 10, type: 'u8' },
+    { name: 'goAway', offset: 12, type: 'u8' },
+    { name: 'refCon', offset: 14, type: 'u32' },
+    { name: 'zoomState', offset: 18, type: 'u16' },
   ],
-  'CNTL': [
-    { name: 'bounds.top',    offset: 0,  type: 's16' },
-    { name: 'bounds.left',   offset: 2,  type: 's16' },
-    { name: 'bounds.bottom', offset: 4,  type: 's16' },
-    { name: 'bounds.right',  offset: 6,  type: 's16' },
-    { name: 'value',         offset: 8,  type: 's16' },
-    { name: 'visible',       offset: 10, type: 'u16' },
-    { name: 'max',           offset: 12, type: 's16' },
-    { name: 'min',           offset: 14, type: 's16' },
-    { name: 'procId',        offset: 16, type: 'u16' },
-    { name: 'refCon',        offset: 18, type: 'u32' },
+  CNTL: [
+    { name: 'bounds.top', offset: 0, type: 's16' },
+    { name: 'bounds.left', offset: 2, type: 's16' },
+    { name: 'bounds.bottom', offset: 4, type: 's16' },
+    { name: 'bounds.right', offset: 6, type: 's16' },
+    { name: 'value', offset: 8, type: 's16' },
+    { name: 'visible', offset: 10, type: 'u16' },
+    { name: 'max', offset: 12, type: 's16' },
+    { name: 'min', offset: 14, type: 's16' },
+    { name: 'procId', offset: 16, type: 'u16' },
+    { name: 'refCon', offset: 18, type: 'u32' },
   ],
-  'RECT': [
-    { name: 'top',    offset: 0, type: 's16' },
-    { name: 'left',   offset: 2, type: 's16' },
+  RECT: [
+    { name: 'top', offset: 0, type: 's16' },
+    { name: 'left', offset: 2, type: 's16' },
     { name: 'bottom', offset: 4, type: 's16' },
-    { name: 'right',  offset: 6, type: 's16' },
+    { name: 'right', offset: 6, type: 's16' },
   ],
   // Mac OS Menu resource (MENU) — header fields
-  'MENU': [
-    { name: 'menuId',       offset: 0,  type: 's16' },
-    { name: 'width',        offset: 2,  type: 'u16' },
-    { name: 'height',       offset: 4,  type: 'u16' },
-    { name: 'procId',       offset: 6,  type: 's16' },
-    { name: 'flags',        offset: 10, type: 'u32' },
+  MENU: [
+    { name: 'menuId', offset: 0, type: 's16' },
+    { name: 'width', offset: 2, type: 'u16' },
+    { name: 'height', offset: 4, type: 'u16' },
+    { name: 'procId', offset: 6, type: 's16' },
+    { name: 'flags', offset: 10, type: 'u32' },
   ],
   // Version resource (vers)
-  'vers': [
+  vers: [
     { name: 'numericVersion', offset: 0, type: 'u32' },
-    { name: 'country',        offset: 4, type: 'u16' },
+    { name: 'country', offset: 4, type: 'u16' },
   ],
   // Mac OS Picture (PICT) — header only
-  'PICT': [
-    { name: 'size',        offset: 0, type: 'u16' },
-    { name: 'bounds.top',  offset: 2, type: 's16' },
+  PICT: [
+    { name: 'size', offset: 0, type: 'u16' },
+    { name: 'bounds.top', offset: 2, type: 's16' },
     { name: 'bounds.left', offset: 4, type: 's16' },
-    { name: 'bounds.bot',  offset: 6, type: 's16' },
-    { name: 'bounds.rgt',  offset: 8, type: 's16' },
+    { name: 'bounds.bot', offset: 6, type: 's16' },
+    { name: 'bounds.rgt', offset: 8, type: 's16' },
   ],
   // Mac OS snd resource — format header
   'snd ': [
-    { name: 'format',        offset: 0, type: 'u16' },
-    { name: 'numSynths',     offset: 2, type: 'u16' },
+    { name: 'format', offset: 0, type: 'u16' },
+    { name: 'numSynths', offset: 2, type: 'u16' },
   ],
 };
 
@@ -300,23 +399,23 @@ const RESOURCE_SCHEMAS: Record<string, ResFieldSchema[]> = {
 const PACK_ENTRY_SCHEMAS: Record<number, ResFieldSchema[]> = {
   // Pack 128: Object group reference (tObjectGroupReference)
   128: [
-    { name: 'typeRes',  offset: 0, type: 's16' },
-    { name: 'numObjs',  offset: 2, type: 'u16' },
+    { name: 'typeRes', offset: 0, type: 's16' },
+    { name: 'numObjs', offset: 2, type: 'u16' },
   ],
   // Pack 130: Object group entries (tObjectGroup + tObjectGroupEntry[])
   130: [
-    { name: 'numEntries',         offset: 0,  type: 'u32' },
+    { name: 'numEntries', offset: 0, type: 'u32' },
     // First entry at offset 4 (tObjectGroupEntry: typeRes s16 + minOffs s16 + maxOffs s16 + probility s16 + dir f32)
-    { name: 'entry[0].typeRes',   offset: 4,  type: 's16' },
-    { name: 'entry[0].minOffs',   offset: 6,  type: 's16' },
-    { name: 'entry[0].maxOffs',   offset: 8,  type: 's16' },
+    { name: 'entry[0].typeRes', offset: 4, type: 's16' },
+    { name: 'entry[0].minOffs', offset: 6, type: 's16' },
+    { name: 'entry[0].maxOffs', offset: 8, type: 's16' },
     { name: 'entry[0].probility', offset: 10, type: 's16' },
-    { name: 'entry[0].dir',       offset: 12, type: 'f32' },
+    { name: 'entry[0].dir', offset: 12, type: 'f32' },
   ],
   // Pack 134 (kPackSnds): Mac OS 'snd ' entries — SoundHeader
   134: [
-    { name: 'snd.format',     offset: 0,  type: 'u16' },
-    { name: 'snd.numSynths',  offset: 2,  type: 'u16' },
+    { name: 'snd.format', offset: 0, type: 'u16' },
+    { name: 'snd.numSynths', offset: 2, type: 'u16' },
   ],
   // Pack 135 (kPackRoad): Road info record (tRoadInfo, big-endian)
   // struct tRoadInfo {
@@ -345,44 +444,44 @@ const PACK_ENTRY_SCHEMAS: Record<number, ResFieldSchema[]> = {
   //   float slideFriction;    @ 60  (f32)
   // }
   135: [
-    { name: 'friction',        offset: 0,  type: 'f32' },
-    { name: 'airResistance',   offset: 4,  type: 'f32' },
-    { name: 'backResistance',  offset: 8,  type: 'f32' },
-    { name: 'tolerance',       offset: 12, type: 'u16' },
-    { name: 'marks',           offset: 14, type: 's16' },
-    { name: 'deathOffs',       offset: 16, type: 's16' },
-    { name: 'bgTex',           offset: 18, type: 's16' },
-    { name: 'fgTex',           offset: 20, type: 's16' },
-    { name: 'lBorder',         offset: 22, type: 's16' },
-    { name: 'rBorder',         offset: 24, type: 's16' },
-    { name: 'tracks',          offset: 26, type: 's16' },
-    { name: 'skidSound',       offset: 28, type: 's16' },
-    { name: 'filler',          offset: 30, type: 's16' },
-    { name: 'xDrift',          offset: 32, type: 'f32' },
-    { name: 'yDrift',          offset: 36, type: 'f32' },
-    { name: 'xFrontDrift',     offset: 40, type: 'f32' },
-    { name: 'yFrontDrift',     offset: 44, type: 'f32' },
-    { name: 'trackSlide',      offset: 48, type: 'f32' },
-    { name: 'dustSlide',       offset: 52, type: 'f32' },
-    { name: 'dustColor',       offset: 56, type: 'u8'  },
-    { name: 'water',           offset: 57, type: 'u8'  },
-    { name: 'filler2',         offset: 58, type: 'u16' },
-    { name: 'slideFriction',   offset: 60, type: 'f32' },
+    { name: 'friction', offset: 0, type: 'f32' },
+    { name: 'airResistance', offset: 4, type: 'f32' },
+    { name: 'backResistance', offset: 8, type: 'f32' },
+    { name: 'tolerance', offset: 12, type: 'u16' },
+    { name: 'marks', offset: 14, type: 's16' },
+    { name: 'deathOffs', offset: 16, type: 's16' },
+    { name: 'bgTex', offset: 18, type: 's16' },
+    { name: 'fgTex', offset: 20, type: 's16' },
+    { name: 'lBorder', offset: 22, type: 's16' },
+    { name: 'rBorder', offset: 24, type: 's16' },
+    { name: 'tracks', offset: 26, type: 's16' },
+    { name: 'skidSound', offset: 28, type: 's16' },
+    { name: 'filler', offset: 30, type: 's16' },
+    { name: 'xDrift', offset: 32, type: 'f32' },
+    { name: 'yDrift', offset: 36, type: 'f32' },
+    { name: 'xFrontDrift', offset: 40, type: 'f32' },
+    { name: 'yFrontDrift', offset: 44, type: 'f32' },
+    { name: 'trackSlide', offset: 48, type: 'f32' },
+    { name: 'dustSlide', offset: 52, type: 'f32' },
+    { name: 'dustColor', offset: 56, type: 'u8' },
+    { name: 'water', offset: 57, type: 'u8' },
+    { name: 'filler2', offset: 58, type: 'u16' },
+    { name: 'slideFriction', offset: 60, type: 'f32' },
   ],
 };
 
 // Pack IDs 140-149 are level packs – generate their schema dynamically.
 for (let pid = 140; pid <= 149; pid++) {
   PACK_ENTRY_SCHEMAS[pid] = [
-    { name: 'roadInfo',    offset: 0,  type: 's16' },
-    { name: 'time',        offset: 2,  type: 'u16' },
+    { name: 'roadInfo', offset: 0, type: 's16' },
+    { name: 'time', offset: 2, type: 'u16' },
     // tObjectGroupReference[10] – each 4 bytes (typeRes s16 + count u16)
     ...Array.from({ length: 10 }, (_, i) => [
-      { name: `objGroup[${i}].typeRes`, offset: 4 + i * 4,     type: 's16' as const },
-      { name: `objGroup[${i}].count`,  offset: 4 + i * 4 + 2, type: 'u16' as const },
+      { name: `objGroup[${i}].typeRes`, offset: 4 + i * 4, type: 's16' as const },
+      { name: `objGroup[${i}].count`, offset: 4 + i * 4 + 2, type: 'u16' as const },
     ]).flat(),
     { name: 'xStartPos', offset: 44, type: 's16' },
-    { name: 'levelEnd',  offset: 46, type: 'u16' },
+    { name: 'levelEnd', offset: 46, type: 'u16' },
   ];
 }
 
@@ -390,12 +489,18 @@ for (let pid = 140; pid <= 149; pid++) {
 function readResField(view: DataView, f: ResFieldSchema): number {
   const le = false; // big-endian (Mac OS)
   switch (f.type) {
-    case 'u8':  return view.getUint8(f.offset);
-    case 'u16': return view.getUint16(f.offset, le);
-    case 's16': return view.getInt16(f.offset, le);
-    case 'u32': return view.getUint32(f.offset, le);
-    case 's32': return view.getInt32(f.offset, le);
-    case 'f32': return view.getFloat32(f.offset, le);
+    case 'u8':
+      return view.getUint8(f.offset);
+    case 'u16':
+      return view.getUint16(f.offset, le);
+    case 's16':
+      return view.getInt16(f.offset, le);
+    case 'u32':
+      return view.getUint32(f.offset, le);
+    case 's32':
+      return view.getInt32(f.offset, le);
+    case 'f32':
+      return view.getFloat32(f.offset, le);
   }
 }
 
@@ -403,12 +508,24 @@ function readResField(view: DataView, f: ResFieldSchema): number {
 function writeResField(view: DataView, f: ResFieldSchema, value: number): void {
   const le = false; // big-endian (Mac OS)
   switch (f.type) {
-    case 'u8':  view.setUint8(f.offset, value); break;
-    case 'u16': view.setUint16(f.offset, value, le); break;
-    case 's16': view.setInt16(f.offset, value, le); break;
-    case 'u32': view.setUint32(f.offset, value, le); break;
-    case 's32': view.setInt32(f.offset, value, le); break;
-    case 'f32': view.setFloat32(f.offset, value, le); break;
+    case 'u8':
+      view.setUint8(f.offset, value);
+      break;
+    case 'u16':
+      view.setUint16(f.offset, value, le);
+      break;
+    case 's16':
+      view.setInt16(f.offset, value, le);
+      break;
+    case 'u32':
+      view.setUint32(f.offset, value, le);
+      break;
+    case 's32':
+      view.setInt32(f.offset, value, le);
+      break;
+    case 'f32':
+      view.setFloat32(f.offset, value, le);
+      break;
   }
 }
 
@@ -423,14 +540,19 @@ function buildResFields(bytes: Uint8Array, schema: ResFieldSchema[] | null): Res
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (schema) {
     return schema
-      .filter(f => f.offset + fieldByteSize(f.type) <= bytes.byteLength)
-      .map(f => ({ ...f, value: readResField(view, f) }));
+      .filter((f) => f.offset + fieldByteSize(f.type) <= bytes.byteLength)
+      .map((f) => ({ ...f, value: readResField(view, f) }));
   }
   // Auto-generate: u16 at every 2 bytes (capped to avoid locking up on large blobs)
   const fields: ResField[] = [];
   const maxOffset = Math.min(bytes.byteLength, MAX_AUTO_FIELDS * 2);
   for (let offset = 0; offset + 2 <= maxOffset; offset += 2) {
-    fields.push({ name: `field_${offset}`, offset, type: 'u16', value: view.getUint16(offset, false) });
+    fields.push({
+      name: `field_${offset}`,
+      offset,
+      type: 'u16',
+      value: view.getUint16(offset, false),
+    });
   }
   return fields;
 }
@@ -501,7 +623,6 @@ const MAC_8BIT_PALETTE: readonly number[] = [
   244,164,96,    210,105,30,    255,218,185,   0,0,0,
 ];
 
-
 /**
  * Attempt to play a Mac OS 'snd ' resource using the Web Audio API.
  * Supports:
@@ -531,17 +652,17 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
 
   for (let i = 0; i < numCmds; i++) {
     if (cmdOffset + 8 > bytes.length) break;
-    const cmd = view.getUint16(cmdOffset, false) & 0x7FFF;
+    const cmd = view.getUint16(cmdOffset, false) & 0x7fff;
     const param2 = view.getUint32(cmdOffset + 4, false);
     cmdOffset += 8;
 
     if (cmd === 80 || cmd === 81) {
       const headerOff = param2;
       if (headerOff + 22 > bytes.length) break;
-      const numFrames      = view.getUint32(headerOff + 4, false);
+      const numFrames = view.getUint32(headerOff + 4, false);
       const sampleRateFixed = view.getUint32(headerOff + 8, false);
-      const sampleRate     = Math.max(sampleRateFixed / 65536, 100); // clamp ≥ 100 Hz
-      const encode         = view.getUint8(headerOff + 20);
+      const sampleRate = Math.max(sampleRateFixed / 65536, 100); // clamp ≥ 100 Hz
+      const encode = view.getUint8(headerOff + 20);
 
       // ── stdSH: 8-bit unsigned mono PCM ──────────────────────────────
       if (encode === 0x00) {
@@ -552,12 +673,14 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
         const ch = audioBuffer.getChannelData(0);
         for (let s = 0; s < sampleCount; s++) ch[s] = (bytes[dataStart + s] - 128) / 128;
         const src = audioCtx.createBufferSource();
-        src.buffer = audioBuffer; src.connect(audioCtx.destination); src.start();
+        src.buffer = audioBuffer;
+        src.connect(audioCtx.destination);
+        src.start();
         return true;
       }
 
       // ── cmpSH: compressed (IMA4 ADPCM) ──────────────────────────────
-      if (encode === 0xFE) {
+      if (encode === 0xfe) {
         // cmpSH extra fields layout (after the 22-byte base):
         //   numFrames2(4) + AIFFSampleRate(10) + markerChunk(4) + format(4) = 22 extra bytes
         //   + futureUse2(4) + stateVars(4) + leftOverSamples(4) = 12 more
@@ -570,23 +693,25 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
 
         const dataStart = headerOff + 66;
         // numFrames from headerOff+4 = number of IMA4 packets (each produces 64 samples)
-        const numPackets   = numFrames;
+        const numPackets = numFrames;
         const totalSamples = numPackets * 64;
         if (totalSamples <= 0 || totalSamples > 10_000_000) break;
-        const available    = Math.floor((bytes.length - dataStart) / 34);
-        const pktsToUse    = Math.min(numPackets, available);
+        const available = Math.floor((bytes.length - dataStart) / 34);
+        const pktsToUse = Math.min(numPackets, available);
         if (pktsToUse <= 0) break;
 
         const f32 = decodeIMA4(bytes.subarray(dataStart), pktsToUse);
         const audioBuffer = audioCtx.createBuffer(1, f32.length, sampleRate);
         audioBuffer.getChannelData(0).set(f32);
         const src = audioCtx.createBufferSource();
-        src.buffer = audioBuffer; src.connect(audioCtx.destination); src.start();
+        src.buffer = audioBuffer;
+        src.connect(audioCtx.destination);
+        src.start();
         return true;
       }
 
       // ── extSH: uncompressed 16-bit big-endian mono PCM ───────────────
-      if (encode === 0xFF) {
+      if (encode === 0xff) {
         // extSH data starts at headerOff + 64 (base 22 + 42 extra bytes)
         // numFrames at headerOff+4 is the frame count; each frame = 1 sample (mono)
         const dataStart = headerOff + 64;
@@ -600,7 +725,9 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
           ch[s] = sample / 32768.0;
         }
         const src = audioCtx.createBufferSource();
-        src.buffer = audioBuffer; src.connect(audioCtx.destination); src.start();
+        src.buffer = audioBuffer;
+        src.connect(audioCtx.destination);
+        src.start();
         return true;
       }
 
@@ -609,8 +736,6 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
   }
   return false;
 }
-
-
 
 @Component({
   selector: 'app-root',
@@ -629,7 +754,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
 
   /** Convert a level resource ID (140-149) to a human-readable level number (1-10). */
-  levelDisplayNum(resourceId: number): number { return resourceId - 139; }
+  levelDisplayNum(resourceId: number): number {
+    return resourceId - 139;
+  }
 
   private readonly konva = inject(KonvaEditorService);
   private readonly snackBar = inject(MatSnackBar);
@@ -676,7 +803,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   editObjY = signal(0);
   editObjDir = signal(0);
   /** editObjDir expressed in degrees for display in the inspector. */
-  readonly editObjDirDeg = computed(() => parseFloat((this.editObjDir() * 180 / Math.PI).toFixed(2)));
+  readonly editObjDirDeg = computed(() =>
+    parseFloat(((this.editObjDir() * 180) / Math.PI).toFixed(2)),
+  );
   editObjTypeRes = signal(128);
   /** Sorted list of available typeRes IDs (populated after loading resources). */
   availableTypeIds = signal<number[]>([]);
@@ -888,10 +1017,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const map = new Map<string, { type: string; id: number; size: number }[]>();
     for (const entry of this.allResourceEntries()) {
       let bucket = map.get(entry.type);
-      if (!bucket) { bucket = []; map.set(entry.type, bucket); }
+      if (!bucket) {
+        bucket = [];
+        map.set(entry.type, bucket);
+      }
       bucket.push(entry);
     }
-    return [...map.entries()].map(([type, entries]) => ({ type, entries }))
+    return [...map.entries()]
+      .map(([type, entries]) => ({ type, entries }))
       .sort((a, b) => a.type.localeCompare(b.type));
   });
 
@@ -962,9 +1095,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   // a second time unsafe (the ASYNCIFY state machine is not designed to be re-entered).
   // We therefore restart by reloading the page, persisting the custom bytes in IndexedDB
   // so the preRun hook can inject them into MEMFS before the game's main() runs.
-  private static readonly _IDB_NAME  = 'reckless-drivin';
+  private static readonly _IDB_NAME = 'reckless-drivin';
   private static readonly _IDB_STORE = 'custom-resources';
-  private static readonly _IDB_KEY   = 'resources-dat';
+  private static readonly _IDB_KEY = 'resources-dat';
 
   private static _openCustomResourcesDb(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -975,7 +1108,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         }
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror  = () => reject(req.error);
+      req.onerror = () => reject(req.error);
     });
   }
 
@@ -984,8 +1117,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(App._IDB_STORE, 'readwrite');
       tx.objectStore(App._IDB_STORE).put({ bytes, name }, App._IDB_KEY);
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror    = () => { db.close(); reject(tx.error); };
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
     });
   }
 
@@ -999,11 +1138,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       };
       req.onsuccess = () => {
         const db = req.result;
-        if (!db.objectStoreNames.contains(App._IDB_STORE)) { db.close(); resolve(null); return; }
-        const tx     = db.transaction(App._IDB_STORE, 'readonly');
+        if (!db.objectStoreNames.contains(App._IDB_STORE)) {
+          db.close();
+          resolve(null);
+          return;
+        }
+        const tx = db.transaction(App._IDB_STORE, 'readonly');
         const getReq = tx.objectStore(App._IDB_STORE).get(App._IDB_KEY);
-        getReq.onsuccess = () => { db.close(); resolve((getReq.result as { bytes: Uint8Array; name: string }) ?? null); };
-        getReq.onerror   = () => { db.close(); resolve(null); };
+        getReq.onsuccess = () => {
+          db.close();
+          resolve((getReq.result as { bytes: Uint8Array; name: string }) ?? null);
+        };
+        getReq.onerror = () => {
+          db.close();
+          resolve(null);
+        };
       };
       req.onerror = () => resolve(null);
     });
@@ -1014,11 +1163,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const req = indexedDB.open(App._IDB_NAME, 1);
       req.onsuccess = () => {
         const db = req.result;
-        if (!db.objectStoreNames.contains(App._IDB_STORE)) { db.close(); resolve(); return; }
+        if (!db.objectStoreNames.contains(App._IDB_STORE)) {
+          db.close();
+          resolve();
+          return;
+        }
         const tx = db.transaction(App._IDB_STORE, 'readwrite');
         tx.objectStore(App._IDB_STORE).delete(App._IDB_KEY);
-        tx.oncomplete = () => { db.close(); resolve(); };
-        tx.onerror    = () => { db.close(); resolve(); };
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          db.close();
+          resolve();
+        };
       };
       req.onerror = () => resolve();
     });
@@ -1157,12 +1316,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // This allows the custom resources to persist after a page reload triggered by the
     // "Restart Game" button (which uses window.location.reload() instead of callMain()).
     if (typeof indexedDB !== 'undefined') {
-      App._loadCustomResourcesDb().then((entry) => {
-        if (entry) {
-          this.customResourcesLoaded.set(true);
-          this.customResourcesName.set(entry.name);
-        }
-      }).catch(() => { /* ignore */ });
+      App._loadCustomResourcesDb()
+        .then((entry) => {
+          if (entry) {
+            this.customResourcesLoaded.set(true);
+            this.customResourcesName.set(entry.name);
+          }
+        })
+        .catch(() => {
+          /* ignore */
+        });
     }
   }
 
@@ -1202,27 +1365,51 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       canvas.insertAdjacentElement('afterend', konvaContainer);
 
       // Forward wheel events from Konva container to the canvas for zoom/pan
-      konvaContainer.addEventListener('wheel', (e) => {
-        const fwd = new WheelEvent('wheel', e);
-        canvas.dispatchEvent(fwd);
-      }, { passive: false });
+      konvaContainer.addEventListener(
+        'wheel',
+        (e) => {
+          const fwd = new WheelEvent('wheel', e);
+          canvas.dispatchEvent(fwd);
+        },
+        { passive: false },
+      );
 
       // Make Konva container focusable so it can receive keyboard events.
       // Forward key events to the canvas so existing Angular key handlers fire.
       konvaContainer.tabIndex = 0;
       konvaContainer.addEventListener('keydown', (e) => {
-        canvas.dispatchEvent(new KeyboardEvent('keydown', {
-          key: e.key, code: e.code, keyCode: e.keyCode, which: e.which,
-          ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey,
-          repeat: e.repeat, bubbles: true, cancelable: true,
-        }));
+        canvas.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: e.key,
+            code: e.code,
+            keyCode: e.keyCode,
+            which: e.which,
+            ctrlKey: e.ctrlKey,
+            metaKey: e.metaKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+            repeat: e.repeat,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
       });
       konvaContainer.addEventListener('keyup', (e) => {
-        canvas.dispatchEvent(new KeyboardEvent('keyup', {
-          key: e.key, code: e.code, keyCode: e.keyCode, which: e.which,
-          ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey,
-          repeat: e.repeat, bubbles: true, cancelable: true,
-        }));
+        canvas.dispatchEvent(
+          new KeyboardEvent('keyup', {
+            key: e.key,
+            code: e.code,
+            keyCode: e.keyCode,
+            which: e.which,
+            ctrlKey: e.ctrlKey,
+            metaKey: e.metaKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+            repeat: e.repeat,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
       });
       // Focus Konva container when user clicks in canvas area
       konvaContainer.addEventListener('mousedown', () => {
@@ -1249,7 +1436,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const w = Math.max(1, Math.round(r.width));
       const h = Math.max(1, Math.round(r.height));
       if (canvas.width !== w || canvas.height !== h) {
-        canvas.width  = w;
+        canvas.width = w;
         canvas.height = h;
         // Invalidate the road offscreen cache since the canvas dimensions changed.
         this._roadOffscreenKey = '';
@@ -1287,9 +1474,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const objs = [...this.objects()];
       // Use currently selected object's typeRes if available, otherwise default to 128
       const selIdx = this.selectedObjIndex();
-      const typeRes = selIdx !== null && selIdx < objs.length
-        ? objs[selIdx].typeRes
-        : 128;
+      const typeRes = selIdx !== null && selIdx < objs.length ? objs[selIdx].typeRes : 128;
       // Push undo BEFORE mutating so undo restores the pre-add state.
       this._pushUndo();
       objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes });
@@ -1350,9 +1535,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const oldX = e.endpoint === 'p1' ? m.x1 : m.x2;
       const oldY = e.endpoint === 'p1' ? m.y1 : m.y2;
       // Move the dragged endpoint
-      ms[e.markIdx] = e.endpoint === 'p1'
-        ? { ...m, x1: e.worldX, y1: e.worldY }
-        : { ...m, x2: e.worldX, y2: e.worldY };
+      ms[e.markIdx] =
+        e.endpoint === 'p1'
+          ? { ...m, x1: e.worldX, y1: e.worldY }
+          : { ...m, x2: e.worldX, y2: e.worldY };
       // Move all OTHER endpoints that were colocated with the dragged endpoint
       // (i.e. same x,y as oldX,oldY). This lets chained/shared mark vertices
       // move as a single handle when they are coincident.
@@ -1420,7 +1606,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (button === 0) {
         // Check for start-marker drag (the player start position triangle at Y=0)
         const [wx, wy] = this.canvasToWorld(cssX, cssY);
-        const startHitR = Math.max(MIN_START_MARKER_HIT_RADIUS, BASE_START_MARKER_HIT_RADIUS / this.canvasZoom());
+        const startHitR = Math.max(
+          MIN_START_MARKER_HIT_RADIUS,
+          BASE_START_MARKER_HIT_RADIUS / this.canvasZoom(),
+        );
         if (dist2d(this.editXStartPos(), 0, wx, wy) < startHitR) {
           this._draggingStartMarker = true;
           return;
@@ -1437,8 +1626,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this._prevPanMouseY = cssY;
         // Screen right → world left ⟹ panX decreases
         // Screen down  → world down ⟹ panY decreases (world +Y is up)
-        this.canvasPanX.update(x => x - dx / zoom);
-        this.canvasPanY.update(y => y - dy / zoom);
+        this.canvasPanX.update((x) => x - dx / zoom);
+        this.canvasPanY.update((y) => y - dy / zoom);
         return;
       }
       if (this.markCreateMode() && this._pendingMarkPoints.length > 0) {
@@ -1465,7 +1654,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           // Update preview line (every N points to reduce noise)
           if (this._barrierDrawPath.length % 3 === 0) {
             const pts: number[] = [];
-            for (const p of this._barrierDrawPath) { pts.push(p.wx, -p.wy); }
+            for (const p of this._barrierDrawPath) {
+              pts.push(p.wx, -p.wy);
+            }
             this.konva.setBarrierDrawPreview(pts);
             this.konva.flush();
           }
@@ -1485,7 +1676,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this._isPanning = false;
           this.isPanning.set(false);
           const kc = document.getElementById('konva-container');
-          if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : (this.drawMode() !== 'none' ? 'crosshair' : 'default');
+          if (kc)
+            kc.style.cursor = this.spaceDown()
+              ? 'grab'
+              : this.drawMode() !== 'none'
+                ? 'crosshair'
+                : 'default';
         }
         if (this._barrierDrawing) {
           this._barrierDrawing = false;
@@ -1499,7 +1695,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             this._applyBarrierDrawPath();
           }
           const kc = document.getElementById('konva-container');
-          if (kc) kc.style.cursor = this.spaceDown() ? 'grab' : (this.drawMode() !== 'none' ? 'crosshair' : 'default');
+          if (kc)
+            kc.style.cursor = this.spaceDown()
+              ? 'grab'
+              : this.drawMode() !== 'none'
+                ? 'crosshair'
+                : 'default';
         }
         if (this._draggingStartMarker) {
           this._draggingStartMarker = false;
@@ -1510,21 +1711,23 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Handle track context menu at given world coordinates (extracted for re-use). */
   private _handleTrackContextMenuAtWorld(wx: number, wy: number): void {
-    const trackUp   = this.editTrackUp();
+    const trackUp = this.editTrackUp();
     const trackDown = this.editTrackDown();
     const trackHitR = Math.max(20, 14 / this.canvasZoom());
 
     // Check if clicking near an existing waypoint to remove it
     for (let i = 0; i < trackUp.length; i++) {
       if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
-        const arr = [...trackUp]; arr.splice(i, 1);
+        const arr = [...trackUp];
+        arr.splice(i, 1);
         this.editTrackUp.set(arr);
         return;
       }
     }
     for (let i = 0; i < trackDown.length; i++) {
       if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
-        const arr = [...trackDown]; arr.splice(i, 1);
+        const arr = [...trackDown];
+        arr.splice(i, 1);
         this.editTrackDown.set(arr);
         return;
       }
@@ -1537,14 +1740,28 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Find nearest segment distance for each track to decide which to insert into
     let nearestSegDistUp = Infinity;
     for (let i = 0; i < trackUp.length - 1; i++) {
-      const d = distToSegment2d(wx, wy, trackUp[i].x, trackUp[i].y, trackUp[i + 1].x, trackUp[i + 1].y);
+      const d = distToSegment2d(
+        wx,
+        wy,
+        trackUp[i].x,
+        trackUp[i].y,
+        trackUp[i + 1].x,
+        trackUp[i + 1].y,
+      );
       if (d < nearestSegDistUp) nearestSegDistUp = d;
     }
     if (trackUp.length === 1) nearestSegDistUp = dist2d(trackUp[0].x, trackUp[0].y, wx, wy);
 
     let nearestSegDistDown = Infinity;
     for (let i = 0; i < trackDown.length - 1; i++) {
-      const d = distToSegment2d(wx, wy, trackDown[i].x, trackDown[i].y, trackDown[i + 1].x, trackDown[i + 1].y);
+      const d = distToSegment2d(
+        wx,
+        wy,
+        trackDown[i].x,
+        trackDown[i].y,
+        trackDown[i + 1].x,
+        trackDown[i + 1].y,
+      );
       if (d < nearestSegDistDown) nearestSegDistDown = d;
     }
     if (trackDown.length === 1) nearestSegDistDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
@@ -1558,7 +1775,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     // Ensure any managed audio playback is stopped and RAF cancelled
-    try { this.stopAudio(); } catch { /* ignore */ }
+    try {
+      this.stopAudio();
+    } catch {
+      /* ignore */
+    }
     if (this.wasmScript?.parentNode) {
       (this.wasmScript.parentNode as HTMLElement).removeChild(this.wasmScript);
     }
@@ -1584,7 +1805,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Maps EditorSection → mat-tab index for [(selectedIndex)] binding. */
-  private readonly SECTION_ORDER: EditorSection[] = ['properties', 'objects', 'sprites', 'tiles', 'audio', 'screens'];
+  private readonly SECTION_ORDER: EditorSection[] = [
+    'properties',
+    'objects',
+    'sprites',
+    'tiles',
+    'audio',
+    'screens',
+  ];
   get editorSectionIndex(): number {
     return this.SECTION_ORDER.indexOf(this.editorSection());
   }
@@ -1679,7 +1907,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   clearEditorResources(): void {
     this.resetEditorData();
-    this.snackBar.open('Editor file cleared', 'OK', { duration: 2500, panelClass: 'snack-success' });
+    this.snackBar.open('Editor file cleared', 'OK', {
+      duration: 2500,
+      panelClass: 'snack-success',
+    });
   }
 
   async downloadEditedResources(): Promise<void> {
@@ -1698,38 +1929,48 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       // Sync road segments (barriers) for every loaded level.
       for (const level of this.parsedLevels()) {
-        syncPromises.push(this.dispatchWorker<unknown>('APPLY_ROAD_SEGS', {
-          resourceId: level.resourceId,
-          roadSegs: level.roadSegs,
-        }));
+        syncPromises.push(
+          this.dispatchWorker<unknown>('APPLY_ROAD_SEGS', {
+            resourceId: level.resourceId,
+            roadSegs: level.roadSegs,
+          }),
+        );
       }
 
       // Sync current-level marks, track, objects, and properties (only available
       // for the selected level because those signals are per-selection).
       const selId = this.selectedLevelId();
       if (selId !== null) {
-        syncPromises.push(this.dispatchWorker<unknown>('APPLY_MARKS', {
-          resourceId: selId,
-          marks: this.marks(),
-        }));
-        syncPromises.push(this.dispatchWorker<unknown>('APPLY_TRACK', {
-          resourceId: selId,
-          trackUp:   this.editTrackUp(),
-          trackDown: this.editTrackDown(),
-        }));
-        syncPromises.push(this.dispatchWorker<unknown>('APPLY_OBJECTS', {
-          resourceId: selId,
-          objects: this.objects(),
-        }));
+        syncPromises.push(
+          this.dispatchWorker<unknown>('APPLY_MARKS', {
+            resourceId: selId,
+            marks: this.marks(),
+          }),
+        );
+        syncPromises.push(
+          this.dispatchWorker<unknown>('APPLY_TRACK', {
+            resourceId: selId,
+            trackUp: this.editTrackUp(),
+            trackDown: this.editTrackDown(),
+          }),
+        );
+        syncPromises.push(
+          this.dispatchWorker<unknown>('APPLY_OBJECTS', {
+            resourceId: selId,
+            objects: this.objects(),
+          }),
+        );
         if (this.propertiesDirty()) {
           const props: LevelProperties = {
-            roadInfo:     this.editRoadInfo(),
-            time:         this.editTime(),
-            xStartPos:    this.editXStartPos(),
-            levelEnd:     this.editLevelEnd(),
+            roadInfo: this.editRoadInfo(),
+            time: this.editTime(),
+            xStartPos: this.editXStartPos(),
+            levelEnd: this.editLevelEnd(),
             objectGroups: this.editObjectGroups(),
           };
-          syncPromises.push(this.dispatchWorker<unknown>('APPLY_PROPS', { resourceId: selId, props }));
+          syncPromises.push(
+            this.dispatchWorker<unknown>('APPLY_PROPS', { resourceId: selId, props }),
+          );
         }
       }
 
@@ -1748,7 +1989,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       this.resourcesStatus.set('Downloaded updated resources.dat.');
-      this.snackBar.open('✓ Downloaded resources.dat', 'OK', { duration: 3000, panelClass: 'snack-success' });
+      this.snackBar.open('✓ Downloaded resources.dat', 'OK', {
+        duration: 3000,
+        panelClass: 'snack-success',
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to serialize resources';
       this.editorError.set(msg);
@@ -1775,29 +2019,45 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Sync all in-memory edits to the worker (same as downloadEditedResources).
       const syncPromises: Promise<unknown>[] = [];
       for (const level of this.parsedLevels()) {
-        syncPromises.push(this.dispatchWorker<unknown>('APPLY_ROAD_SEGS', {
-          resourceId: level.resourceId,
-          roadSegs: level.roadSegs,
-        }));
+        syncPromises.push(
+          this.dispatchWorker<unknown>('APPLY_ROAD_SEGS', {
+            resourceId: level.resourceId,
+            roadSegs: level.roadSegs,
+          }),
+        );
       }
       const selId = this.selectedLevelId();
       if (selId !== null) {
-        syncPromises.push(this.dispatchWorker<unknown>('APPLY_MARKS', {
-          resourceId: selId, marks: this.marks(),
-        }));
-        syncPromises.push(this.dispatchWorker<unknown>('APPLY_TRACK', {
-          resourceId: selId, trackUp: this.editTrackUp(), trackDown: this.editTrackDown(),
-        }));
-        syncPromises.push(this.dispatchWorker<unknown>('APPLY_OBJECTS', {
-          resourceId: selId, objects: this.objects(),
-        }));
+        syncPromises.push(
+          this.dispatchWorker<unknown>('APPLY_MARKS', {
+            resourceId: selId,
+            marks: this.marks(),
+          }),
+        );
+        syncPromises.push(
+          this.dispatchWorker<unknown>('APPLY_TRACK', {
+            resourceId: selId,
+            trackUp: this.editTrackUp(),
+            trackDown: this.editTrackDown(),
+          }),
+        );
+        syncPromises.push(
+          this.dispatchWorker<unknown>('APPLY_OBJECTS', {
+            resourceId: selId,
+            objects: this.objects(),
+          }),
+        );
         if (this.propertiesDirty()) {
           const props: LevelProperties = {
-            roadInfo: this.editRoadInfo(), time: this.editTime(),
-            xStartPos: this.editXStartPos(), levelEnd: this.editLevelEnd(),
+            roadInfo: this.editRoadInfo(),
+            time: this.editTime(),
+            xStartPos: this.editXStartPos(),
+            levelEnd: this.editLevelEnd(),
             objectGroups: this.editObjectGroups(),
           };
-          syncPromises.push(this.dispatchWorker<unknown>('APPLY_PROPS', { resourceId: selId, props }));
+          syncPromises.push(
+            this.dispatchWorker<unknown>('APPLY_PROPS', { resourceId: selId, props }),
+          );
         }
       }
       await Promise.all(syncPromises);
@@ -1813,9 +2073,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.customResourcesLoaded.set(true);
 
       this.resourcesStatus.set('Saved to game. Restart the game to apply changes.');
-      this.snackBar.open('✓ Saved to game – click Restart Game to apply', 'Restart', {
-        duration: 8000, panelClass: 'snack-success',
-      }).onAction().subscribe(() => this.restartGameWithCustomResources());
+      this.snackBar
+        .open('✓ Saved to game – click Restart Game to apply', 'Restart', {
+          duration: 8000,
+          panelClass: 'snack-success',
+        })
+        .onAction()
+        .subscribe(() => this.restartGameWithCustomResources());
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to save resources';
       this.editorError.set(msg);
@@ -1875,7 +2139,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (rawR.bytes) this.selectedResBytes.set(new Uint8Array(rawR.bytes));
       } else if (TEXT_RESOURCE_TYPES.has(type)) {
         // For text resources (STR, TEXT), load as decoded string
-        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
+        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', {
+          type,
+          id,
+        });
         if (r.bytes) {
           const bytes = new Uint8Array(r.bytes);
           this.selectedResBytes.set(bytes);
@@ -1892,7 +2159,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         }
       } else {
         // Load raw bytes for structured field editor (and icon preview)
-        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
+        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', {
+          type,
+          id,
+        });
         if (r.bytes) this.selectedResBytes.set(new Uint8Array(r.bytes));
       }
     } catch (err) {
@@ -1908,9 +2178,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedPackEntryBytes.set(null);
     try {
       this.resBrowserBusy.set(true);
-      const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>(
-        'GET_PACK_ENTRY_RAW', { packId, entryId },
-      );
+      const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_PACK_ENTRY_RAW', {
+        packId,
+        entryId,
+      });
       if (r.bytes) this.selectedPackEntryBytes.set(new Uint8Array(r.bytes));
     } catch (err) {
       this.resBrowserStatus.set(`Error loading pack entry: ${err}`);
@@ -1955,9 +2226,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         await this.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
         await this.loadResourceList();
         // Reload raw bytes
-        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id });
+        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', {
+          type,
+          id,
+        });
         if (r.bytes) this.selectedResBytes.set(new Uint8Array(r.bytes));
-        this.snackBar.open(`✓ Replaced ${type}#${id} (${bytes.length} bytes)`, 'OK', { duration: 3000 });
+        this.snackBar.open(`✓ Replaced ${type}#${id} (${bytes.length} bytes)`, 'OK', {
+          duration: 3000,
+        });
       } catch (err) {
         this.snackBar.open(`✗ Upload failed: ${err}`, 'Dismiss', { duration: 5000 });
       } finally {
@@ -1987,12 +2263,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         type ListPackResult = { entries: { id: number; size: number }[] | null };
         const listR = await this.dispatchWorker<ListPackResult>('LIST_PACK_ENTRIES', { packId });
         this.selectedPackEntries.set(listR.entries);
-        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>(
-          'GET_PACK_ENTRY_RAW', { packId, entryId },
-        );
+        const r = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_PACK_ENTRY_RAW', {
+          packId,
+          entryId,
+        });
         if (r.bytes) this.selectedPackEntryBytes.set(new Uint8Array(r.bytes));
         await this.loadResourceList();
-        this.snackBar.open(`✓ Replaced Pack#${packId} entry #${entryId} (${bytes.length} bytes)`, 'OK', { duration: 3000 });
+        this.snackBar.open(
+          `✓ Replaced Pack#${packId} entry #${entryId} (${bytes.length} bytes)`,
+          'OK',
+          { duration: 3000 },
+        );
       } catch (err) {
         this.snackBar.open(`✗ Upload failed: ${err}`, 'Dismiss', { duration: 5000 });
       } finally {
@@ -2012,7 +2293,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       await this.dispatchWorker('PUT_STR_LIST', { id, strings });
       await this.loadResourceList();
       // Refresh raw bytes so the Download button stays current
-      const rawR = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type: 'STR#', id });
+      const rawR = await this.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', {
+        type: 'STR#',
+        id,
+      });
       if (rawR.bytes) this.selectedResBytes.set(new Uint8Array(rawR.bytes));
       this.snackBar.open(`✓ Saved STR#${id}`, 'OK', { duration: 3000 });
     } catch (err) {
@@ -2058,12 +2342,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         // Pascal string: 1-byte length prefix
         const encoded = new Uint8Array(Math.min(255, text.length) + 1);
         encoded[0] = Math.min(255, text.length);
-        for (let i = 0; i < encoded[0]; i++) encoded[i + 1] = text.charCodeAt(i) & 0xFF;
+        for (let i = 0; i < encoded[0]; i++) encoded[i + 1] = text.charCodeAt(i) & 0xff;
         bytes = encoded;
       } else {
         // TEXT: raw bytes
         bytes = new Uint8Array(text.length);
-        for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 0xFF;
+        for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 0xff;
       }
       const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
       await this.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
@@ -2081,7 +2365,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   onResFieldInput(fieldIdx: number, event: Event): void {
     const target = event.target as EventTarget & { value?: string };
     const raw = target?.value ?? '';
-    const val = (this.selectedResFields()[fieldIdx]?.type === 'f32') ? parseFloat(raw) : Number.parseInt(raw, 10);
+    const val =
+      this.selectedResFields()[fieldIdx]?.type === 'f32'
+        ? parseFloat(raw)
+        : Number.parseInt(raw, 10);
     if (Number.isNaN(val)) return;
     const fields = this.selectedResFields();
     const bytes = this.selectedResBytes();
@@ -2118,7 +2405,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   onPackEntryFieldInput(fieldIdx: number, event: Event): void {
     const target = event.target as EventTarget & { value?: string };
     const raw = target?.value ?? '';
-    const val = (this.selectedPackEntryFields()[fieldIdx]?.type === 'f32') ? parseFloat(raw) : Number.parseInt(raw, 10);
+    const val =
+      this.selectedPackEntryFields()[fieldIdx]?.type === 'f32'
+        ? parseFloat(raw)
+        : Number.parseInt(raw, 10);
     if (Number.isNaN(val)) return;
     const fields = this.selectedPackEntryFields();
     const bytes = this.selectedPackEntryBytes();
@@ -2200,14 +2490,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Create a BufferSource from buffer and wire the ended handler. */
-  private _createSourceFromBuffer(buffer: AudioBuffer, onended?: () => void): AudioBufferSourceNode {
+  private _createSourceFromBuffer(
+    buffer: AudioBuffer,
+    onended?: () => void,
+  ): AudioBufferSourceNode {
     if (!this._audioCtx) throw new Error('No AudioContext');
     const gainNode = this._ensureAudioCtx();
     const src = this._audioCtx.createBufferSource();
     src.buffer = buffer;
     src.connect(gainNode);
     src.onended = () => {
-      try { onended?.(); } finally { if (this._audioSource === src) this._audioSource = null; }
+      try {
+        onended?.();
+      } finally {
+        if (this._audioSource === src) this._audioSource = null;
+      }
     };
     return src;
   }
@@ -2215,11 +2512,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Start playback of an AudioBuffer at optional offset (seconds). */
   private _startAudioBuffer(buffer: AudioBuffer, offset = 0): void {
     if (!this._audioCtx) return;
-    try { this._audioSource?.stop(); } catch { /* ignore */ }
+    try {
+      this._audioSource?.stop();
+    } catch {
+      /* ignore */
+    }
     this._audioSource = this._createSourceFromBuffer(buffer, () => {
       this.audioPlaying.set(false);
       this.audioCurrentTime.set(this.audioDuration());
-      if (this._audioRaf !== null) { cancelAnimationFrame(this._audioRaf); this._audioRaf = null; }
+      if (this._audioRaf !== null) {
+        cancelAnimationFrame(this._audioRaf);
+        this._audioRaf = null;
+      }
       this._audioPauseOffset = 0;
     });
     const startAt = Math.max(0, Math.min(offset, buffer.duration));
@@ -2240,11 +2544,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           const offset = this._audioCtx!.currentTime - this._audioStartTime;
           this._audioPauseOffset = Math.max(0, Math.min(offset, this.audioDuration()));
           this._audioSource.stop();
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         this._audioSource = null;
       }
       this.audioPlaying.set(false);
-      if (this._audioRaf !== null) { cancelAnimationFrame(this._audioRaf); this._audioRaf = null; }
+      if (this._audioRaf !== null) {
+        cancelAnimationFrame(this._audioRaf);
+        this._audioRaf = null;
+      }
       return;
     }
 
@@ -2276,13 +2585,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const buf = this._lastAudioBuffer;
     if (!buf || !this._audioCtx) return;
     const offset = this._audioPauseOffset || 0;
-    try { await this._audioCtx!.resume().catch(() => {}); } catch { /* ignore */ }
+    try {
+      await this._audioCtx!.resume().catch(() => {});
+    } catch {
+      /* ignore */
+    }
     this._startAudioBuffer(buf, offset);
   }
 
   stopAudio(): void {
     if (this._audioSource) {
-      try { this._audioSource.stop(); } catch { /* ignore */ }
+      try {
+        this._audioSource.stop();
+      } catch {
+        /* ignore */
+      }
       this._audioSource = null;
     }
     this._lastAudioBuffer = null;
@@ -2290,7 +2607,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.audioCurrentTime.set(0);
     this.audioDuration.set(0);
     this._audioPauseOffset = 0;
-    if (this._audioRaf !== null) { cancelAnimationFrame(this._audioRaf); this._audioRaf = null; }
+    if (this._audioRaf !== null) {
+      cancelAnimationFrame(this._audioRaf);
+      this._audioRaf = null;
+    }
   }
 
   seekAudio(seconds: number): void {
@@ -2299,7 +2619,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const clamped = Math.max(0, Math.min(seconds, buf.duration));
     const wasPlaying = this.audioPlaying();
     if (this._audioSource) {
-      try { this._audioSource.stop(); } catch { /* ignore */ }
+      try {
+        this._audioSource.stop();
+      } catch {
+        /* ignore */
+      }
       this._audioSource = null;
     }
     this._audioPauseOffset = clamped;
@@ -2329,10 +2653,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this._ensureAudioCtx();
     const ctx = this._audioCtx!;
     if (ctx.state === 'suspended') {
-      try { await ctx.resume(); } catch { /* ignore */ }
+      try {
+        await ctx.resume();
+      } catch {
+        /* ignore */
+      }
     }
     if (ctx.state === 'suspended') {
-      this.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', { duration: 4000 });
+      this.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', {
+        duration: 4000,
+      });
       return;
     }
     try {
@@ -2345,31 +2675,47 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             const data = bytes.subarray(info.pcmOffset, info.pcmOffset + info.numFrames);
             const floatBuf = new Float32Array(data.length);
             for (let i = 0; i < data.length; i++) floatBuf[i] = (data[i] - 128) / 128;
-            const audioBuffer = ctx.createBuffer(1, floatBuf.length, Math.max(1, Math.round(info.sampleRate)));
+            const audioBuffer = ctx.createBuffer(
+              1,
+              floatBuf.length,
+              Math.max(1, Math.round(info.sampleRate)),
+            );
             audioBuffer.getChannelData(0).set(floatBuf);
             // Use managed playback: set last buffer and start via helper
             this._lastAudioBuffer = audioBuffer;
             this._startAudioBuffer(audioBuffer, 0);
             return;
-          // Handle IMA4 compressed (use decoder)
-          } else if (info.encode === 0xFE) {
+            // Handle IMA4 compressed (use decoder)
+          } else if (info.encode === 0xfe) {
             const dataStart = info.pcmOffset;
             const pktsAvail = Math.floor((bytes.length - dataStart) / 34);
             if (pktsAvail > 0) {
               const f32 = decodeIMA4(bytes.subarray(dataStart), pktsAvail);
-              const audioBuffer = ctx.createBuffer(1, f32.length, Math.max(1, Math.round(info.sampleRate)));
+              const audioBuffer = ctx.createBuffer(
+                1,
+                f32.length,
+                Math.max(1, Math.round(info.sampleRate)),
+              );
               audioBuffer.getChannelData(0).set(f32);
               this._lastAudioBuffer = audioBuffer;
               this._startAudioBuffer(audioBuffer, 0);
               return;
             }
             // Fallthrough to fallback below
-          // Handle extSH (16-bit big-endian, possibly multi-channel)
-          } else if (info.encode === 0xFF) {
+            // Handle extSH (16-bit big-endian, possibly multi-channel)
+          } else if (info.encode === 0xff) {
             const sampleCount = info.numFrames;
             const ch = info.numChannels || 1;
-            const audioBuffer = ctx.createBuffer(ch, sampleCount, Math.max(1, Math.round(info.sampleRate)));
-            const view = new DataView(bytes.buffer, bytes.byteOffset + info.pcmOffset, bytes.length - info.pcmOffset);
+            const audioBuffer = ctx.createBuffer(
+              ch,
+              sampleCount,
+              Math.max(1, Math.round(info.sampleRate)),
+            );
+            const view = new DataView(
+              bytes.buffer,
+              bytes.byteOffset + info.pcmOffset,
+              bytes.length - info.pcmOffset,
+            );
             for (let s = 0; s < sampleCount; s++) {
               for (let c = 0; c < ch; c++) {
                 const idx = (s * ch + c) * 2;
@@ -2392,15 +2738,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this._lastAudioBuffer = null;
       const played = tryPlaySndResource(bytes, ctx);
       if (!played) {
-        this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+        this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', {
+          duration: 4000,
+        });
       } else {
-        this.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', { duration: 4000 });
+        this.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', {
+          duration: 4000,
+        });
       }
-      } catch (e) {
-        this._lastAudioBuffer = null;
-        this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', { duration: 4000 });
-      }
+    } catch (e) {
+      this._lastAudioBuffer = null;
+      this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', {
+        duration: 4000,
+      });
     }
+  }
 
   /** Render an ICN# resource (32×32 1-bit) as an RGBA canvas for preview. */
   renderIconResource(bytes: Uint8Array | null): HTMLCanvasElement | null {
@@ -2417,7 +2769,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const byteIdx = row * 4 + Math.floor(col / 8);
         const bit = (bytes[byteIdx] >> (7 - (col % 8))) & 1;
         const pixIdx = (row * SIZE + col) * 4;
-        imgData.data[pixIdx]     = bit ? 0 : 255;
+        imgData.data[pixIdx] = bit ? 0 : 255;
         imgData.data[pixIdx + 1] = bit ? 0 : 255;
         imgData.data[pixIdx + 2] = bit ? 0 : 255;
         imgData.data[pixIdx + 3] = 255;
@@ -2431,7 +2783,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   getIconResourceDataUrl(bytes: Uint8Array | null): string | null {
     const canvas = this.renderIconResource(bytes);
     if (!canvas) return null;
-    try { return canvas.toDataURL(); } catch { return null; }
+    try {
+      return canvas.toDataURL();
+    } catch {
+      return null;
+    }
   }
 
   /** Trigger a browser download of the given bytes. */
@@ -2459,8 +2815,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const lines: string[] = [];
     for (let i = 0; i < limit; i += 16) {
       const row = bytes.subarray(i, Math.min(i + 16, limit));
-      const hex = Array.from(row).map(b => b.toString(16).padStart(2, '0')).join(' ').padEnd(47, ' ');
-      const ascii = Array.from(row).map(b => (b >= 32 && b < 127) ? String.fromCharCode(b) : '.').join('');
+      const hex = Array.from(row)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(' ')
+        .padEnd(47, ' ');
+      const ascii = Array.from(row)
+        .map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : '.'))
+        .join('');
       lines.push(`${i.toString(16).padStart(4, '0')}  ${hex}  ${ascii}`);
     }
     if (bytes.length > maxBytes) {
@@ -2478,7 +2839,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.editTime.set(level.properties.time);
       this.editXStartPos.set(level.properties.xStartPos);
       this.editLevelEnd.set(level.properties.levelEnd);
-      this.editObjectGroups.set(level.objectGroups.map((g) => ({ resID: g.resID, numObjs: g.numObjs })));
+      this.editObjectGroups.set(
+        level.objectGroups.map((g) => ({ resID: g.resID, numObjs: g.numObjs })),
+      );
       this.propertiesDirty.set(false);
       this.objects.set([...level.objects]);
       this.selectedObjIndex.set(null);
@@ -2486,8 +2849,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.marks.set([...level.marks]);
       this.selectedMarkIndex.set(null);
       // Load track waypoints into editable copies
-      this.editTrackUp.set(level.trackUp.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })));
-      this.editTrackDown.set(level.trackDown.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })));
+      this.editTrackUp.set(
+        level.trackUp.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })),
+      );
+      this.editTrackDown.set(
+        level.trackDown.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })),
+      );
       this.dragTrackWaypoint.set(null);
       // Set a smart default zoom/pan so the road appears at correct game proportions.
       this.resetViewToRoad(level);
@@ -2533,14 +2900,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const val = Number.parseInt(target?.value ?? '', 10);
     if (Number.isNaN(val)) return;
     switch (field) {
-      case 'roadInfo': this.editRoadInfo.set(val); break;
+      case 'roadInfo':
+        this.editRoadInfo.set(val);
+        break;
       case 'time': {
         const nextTime = Math.max(0, Math.min(MAX_TIME_VALUE, val));
         this.editTime.set(nextTime);
         break;
       }
-      case 'xStartPos': this.editXStartPos.set(val); break;
-      case 'levelEnd': this.editLevelEnd.set(Math.max(0, val)); break;
+      case 'xStartPos':
+        this.editXStartPos.set(val);
+        break;
+      case 'levelEnd':
+        this.editLevelEnd.set(Math.max(0, val));
+        break;
     }
     this.propertiesDirty.set(true);
   }
@@ -2574,11 +2947,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     };
     try {
       this.workerBusy.set(true);
-      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_PROPS', { resourceId: id, props });
+      const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_PROPS', {
+        resourceId: id,
+        props,
+      });
       this.applyLevelsResult(result.levels);
       this.propertiesDirty.set(false);
       this.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
-      this.snackBar.open(`✓ Level ${id - 139} properties saved`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      this.snackBar.open(`✓ Level ${id - 139} properties saved`, 'OK', {
+        duration: 3000,
+        panelClass: 'snack-success',
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Save failed';
       this.editorError.set(msg);
@@ -2617,15 +2996,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const val = parseFloat(target?.value ?? '');
     if (Number.isNaN(val)) return;
     switch (field) {
-      case 'x': this.editObjX.set(Math.round(val)); break;
-      case 'y': this.editObjY.set(Math.round(val)); break;
+      case 'x':
+        this.editObjX.set(Math.round(val));
+        break;
+      case 'y':
+        this.editObjY.set(Math.round(val));
+        break;
       case 'dir': {
         // Normalise to [-π, π] using atan2 of the unit vector – handles all edge cases.
         const wrapped = Math.atan2(Math.sin(val), Math.cos(val));
         this.editObjDir.set(wrapped);
         break;
       }
-      case 'typeRes': this.editObjTypeRes.set(Math.round(val)); break;
+      case 'typeRes':
+        this.editObjTypeRes.set(Math.round(val));
+        break;
     }
     // Auto-apply so the canvas reflects changes immediately without a separate button press.
     this.applyObjEdit();
@@ -2633,11 +3018,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Handler for direction input in degrees (converts to radians internally). */
   onObjDirDegInput(value: string | Event): void {
-    const deg = typeof value === 'string'
-      ? parseFloat(value)
-      : parseFloat(((value.target as EventTarget & { value?: string } | null)?.value) ?? '');
+    const deg =
+      typeof value === 'string'
+        ? parseFloat(value)
+        : parseFloat((value.target as (EventTarget & { value?: string }) | null)?.value ?? '');
     if (Number.isNaN(deg)) return;
-    const rad = deg * Math.PI / 180;
+    const rad = (deg * Math.PI) / 180;
     // Normalise to [-π, π] using atan2 of the unit vector – handles all edge cases.
     const wrapped = Math.atan2(Math.sin(rad), Math.cos(rad));
     this.editObjDir.set(wrapped);
@@ -2668,7 +3054,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   addObject(): void {
     this._pushUndo();
     const objs = [...this.objects()];
-    objs.push({ x: Math.round(this.canvasPanX()), y: Math.round(this.canvasPanY()), dir: 0, typeRes: 128 });
+    objs.push({
+      x: Math.round(this.canvasPanX()),
+      y: Math.round(this.canvasPanY()),
+      dir: 0,
+      typeRes: 128,
+    });
     this.objects.set(objs);
     this.selectObject(objs.length - 1);
   }
@@ -2748,7 +3139,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.workerBusy.set(true);
       const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_TRACK', {
         resourceId: id,
-        trackUp:   this.editTrackUp(),
+        trackUp: this.editTrackUp(),
         trackDown: this.editTrackDown(),
       });
       this.applyLevelsResult(result.levels);
@@ -2867,7 +3258,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         }
       }
     }
-    const startHitR = Math.max(MIN_START_MARKER_HIT_RADIUS, BASE_START_MARKER_HIT_RADIUS / this.canvasZoom());
+    const startHitR = Math.max(
+      MIN_START_MARKER_HIT_RADIUS,
+      BASE_START_MARKER_HIT_RADIUS / this.canvasZoom(),
+    );
     if (dist2d(this.editXStartPos(), 0, wx, wy) < startHitR) {
       this._draggingStartMarker = true;
       this.selectedObjIndex.set(null);
@@ -2880,7 +3274,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     let closestDist = hitRadius;
     for (let i = 0; i < objs.length; i++) {
       const d = dist2d(objs[i].x, objs[i].y, wx, wy);
-      if (d < closestDist) { closestDist = d; closest = i; }
+      if (d < closestDist) {
+        closestDist = d;
+        closest = i;
+      }
     }
     if (closest >= 0) {
       this.selectObject(closest);
@@ -2909,7 +3306,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const twp = this.dragTrackWaypoint();
     if (twp) {
       const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
-      const rx = Math.round(wx), ry = Math.round(wy);
+      const rx = Math.round(wx),
+        ry = Math.round(wy);
       // Store the pending position for commit on mouseup
       this._pendingWaypointDragPos = { x: rx, y: ry };
       // Move Konva node immediately (O(1), no signal/effect/redraw chain)
@@ -2928,7 +3326,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Throttle: only run the detection once per animation frame.
       if (this.showTrackOverlay() && !this._hoverRafPending) {
         this._hoverRafPending = true;
-        const evX = event.offsetX, evY = event.offsetY;
+        const evX = event.offsetX,
+          evY = event.offsetY;
         window.requestAnimationFrame(() => {
           this._hoverRafPending = false;
           const [wx, wy] = this.canvasToWorld(evX, evY);
@@ -3042,7 +3441,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   onCanvasContextMenu(event: MouseEvent): void {
     if (!this.showTrackOverlay()) return;
     const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
-    const trackUp   = this.editTrackUp();
+    const trackUp = this.editTrackUp();
     const trackDown = this.editTrackDown();
     const trackHitR = Math.max(20, 14 / this.canvasZoom());
 
@@ -3071,14 +3470,28 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Find nearest segment distance for each track
     let nearestSegDistUp = Infinity;
     for (let i = 0; i < trackUp.length - 1; i++) {
-      const d = distToSegment2d(wx, wy, trackUp[i].x, trackUp[i].y, trackUp[i + 1].x, trackUp[i + 1].y);
+      const d = distToSegment2d(
+        wx,
+        wy,
+        trackUp[i].x,
+        trackUp[i].y,
+        trackUp[i + 1].x,
+        trackUp[i + 1].y,
+      );
       if (d < nearestSegDistUp) nearestSegDistUp = d;
     }
     if (trackUp.length === 1) nearestSegDistUp = dist2d(trackUp[0].x, trackUp[0].y, wx, wy);
 
     let nearestSegDistDown = Infinity;
     for (let i = 0; i < trackDown.length - 1; i++) {
-      const d = distToSegment2d(wx, wy, trackDown[i].x, trackDown[i].y, trackDown[i + 1].x, trackDown[i + 1].y);
+      const d = distToSegment2d(
+        wx,
+        wy,
+        trackDown[i].x,
+        trackDown[i].y,
+        trackDown[i + 1].x,
+        trackDown[i + 1].y,
+      );
       if (d < nearestSegDistDown) nearestSegDistDown = d;
     }
     if (trackDown.length === 1) nearestSegDistDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
@@ -3127,7 +3540,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.undo();
       return;
     }
-    if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'y' || (event.key.toLowerCase() === 'z' && event.shiftKey))) {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      (event.key.toLowerCase() === 'y' || (event.key.toLowerCase() === 'z' && event.shiftKey))
+    ) {
       event.preventDefault();
       this.redo();
       return;
@@ -3157,10 +3573,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
     // Arrow key panning (Y flipped: ArrowUp → higher world Y)
     const panStep = 50 / this.canvasZoom(); // world units per keystroke
-    if (event.key === 'ArrowUp')    { event.preventDefault(); this.canvasPanY.update((y) => y + panStep); }
-    if (event.key === 'ArrowDown')  { event.preventDefault(); this.canvasPanY.update((y) => y - panStep); }
-    if (event.key === 'ArrowLeft')  { event.preventDefault(); this.canvasPanX.update((x) => x - panStep); }
-    if (event.key === 'ArrowRight') { event.preventDefault(); this.canvasPanX.update((x) => x + panStep); }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.canvasPanY.update((y) => y + panStep);
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.canvasPanY.update((y) => y - panStep);
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      this.canvasPanX.update((x) => x - panStep);
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      this.canvasPanX.update((x) => x + panStep);
+    }
   }
 
   onCanvasKeyUp(event: KeyboardEvent): void {
@@ -3192,16 +3620,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     } else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
       delta = delta * 120;
     }
-    const factor  = 1 - delta * 0.001;
+    const factor = 1 - delta * 0.001;
     const newZoom = Math.min(10, Math.max(0.1, oldZoom * factor));
     if (Math.abs(newZoom - oldZoom) < 1e-6) return;
 
     // Zoom toward the cursor position: the world point under the cursor
     // stays at the same screen position after zoom.
     const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
-    const scale    = this.getCanvasScale();
-    const canvas   = document.getElementById('object-canvas') as HTMLCanvasElement | null;
-    const W = canvas?.width  ?? 900;
+    const scale = this.getCanvasScale();
+    const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
+    const W = canvas?.width ?? 900;
     const H = canvas?.height ?? 700;
     const lx = event.offsetX * scale;
     const ly = event.offsetY * scale;
@@ -3317,8 +3745,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const [ox2, oy2] = this.worldToCanvas(0, 0);
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(ox2, 0); ctx.lineTo(ox2, H); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, oy2); ctx.lineTo(W, oy2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ox2, 0);
+      ctx.lineTo(ox2, H);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, oy2);
+      ctx.lineTo(W, oy2);
+      ctx.stroke();
     }
 
     // Draw track overlay (AI paths) over road but under objects
@@ -3356,7 +3790,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // PanY is quantised to 8 world units to avoid rebuilding on every scroll pixel;
       // the BARRIER_CULL_MARGIN is large enough that 8-unit granularity is imperceptible.
       const segs = level.roadSegs;
-      const N    = Math.max(1, Math.floor(segs.length / 20));
+      const N = Math.max(1, Math.floor(segs.length / 20));
       const panYQ = Math.round(panY / 8) * 8;
       let barrierKey = `${segs.length}:${zoom.toFixed(2)}:${panYQ}`;
       for (let ki = 0; ki < segs.length; ki += N) {
@@ -3385,7 +3819,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const objsVisible = this.showObjects();
     for (let i = 0; i < objs.length; i++) {
       const obj = objs[i];
-      const typeIdx = ((obj.typeRes % OBJ_PALETTE.length) + OBJ_PALETTE.length) % OBJ_PALETTE.length;
+      const typeIdx =
+        ((obj.typeRes % OBJ_PALETTE.length) + OBJ_PALETTE.length) % OBJ_PALETTE.length;
       const isFilteredOut = !visibleTypes.has(typeIdx) || !objsVisible;
       if (isFilteredOut && i !== selIdx) continue;
       const [cx, cy] = this.worldToCanvas(obj.x, obj.y);
@@ -3400,10 +3835,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       //   screen_width = xSize / roadZoom  (where roadZoom = world_units / screen_pixel)
       // which is equivalent to  xSize * (1/roadZoom) = xSize * canvasZoom.
       // objectType.width/length are PHYSICS metres only – never use them for rendering.
-      const drawWidth  = preview ? Math.max(MIN_HIT_RADIUS * 2, preview.width  * zoom)
-                                 : baseRadius * 2.5;
-      const drawHeight = preview ? Math.max(MIN_HIT_RADIUS * 2, preview.height * zoom)
-                                 : baseRadius * 2.5;
+      const drawWidth = preview
+        ? Math.max(MIN_HIT_RADIUS * 2, preview.width * zoom)
+        : baseRadius * 2.5;
+      const drawHeight = preview
+        ? Math.max(MIN_HIT_RADIUS * 2, preview.height * zoom)
+        : baseRadius * 2.5;
 
       const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
       const isSel = i === selIdx;
@@ -3427,7 +3864,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
 
       // Bounding-box outline (colour-coded by type)
-      ctx.strokeStyle = isSel ? '#ffffff' : (isPlayerCar ? '#ffe082' : color);
+      ctx.strokeStyle = isSel ? '#ffffff' : isPlayerCar ? '#ffe082' : color;
       ctx.lineWidth = isSel ? 2 : 1;
       ctx.strokeRect(cx - drawWidth / 2, cy - drawHeight / 2, drawWidth, drawHeight);
 
@@ -3484,12 +3921,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (smx > -20 && smx < W + 20 && smy > -20 && smy < H + 20) {
         const isDraggingStart = this._draggingStartMarker;
         const zf = Math.min(zoom, 2); // zoom factor capped at 2×
-        const POLE_H   = 20 * zf;
+        const POLE_H = 20 * zf;
         const FLAG_TIP = 10 * zf;
         const FLAG_MID = 14 * zf;
-        const FLAG_BOT = 8  * zf;
+        const FLAG_BOT = 8 * zf;
         ctx.strokeStyle = isDraggingStart ? '#ffffff' : '#00e5ff';
-        ctx.fillStyle   = isDraggingStart ? '#ffffff' : '#00e5ff';
+        ctx.fillStyle = isDraggingStart ? '#ffffff' : '#00e5ff';
         ctx.lineWidth = 2;
         // Vertical pole
         ctx.beginPath();
@@ -3541,12 +3978,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     };
     // Pass empty objects array when objects visibility is off
     const konvaObjs = this.showObjects() ? objs : [];
-    this.konva.setObjects(konvaObjs, selIdx, visibleTypes, OBJ_PALETTE, getImgForType, zoom, panX, panY);
+    this.konva.setObjects(
+      konvaObjs,
+      selIdx,
+      visibleTypes,
+      OBJ_PALETTE,
+      getImgForType,
+      zoom,
+      panX,
+      panY,
+    );
 
     // Update Konva track layer – respect showTrackUp / showTrackDown
     if (level && this.showTrackOverlay()) {
-      const up   = this.showTrackUp()   ? this.editTrackUp()   as {x:number,y:number}[] : [];
-      const down = this.showTrackDown() ? this.editTrackDown() as {x:number,y:number}[] : [];
+      const up = this.showTrackUp() ? (this.editTrackUp() as { x: number; y: number }[]) : [];
+      const down = this.showTrackDown() ? (this.editTrackDown() as { x: number; y: number }[]) : [];
       this.konva.setTrackWaypoints(up, down, zoom, panX, panY);
     } else {
       this.konva.clearTrackWaypoints();
@@ -3583,7 +4029,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this._pendingMarkPoints = [];
     this.pendingMarkPointCount.set(0);
     this._markCreateHoverPoint = null;
-    this.snackBar.open('Click points on the canvas to chain new markings. Click Confirm when done.', undefined, { duration: 2500 });
+    this.snackBar.open(
+      'Click points on the canvas to chain new markings. Click Confirm when done.',
+      undefined,
+      { duration: 2500 },
+    );
   }
 
   confirmMarkCreateMode(): void {
@@ -3594,31 +4044,61 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.scheduleCanvasRedraw();
   }
 
-  generateSideRoadMarks(roadSelection: MarkingRoadSelection, yStart: number, yEnd: number, inset: number): void {
+  generateSideRoadMarks(
+    roadSelection: MarkingRoadSelection,
+    yStart: number,
+    yEnd: number,
+    inset: number,
+  ): void {
     const level = this.selectedLevel();
     if (!level) return;
     const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset });
     this._appendGeneratedMarks(generated, 'side road');
   }
 
-  generateCentreRoadMarks(roadSelection: MarkingRoadSelection, yStart: number, yEnd: number, dashFrequency: number): void {
+  generateCentreRoadMarks(
+    roadSelection: MarkingRoadSelection,
+    yStart: number,
+    yEnd: number,
+    dashFrequency: number,
+  ): void {
     const level = this.selectedLevel();
     if (!level) return;
-    const generated = generateCentreDashMarkings(level.roadSegs, { roadSelection, yStart, yEnd, dashFrequency });
+    const generated = generateCentreDashMarkings(level.roadSegs, {
+      roadSelection,
+      yStart,
+      yEnd,
+      dashFrequency,
+    });
     this._appendGeneratedMarks(generated, 'centre dashed');
   }
 
-  previewSideRoadMarks(roadSelection: MarkingRoadSelection, yStart: number, yEnd: number, inset: number): void {
+  previewSideRoadMarks(
+    roadSelection: MarkingRoadSelection,
+    yStart: number,
+    yEnd: number,
+    inset: number,
+  ): void {
     const level = this.selectedLevel();
     if (!level) return;
     const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset });
     this.markingPreview.set(generated);
   }
 
-  previewCentreRoadMarks(roadSelection: MarkingRoadSelection, yStart: number, yEnd: number, dashFrequency: number): void {
+  previewCentreRoadMarks(
+    roadSelection: MarkingRoadSelection,
+    yStart: number,
+    yEnd: number,
+    dashFrequency: number,
+  ): void {
     const level = this.selectedLevel();
     if (!level) return;
-    const generated = generateCentreDashMarkings(level.roadSegs, { roadSelection, yStart, yEnd, dashFrequency });
+    const generated = generateCentreDashMarkings(level.roadSegs, {
+      roadSelection,
+      yStart,
+      yEnd,
+      dashFrequency,
+    });
     this.markingPreview.set(generated);
   }
 
@@ -3633,14 +4113,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   private _appendGeneratedMarks(generated: MarkSeg[], label: string): void {
     if (generated.length === 0) {
-      this.snackBar.open(`No ${label} markings were generated for that range.`, undefined, { duration: 2000 });
+      this.snackBar.open(`No ${label} markings were generated for that range.`, undefined, {
+        duration: 2000,
+      });
       return;
     }
     this._pushUndo();
     const marks = [...this.marks(), ...generated];
     this.marks.set(marks);
     this.selectedMarkIndex.set(marks.length - 1);
-    this.snackBar.open(`Added ${generated.length} ${label} marking segments.`, undefined, { duration: 2200 });
+    this.snackBar.open(`Added ${generated.length} ${label} marking segments.`, undefined, {
+      duration: 2200,
+    });
     this.scheduleMarkAutoSave();
   }
 
@@ -3674,7 +4158,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         (other.x2 === sel.x1 && other.y2 === sel.y1) ||
         (other.x1 === sel.x2 && other.y1 === sel.y2) ||
         (other.x2 === sel.x2 && other.y2 === sel.y2)
-      ) return true;
+      )
+        return true;
     }
     return false;
   }
@@ -3749,8 +4234,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     for (let j = 0; j < ms.length; j++) {
       if (j === srcI) continue;
       for (const epX of ['x1', 'x2'] as const) {
-        const epY = epX === 'x1' ? 'y1' as const : 'y2' as const;
-        const dx = srcX - ms[j][epX]; const dy = srcY - ms[j][epY];
+        const epY = epX === 'x1' ? ('y1' as const) : ('y2' as const);
+        const dx = srcX - ms[j][epX];
+        const dy = srcY - ms[j][epY];
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d > 0 && d < bestDist) {
           bestDist = d;
@@ -3761,11 +4247,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
 
     if (bestJ < 0) {
-      this.snackBar.open('No nearby mark endpoints to join (within 30 world units).', undefined, { duration: 2500 });
+      this.snackBar.open('No nearby mark endpoints to join (within 30 world units).', undefined, {
+        duration: 2500,
+      });
       return;
     }
     this._pushUndo();
-    const bestJEpY = bestJEpX === 'x1' ? 'y1' as const : 'y2' as const;
+    const bestJEpY = bestJEpX === 'x1' ? ('y1' as const) : ('y2' as const);
     ms[bestJ] = { ...ms[bestJ], [bestJEpX]: srcX, [bestJEpY]: srcY };
     this.marks.set(ms);
     this.snackBar.open('Joined nearest mark endpoints.', undefined, { duration: 2000 });
@@ -3818,13 +4306,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this._curveEndPoint = null;
       this.konva.setBarrierDrawPreview([wx, -wy]);
       this.konva.flush();
-      this.snackBar.open('Curve start set. Click the curve end point next.', undefined, { duration: 1500 });
+      this.snackBar.open('Curve start set. Click the curve end point next.', undefined, {
+        duration: 1500,
+      });
       return;
     }
     if (!this._curveEndPoint) {
       this._curveEndPoint = { wx, wy };
       this._updateCurvePreview(wx, wy);
-      this.snackBar.open('Curve end set. Move to adjust the bend, then click again to apply.', undefined, { duration: 1800 });
+      this.snackBar.open(
+        'Curve end set. Move to adjust the bend, then click again to apply.',
+        undefined,
+        { duration: 1800 },
+      );
       return;
     }
 
@@ -3843,7 +4337,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _updateCurvePreview(wx: number, wy: number): void {
     if (!this._curveStartPoint) return;
     if (!this._curveEndPoint) {
-      this.konva.setBarrierDrawPreview([this._curveStartPoint.wx, -this._curveStartPoint.wy, wx, -wy]);
+      this.konva.setBarrierDrawPreview([
+        this._curveStartPoint.wx,
+        -this._curveStartPoint.wy,
+        wx,
+        -wy,
+      ]);
       this.konva.flush();
       return;
     }
@@ -3890,12 +4389,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
      * Uses the sorted array and finds the two surrounding points.
      */
     const xAtY = (wy: number): number => {
-      if (wy <= sorted[0].wy)    return sorted[0].wx;
+      if (wy <= sorted[0].wy) return sorted[0].wx;
       if (wy >= sorted[sorted.length - 1].wy) return sorted[sorted.length - 1].wx;
-      let lo = 0, hi = sorted.length - 1;
+      let lo = 0,
+        hi = sorted.length - 1;
       while (hi - lo > 1) {
         const mid = (lo + hi) >> 1;
-        if (sorted[mid].wy < wy) lo = mid; else hi = mid;
+        if (sorted[mid].wy < wy) lo = mid;
+        else hi = mid;
       }
       const t = (wy - sorted[lo].wy) / (sorted[hi].wy - sorted[lo].wy);
       return sorted[lo].wx + t * (sorted[hi].wx - sorted[lo].wx);
@@ -3903,14 +4404,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     this._pushUndo();
     const segs = level.roadSegs.map((seg, i) => {
-      const segWy = i * 2;  // world Y of segment i
+      const segWy = i * 2; // world Y of segment i
       if (segWy < minWy || segWy > maxWy) return seg;
       const newX = Math.round(xAtY(segWy));
       return clampBarrierPoint(seg as RoadSeg, side, newX);
     });
 
     this.parsedLevels.update((levels) =>
-      levels.map((l) => l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)
+      levels.map((l) => (l.resourceId === level.resourceId ? { ...l, roadSegs: segs } : l)),
     );
     this._lastBarriersSerialized = '';
     this._roadOffscreenKey = '';
@@ -3921,8 +4422,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   // ---- Mark canvas helpers ----
 
-  private markWorldToCanvas(wx: number, wy: number, canvas: HTMLCanvasElement,
-    minX: number, minY: number, rangeX: number, rangeY: number): [number, number] {
+  private markWorldToCanvas(
+    wx: number,
+    wy: number,
+    canvas: HTMLCanvasElement,
+    minX: number,
+    minY: number,
+    rangeX: number,
+    rangeY: number,
+  ): [number, number] {
     const pad = 24;
     const W = canvas.width;
     const H = canvas.height;
@@ -3931,13 +4439,27 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     return [cx, cy];
   }
 
-  private markBounds(ms: MarkSeg[]): { minX: number; minY: number; maxX: number; maxY: number; rangeX: number; rangeY: number } {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  private markBounds(ms: MarkSeg[]): {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    rangeX: number;
+    rangeY: number;
+  } {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const m of ms) {
-      if (m.x1 < minX) minX = m.x1; if (m.x2 < minX) minX = m.x2;
-      if (m.y1 < minY) minY = m.y1; if (m.y2 < minY) minY = m.y2;
-      if (m.x1 > maxX) maxX = m.x1; if (m.x2 > maxX) maxX = m.x2;
-      if (m.y1 > maxY) maxY = m.y1; if (m.y2 > maxY) maxY = m.y2;
+      if (m.x1 < minX) minX = m.x1;
+      if (m.x2 < minX) minX = m.x2;
+      if (m.y1 < minY) minY = m.y1;
+      if (m.y2 < minY) minY = m.y2;
+      if (m.x1 > maxX) maxX = m.x1;
+      if (m.x2 > maxX) maxX = m.x2;
+      if (m.y1 > maxY) maxY = m.y1;
+      if (m.y2 > maxY) maxY = m.y2;
     }
     return { minX, minY, maxX, maxY, rangeX: maxX - minX, rangeY: maxY - minY };
   }
@@ -3964,9 +4486,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (!this.markCreateMode() || this._pendingMarkPoints.length === 0) return;
     }
 
-    const boundsSource = ms.length > 0
-      ? ms
-      : [{ x1: this._pendingMarkPoints[0].x, y1: this._pendingMarkPoints[0].y, x2: this._pendingMarkPoints[0].x, y2: this._pendingMarkPoints[0].y }];
+    const boundsSource =
+      ms.length > 0
+        ? ms
+        : [
+            {
+              x1: this._pendingMarkPoints[0].x,
+              y1: this._pendingMarkPoints[0].y,
+              x2: this._pendingMarkPoints[0].x,
+              y2: this._pendingMarkPoints[0].y,
+            },
+          ];
     const { minX, minY, rangeX, rangeY } = this.markBounds(boundsSource);
 
     const toC = (wx: number, wy: number) =>
@@ -3987,8 +4517,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       // Endpoint dots
       ctx.fillStyle = isSel ? '#42a5f5' : '#888';
-      ctx.beginPath(); ctx.arc(ax, ay, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ax, ay, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(bx, by, 6, 0, Math.PI * 2);
+      ctx.fill();
 
       if (isSel) {
         ctx.fillStyle = '#fff';
@@ -4098,8 +4632,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.dragMarkEndpoint.set(null);
   }
 
-  private pointToSegmentDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
-    const dx = bx - ax; const dy = by - ay;
+  private pointToSegmentDist(
+    px: number,
+    py: number,
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+  ): number {
+    const dx = bx - ax;
+    const dy = by - ay;
     const lenSq = dx * dx + dy * dy;
     if (lenSq === 0) return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2);
     const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
@@ -4112,7 +4654,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedSpriteId.set(spriteId);
     this.currentSpriteBytes.set(null);
     try {
-      const result = await this.dispatchWorker<{ bytes: Uint8Array | null }>('GET_SPRITE_BYTES', { spriteId });
+      const result = await this.dispatchWorker<{ bytes: Uint8Array | null }>('GET_SPRITE_BYTES', {
+        spriteId,
+      });
       const bytes = result.bytes;
       this.currentSpriteBytes.set(bytes);
     } catch {
@@ -4250,7 +4794,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       type DecodeResult = {
         decodedSprites: { typeRes: number; pixels: ArrayBuffer; width: number; height: number }[];
       };
-      const result = await this.dispatchWorker<DecodeResult>('DECODE_SPRITE_PREVIEWS', { objectTypesArr });
+      const result = await this.dispatchWorker<DecodeResult>('DECODE_SPRITE_PREVIEWS', {
+        objectTypesArr,
+      });
       for (const { typeRes, pixels, width, height } of result.decodedSprites) {
         const clamped = new Uint8ClampedArray(pixels);
         const canvas = this.renderSpritePixels(clamped, width, height);
@@ -4292,7 +4838,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
 
       // Helper: build canvas from decoded texture
-      const buildCanvas = (texId: number, width: number, height: number, pixels: ArrayBuffer): HTMLCanvasElement | null => {
+      const buildCanvas = (
+        texId: number,
+        width: number,
+        height: number,
+        pixels: ArrayBuffer,
+      ): HTMLCanvasElement | null => {
         const clamped = new Uint8ClampedArray(pixels);
         const tc = document.createElement('canvas');
         tc.width = width;
@@ -4339,7 +4890,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private async decodePackSpritesInBackground(): Promise<void> {
     try {
       type AllSpritesResult = {
-        frames: { id: number; bitDepth: 8 | 16; width: number; height: number; pixels: ArrayBuffer }[];
+        frames: {
+          id: number;
+          bitDepth: 8 | 16;
+          width: number;
+          height: number;
+          pixels: ArrayBuffer;
+        }[];
       };
       const result = await this.dispatchWorker<AllSpritesResult>('DECODE_ALL_SPRITE_FRAMES');
       this.packSpriteCanvases.clear();
@@ -4349,7 +4906,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const clamped = new Uint8ClampedArray(pixels);
         const canvas = this.renderSpritePixels(clamped, width, height);
         if (canvas) this.packSpriteCanvases.set(id, canvas);
-        this.packSpriteDecodedFrames.set(id, { frameId: id, width, height, pixels: clamped, bitDepth });
+        this.packSpriteDecodedFrames.set(id, {
+          frameId: id,
+          width,
+          height,
+          pixels: clamped,
+          bitDepth,
+        });
         frameInfos.push({ id, bitDepth, width, height });
       }
       this.packSpriteFrames.set(frameInfos);
@@ -4367,14 +4930,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   getPackSpriteDataUrl(frameId: number): string | null {
     const canvas = this.packSpriteCanvases.get(frameId) ?? null;
     if (!canvas) return null;
-    try { return canvas.toDataURL(); } catch { return null; }
+    try {
+      return canvas.toDataURL();
+    } catch {
+      return null;
+    }
   }
 
   /** Return a data URL for a road texture tile by its texId. */
   getTileDataUrl(texId: number): string | null {
     const canvas = this.roadTextureCanvases.get(texId) ?? null;
     if (!canvas) return null;
-    try { return canvas.toDataURL(); } catch { return null; }
+    try {
+      return canvas.toDataURL();
+    } catch {
+      return null;
+    }
   }
 
   /** Return "WxH px" label for a tile by texId, or '?' if not found. */
@@ -4421,7 +4992,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       a.href = url;
       a.download = `tile-${texId}.png`;
       a.click();
-    } catch { /* security error */ }
+    } catch {
+      /* security error */
+    }
   }
 
   /** Handle PNG file upload to replace a kPackTx16 tile. */
@@ -4431,7 +5004,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (!file) return;
     input.value = '';
     const entry = this.tileTileEntries().find((t) => t.texId === texId);
-    if (!entry) { this.editorError.set('Tile not found'); return; }
+    if (!entry) {
+      this.editorError.set('Tile not found');
+      return;
+    }
     try {
       const url = URL.createObjectURL(file);
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -4442,7 +5018,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       });
       URL.revokeObjectURL(url);
       const offscreen = document.createElement('canvas');
-      offscreen.width  = entry.width;
+      offscreen.width = entry.width;
       offscreen.height = entry.height;
       const ctx = offscreen.getContext('2d')!;
       ctx.drawImage(img, 0, 0, entry.width, entry.height);
@@ -4502,7 +5078,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
       // Populate durations in background — load bytes for each entry and parse header
       void this._loadAudioDurations(entries.map((e) => e.id));
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
   }
 
   /** Load bytes for each audio entry and compute duration from the snd header. */
@@ -4510,16 +5088,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     type RawResult = { bytes: ArrayBuffer | null };
     for (const id of ids) {
       try {
-        const result = await this.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', { packId: 134, entryId: id });
+        const result = await this.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', {
+          packId: 134,
+          entryId: id,
+        });
         if (!result.bytes) continue;
         const info = parseSndHeader(new Uint8Array(result.bytes));
         if (!info || info.sampleRate <= 0) continue;
         const durationMs = (info.numFrames / info.sampleRate) * 1000;
         // Patch the durationMs into the matching entry
         this.audioEntries.update((prev) =>
-          prev.map((e) => e.id === id ? { ...e, durationMs } : e),
+          prev.map((e) => (e.id === id ? { ...e, durationMs } : e)),
         );
-      } catch { /* ignore individual failures */ }
+      } catch {
+        /* ignore individual failures */
+      }
     }
   }
 
@@ -4537,9 +5120,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private async loadSelectedAudioBytes(id: number): Promise<void> {
     try {
       type RawResult = { bytes: ArrayBuffer | null };
-      const result = await this.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', { packId: 134, entryId: id });
+      const result = await this.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', {
+        packId: 134,
+        entryId: id,
+      });
       this.selectedAudioBytes.set(result.bytes ? new Uint8Array(result.bytes) : null);
-    } catch { this.selectedAudioBytes.set(null); }
+    } catch {
+      this.selectedAudioBytes.set(null);
+    }
   }
 
   /** Download the selected audio entry as a WAV file. */
@@ -4564,10 +5152,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this._ensureAudioCtx();
     const ctx = this._audioCtx!;
     if (ctx.state === 'suspended') {
-      try { await ctx.resume(); } catch { /* ignore */ }
+      try {
+        await ctx.resume();
+      } catch {
+        /* ignore */
+      }
     }
     if (ctx.state === 'suspended') {
-      this.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', { duration: 4000 });
+      this.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', {
+        duration: 4000,
+      });
       return;
     }
     try {
@@ -4581,29 +5175,41 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const wavBytes = this._sndToWav(bytes);
         try {
           // decodeAudioData expects an ArrayBuffer; guard against SharedArrayBuffer
-          const ab = wavBytes.buffer.slice(wavBytes.byteOffset, wavBytes.byteOffset + wavBytes.byteLength) as ArrayBuffer;
+          const ab = wavBytes.buffer.slice(
+            wavBytes.byteOffset,
+            wavBytes.byteOffset + wavBytes.byteLength,
+          ) as ArrayBuffer;
           const audioBuf = await ctx.decodeAudioData(ab);
           // Use managed playback: store decoded AudioBuffer and start via helpers
           this._lastAudioBuffer = audioBuf;
           this._startAudioBuffer(audioBuf, 0);
-          } catch (err) {
-            // Some browsers reject decodeAudioData for raw WAV blobs; fall back to
-            // the legacy player which may handle raw PCM directly. Mark that
-            // advanced controls are unavailable when falling back.
-            this._lastAudioBuffer = null;
-            const played = tryPlaySndResource(bytes, ctx);
-            if (!played) throw err instanceof Error ? err : new Error(String(err ?? 'Unsupported snd format'));
-            // Inform the user that we're in one-shot fallback mode
-            this.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', { duration: 4000 });
-          }
+        } catch (err) {
+          // Some browsers reject decodeAudioData for raw WAV blobs; fall back to
+          // the legacy player which may handle raw PCM directly. Mark that
+          // advanced controls are unavailable when falling back.
+          this._lastAudioBuffer = null;
+          const played = tryPlaySndResource(bytes, ctx);
+          if (!played)
+            throw err instanceof Error ? err : new Error(String(err ?? 'Unsupported snd format'));
+          // Inform the user that we're in one-shot fallback mode
+          this.snackBar.open(
+            'Playing using legacy one-shot player — pause/seek unavailable.',
+            'OK',
+            { duration: 4000 },
+          );
+        }
       } else {
         const played = tryPlaySndResource(bytes, ctx);
         if (!played) {
-          this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', { duration: 4000 });
+          this.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', {
+            duration: 4000,
+          });
         }
       }
     } catch (e) {
-      this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', { duration: 4000 });
+      this.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', {
+        duration: 4000,
+      });
     }
   }
 
@@ -4620,9 +5226,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const arrBuf = await file.arrayBuffer();
       // Convert uploaded WAV to raw Mac 'snd ' Format 1 resource bytes.
       const sndBytes = this._wavToSnd(new Uint8Array(arrBuf));
-      await this.dispatchWorker<Record<string, never>>(
-        'PUT_PACK_ENTRY_RAW', { packId: 134, entryId: id, bytes: sndBytes.buffer },
-      );
+      await this.dispatchWorker<Record<string, never>>('PUT_PACK_ENTRY_RAW', {
+        packId: 134,
+        entryId: id,
+        bytes: sndBytes.buffer,
+      });
       await this.loadSelectedAudioBytes(id);
       this.resourcesStatus.set(`Sound #${id} replaced from WAV.`);
     } catch (err) {
@@ -4643,14 +5251,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       return buildWav(bytes, 22050, 1, 8);
     }
     // IMA4 compressed (encode=0xFE) - decode to 16-bit PCM
-    if (info.encode === 0xFE) {
+    if (info.encode === 0xfe) {
       const dataStart = info.pcmOffset;
       const pktsAvail = Math.floor((bytes.length - dataStart) / 34);
       if (pktsAvail > 0) {
         const f32 = decodeIMA4(bytes.subarray(dataStart), pktsAvail);
         const pcm16 = new Int16Array(f32.length);
-        for (let s = 0; s < f32.length; s++) pcm16[s] = Math.max(-32768, Math.min(32767, Math.round(f32[s] * 32768)));
-        return buildWav(new Uint8Array(pcm16.buffer), Math.round(info.sampleRate), info.numChannels, 16);
+        for (let s = 0; s < f32.length; s++)
+          pcm16[s] = Math.max(-32768, Math.min(32767, Math.round(f32[s] * 32768)));
+        return buildWav(
+          new Uint8Array(pcm16.buffer),
+          Math.round(info.sampleRate),
+          info.numChannels,
+          16,
+        );
       }
       return buildWav(bytes, Math.round(info.sampleRate), 1, 8);
     }
@@ -4675,9 +5289,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     let dataOff = 12;
     let dataLen = 0;
     while (dataOff + 8 <= wav.length) {
-      const chunkId = String.fromCharCode(wav[dataOff], wav[dataOff+1], wav[dataOff+2], wav[dataOff+3]);
+      const chunkId = String.fromCharCode(
+        wav[dataOff],
+        wav[dataOff + 1],
+        wav[dataOff + 2],
+        wav[dataOff + 3],
+      );
       const chunkLen = wavView.getUint32(dataOff + 4, true);
-      if (chunkId === 'data') { dataOff += 8; dataLen = chunkLen; break; }
+      if (chunkId === 'data') {
+        dataOff += 8;
+        dataLen = chunkLen;
+        break;
+      }
       dataOff += 8 + chunkLen;
     }
     if (dataLen === 0) throw new Error('No data chunk in WAV');
@@ -4709,22 +5332,22 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const headerOff = 20; // offset of SoundHeader from start of resource
     const out = new Uint8Array(headerOff + 22 + pcm.length);
     const dv = new DataView(out.buffer);
-    dv.setUint16(0, 1, false);          // format=1
-    dv.setUint16(2, 1, false);          // numSynthTypes=1
-    dv.setUint16(4, 5, false);          // sampledSynth
-    dv.setUint32(6, 0x80, false);       // initOption (stereoMask)
-    dv.setUint16(10, 1, false);         // numCmds=1
-    dv.setUint16(12, 0x8051, false);    // bufferCmd
-    dv.setUint16(14, 0, false);         // param1=0
+    dv.setUint16(0, 1, false); // format=1
+    dv.setUint16(2, 1, false); // numSynthTypes=1
+    dv.setUint16(4, 5, false); // sampledSynth
+    dv.setUint32(6, 0x80, false); // initOption (stereoMask)
+    dv.setUint16(10, 1, false); // numCmds=1
+    dv.setUint16(12, 0x8051, false); // bufferCmd
+    dv.setUint16(14, 0, false); // param1=0
     dv.setUint32(16, headerOff, false); // param2 = offset of header
     // SoundHeader at headerOff
-    dv.setUint32(headerOff + 0, 0, false);                         // samplePtr=0
-    dv.setUint32(headerOff + 4, pcm.length, false);                // length
-    dv.setUint32(headerOff + 8, sampleRate * 65536, false);        // sampleRate (4.16 fixed-point)
-    dv.setUint32(headerOff + 12, 0, false);                        // loopStart
-    dv.setUint32(headerOff + 16, 0, false);                        // loopEnd
-    dv.setUint8(headerOff + 20, 0);                                // encode=0 (stdSH)
-    dv.setUint8(headerOff + 21, 60);                               // baseFreq=middle-C
+    dv.setUint32(headerOff + 0, 0, false); // samplePtr=0
+    dv.setUint32(headerOff + 4, pcm.length, false); // length
+    dv.setUint32(headerOff + 8, sampleRate * 65536, false); // sampleRate (4.16 fixed-point)
+    dv.setUint32(headerOff + 12, 0, false); // loopStart
+    dv.setUint32(headerOff + 16, 0, false); // loopEnd
+    dv.setUint8(headerOff + 20, 0); // encode=0 (stdSH)
+    dv.setUint8(headerOff + 21, 60); // baseFreq=middle-C
     out.set(pcm, headerOff + 22);
     return out;
   }
@@ -4744,7 +5367,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const id = this.selectedIconId();
     const type = this.selectedIconType();
     if (id === null) return '';
-    return this.iconEntries().find((e) => e.id === id && e.type === type)?.label ?? `${type} #${id}`;
+    return (
+      this.iconEntries().find((e) => e.id === id && e.type === type)?.label ?? `${type} #${id}`
+    );
   });
 
   /** Load list of all screen-image resource types (ICN#, icl8, ics8, PICT). */
@@ -4755,13 +5380,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const SCREEN_TYPES = new Set(['ICN#', 'icl8', 'ics8', 'PICT']);
       const entries = result.entries
         .filter((e) => SCREEN_TYPES.has(e.type))
-        .map((e) => ({ type: e.type, id: e.id, label: this._iconLabel(e.type, e.id), sizeBytes: e.size }));
+        .map((e) => ({
+          type: e.type,
+          id: e.id,
+          label: this._iconLabel(e.type, e.id),
+          sizeBytes: e.size,
+        }));
       this.iconEntries.set(entries);
       if (entries.length > 0 && this.selectedIconId() === null) {
         this.selectIconEntry(entries[0].type, entries[0].id);
       }
       void this.loadAllIconThumbnails();
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
   }
 
   async selectIconEntry(type: string, id: number): Promise<void> {
@@ -4780,7 +5412,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             this.iconCanvasMap.set(`${type}:${id}`, canvas);
           }
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
       return;
     }
     try {
@@ -4801,7 +5435,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this.iconCanvasMap.set(`${type}:${id}`, canvas);
         }
       }
-    } catch { this.iconPreviewCanvas.set(null); }
+    } catch {
+      this.iconPreviewCanvas.set(null);
+    }
   }
 
   /** Export the selected icon/screen resource as a PNG file. */
@@ -4816,7 +5452,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       a.href = url;
       a.download = `${type.trim()}-${id}.png`;
       a.click();
-    } catch { /* security */ }
+    } catch {
+      /* security */
+    }
   }
 
   /** Export PICT resource as raw bytes. */
@@ -4831,7 +5469,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (result.bytes) {
           this.triggerBytesDownload(new Uint8Array(result.bytes), `${type.trim()}-${id}.bin`);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     })();
   }
 
@@ -4859,26 +5499,33 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (type === 'icl8') {
         // Scale to 32×32 and convert to 8-bit Mac palette
         const offscreen = document.createElement('canvas');
-        offscreen.width = 32; offscreen.height = 32;
+        offscreen.width = 32;
+        offscreen.height = 32;
         const ctx = offscreen.getContext('2d')!;
         ctx.drawImage(img, 0, 0, 32, 32);
         iconBytes = this._imageDataToIcl8(ctx.getImageData(0, 0, 32, 32).data);
       } else if (type === 'ics8') {
         // Scale to 16×16 and convert to 8-bit Mac palette
         const offscreen = document.createElement('canvas');
-        offscreen.width = 16; offscreen.height = 16;
+        offscreen.width = 16;
+        offscreen.height = 16;
         const ctx = offscreen.getContext('2d')!;
         ctx.drawImage(img, 0, 0, 16, 16);
         iconBytes = this._imageDataToIcl8(ctx.getImageData(0, 0, 16, 16).data);
       } else {
         // ICN# or ics#: 32×32 1-bit
         const offscreen = document.createElement('canvas');
-        offscreen.width = 32; offscreen.height = 32;
+        offscreen.width = 32;
+        offscreen.height = 32;
         const ctx = offscreen.getContext('2d')!;
         ctx.drawImage(img, 0, 0, 32, 32);
         iconBytes = this._imageDataToIconHash(ctx.getImageData(0, 0, 32, 32).data);
       }
-      await this.dispatchWorker<Record<string, never>>('PUT_RESOURCE_RAW', { type, id, bytes: iconBytes.buffer });
+      await this.dispatchWorker<Record<string, never>>('PUT_RESOURCE_RAW', {
+        type,
+        id,
+        bytes: iconBytes.buffer,
+      });
       await this.selectIconEntry(type, id);
       this.resourcesStatus.set(`${type} #${id} replaced.`);
     } catch (err) {
@@ -4912,7 +5559,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   getIconThumbDataUrl(type: string, id: number): string | null {
     const canvas = this.iconCanvasMap.get(`${type}:${id}`);
     if (!canvas) return null;
-    try { return canvas.toDataURL(); } catch { return null; }
+    try {
+      return canvas.toDataURL();
+    } catch {
+      return null;
+    }
   }
 
   /** Load thumbnails for all icon entries in the background to populate iconCanvasMap. */
@@ -4922,7 +5573,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (this.iconCanvasMap.has(key)) continue;
       try {
         type RawResult = { bytes: ArrayBuffer | null };
-        const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type: entry.type, id: entry.id });
+        const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', {
+          type: entry.type,
+          id: entry.id,
+        });
         if (!result.bytes) continue;
         const bytes = new Uint8Array(result.bytes);
         let canvas: HTMLCanvasElement | null = null;
@@ -4938,9 +5592,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (canvas) {
           this.iconCanvasMap.set(key, canvas);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       // Yield to keep UI responsive
-      await new Promise<void>(r => setTimeout(r, 0));
+      await new Promise<void>((r) => setTimeout(r, 0));
     }
   }
 
@@ -4960,7 +5616,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const bitIdx = 7 - (col % 8);
         const bit = byteIdx < bytes.length ? (bytes[byteIdx] >> bitIdx) & 1 : 0;
         const i = (row * 32 + col) * 4;
-        imgData.data[i]     = bit ? 0 : 255;
+        imgData.data[i] = bit ? 0 : 255;
         imgData.data[i + 1] = bit ? 0 : 255;
         imgData.data[i + 2] = bit ? 0 : 255;
         imgData.data[i + 3] = 255;
@@ -4980,8 +5636,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         for (let bit = 0; bit < 8; bit++) {
           const col = byteInRow * 8 + bit;
           const i = (row * 32 + col) * 4;
-          const lum = rgba[i] * 0.299 + rgba[i+1] * 0.587 + rgba[i+2] * 0.114;
-          if (lum < 128) b |= (1 << (7 - bit)); // dark pixel → 1 (black)
+          const lum = rgba[i] * 0.299 + rgba[i + 1] * 0.587 + rgba[i + 2] * 0.114;
+          if (lum < 128) b |= 1 << (7 - bit); // dark pixel → 1 (black)
         }
         out[row * 4 + byteInRow] = b;
         out[128 + row * 4 + byteInRow] = mask;
@@ -5007,16 +5663,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // PICT header: 2-byte size + 8-byte bounding rect (top, left, bottom, right)
     let pos = 2; // skip 'size' field
-    const picTop    = view.getInt16(pos,     false); pos += 2;
-    const picLeft   = view.getInt16(pos,     false); pos += 2;
-    const picBottom = view.getInt16(pos,     false); pos += 2;
-    const picRight  = view.getInt16(pos,     false); pos += 2;
-    const picW = picRight  - picLeft;
+    const picTop = view.getInt16(pos, false);
+    pos += 2;
+    const picLeft = view.getInt16(pos, false);
+    pos += 2;
+    const picBottom = view.getInt16(pos, false);
+    pos += 2;
+    const picRight = view.getInt16(pos, false);
+    pos += 2;
+    const picW = picRight - picLeft;
     const picH = picBottom - picTop;
     if (picW <= 0 || picH <= 0 || picW > 4096 || picH > 4096) return null;
 
     const canvas = document.createElement('canvas');
-    canvas.width = picW; canvas.height = picH;
+    canvas.width = picW;
+    canvas.height = picH;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
@@ -5024,8 +5685,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     let isV2 = false;
     if (pos + 2 <= bytes.length && view.getUint16(pos, false) === 0x0011) {
       pos += 2; // version opcode
-      if (pos + 2 <= bytes.length && view.getUint16(pos, false) === 0x02FF) {
-        isV2 = true; pos += 2;
+      if (pos + 2 <= bytes.length && view.getUint16(pos, false) === 0x02ff) {
+        isV2 = true;
+        pos += 2;
       }
     }
 
@@ -5036,55 +5698,109 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (isV2) {
         if (pos % 2 !== 0) pos++; // align to even byte
         if (pos + 2 > bytes.length) break;
-        opcode = view.getUint16(pos, false); pos += 2;
+        opcode = view.getUint16(pos, false);
+        pos += 2;
       } else {
         opcode = view.getUint8(pos++);
       }
 
       switch (opcode) {
-        case 0x0000: break; // NOP
-        case 0x00FF: break outer; // EndOfPicture
-        case 0x0001: { // ClipRgn
+        case 0x0000:
+          break; // NOP
+        case 0x00ff:
+          break outer; // EndOfPicture
+        case 0x0001: {
+          // ClipRgn
           if (pos + 2 > bytes.length) break outer;
-          const rgnSize = view.getUint16(pos, false); pos += rgnSize; break;
+          const rgnSize = view.getUint16(pos, false);
+          pos += rgnSize;
+          break;
         }
-        case 0x0003: pos += 2; break; // TxFont
-        case 0x0004: pos += 2; break; // TxFace
-        case 0x0005: pos += 2; break; // TxMode
-        case 0x0006: pos += 4; break; // SpExtra
-        case 0x0007: pos += 4; break; // PnSize
-        case 0x0008: pos += 2; break; // PnMode
-        case 0x0009: pos += 8; break; // PnPat
-        case 0x000A: pos += 8; break; // FillPat
-        case 0x000B: pos += 4; break; // OvSize
-        case 0x000C: pos += 4; break; // Origin
-        case 0x000D: pos += 2; break; // TxSize
-        case 0x000E: pos += 4; break; // FgColor (long)
-        case 0x000F: pos += 4; break; // BkColor (long)
-        case 0x0010: pos += 8; break; // TxRatio
-        case 0x001A: pos += 6; break; // RGBFgCol
-        case 0x001B: pos += 6; break; // RGBBkCol
-        case 0x001C: break;           // HiliteMode (no data)
-        case 0x001D: pos += 6; break; // HiliteColor
-        case 0x001E: break; // DefHilite (no data)
-        case 0x001F: pos += 6; break; // OpColor
-        case 0x0C00: pos += 24; break; // HeaderOp (v2)
-        case 0x0098: case 0x0099: // PackBitsRect / PackBitsRgn
-        case 0x009A: case 0x009B: { // DirectBitsRect / DirectBitsRgn
-          const isDirect = (opcode === 0x009A || opcode === 0x009B);
+        case 0x0003:
+          pos += 2;
+          break; // TxFont
+        case 0x0004:
+          pos += 2;
+          break; // TxFace
+        case 0x0005:
+          pos += 2;
+          break; // TxMode
+        case 0x0006:
+          pos += 4;
+          break; // SpExtra
+        case 0x0007:
+          pos += 4;
+          break; // PnSize
+        case 0x0008:
+          pos += 2;
+          break; // PnMode
+        case 0x0009:
+          pos += 8;
+          break; // PnPat
+        case 0x000a:
+          pos += 8;
+          break; // FillPat
+        case 0x000b:
+          pos += 4;
+          break; // OvSize
+        case 0x000c:
+          pos += 4;
+          break; // Origin
+        case 0x000d:
+          pos += 2;
+          break; // TxSize
+        case 0x000e:
+          pos += 4;
+          break; // FgColor (long)
+        case 0x000f:
+          pos += 4;
+          break; // BkColor (long)
+        case 0x0010:
+          pos += 8;
+          break; // TxRatio
+        case 0x001a:
+          pos += 6;
+          break; // RGBFgCol
+        case 0x001b:
+          pos += 6;
+          break; // RGBBkCol
+        case 0x001c:
+          break; // HiliteMode (no data)
+        case 0x001d:
+          pos += 6;
+          break; // HiliteColor
+        case 0x001e:
+          break; // DefHilite (no data)
+        case 0x001f:
+          pos += 6;
+          break; // OpColor
+        case 0x0c00:
+          pos += 24;
+          break; // HeaderOp (v2)
+        case 0x0098:
+        case 0x0099: // PackBitsRect / PackBitsRgn
+        case 0x009a:
+        case 0x009b: {
+          // DirectBitsRect / DirectBitsRgn
+          const isDirect = opcode === 0x009a || opcode === 0x009b;
           if (isDirect && pos + 4 <= bytes.length) pos += 4; // skip baseAddr
 
           if (pos + 2 > bytes.length) break outer;
-          const rowBytesRaw = view.getUint16(pos, false); pos += 2;
-          const rowBytes    = rowBytesRaw & 0x3FFF;
-          const isPixMap    = (rowBytesRaw & 0x8000) !== 0 || isDirect;
+          const rowBytesRaw = view.getUint16(pos, false);
+          pos += 2;
+          const rowBytes = rowBytesRaw & 0x3fff;
+          const isPixMap = (rowBytesRaw & 0x8000) !== 0 || isDirect;
 
           // Bounds rect
           if (pos + 8 > bytes.length) break outer;
-          const bTop    = view.getInt16(pos, false); pos += 2;
-          const bLeft   = view.getInt16(pos, false); pos += 2;
-          const bBottom = view.getInt16(pos, false); pos += 2;
-          const bRight  = view.getInt16(pos, false); pos += 2;
+          const bTop = view.getInt16(pos, false);
+          pos += 2;
+          const bLeft = view.getInt16(pos, false);
+          pos += 2;
+          const bBottom = view.getInt16(pos, false);
+          pos += 2;
+          const bRight = view.getInt16(pos, false);
+          pos += 2;
           const imgW = bRight - bLeft;
           const imgH = bBottom - bTop;
           if (imgW <= 0 || imgH <= 0 || imgW > 4096 || imgH > 4096) break outer;
@@ -5097,7 +5813,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             if (pos + 2 > bytes.length) break outer;
             pos += 2; // pmVersion
             if (pos + 2 > bytes.length) break outer;
-            packType = view.getUint16(pos, false); pos += 2;
+            packType = view.getUint16(pos, false);
+            pos += 2;
             if (pos + 4 > bytes.length) break outer;
             pos += 4; // packSize
             if (pos + 8 > bytes.length) break outer;
@@ -5105,7 +5822,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             if (pos + 2 > bytes.length) break outer;
             pos += 2; // pixelType
             if (pos + 2 > bytes.length) break outer;
-            pixelSize = view.getUint16(pos, false); pos += 2;
+            pixelSize = view.getUint16(pos, false);
+            pos += 2;
             if (pos + 6 > bytes.length) break outer;
             pos += 6; // cmpCount + cmpSize + planeBytes
             if (pos + 4 > bytes.length) break outer;
@@ -5118,14 +5836,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
               if (pos + 8 > bytes.length) break outer;
               pos += 4; // ctSeed
               pos += 2; // ctFlags
-              const ctSize = view.getInt16(pos, false) + 1; pos += 2;
+              const ctSize = view.getInt16(pos, false) + 1;
+              pos += 2;
               colorTable = [];
               for (let ci = 0; ci < ctSize; ci++) {
                 if (pos + 8 > bytes.length) break outer;
                 pos += 2; // index (ignored)
-                const r = view.getUint16(pos, false) >> 8; pos += 2;
-                const g = view.getUint16(pos, false) >> 8; pos += 2;
-                const b = view.getUint16(pos, false) >> 8; pos += 2;
+                const r = view.getUint16(pos, false) >> 8;
+                pos += 2;
+                const g = view.getUint16(pos, false) >> 8;
+                pos += 2;
+                const b = view.getUint16(pos, false) >> 8;
+                pos += 2;
                 colorTable.push(r, g, b);
               }
             }
@@ -5138,9 +5860,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           pos += 2; // mode
 
           // If PackBitsRgn / DirectBitsRgn, skip region
-          if (opcode === 0x0099 || opcode === 0x009B) {
+          if (opcode === 0x0099 || opcode === 0x009b) {
             if (pos + 2 > bytes.length) break outer;
-            const rgnSize = view.getUint16(pos, false); pos += rgnSize;
+            const rgnSize = view.getUint16(pos, false);
+            pos += rgnSize;
           }
 
           // Decode pixel rows
@@ -5152,9 +5875,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             const bytesPerRow = rowBytes;
             if (isPacked) {
               if (pos + (bytesPerRow > 250 ? 2 : 1) > bytes.length) break outer;
-              const compLen = bytesPerRow > 250
-                ? (view.getUint16(pos, false) + (pos += 2, 0))
-                : (view.getUint8(pos++) + 0);
+              const compLen =
+                bytesPerRow > 250
+                  ? view.getUint16(pos, false) + ((pos += 2), 0)
+                  : view.getUint8(pos++) + 0;
               if (pos + compLen > bytes.length) break outer;
               rowData = decodePackBits(bytes.subarray(pos, pos + compLen), bytesPerRow);
               pos += compLen;
@@ -5172,15 +5896,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
                 const pixOff = col * 2;
                 if (pixOff + 2 > rowData.length) break;
                 const pixel = (rowData[pixOff]! << 8) | rowData[pixOff + 1]!;
-                imgData.data[di]     = ((pixel >> 10) & 0x1F) * 255 / 31;
-                imgData.data[di + 1] = ((pixel >>  5) & 0x1F) * 255 / 31;
-                imgData.data[di + 2] =  (pixel        & 0x1F) * 255 / 31;
+                imgData.data[di] = (((pixel >> 10) & 0x1f) * 255) / 31;
+                imgData.data[di + 1] = (((pixel >> 5) & 0x1f) * 255) / 31;
+                imgData.data[di + 2] = ((pixel & 0x1f) * 255) / 31;
                 imgData.data[di + 3] = 255;
               } else if (pixelSize === 32) {
                 // 32-bit ARGB
                 const pixOff = col * 4;
                 if (pixOff + 4 > rowData.length) break;
-                imgData.data[di]     = rowData[pixOff + 1]!;
+                imgData.data[di] = rowData[pixOff + 1]!;
                 imgData.data[di + 1] = rowData[pixOff + 2]!;
                 imgData.data[di + 2] = rowData[pixOff + 3]!;
                 imgData.data[di + 3] = rowData[pixOff]! || 255; // alpha (or 255 if 0)
@@ -5188,7 +5912,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
                 // 8-bit indexed or grayscale
                 const idx = rowData[col] ?? 0;
                 if (colorTable && colorTable.length >= (idx + 1) * 3) {
-                  imgData.data[di]     = colorTable[idx * 3]!;
+                  imgData.data[di] = colorTable[idx * 3]!;
                   imgData.data[di + 1] = colorTable[idx * 3 + 1]!;
                   imgData.data[di + 2] = colorTable[idx * 3 + 2]!;
                 } else {
@@ -5212,13 +5936,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           //   0x8000–0x80FF: no data
           //   0x8100–0xFFFF: next 4 bytes give data length (longword)
           // For genuinely unknown low-range (0x0000–0x00FF) opcodes we stop.
-          if (isV2 && opcode >= 0x0100 && opcode <= 0x7FFF) {
+          if (isV2 && opcode >= 0x0100 && opcode <= 0x7fff) {
             pos += (opcode >> 8) * 2;
-          } else if (isV2 && opcode >= 0x8000 && opcode <= 0x80FF) {
+          } else if (isV2 && opcode >= 0x8000 && opcode <= 0x80ff) {
             // no data
           } else if (isV2 && opcode >= 0x8100) {
             if (pos + 4 > bytes.length) break outer;
-            const longLen = view.getUint32(pos, false); pos += 4 + longLen;
+            const longLen = view.getUint32(pos, false);
+            pos += 4 + longLen;
           } else {
             break outer; // Truly unknown low-range opcode; stop
           }
@@ -5234,7 +5959,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _renderPalettedIcon(bytes: Uint8Array, w: number, h: number): HTMLCanvasElement | null {
     if (typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     const imgData = ctx.createImageData(w, h);
@@ -5244,7 +5970,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const idx = i < bytes.length ? bytes[i] : 0;
       const pi = (idx < palLen ? idx : palLen - 1) * 3;
       const di = i * 4;
-      imgData.data[di]     = pal[pi]     ?? 0;
+      imgData.data[di] = pal[pi] ?? 0;
       imgData.data[di + 1] = pal[pi + 1] ?? 0;
       imgData.data[di + 2] = pal[pi + 2] ?? 0;
       imgData.data[di + 3] = 255;
@@ -5269,12 +5995,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     for (let rq = 0; rq < 32; rq++) {
       for (let gq = 0; gq < 32; gq++) {
         for (let bq = 0; bq < 32; bq++) {
-          const r = rq * 8; const g = gq * 8; const b = bq * 8;
-          let bestIdx = 0; let bestDist = Infinity;
+          const r = rq * 8;
+          const g = gq * 8;
+          const b = bq * 8;
+          let bestIdx = 0;
+          let bestDist = Infinity;
           for (let p = 0; p < palLen; p++) {
-            const dr = r - (pal[p * 3] ?? 0); const dg = g - (pal[p * 3 + 1] ?? 0); const db = b - (pal[p * 3 + 2] ?? 0);
+            const dr = r - (pal[p * 3] ?? 0);
+            const dg = g - (pal[p * 3 + 1] ?? 0);
+            const db = b - (pal[p * 3 + 2] ?? 0);
             const dist = dr * dr + dg * dg + db * db;
-            if (dist < bestDist) { bestDist = dist; bestIdx = p; }
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestIdx = p;
+            }
           }
           lut.set((rq << 10) | (gq << 5) | bq, bestIdx);
         }
@@ -5290,7 +6024,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const out = new Uint8Array(pixelCount);
     const lut = this._getMac8bitLUT();
     for (let i = 0; i < pixelCount; i++) {
-      const rq = rgba[i * 4]     >> 3;
+      const rq = rgba[i * 4] >> 3;
       const gq = rgba[i * 4 + 1] >> 3;
       const bq = rgba[i * 4 + 2] >> 3;
       out[i] = lut.get((rq << 10) | (gq << 5) | bq) ?? 0;
@@ -5309,7 +6043,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       a.href = url;
       a.download = `sprite-${id}.png`;
       a.click();
-    } catch { /* security error on cross-origin canvas */ }
+    } catch {
+      /* security error on cross-origin canvas */
+    }
   }
 
   /** Return a human-readable pixel format label for a sprite pack bit depth. */
@@ -5339,7 +6075,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     input.value = ''; // reset so same file can be re-selected
 
     const frame = this.packSpriteDecodedFrames.get(frameId);
-    if (!frame) { this.editorError.set('Sprite frame not found'); return; }
+    if (!frame) {
+      this.editorError.set('Sprite frame not found');
+      return;
+    }
 
     try {
       // Load the PNG into an Image
@@ -5354,7 +6093,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       // Draw it scaled to the frame's dimensions on an offscreen canvas
       const canvas = document.createElement('canvas');
-      canvas.width  = frame.width;
+      canvas.width = frame.width;
       canvas.height = frame.height;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0, frame.width, frame.height);
@@ -5409,8 +6148,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Preserve in-memory road segments: barrier drags update parsedLevels directly (in-memory)
     // but are NOT flushed to the worker until download time. If the worker returns stale levels
     // (e.g., after a sprite/tile edit), we must keep the locally-edited road segs.
-    const existingById = new Map(this.parsedLevels().map(l => [l.resourceId, l]));
-    const merged = levels.map(l => {
+    const existingById = new Map(this.parsedLevels().map((l) => [l.resourceId, l]));
+    const merged = levels.map((l) => {
       const cur = existingById.get(l.resourceId);
       return cur ? { ...l, roadSegs: cur.roadSegs } : l;
     });
@@ -5466,7 +6205,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
    * Send a command to the pack worker and return a Promise that resolves with
    * the result when the worker responds, or rejects on error.
    */
-  private dispatchWorker<T>(cmd: string, payload?: unknown, transferables?: Transferable[]): Promise<T> {
+  private dispatchWorker<T>(
+    cmd: string,
+    payload?: unknown,
+    transferables?: Transferable[],
+  ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (!this.packWorker) {
         reject(new Error('Pack worker not available'));
@@ -5518,14 +6261,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (typeof window.crossOriginIsolated !== 'undefined' && !window.crossOriginIsolated) {
       this.statusText.set(
         'Cross-origin isolation unavailable – the WASM game requires SharedArrayBuffer. ' +
-        'The server must send Cross-Origin-Opener-Policy: same-origin and ' +
-        'Cross-Origin-Embedder-Policy: require-corp headers. ' +
-        'Run `npm start` from the angular-site directory (the built-in dev server already ' +
-        'sets these headers). The level editor will still work without the game.',
+          'The server must send Cross-Origin-Opener-Policy: same-origin and ' +
+          'Cross-Origin-Embedder-Policy: require-corp headers. ' +
+          'Run `npm start` from the angular-site directory (the built-in dev server already ' +
+          'sets these headers). The level editor will still work without the game.',
       );
       console.error(
         '[Angular] window.crossOriginIsolated is false – WASM with SharedArrayBuffer will fail. ' +
-        'Use `npm start` (ng serve) which sets COOP/COEP headers automatically.',
+          'Use `npm start` (ng serve) which sets COOP/COEP headers automatically.',
       );
     }
 
@@ -5547,7 +6290,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           this.overlayVisible.set(false);
         }
       },
-      monitorRunDependencies: (left: number) => { if (left === 0) this.progressPct.set(100); },
+      monitorRunDependencies: (left: number) => {
+        if (left === 0) this.progressPct.set(100);
+      },
       onRuntimeInitialized: () => {
         this.statusText.set('Running');
         this.overlayVisible.set(false);
@@ -5570,25 +6315,32 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           const mod = window.Module;
           if (!mod?.addRunDependency || typeof indexedDB === 'undefined') return;
           mod.addRunDependency('customResourcesDat');
-          App._loadCustomResourcesDb().then((entry) => {
-            if (entry) {
-              const FS = (window as unknown as Record<string, unknown>)['FS'] as {
-                writeFile: (path: string, data: Uint8Array) => void;
-              } | undefined;
-              if (FS) {
-                try {
-                  FS.writeFile('/resources.dat', entry.bytes);
-                  console.log(`[Angular] Injected custom resources.dat (${Math.round(entry.bytes.length / 1024)} KB) from IndexedDB`);
-                } catch (err) {
-                  console.warn('[Angular] Failed to inject custom resources.dat into MEMFS', err);
+          App._loadCustomResourcesDb()
+            .then((entry) => {
+              if (entry) {
+                const FS = (window as unknown as Record<string, unknown>)['FS'] as
+                  | {
+                      writeFile: (path: string, data: Uint8Array) => void;
+                    }
+                  | undefined;
+                if (FS) {
+                  try {
+                    FS.writeFile('/resources.dat', entry.bytes);
+                    console.log(
+                      `[Angular] Injected custom resources.dat (${Math.round(entry.bytes.length / 1024)} KB) from IndexedDB`,
+                    );
+                  } catch (err) {
+                    console.warn('[Angular] Failed to inject custom resources.dat into MEMFS', err);
+                  }
                 }
               }
-            }
-          }).catch((err) => {
-            console.warn('[Angular] Failed to read custom resources.dat from IndexedDB', err);
-          }).finally(() => {
-            window.Module?.removeRunDependency?.('customResourcesDat');
-          });
+            })
+            .catch((err) => {
+              console.warn('[Angular] Failed to read custom resources.dat from IndexedDB', err);
+            })
+            .finally(() => {
+              window.Module?.removeRunDependency?.('customResourcesDat');
+            });
         },
       ],
       postRun: [],
@@ -5600,7 +6352,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.wasmScript.src = this.assetUrl('reckless_drivin.js');
     this.wasmScript.async = true;
     this.wasmScript.onerror = () => {
-      this.statusText.set('WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).');
+      this.statusText.set(
+        'WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).',
+      );
       console.error('[Angular] Failed to load WASM JS module');
     };
     document.body.appendChild(this.wasmScript);
@@ -5613,7 +6367,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private async readAssetBytes(path: string): Promise<Uint8Array> {
     const response = await fetch(this.assetUrl(path));
     if (!response.ok) {
-      throw new Error(`Could not fetch ${path} (HTTP ${response.status}). Run \`npm start\` again so dev assets are synced.`);
+      throw new Error(
+        `Could not fetch ${path} (HTTP ${response.status}). Run \`npm start\` again so dev assets are synced.`,
+      );
     }
     const bytes = new Uint8Array(await response.arrayBuffer());
     const contentType = response.headers.get('content-type') ?? '';
@@ -5644,7 +6400,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.canvasPanY.set((minY + maxY) / 2);
   }
 
-    /** Offscreen canvas used to cache road rendering between frames. */
+  /** Offscreen canvas used to cache road rendering between frames. */
   private _roadOffscreen: HTMLCanvasElement | null = null;
   private _roadOffscreenKey = '';
   /** panY (world units) at which the offscreen was last rendered – used for fast-blit panning. */
@@ -5690,19 +6446,23 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const srcY = offscreenCentreCanvasY - panYDeltaPx - H / 2;
 
     const needsRender =
-      this._roadOffscreenKey !== staticKey ||         // zoom/pan-x/level changed
+      this._roadOffscreenKey !== staticKey || // zoom/pan-x/level changed
       !this._roadOffscreen ||
       this._roadOffscreen.width !== W ||
       this._roadOffscreen.height !== offH ||
-      srcY < 0 ||                                    // panned beyond top overhang
-      srcY + H > offH;                               // panned beyond bottom overhang
+      srcY < 0 || // panned beyond top overhang
+      srcY + H > offH; // panned beyond bottom overhang
 
     if (needsRender) {
       // (Re-)render into oversized offscreen canvas centred at current panY.
       this._roadOffscreenPanY = panY;
-      if (!this._roadOffscreen || this._roadOffscreen.width !== W || this._roadOffscreen.height !== offH) {
+      if (
+        !this._roadOffscreen ||
+        this._roadOffscreen.width !== W ||
+        this._roadOffscreen.height !== offH
+      ) {
         this._roadOffscreen = document.createElement('canvas');
-        this._roadOffscreen.width  = W;
+        this._roadOffscreen.width = W;
         this._roadOffscreen.height = offH;
       }
       const offCtx = this._roadOffscreen.getContext('2d');
@@ -5731,7 +6491,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // Blit the slice of the oversized offscreen that corresponds to the current viewport.
     if (this._roadOffscreen) {
-      const offscreenSrcY = offscreenCentreCanvasY - (panY - this._roadOffscreenPanY) * zoom - H / 2;
+      const offscreenSrcY =
+        offscreenCentreCanvasY - (panY - this._roadOffscreenPanY) * zoom - H / 2;
       // Clamp srcY to valid range to avoid drawImage throwing on out-of-bounds source rect.
       if (offscreenSrcY >= 0 && offscreenSrcY + H <= offH) {
         ctx.drawImage(this._roadOffscreen, 0, offscreenSrcY, W, H, 0, 0, W, H);
@@ -5760,7 +6521,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     /** Local worldToCanvas that respects the explicit pan/zoom and optional yOverhang. */
     const wtc = (wx: number, wy: number): [number, number] => {
       const cx = W / 2 + (wx - panX) * zoom;
-      const cy = (H / 2 + yOverhang) - (wy - panY) * zoom;
+      const cy = H / 2 + yOverhang - (wy - panY) * zoom;
       return [cx, cy];
     };
 
@@ -5768,8 +6529,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const canvasH = H + 2 * yOverhang;
 
     // Look up the road info for this level to get real texture IDs.
-    const roadInfo  = level.properties.roadInfo;
-    const ri        = this.roadInfoDataMap.get(roadInfo);
+    const roadInfo = level.properties.roadInfo;
+    const ri = this.roadInfoDataMap.get(roadInfo);
     const KERB_WIDTH = 16; // world units (matches game's 16.0f/zoom borderWidth)
 
     /**
@@ -5781,21 +6542,25 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
      *                       Pass the outer edge of the kerb strip so the texture is attached
      *                       to the road boundary rather than the global world origin.
      */
-    const makePattern = (texId: number, texWorldSize: number, anchorWorldX = 0): CanvasPattern | string | null => {
+    const makePattern = (
+      texId: number,
+      texWorldSize: number,
+      anchorWorldX = 0,
+    ): CanvasPattern | string | null => {
       const tc = this.roadTextureCanvases.get(texId);
       if (!tc) return null;
       try {
         const pat = ctx.createPattern(tc, 'repeat');
         if (!pat) return null;
         // scale: maps texture pixels → canvas pixels so one full texture width = texWorldSize world units
-        const scale = texWorldSize * zoom / tc.width;
+        const scale = (texWorldSize * zoom) / tc.width;
         const tileW = texWorldSize * zoom; // = tc.width * scale
         const tileH = tc.height * scale;
         // Anchor the pattern's U=0 to anchorWorldX (for kerbs: the outer road edge).
         // This makes the texture track the road boundary instead of the world X origin,
         // so the kerb visually bends with the road rather than tiling globally.
-        const tx = ((W / 2 + (anchorWorldX - panX) * zoom) % tileW + tileW) % tileW;
-        const ty = (((H / 2 + yOverhang) + panY * zoom) % tileH + tileH) % tileH;
+        const tx = (((W / 2 + (anchorWorldX - panX) * zoom) % tileW) + tileW) % tileW;
+        const ty = (((H / 2 + yOverhang + panY * zoom) % tileH) + tileH) % tileH;
         pat.setTransform(new DOMMatrix([scale, 0, 0, scale, tx, ty]));
         return pat;
       } catch {
@@ -5809,16 +6574,26 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const fgPat = ri ? (makePattern(ri.foregroundTex, 128) ?? theme.road) : theme.road;
     // Kerb patterns use 16-world-unit tiles, anchored to world origin for seamless tiling.
     const KERB_TEX_WORLD = 16;
-    const lbPat = ri ? (makePattern(ri.roadLeftBorder,  KERB_TEX_WORLD) ?? theme.kerbA) : theme.kerbA;
-    const rbPat = ri ? (makePattern(ri.roadRightBorder, KERB_TEX_WORLD) ?? theme.kerbB) : theme.kerbB;
+    const lbPat = ri
+      ? (makePattern(ri.roadLeftBorder, KERB_TEX_WORLD) ?? theme.kerbA)
+      : theme.kerbA;
+    const rbPat = ri
+      ? (makePattern(ri.roadRightBorder, KERB_TEX_WORLD) ?? theme.kerbB)
+      : theme.kerbB;
     // Centre line: cyan for water, yellow for asphalt
     const CENTRE_COLOUR = theme.water ? 'rgba(80, 255, 180, 0.85)' : 'rgba(255, 248, 140, 0.85)';
 
     /** Append quad canvas coords to a batch array. */
     const addQuad = (
       batch: number[],
-      x0: number, y0: number, x1: number, y1: number,
-      x2: number, y2: number, x3: number, y3: number,
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+      x3: number,
+      y3: number,
     ): void => {
       const [ax0, ay0] = wtc(x0, y0);
       const [ax1, ay1] = wtc(x1, y1);
@@ -5835,7 +6610,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillStyle = fill as string;
       ctx.beginPath();
       for (let j = 0; j < batch.length; j += 8) {
-        ctx.moveTo(batch[j],     batch[j + 1]);
+        ctx.moveTo(batch[j], batch[j + 1]);
         ctx.lineTo(batch[j + 2], batch[j + 3]);
         ctx.lineTo(batch[j + 4], batch[j + 5]);
         ctx.lineTo(batch[j + 6], batch[j + 7]);
@@ -5848,7 +6623,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const visibleWorldMinY = panY - (H / 2 + yOverhang) / zoom - 4;
     const visibleWorldMaxY = panY + (H / 2 + yOverhang) / zoom + 4;
     const firstSeg = Math.max(0, Math.floor(visibleWorldMinY / 2));
-    const lastSeg  = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
+    const lastSeg = Math.min(level.roadSegs.length - 2, Math.ceil(visibleWorldMaxY / 2));
 
     // Adaptive step: merge adjacent segments at low zoom for performance.
     const step = Math.max(1, Math.ceil(1.5 / zoom));
@@ -5865,37 +6640,67 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const cur = level.roadSegs[index];
       const nxtIdx = Math.min(index + step, level.roadSegs.length - 1);
       const nxt = level.roadSegs[nxtIdx];
-      const y0  = index * 2;
-      const y1  = nxtIdx * 2;
+      const y0 = index * 2;
+      const y1 = nxtIdx * 2;
 
       // Off-road (background texture) – extend to canvas edges
-      addQuad(bgBatch, worldMinX, y0,  cur.v0 - KERB_WIDTH, y0,  nxt.v0 - KERB_WIDTH, y1,  worldMinX, y1);
+      addQuad(
+        bgBatch,
+        worldMinX,
+        y0,
+        cur.v0 - KERB_WIDTH,
+        y0,
+        nxt.v0 - KERB_WIDTH,
+        y1,
+        worldMinX,
+        y1,
+      );
 
       // Left border/kerb
-      addQuad(lbBatch, cur.v0 - KERB_WIDTH, y0,  cur.v0, y0,  nxt.v0, y1,  nxt.v0 - KERB_WIDTH, y1);
+      addQuad(lbBatch, cur.v0 - KERB_WIDTH, y0, cur.v0, y0, nxt.v0, y1, nxt.v0 - KERB_WIDTH, y1);
 
       // Left road lane: v0 to v1 (road surface)
-      addQuad(fgBatch, cur.v0, y0,  cur.v1, y0,  nxt.v1, y1,  nxt.v0, y1);
+      addQuad(fgBatch, cur.v0, y0, cur.v1, y0, nxt.v1, y1, nxt.v0, y1);
 
       // Median / center gap: v1 to v2 (background with kerbs on both edges)
       const medianW = Math.min(cur.v2 - cur.v1, nxt.v2 - nxt.v1);
       if (medianW > 0) {
         const halfKerb = Math.min(KERB_WIDTH, medianW / 2);
-        addQuad(rbBatch, cur.v1, y0,  cur.v1 + halfKerb, y0,  nxt.v1 + halfKerb, y1,  nxt.v1, y1);
+        addQuad(rbBatch, cur.v1, y0, cur.v1 + halfKerb, y0, nxt.v1 + halfKerb, y1, nxt.v1, y1);
         if (medianW > halfKerb * 2) {
-          addQuad(bgBatch, cur.v1 + halfKerb, y0,  cur.v2 - halfKerb, y0,  nxt.v2 - halfKerb, y1,  nxt.v1 + halfKerb, y1);
+          addQuad(
+            bgBatch,
+            cur.v1 + halfKerb,
+            y0,
+            cur.v2 - halfKerb,
+            y0,
+            nxt.v2 - halfKerb,
+            y1,
+            nxt.v1 + halfKerb,
+            y1,
+          );
         }
-        addQuad(lbBatch, cur.v2 - halfKerb, y0,  cur.v2, y0,  nxt.v2, y1,  nxt.v2 - halfKerb, y1);
+        addQuad(lbBatch, cur.v2 - halfKerb, y0, cur.v2, y0, nxt.v2, y1, nxt.v2 - halfKerb, y1);
       }
 
       // Right road lane: v2 to v3 (road surface)
-      addQuad(fgBatch, cur.v2, y0,  cur.v3, y0,  nxt.v3, y1,  nxt.v2, y1);
+      addQuad(fgBatch, cur.v2, y0, cur.v3, y0, nxt.v3, y1, nxt.v2, y1);
 
       // Right border/kerb
-      addQuad(rbBatch, cur.v3, y0,  cur.v3 + KERB_WIDTH, y0,  nxt.v3 + KERB_WIDTH, y1,  nxt.v3, y1);
+      addQuad(rbBatch, cur.v3, y0, cur.v3 + KERB_WIDTH, y0, nxt.v3 + KERB_WIDTH, y1, nxt.v3, y1);
 
       // Off-road far right – extend to canvas edges
-      addQuad(bgBatch, cur.v3 + KERB_WIDTH, y0,  worldMaxX, y0,  worldMaxX, y1,  nxt.v3 + KERB_WIDTH, y1);
+      addQuad(
+        bgBatch,
+        cur.v3 + KERB_WIDTH,
+        y0,
+        worldMaxX,
+        y0,
+        worldMaxX,
+        y1,
+        nxt.v3 + KERB_WIDTH,
+        y1,
+      );
     }
 
     // ─── Flush layers in back-to-front order ────────────────────────────────────
@@ -5917,8 +6722,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const seg = level.roadSegs[index];
       const midX = (seg.v1 + seg.v2) / 2;
       const [cx, cy] = wtc(midX, index * 2);
-      if (!dashStarted) { ctx.moveTo(cx, cy); dashStarted = true; }
-      else ctx.lineTo(cx, cy);
+      if (!dashStarted) {
+        ctx.moveTo(cx, cy);
+        dashStarted = true;
+      } else ctx.lineTo(cx, cy);
     }
     ctx.stroke();
     ctx.setLineDash([]);
@@ -5950,7 +6757,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = '9px monospace';
     const startY = Math.floor((panY - canvasH / (2 * zoom)) / 1000) * 1000;
-    const endY   = panY + canvasH / (2 * zoom);
+    const endY = panY + canvasH / (2 * zoom);
     for (let wy = startY; wy <= endY; wy += 1000) {
       const [, tickY] = wtc(0, wy);
       if (tickY < 0 || tickY > canvasH) continue;
@@ -5971,8 +6778,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillStyle = 'rgba(255,255,255,0.08)';
       ctx.fillRect(barX, barY, barW, barH);
       // Thumb: top of bar = finish (high Y), bottom = start (Y=0)
-      const thumbTop    = Math.max(barY,       (1 - Math.min(1, viewWorldMax / totalWorldH)) * barH + barY);
-      const thumbBottom = Math.min(barH + barY, (1 - Math.max(0, viewWorldMin / totalWorldH)) * barH + barY);
+      const thumbTop = Math.max(barY, (1 - Math.min(1, viewWorldMax / totalWorldH)) * barH + barY);
+      const thumbBottom = Math.min(
+        barH + barY,
+        (1 - Math.max(0, viewWorldMin / totalWorldH)) * barH + barY,
+      );
       const thumbH = Math.max(12, thumbBottom - thumbTop);
       ctx.fillStyle = 'rgba(66, 165, 245, 0.55)';
       ctx.beginPath();
@@ -5990,8 +6800,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const W = canvas.width;
     const H = canvas.height;
     const zoom = this.canvasZoom();
-    const dragWp   = this.dragTrackWaypoint();
-    const hoverWp  = this.hoverTrackWaypoint();
+    const dragWp = this.dragTrackWaypoint();
+    const hoverWp = this.hoverTrackWaypoint();
     const hoverMid = this.hoverTrackMidpoint();
 
     const drawPath = (
@@ -6009,7 +6819,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.beginPath();
       segs.forEach((seg, i) => {
         const [cx, cy] = this.worldToCanvas(seg.x, seg.y);
-        if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        if (i === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
       });
       ctx.stroke();
 
@@ -6047,9 +6858,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         ctx.strokeStyle = isHovMid ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.2)';
         ctx.lineWidth = isHovMid ? 1.5 : 0.8;
         ctx.beginPath();
-        ctx.moveTo(cx,        cy - size);
+        ctx.moveTo(cx, cy - size);
         ctx.lineTo(cx + size, cy);
-        ctx.lineTo(cx,        cy + size);
+        ctx.lineTo(cx, cy + size);
         ctx.lineTo(cx - size, cy);
         ctx.closePath();
         ctx.fill();
@@ -6064,9 +6875,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (cx < -10 || cx > W + 10 || cy < -10 || cy > H + 10) continue;
         const isDragged = dragWp?.track === track && dragWp.segIdx === i;
         const isHovered = !isDragged && hoverWp?.track === track && hoverWp.segIdx === i;
-        ctx.fillStyle = isDragged ? '#ffffff' : (isHovered ? '#ffdd00' : dotColor);
+        ctx.fillStyle = isDragged ? '#ffffff' : isHovered ? '#ffdd00' : dotColor;
         ctx.beginPath();
-        ctx.arc(cx, cy, isDragged ? dotR + 3 : (isHovered ? dotR + 2 : dotR), 0, Math.PI * 2);
+        ctx.arc(cx, cy, isDragged ? dotR + 3 : isHovered ? dotR + 2 : dotR, 0, Math.PI * 2);
         ctx.fill();
         if (isHovered) {
           ctx.strokeStyle = 'rgba(255,255,255,0.7)';
@@ -6087,8 +6898,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
     };
 
-    drawPath(this.editTrackUp(),   'rgba(66,165,245,0.9)',  'rgba(66,165,245,0.7)',  '▲ Up',   'up');
-    drawPath(this.editTrackDown(), 'rgba(239,83,80,0.9)',   'rgba(239,83,80,0.7)',   '▼ Down', 'down');
+    drawPath(this.editTrackUp(), 'rgba(66,165,245,0.9)', 'rgba(66,165,245,0.7)', '▲ Up', 'up');
+    drawPath(this.editTrackDown(), 'rgba(239,83,80,0.9)', 'rgba(239,83,80,0.7)', '▼ Down', 'down');
   }
 
   /** Draw mark segments (checkpoint lines) on the object canvas. */
@@ -6114,8 +6925,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Only draw endpoint dots when Konva is NOT rendering them
       if (!konvaActive) {
         ctx.fillStyle = isSel ? '#00e5ff' : '#ffd600';
-        [[x1, y1], [x2, y2]].forEach(([px, py]) => {
-          ctx.beginPath(); ctx.arc(px, py, isSel ? 12 : 8, 0, Math.PI * 2); ctx.fill();
+        [
+          [x1, y1],
+          [x2, y2],
+        ].forEach(([px, py]) => {
+          ctx.beginPath();
+          ctx.arc(px, py, isSel ? 12 : 8, 0, Math.PI * 2);
+          ctx.fill();
         });
       }
     });
@@ -6128,7 +6944,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.arc(px, py, 8, 0, Math.PI * 2);
       ctx.fill();
       if (this._markCreateHoverPoint) {
-        const [hx, hy] = this.worldToCanvas(this._markCreateHoverPoint.x, this._markCreateHoverPoint.y);
+        const [hx, hy] = this.worldToCanvas(
+          this._markCreateHoverPoint.x,
+          this._markCreateHoverPoint.y,
+        );
         ctx.strokeStyle = 'rgba(0,229,255,0.8)';
         ctx.lineWidth = 2;
         ctx.setLineDash([10, 6]);
@@ -6146,7 +6965,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     return this.objectSpritePreviews.get(typeRes) ?? null;
   }
 
-  private renderSpritePixels(pixels: Uint8ClampedArray, width: number, height: number): HTMLCanvasElement | null {
+  private renderSpritePixels(
+    pixels: Uint8ClampedArray,
+    width: number,
+    height: number,
+  ): HTMLCanvasElement | null {
     if (typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -6275,11 +7098,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // Write into the live MEMFS so the current session reflects the update.
     try {
-      const FS = (window as unknown as Record<string, unknown>)['FS'] as {
-        writeFile: (path: string, data: Uint8Array) => void;
-      } | undefined;
+      const FS = (window as unknown as Record<string, unknown>)['FS'] as
+        | {
+            writeFile: (path: string, data: Uint8Array) => void;
+          }
+        | undefined;
       if (!FS) {
-        console.warn('[Angular] Emscripten FS not available yet – bytes will be injected on next page load via IndexedDB');
+        console.warn(
+          '[Angular] Emscripten FS not available yet – bytes will be injected on next page load via IndexedDB',
+        );
         this._pendingCustomResources = bytes;
         return;
       }
@@ -6287,21 +7114,28 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       FS.writeFile('/resources.dat', bytes);
       console.log('[Angular] Custom resources.dat written to MEMFS at /resources.dat');
     } catch (e) {
-      console.warn('[Angular] Could not write custom resources.dat to live MEMFS (will take effect on page reload)', e);
+      console.warn(
+        '[Angular] Could not write custom resources.dat to live MEMFS (will take effect on page reload)',
+        e,
+      );
     }
 
     this.customResourcesLoaded.set(true);
     this.statusText.set(
       `Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB). ` +
-      'Click "Restart Game" to reload the page with the new resources.',
+        'Click "Restart Game" to reload the page with the new resources.',
     );
   }
 
   /** Remove any persisted custom resources.dat from IndexedDB and reset UI state. */
   clearCustomResources(): void {
-    App._clearCustomResourcesDb().catch(() => { /* ignore */ });
+    App._clearCustomResourcesDb().catch(() => {
+      /* ignore */
+    });
     this.customResourcesLoaded.set(false);
     this.customResourcesName.set(null);
-    this.statusText.set('Custom resources.dat cleared — game will use default resources on next reload.');
+    this.statusText.set(
+      'Custom resources.dat cleared — game will use default resources on next reload.',
+    );
   }
 }
