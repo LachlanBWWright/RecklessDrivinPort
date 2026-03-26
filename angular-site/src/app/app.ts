@@ -974,6 +974,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   // ---- Pack sprite viewer (decoded from Pack 129 & 137) ----
   /** Decoded game sprite frames: id → HTMLCanvasElement. */
   private packSpriteCanvases = new Map<number, HTMLCanvasElement>();
+  /** Cached data URLs for pack sprite canvases. Cleared when canvases are rebuilt. */
+  private _packSpriteDataUrls = new Map<number, string>();
   /** Full decoded frames for the sprite editor – includes pixel data. */
   private packSpriteDecodedFrames = new Map<number, DecodedSpriteFrame>();
   /** List of decoded sprite frame infos (id, bitDepth, w, h). */
@@ -1198,6 +1200,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private roadInfoDataMap = new Map<number, RoadInfoData>();
   /** Cached rendered canvases for icon/screen resources (type:id → canvas). */
   iconCanvasMap = new Map<string, HTMLCanvasElement>();
+  /** Cached data URLs for icon thumbnails (type:id → data URL). */
+  private _iconDataUrls = new Map<string, string>();
+  /** Cached data URLs for road texture canvases. Cleared when textures are reloaded. */
+  private _roadTextureDataUrls = new Map<number, string>();
   /** Decoded texture canvases from kPackTx16: texId → HTMLCanvasElement. */
   private roadTextureCanvases = new Map<number, HTMLCanvasElement>();
   /** Version signal bumped when road textures are loaded (triggers canvas redraw). */
@@ -4844,6 +4850,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       // Rebuild road info map
       this.roadInfoDataMap.clear();
+      this._roadTextureDataUrls.clear();
       for (const [id, ri] of result.roadInfoArr) {
         this.roadInfoDataMap.set(id, ri);
       }
@@ -4911,6 +4918,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       };
       const result = await this.dispatchWorker<AllSpritesResult>('DECODE_ALL_SPRITE_FRAMES');
       this.packSpriteCanvases.clear();
+      this._packSpriteDataUrls.clear();
       this.packSpriteDecodedFrames.clear();
       const frameInfos: { id: number; bitDepth: 8 | 16; width: number; height: number }[] = [];
       for (const { id, bitDepth, width, height, pixels } of result.frames) {
@@ -4939,10 +4947,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Return the pack sprite preview as a data URL for a given frame ID. */
   getPackSpriteDataUrl(frameId: number): string | null {
+    const cached = this._packSpriteDataUrls.get(frameId);
+    if (cached) return cached;
     const canvas = this.packSpriteCanvases.get(frameId) ?? null;
     if (!canvas) return null;
     try {
-      return canvas.toDataURL();
+      const url = canvas.toDataURL();
+      this._packSpriteDataUrls.set(frameId, url);
+      return url;
     } catch {
       return null;
     }
@@ -4950,10 +4962,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Return a data URL for a road texture tile by its texId. */
   getTileDataUrl(texId: number): string | null {
+    const cached = this._roadTextureDataUrls.get(texId);
+    if (cached) return cached;
     const canvas = this.roadTextureCanvases.get(texId) ?? null;
     if (!canvas) return null;
     try {
-      return canvas.toDataURL();
+      const url = canvas.toDataURL();
+      this._roadTextureDataUrls.set(texId, url);
+      return url;
     } catch {
       return null;
     }
@@ -5420,7 +5436,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           const canvas = this._renderPictBytes(bytes);
           if (canvas) {
             this.iconPreviewCanvas.set(canvas);
-            this.iconCanvasMap.set(`${type}:${id}`, canvas);
+            const cacheKey = `${type}:${id}`;
+            this.iconCanvasMap.set(cacheKey, canvas);
+            this._iconDataUrls.delete(cacheKey);
           }
         }
       } catch {
@@ -5443,7 +5461,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         }
         this.iconPreviewCanvas.set(canvas);
         if (canvas) {
-          this.iconCanvasMap.set(`${type}:${id}`, canvas);
+          const cacheKey = `${type}:${id}`;
+          this.iconCanvasMap.set(cacheKey, canvas);
+          this._iconDataUrls.delete(cacheKey);
         }
       }
     } catch {
@@ -5571,10 +5591,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Return a data URL for a cached icon thumbnail, or null if not yet rendered. */
   getIconThumbDataUrl(type: string, id: number): string | null {
-    const canvas = this.iconCanvasMap.get(`${type}:${id}`);
+    const key = `${type}:${id}`;
+    const cached = this._iconDataUrls.get(key);
+    if (cached) return cached;
+    const canvas = this.iconCanvasMap.get(key);
     if (!canvas) return null;
     try {
-      return canvas.toDataURL();
+      const url = canvas.toDataURL();
+      this._iconDataUrls.set(key, url);
+      return url;
     } catch {
       return null;
     }
@@ -5605,6 +5630,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         }
         if (canvas) {
           this.iconCanvasMap.set(key, canvas);
+          this._iconDataUrls.delete(key);
         }
       } catch {
         /* ignore */
