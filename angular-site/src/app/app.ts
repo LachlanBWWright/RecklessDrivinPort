@@ -921,7 +921,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   undo(): void {
     if (this._undoStack.length === 0) return;
     this._redoStack.push(this.objects().map((o) => ({ ...o })));
-    this.objects.set(this._undoStack.pop()!);
+    const snapshot = this._undoStack.pop();
+    if (snapshot) this.objects.set(snapshot);
     this.canUndo.set(this._undoStack.length > 0);
     this.canRedo.set(true);
   }
@@ -929,7 +930,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   redo(): void {
     if (this._redoStack.length === 0) return;
     this._undoStack.push(this.objects().map((o) => ({ ...o })));
-    this.objects.set(this._redoStack.pop()!);
+    const snapshot = this._redoStack.pop();
+    if (snapshot) this.objects.set(snapshot);
     this.canUndo.set(true);
     this.canRedo.set(this._redoStack.length > 0);
   }
@@ -1413,7 +1415,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       });
       // Focus Konva container when user clicks in canvas area
       konvaContainer.addEventListener('mousedown', () => {
-        konvaContainer!.focus({ preventScroll: true });
+        const el = document.getElementById('konva-container');
+        if (el) el.focus({ preventScroll: true });
       });
     }
     // Always update the container CSS to match the current canvas display size
@@ -2464,8 +2467,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _audioPauseOffset = 0; // seconds offset where paused
   private _audioRaf: number | null = null;
 
-  /** Ensure AudioContext and GainNode are created; return the gain node. */
-  private _ensureAudioCtx(): GainNode {
+  /** Ensure AudioContext and GainNode are created; return the AudioContext. */
+  private _ensureAudioCtx(): AudioContext {
     if (!this._audioCtx) {
       this._audioCtx = new AudioContext({ latencyHint: 'interactive' });
       this._audioGainNode = this._audioCtx.createGain();
@@ -2477,7 +2480,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this._audioGainNode.connect(this._audioCtx.destination);
       this._audioGainNode.gain.value = this.audioPlayerVolume() / 100;
     }
-    return this._audioGainNode;
+    return this._audioCtx;
   }
 
   /** Update the audio player volume (0–100). */
@@ -2494,9 +2497,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     buffer: AudioBuffer,
     onended?: () => void,
   ): AudioBufferSourceNode {
-    if (!this._audioCtx) throw new Error('No AudioContext');
-    const gainNode = this._ensureAudioCtx();
-    const src = this._audioCtx.createBufferSource();
+    const audioCtx = this._ensureAudioCtx();
+    const gainNode = this._audioGainNode;
+    if (!gainNode) throw new Error('No GainNode');
+    const src = audioCtx.createBufferSource();
     src.buffer = buffer;
     src.connect(gainNode);
     src.onended = () => {
@@ -2538,10 +2542,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   async togglePlayPause(): Promise<void> {
     if (this.audioPlaying()) {
       if (!this._audioCtx) return;
+      const audioCtx = this._audioCtx;
       // Pause
       if (this._audioSource) {
         try {
-          const offset = this._audioCtx!.currentTime - this._audioStartTime;
+          const offset = audioCtx.currentTime - this._audioStartTime;
           this._audioPauseOffset = Math.max(0, Math.min(offset, this.audioDuration()));
           this._audioSource.stop();
         } catch {
@@ -2584,9 +2589,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Resume managed playback from pause offset
     const buf = this._lastAudioBuffer;
     if (!buf || !this._audioCtx) return;
+    const audioCtx = this._audioCtx;
     const offset = this._audioPauseOffset || 0;
     try {
-      await this._audioCtx!.resume().catch(() => {});
+      await audioCtx.resume().catch(() => {});
     } catch {
       /* ignore */
     }
@@ -2650,8 +2656,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   async playSndResource(): Promise<void> {
     const bytes = this.selectedResBytes();
     if (!bytes) return;
-    this._ensureAudioCtx();
-    const ctx = this._audioCtx!;
+    const ctx = this._ensureAudioCtx();
     if (ctx.state === 'suspended') {
       try {
         await ctx.resume();
@@ -2729,7 +2734,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             return;
           }
           // Unknown encode – fall through to legacy fallback
-        } catch (err) {
+        } catch {
           // If any decoding/AudioBuffer creation failed, fall back to legacy player below.
         }
       }
@@ -3390,9 +3395,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
     // Finish track waypoint drag – commit the pending position to the signal
     if (this.dragTrackWaypoint()) {
-      const twp = this.dragTrackWaypoint()!;
+      const twp = this.dragTrackWaypoint();
       const pos = this._pendingWaypointDragPos;
-      if (pos) {
+      if (twp && pos) {
         if (twp.track === 'up') {
           const arr = [...this.editTrackUp()];
           arr[twp.segIdx] = { ...arr[twp.segIdx], x: pos.x, y: pos.y };
@@ -5020,7 +5025,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const offscreen = document.createElement('canvas');
       offscreen.width = entry.width;
       offscreen.height = entry.height;
-      const ctx = offscreen.getContext('2d')!;
+      const ctx = offscreen.getContext('2d');
+      if (!ctx) throw new Error('Failed to get 2D context');
       ctx.drawImage(img, 0, 0, entry.width, entry.height);
       const imageData = ctx.getImageData(0, 0, entry.width, entry.height);
       await this._applyTilePixels(texId, new Uint8ClampedArray(imageData.data));
@@ -5149,8 +5155,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   async playAudioEntry(): Promise<void> {
     const bytes = this.selectedAudioBytes();
     if (!bytes) return;
-    this._ensureAudioCtx();
-    const ctx = this._audioCtx!;
+    const ctx = this._ensureAudioCtx();
     if (ctx.state === 'suspended') {
       try {
         await ctx.resume();
@@ -5501,7 +5506,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const offscreen = document.createElement('canvas');
         offscreen.width = 32;
         offscreen.height = 32;
-        const ctx = offscreen.getContext('2d')!;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) throw new Error('Failed to get 2D context');
         ctx.drawImage(img, 0, 0, 32, 32);
         iconBytes = this._imageDataToIcl8(ctx.getImageData(0, 0, 32, 32).data);
       } else if (type === 'ics8') {
@@ -5509,7 +5515,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const offscreen = document.createElement('canvas');
         offscreen.width = 16;
         offscreen.height = 16;
-        const ctx = offscreen.getContext('2d')!;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) throw new Error('Failed to get 2D context');
         ctx.drawImage(img, 0, 0, 16, 16);
         iconBytes = this._imageDataToIcl8(ctx.getImageData(0, 0, 16, 16).data);
       } else {
@@ -5517,7 +5524,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const offscreen = document.createElement('canvas');
         offscreen.width = 32;
         offscreen.height = 32;
-        const ctx = offscreen.getContext('2d')!;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) throw new Error('Failed to get 2D context');
         ctx.drawImage(img, 0, 0, 32, 32);
         iconBytes = this._imageDataToIconHash(ctx.getImageData(0, 0, 32, 32).data);
       }
@@ -5895,7 +5903,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
                 // 16-bit RGB555
                 const pixOff = col * 2;
                 if (pixOff + 2 > rowData.length) break;
-                const pixel = (rowData[pixOff]! << 8) | rowData[pixOff + 1]!;
+                const pixel = ((rowData[pixOff] ?? 0) << 8) | (rowData[pixOff + 1] ?? 0);
                 imgData.data[di] = (((pixel >> 10) & 0x1f) * 255) / 31;
                 imgData.data[di + 1] = (((pixel >> 5) & 0x1f) * 255) / 31;
                 imgData.data[di + 2] = ((pixel & 0x1f) * 255) / 31;
@@ -5904,17 +5912,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
                 // 32-bit ARGB
                 const pixOff = col * 4;
                 if (pixOff + 4 > rowData.length) break;
-                imgData.data[di] = rowData[pixOff + 1]!;
-                imgData.data[di + 1] = rowData[pixOff + 2]!;
-                imgData.data[di + 2] = rowData[pixOff + 3]!;
-                imgData.data[di + 3] = rowData[pixOff]! || 255; // alpha (or 255 if 0)
+                imgData.data[di] = rowData[pixOff + 1] ?? 0;
+                imgData.data[di + 1] = rowData[pixOff + 2] ?? 0;
+                imgData.data[di + 2] = rowData[pixOff + 3] ?? 0;
+                imgData.data[di + 3] = rowData[pixOff] || 255; // alpha (or 255 if 0)
               } else if (pixelSize === 8) {
                 // 8-bit indexed or grayscale
                 const idx = rowData[col] ?? 0;
                 if (colorTable && colorTable.length >= (idx + 1) * 3) {
-                  imgData.data[di] = colorTable[idx * 3]!;
-                  imgData.data[di + 1] = colorTable[idx * 3 + 1]!;
-                  imgData.data[di + 2] = colorTable[idx * 3 + 2]!;
+                  imgData.data[di] = colorTable[idx * 3] ?? 0;
+                  imgData.data[di + 1] = colorTable[idx * 3 + 1] ?? 0;
+                  imgData.data[di + 2] = colorTable[idx * 3 + 2] ?? 0;
                 } else {
                   imgData.data[di] = imgData.data[di + 1] = imgData.data[di + 2] = idx;
                 }
@@ -6095,7 +6103,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const canvas = document.createElement('canvas');
       canvas.width = frame.width;
       canvas.height = frame.height;
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to get 2D context');
       ctx.drawImage(img, 0, 0, frame.width, frame.height);
       const imageData = ctx.getImageData(0, 0, frame.width, frame.height);
 

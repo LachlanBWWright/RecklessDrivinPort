@@ -78,14 +78,14 @@ export function decodeIMA4Packet(packet: Uint8Array, pktOff: number, out: Float3
     // Process high nibble then low nibble (Apple IMA4 byte order)
     for (let shift = 4; shift >= 0; shift -= 4) {
       const nibble = (byte >> shift) & 0x0F;
-      const step = IMA4_STEP_TABLE[index]!;
+      const step = IMA4_STEP_TABLE[index] ?? 0;
       let diff = (step >> 3);
       if (nibble & 1) diff += (step >> 2);
       if (nibble & 2) diff += (step >> 1);
       if (nibble & 4) diff += step;
       if (nibble & 8) diff = -diff;
       predictor = Math.max(-32768, Math.min(32767, predictor + diff));
-      index = Math.max(0, Math.min(88, index + IMA4_INDEX_TABLE[nibble]!));
+      index = Math.max(0, Math.min(88, index + (IMA4_INDEX_TABLE[nibble] ?? 0)));
       out[pos++] = predictor / 32768.0;
     }
   }

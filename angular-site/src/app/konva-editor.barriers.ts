@@ -35,7 +35,8 @@ function getOrCreateLine(
     existing.stroke(attrs.stroke);
     existing.strokeWidth(attrs.strokeWidth);
     if (attrs.dash) existing.dash(attrs.dash);
-    return existing;
+    // Cast to the return type after updating attributes
+    return existing as unknown as Konva.Line;
   }
   const line = new Konva.Line({ ...attrs, id });
   group.add(line);

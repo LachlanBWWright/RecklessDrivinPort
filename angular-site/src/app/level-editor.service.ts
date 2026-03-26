@@ -234,9 +234,8 @@ function rgb555ToRgba(value: number): [number, number, number, number] {
 }
 
 /** Convert a packed big-endian RGB565 pixel into 8-bit RGBA for canvas previews.
- *  Kept for future use (RGB565 texture format support). */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function rgb565ToRgba(value: number): [number, number, number, number] {
+ *  Used for RGB565 texture format support. */
+export function rgb565ToRgba(value: number): [number, number, number, number] {
   const r = ((value >> 11) & 0x1f) * RGB5_SCALE;
   const g = ((value >> 5) & 0x3f) * RGB6_SCALE;
   const b = (value & 0x1f) * RGB5_SCALE;

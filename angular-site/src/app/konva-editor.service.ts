@@ -49,9 +49,6 @@ import Konva from 'konva';
 import type { ObjectPos } from './level-editor.service';
 import { profiler } from './konva-editor.profiler';
 import {
-  WAYPOINT_WORLD_R,
-  FALLBACK_CIRCLE_WORLD_R,
-  MARK_ENDPOINT_WORLD_R,
   EMPTY_SET,
   setsEqual,
 } from './konva-editor.types';

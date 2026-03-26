@@ -12,7 +12,6 @@ class ProfilerTimer {
   }
   end(): number {
     const dur = performance.now() - this.startMs;
-    // eslint-disable-next-line no-console
     console.debug(`[profiler] ${this.name}: ${dur.toFixed(2)}ms`);
     return dur;
   }
