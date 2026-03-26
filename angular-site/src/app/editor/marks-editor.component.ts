@@ -20,4 +20,15 @@ export class MarksEditorComponent {
 
   @Output() markSelected   = new EventEmitter<number>();
   @Output() markFieldInput = new EventEmitter<{ idx: number; field: 'x1' | 'y1' | 'x2' | 'y2'; event: Event }>();
+
+  /** The currently selected mark, or null if none selected. */
+  get selectedMark(): MarkSeg | null {
+    if (this.selectedMarkIndex === null) return null;
+    return this.marks[this.selectedMarkIndex] ?? null;
+  }
+
+  onFieldInput(idx: number | null, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event): void {
+    if (idx === null) return;
+    this.markFieldInput.emit({ idx, field, event });
+  }
 }

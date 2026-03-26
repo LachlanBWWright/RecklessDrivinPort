@@ -7,27 +7,27 @@
     <mat-panel-description><span class="badge">{{ marks.length }}</span></mat-panel-description>
   </mat-expansion-panel-header>
 
-  @if (selectedMarkIndex !== null) {
+  @if (selectedMark; as mark) {
     <div class="mark-fields-row">
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P1 X</mat-label>
-        <input matInput type="number" [value]="marks[selectedMarkIndex!].x1"
-          (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x1', event: $event})" />
+        <input matInput type="number" [value]="mark.x1"
+          (input)="onFieldInput(selectedMarkIndex, 'x1', $event)" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P1 Y</mat-label>
-        <input matInput type="number" [value]="marks[selectedMarkIndex!].y1"
-          (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y1', event: $event})" />
+        <input matInput type="number" [value]="mark.y1"
+          (input)="onFieldInput(selectedMarkIndex, 'y1', $event)" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P2 X</mat-label>
-        <input matInput type="number" [value]="marks[selectedMarkIndex!].x2"
-          (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'x2', event: $event})" />
+        <input matInput type="number" [value]="mark.x2"
+          (input)="onFieldInput(selectedMarkIndex, 'x2', $event)" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P2 Y</mat-label>
-        <input matInput type="number" [value]="marks[selectedMarkIndex!].y2"
-          (input)="markFieldInput.emit({idx: selectedMarkIndex!, field: 'y2', event: $event})" />
+        <input matInput type="number" [value]="mark.y2"
+          (input)="onFieldInput(selectedMarkIndex, 'y2', $event)" />
       </mat-form-field>
     </div>
   }
