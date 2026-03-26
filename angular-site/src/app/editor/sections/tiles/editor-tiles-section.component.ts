@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, OnChanges, SimpleChanges } from '@angular/core';
 
 @Component({
   selector: 'app-editor-tiles-section',
@@ -6,7 +6,7 @@ import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from 
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class EditorTilesSectionComponent {
+export class EditorTilesSectionComponent implements OnChanges {
   @Input() tileTileEntries: { texId: number; width: number; height: number }[] = [];
   @Input() selectedTileId: number | null = null;
   @Input() workerBusy = false;
@@ -17,8 +17,15 @@ export class EditorTilesSectionComponent {
   @Output() tilePngUpload = new EventEmitter<{ event: Event; texId: number }>();
   @Output() exportTilePng = new EventEmitter<number>();
 
-  getTileDimensions(texId: number): string {
-    const entry = this.tileTileEntries.find((t) => t.texId === texId);
-    return entry ? `${entry.width}×${entry.height}` : '?';
+  /** Cached dimensions label for the currently selected tile. */
+  selectedTileDimensions = '?';
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if ('selectedTileId' in changes || 'tileTileEntries' in changes) {
+      const entry = this.selectedTileId !== null
+        ? this.tileTileEntries.find((t) => t.texId === this.selectedTileId)
+        : undefined;
+      this.selectedTileDimensions = entry ? `${entry.width}×${entry.height}` : '?';
+    }
   }
 }

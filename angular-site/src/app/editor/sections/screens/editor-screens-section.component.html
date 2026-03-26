@@ -7,7 +7,7 @@
     @if (iconEntries.length > 0) {
       <div class="screens-layout">
         <div class="icon-entry-list">
-          @for (icon of iconEntries; track $index) {
+          @for (icon of iconEntries; track trackIconEntry($index, icon)) {
             <button class="audio-entry-btn"
               [class.audio-entry-btn--active]="selectedIconId === icon.id && selectedIconType === icon.type"
               (click)="selectIconEntry.emit({ type: icon.type, id: icon.id })">
@@ -25,8 +25,8 @@
         @if (selectedIconId !== null) {
           <div class="icon-detail">
             <h4 class="audio-detail-title">{{ selectedIconLabel }}</h4>
-            @if (iconPreviewCanvas; as canvas) {
-              <img [src]="canvas.toDataURL()" class="icon-large-preview"
+            @if (iconPreviewDataUrl; as url) {
+              <img [src]="url" class="icon-large-preview"
                 [style.imageRendering]="'pixelated'" alt="icon preview">
             } @else {
               <div class="icon-placeholder">

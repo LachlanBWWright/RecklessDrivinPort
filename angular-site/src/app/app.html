@@ -63,7 +63,7 @@
         @if (editorSection() === 'properties') {
           <app-editor-properties-section
             [selectedLevel]="selectedLevel()"
-            [levelNum]="selectedLevel() ? levelDisplayNum(selectedLevel()!.resourceId) : 0"
+            [levelNum]="selectedLevelNum()"
             [editRoadInfo]="editRoadInfo()"
             [editTime]="editTime()"
             [editLevelEnd]="editLevelEnd()"
@@ -79,7 +79,7 @@
         @if (editorSection() === 'objects') {
           <app-editor-objects-section
             [selectedLevel]="selectedLevel()"
-            [levelNum]="selectedLevel() ? levelDisplayNum(selectedLevel()!.resourceId) : 0"
+            [levelNum]="selectedLevelNum()"
             [objects]="objects()"
             [selectedObjIndex]="selectedObjIndex()"
             [marks]="marks()"
@@ -90,9 +90,9 @@
             [drawMode]="drawMode()"
             [canUndo]="canUndo()"
             [canRedo]="canRedo()"
-            [trackUpCount]="selectedLevel() ? selectedLevel()!.trackUp.length : 0"
-            [trackDownCount]="selectedLevel() ? selectedLevel()!.trackDown.length : 0"
-            [roadSegCount]="selectedLevel() ? selectedLevel()!.roadSegCount : 0"
+            [trackUpCount]="selectedLevel()?.trackUp?.length ?? 0"
+            [trackDownCount]="selectedLevel()?.trackDown?.length ?? 0"
+            [roadSegCount]="selectedLevel()?.roadSegCount ?? 0"
             [zoom]="canvasZoom()"
             [panX]="canvasPanX()"
             [panY]="canvasPanY()"

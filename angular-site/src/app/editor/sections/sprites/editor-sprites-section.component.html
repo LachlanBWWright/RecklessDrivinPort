@@ -6,7 +6,7 @@
     @if (packSpriteFrames.length > 0) {
       <div class="pack-sprite-viewer sprite-viewer-layout">
         <div class="pack-sprite-grid sprite-list-column">
-          @for (frame of packSpriteFrames; track $index) {
+          @for (frame of packSpriteFrames; track frame.id) {
             @if (getPackSpriteDataUrl(frame.id); as url) {
               <div class="pack-sprite-cell"
                 [class.selected]="selectedPackSpriteId === frame.id"

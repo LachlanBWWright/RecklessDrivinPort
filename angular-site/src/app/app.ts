@@ -758,6 +758,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     return resourceId - 139;
   }
 
+  /** Current level number for display (derived from selectedLevel). */
+  readonly selectedLevelNum = computed(() => {
+    const level = this.selectedLevel();
+    return level ? this.levelDisplayNum(level.resourceId) : 0;
+  });
+
   private readonly konva = inject(KonvaEditorService);
   private readonly snackBar = inject(MatSnackBar);
 

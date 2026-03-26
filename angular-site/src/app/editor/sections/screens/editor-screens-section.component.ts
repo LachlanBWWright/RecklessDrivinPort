@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, OnChanges, SimpleChanges } from '@angular/core';
 
 @Component({
   selector: 'app-editor-screens-section',
@@ -6,7 +6,7 @@ import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from 
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class EditorScreensSectionComponent {
+export class EditorScreensSectionComponent implements OnChanges {
   @Input() iconEntries: { type: string; id: number; label: string }[] = [];
   @Input() selectedIconId: number | null = null;
   @Input() selectedIconType = 'ICN#';
@@ -19,4 +19,19 @@ export class EditorScreensSectionComponent {
   @Output() exportIconPng = new EventEmitter<void>();
   @Output() exportIconRaw = new EventEmitter<void>();
   @Output() iconPngUpload = new EventEmitter<Event>();
+
+  /** Cached data URL for the large preview canvas — recomputed only when the canvas reference changes. */
+  iconPreviewDataUrl: string | null = null;
+
+  /** Stable track-by key for icon entries. */
+  trackIconEntry(_index: number, icon: { type: string; id: number; label: string }): string {
+    return `${icon.type}:${icon.id}`;
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if ('iconPreviewCanvas' in changes) {
+      const canvas = this.iconPreviewCanvas;
+      this.iconPreviewDataUrl = canvas ? canvas.toDataURL() : null;
+    }
+  }
 }
