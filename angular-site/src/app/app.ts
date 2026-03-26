@@ -6142,9 +6142,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
       // Apply using the same path as the pixel editor
       this.workerBusy.set(true);
+      const bitDepth = frame.bitDepth;
       const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>(
         'APPLY_SPRITE_PACK_PIXELS',
-        { frameId, pixels: imageData.data },
+        { frameId, bitDepth, pixels: imageData.data },
       );
       this.applyLevelsResult(result.levels);
       this.decodePackSpritesInBackground();
@@ -6166,12 +6167,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       await this.onTileEditorSaved(event);
       return;
     }
-    // Was editing a sprite – apply to kPackSp16
+    // Was editing a sprite – apply to the matching sprite pack.
     try {
       this.workerBusy.set(true);
+      const bitDepth = this.spriteEditorFrame()?.bitDepth ?? 16;
       const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>(
         'APPLY_SPRITE_PACK_PIXELS',
-        { frameId: event.frameId, pixels: event.pixels },
+        { frameId: event.frameId, bitDepth, pixels: event.pixels },
       );
       this.applyLevelsResult(result.levels);
       // Refresh sprite canvases to reflect edited pixels

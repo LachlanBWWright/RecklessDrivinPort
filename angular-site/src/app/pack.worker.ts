@@ -21,6 +21,7 @@
  *   APPLY_ROAD_SEGS        payload: { resourceId, roadSegs }
  *   APPLY_SPRITE_BYTE      payload: { spriteId, offset, value }
  *   APPLY_TILE16_PIXELS  payload: { texId: number; pixels: Uint8ClampedArray }
+ *   APPLY_SPRITE_PACK_PIXELS payload: { frameId: number; bitDepth: 8 | 16; pixels: Uint8ClampedArray }
  *   DECODE_ALL_ROAD_TEXTURES (no payload) → { textures: DecodedRoadTexture[] }
  *   GET_SPRITE_BYTES       payload: { spriteId }
  *   SERIALIZE              (no payload)
@@ -222,8 +223,12 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'APPLY_SPRITE_PACK_PIXELS': {
-        const { frameId, pixels } = payload as { frameId: number; pixels: Uint8ClampedArray };
-        resources = levelEditorSvc.applySpritePack16Pixels(resources, frameId, pixels);
+        const {
+          frameId,
+          bitDepth,
+          pixels,
+        } = payload as { frameId: number; bitDepth: 8 | 16; pixels: Uint8ClampedArray };
+        resources = levelEditorSvc.applySpritePackPixels(resources, frameId, bitDepth, pixels);
         // Return updated levels so canvas previews refresh
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });

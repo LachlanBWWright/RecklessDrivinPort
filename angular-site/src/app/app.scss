@@ -215,8 +215,8 @@ app-game-panel {
   overflow: visible;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 20px 0 40px;
+  align-items: stretch;
+  padding: 20px 20px 40px;
   gap: 16px;
 }
 /* ======================================================
@@ -307,7 +307,7 @@ app-game-panel {
   mat-card-content {
     display: flex;
     flex: 1 1 auto;
-    min-height: 300px;
+    min-height: 0;
     align-items: stretch;
     justify-content: center;
     padding: 0 16px 16px !important;
@@ -331,14 +331,16 @@ app-game-panel {
   position: relative;
   display: flex;
   justify-content: center;
+  align-self: center;
   background: #000;
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-height: 300px;
-  height: 100%;
-  width: auto;
+  --game-canvas-height: clamp(300px, calc(100dvh - 360px), 720px);
+  height: var(--game-canvas-height);
+  width: min(100%, calc(var(--game-canvas-height) * 4 / 3));
   max-width: 100%;
   aspect-ratio: 4 / 3;
   margin: 0 auto;

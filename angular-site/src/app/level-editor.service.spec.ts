@@ -8,7 +8,7 @@ import {
   serializeLevelRoadSegs,
   serializeMarkSegs,
 } from './level-editor.service';
-import { encodePackHandle } from './pack-parser.service';
+import { encodePackHandle, parsePackHandle } from './pack-parser.service';
 
 function makeLevelEntry(overrides: Partial<{
   roadInfo: number;
@@ -265,6 +265,45 @@ describe('LevelEditorService', () => {
     expect(decoded?.bitDepth).toBe(16);
     expect(decoded?.pixels[3]).toBe(0);
     expect(decoded?.pixels[4]).toBeGreaterThan(decoded?.pixels[6] ?? 0);
+  });
+
+  it('applySpritePackPixels updates 8-bit frames in Pack #129', () => {
+    const sprite = new Uint8Array(8 + 4);
+    const view = new DataView(sprite.buffer);
+    view.setUint16(0, 2, false); // width
+    view.setUint16(2, 2, false); // height
+    sprite[4] = 1; // stride 2
+    sprite[8] = 0; // transparent mask
+    sprite[9] = 10;
+    sprite[10] = 11;
+    sprite[11] = 12;
+
+    const resources = [{
+      type: 'Pack',
+      id: 129,
+      data: encodePackHandle([{ id: 7, data: sprite }], 129),
+    }];
+
+    const pixels = new Uint8ClampedArray([
+      255, 0, 0, 0,
+      0, 255, 0, 255,
+      0, 0, 255, 255,
+      0, 0, 0, 255,
+    ]);
+
+    const updated = svc.applySpritePackPixels(resources, 7, 8, pixels);
+    const pack = updated[0];
+    expect(pack.type).toBe('Pack');
+    expect(pack.id).toBe(129);
+
+    const parsed = parsePackHandle(pack.data, 129);
+    const entry = parsed.find((e) => e.id === 7);
+    expect(entry).toBeDefined();
+    if (!entry) return;
+    expect(entry.data[8]).toBe(0); // mask preserved
+    expect(entry.data[9]).not.toBe(10);
+    expect(entry.data[10]).not.toBe(11);
+    expect(entry.data[11]).not.toBe(12);
   });
 });
 

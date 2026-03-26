@@ -308,6 +308,43 @@ function indexed8ToRgba(value: number): [number, number, number, number] {
   return [entry[0], entry[1], entry[2], 255];
 }
 
+/** Convert RGBA8888 to the nearest Mac 8-bit palette index. */
+function rgbaToMacPaletteIndex(r: number, g: number, b: number): number {
+  if (!rgbaToMacPaletteIndexCache) {
+    const cache = new Map<number, number>();
+    for (let rq = 0; rq < 32; rq++) {
+      for (let gq = 0; gq < 32; gq++) {
+        for (let bq = 0; bq < 32; bq++) {
+          const key = (rq << 10) | (gq << 5) | bq;
+          const rr = rq * 8;
+          const gg = gq * 8;
+          const bb = bq * 8;
+          let bestIdx = 0;
+          let bestDist = Infinity;
+          for (let i = 0; i < MAC_SYSTEM_PALETTE.length; i++) {
+            const [pr, pg, pb] = MAC_SYSTEM_PALETTE[i] ?? [0, 0, 0];
+            const dr = rr - pr;
+            const dg = gg - pg;
+            const db = bb - pb;
+            const dist = dr * dr + dg * dg + db * db;
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestIdx = i;
+            }
+          }
+          cache.set(key, bestIdx);
+        }
+      }
+    }
+    rgbaToMacPaletteIndexCache = cache;
+  }
+
+  const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+  return rgbaToMacPaletteIndexCache.get(key) ?? 0;
+}
+
+let rgbaToMacPaletteIndexCache: Map<number, number> | null = null;
+
 // ------------------------------------------------------------------
 // Level entry parser
 // ------------------------------------------------------------------
@@ -856,15 +893,16 @@ export class LevelEditorService {
   }
 
   /**
-   * Write edited RGBA8888 pixels back into the sprite pack (Pack 137, 16-bit RGB555).
-   * Only writes to 16-bit sprite pack entries; 8-bit PPic PPic entries are not modified.
+   * Write edited RGBA8888 pixels back into the sprite pack.
+   * Pack 137 uses 16-bit RGB555 pixels; Pack 129 uses 8-bit indexed pixels.
    */
-  applySpritePack16Pixels(
+  applySpritePackPixels(
     resources: ResourceDatEntry[],
     frameId: number,
+    bitDepth: 8 | 16,
     pixels: Uint8ClampedArray,
   ): ResourceDatEntry[] {
-    const packId = SPRITE_PACK_16_ID;
+    const packId = bitDepth === 16 ? SPRITE_PACK_16_ID : SPRITE_PACK_8_ID;
     return resources.map((res) => {
       if (res.type !== 'Pack' || res.id !== packId) return res;
       try {
@@ -877,32 +915,49 @@ export class LevelEditorService {
         const log2xSize = entry.data[4];
         const stride = 1 << log2xSize;
         if (width <= 0 || height <= 0 || stride <= 0) return res;
-        // Write edited pixels back (convert RGBA8888 → RGB555 BE)
         const newData = entry.data.slice();
         const newView = new DataView(newData.buffer, newData.byteOffset, newData.byteLength);
-        const maskValue = view.getUint16(SPRITE_HEADER_SIZE, false); // transparent colour unchanged
+        const maskValue = bitDepth === 16
+          ? view.getUint16(SPRITE_HEADER_SIZE, false)
+          : newData[SPRITE_HEADER_SIZE]; // transparent colour unchanged
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
             const srcI = (y * width + x) * 4;
-            const dstOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
-            if (dstOffset + 2 > newData.length) continue;
             const a = pixels[srcI + 3];
             if (a === 0) {
               // transparent – restore mask value
-              newView.setUint16(dstOffset, maskValue, false);
+              if (bitDepth === 16) {
+                const dstOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
+                if (dstOffset + 2 > newData.length) continue;
+                newView.setUint16(dstOffset, maskValue, false);
+              } else {
+                const dstOffset = SPRITE_HEADER_SIZE + y * stride + x;
+                if (dstOffset >= newData.length) continue;
+                newData[dstOffset] = maskValue;
+              }
             } else {
-              const rgb = rgbaToRgb555(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
-              // Flip the LSB to create a visually similar but distinct RGB555 value so it won't
-              // be misidentified as the transparent mask colour by the game renderer.
-              const safe = rgb === maskValue ? (rgb ^ 1) : rgb;
-              newView.setUint16(dstOffset, safe, false);
+              if (bitDepth === 16) {
+                const rgb = rgbaToRgb555(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
+                // Flip the LSB to create a visually similar but distinct RGB555 value so it won't
+                // be misidentified as the transparent mask colour by the game renderer.
+                const safe = rgb === maskValue ? (rgb ^ 1) : rgb;
+                const dstOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
+                if (dstOffset + 2 > newData.length) continue;
+                newView.setUint16(dstOffset, safe, false);
+              } else {
+                const idx = rgbaToMacPaletteIndex(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
+                const safe = idx === maskValue ? ((idx + 1) & 0xff) : idx;
+                const dstOffset = SPRITE_HEADER_SIZE + y * stride + x;
+                if (dstOffset >= newData.length) continue;
+                newData[dstOffset] = safe;
+              }
             }
           }
         }
         const newEntries = packEntries.map((e) => e.id === frameId ? { ...e, data: newData } : e);
         return { ...res, data: encodePackHandle(newEntries, packId) };
       } catch (err) {
-        console.warn('[LevelEditor] applySpritePack16Pixels error:', err);
+        console.warn('[LevelEditor] applySpritePackPixels error:', err);
         return res;
       }
     });

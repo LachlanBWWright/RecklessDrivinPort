@@ -6,6 +6,7 @@
 #include "packs.h"
 #include "screen.h"
 #include "sprites.h"
+#include "byteswap_packs.h"
 
 enum{
 	kOKButton=1,
@@ -48,8 +49,11 @@ void ReInitGraphics()
 	if(gPrefs.hiColor)
 	{
 		LoadPack(kPacksR16);
+		PortByteSwapPackRLE16(kPacksR16);
 		LoadPack(kPackcR16);
+		PortByteSwapPackRLE16(kPackcR16);
 		LoadPack(kPackTx16);
+		PortByteSwapPackTx16();
 	}
 	else
 	{
@@ -84,7 +88,7 @@ void FirstRun()
 		gPrefs.hqSound = 0;
 		gPrefs.lineSkip = 0;
 		gPrefs.motionBlur = 0;
-		gPrefs.hiColor = 0;
+		gPrefs.hiColor = 1;
 		/* Default keyboard bindings: arrow keys + space/shift/z/x/esc */
 		gPrefs.keyCodes[kForward]   = 0x7E; /* Up arrow */
 		gPrefs.keyCodes[kBackward]  = 0x7D; /* Down arrow */
@@ -116,10 +120,9 @@ void FirstRun()
 	 * The Pref resources also have sound disabled by default; enable it here. */
 	gPrefs.sound       = 1;
 	gPrefs.engineSound = 1;
-	/* 16-bit textures/sprites are stored big-endian in the pack and are not
-	 * byte-swapped on little-endian platforms; force 8-bit mode to avoid
-	 * visual corruption (wrong-colour/striped road and sprite glitches). */
-	gPrefs.hiColor     = 0;
+	/* The port now byte-swaps 16-bit textures/sprites on load, so hi-color is
+	 * safe on little-endian platforms. */
+	gPrefs.hiColor     = 1;
 	gPrefs.keyCodes[kForward]   = 0x7E; /* Up arrow */
 	gPrefs.keyCodes[kBackward]  = 0x7D; /* Down arrow */
 	gPrefs.keyCodes[kLeft]      = 0x7B; /* Left arrow */
