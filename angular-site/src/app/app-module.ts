@@ -31,6 +31,15 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 import { App } from './app';
+import { SiteToolbarComponent } from './layout/site-toolbar/site-toolbar.component';
+import { GamePanelComponent } from './game/game-panel/game-panel.component';
+import { EditorToolbarComponent } from './editor/toolbar/editor-toolbar.component';
+import { EditorPropertiesSectionComponent } from './editor/sections/properties/editor-properties-section.component';
+import { EditorObjectsSectionComponent } from './editor/sections/objects/editor-objects-section.component';
+import { EditorSpritesSectionComponent } from './editor/sections/sprites/editor-sprites-section.component';
+import { EditorTilesSectionComponent } from './editor/sections/tiles/editor-tiles-section.component';
+import { EditorAudioSectionComponent } from './editor/sections/audio/editor-audio-section.component';
+import { EditorScreensSectionComponent } from './editor/sections/screens/editor-screens-section.component';
 import { EditorCanvasComponent } from './editor/editor-canvas.component';
 import { MarksEditorComponent } from './editor/marks-editor.component';
 import { ObjectInspectorComponent } from './editor/object-inspector.component';
@@ -49,7 +58,24 @@ const MATERIAL_MODULES = [
 ];
 
 @NgModule({
-  declarations: [App, EditorCanvasComponent, MarksEditorComponent, ObjectInspectorComponent, ObjectListComponent, PropertiesTabComponent, SpriteEditorComponent],
+  declarations: [
+    App,
+    SiteToolbarComponent,
+    GamePanelComponent,
+    EditorToolbarComponent,
+    EditorPropertiesSectionComponent,
+    EditorObjectsSectionComponent,
+    EditorSpritesSectionComponent,
+    EditorTilesSectionComponent,
+    EditorAudioSectionComponent,
+    EditorScreensSectionComponent,
+    EditorCanvasComponent,
+    MarksEditorComponent,
+    ObjectInspectorComponent,
+    ObjectListComponent,
+    PropertiesTabComponent,
+    SpriteEditorComponent,
+  ],
   imports: [
     BrowserModule,
     CommonModule,

@@ -1,0 +1,99 @@
+<mat-card class="tab-panel-card">
+  <mat-card-header>
+    <mat-card-title>Sound Editor</mat-card-title>
+    <mat-card-subtitle>Pack 134 (kPackSnds — Mac OS &#39;snd &#39; format)</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    @if (audioEntries.length > 0) {
+      <div class="audio-editor-layout">
+        <div class="audio-entry-list">
+          @for (entry of audioEntries; track entry.id) {
+            <button class="audio-entry-btn"
+              [class.audio-entry-btn--active]="selectedAudioId === entry.id"
+              (click)="selectAudioEntry.emit(entry.id)">
+              <mat-icon class="audio-entry-icon">audiotrack</mat-icon>
+              <span>Sound #{{ entry.id }}</span>
+              @if (entry.durationMs !== undefined) {
+                <span class="res-size-badge">{{ entry.durationMs / 1000 | number:'1.1-1' }}s</span>
+              } @else {
+                <span class="res-size-badge">{{ entry.sizeBytes | number }} B</span>
+              }
+            </button>
+          }
+        </div>
+
+        @if (selectedAudioId !== null && selectedAudioBytes) {
+          <div class="audio-detail">
+            <h4 class="audio-detail-title">Sound #{{ selectedAudioId }}</h4>
+            @if (selectedAudioSndInfo; as info) {
+              <div class="audio-meta">
+                <span class="badge">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
+                <span class="badge">{{ info.numChannels === 2 ? 'Stereo' : 'Mono' }}</span>
+                <span class="badge">{{ (info.numFrames / info.sampleRate) | number:'1.1-1' }}s</span>
+                <span class="badge">
+                  @if (info.encode === 0) { PCM 8-bit }
+                  @else if (info.encode === 255) { PCM 16-bit }
+                  @else { encode={{ info.encode }} }
+                </span>
+              </div>
+            }
+            <div class="audio-waveform-placeholder">
+              <mat-icon class="waveform-icon">graphic_eq</mat-icon>
+              <span>{{ selectedAudioBytes.length | number }} bytes</span>
+            </div>
+            <div class="audio-actions" style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <mat-icon style="font-size:18px;height:18px;width:18px;color:#8a8a8a">volume_up</mat-icon>
+                <mat-slider min="0" max="100" step="1" discrete style="width:140px">
+                  <input matSliderThumb [value]="audioPlayerVolume"
+                    (valueChange)="setAudioPlayerVolume.emit($event)" />
+                </mat-slider>
+                <span style="font-size:0.78rem;color:#8a8a8a;min-width:32px">{{ audioPlayerVolume }}%</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <button mat-raised-button color="primary"
+                  (click)="togglePlayPause.emit()"
+                  [disabled]="audioDecodeInProgress || (!audioControllable && !selectedAudioBytes)">
+                  <mat-icon matButtonIcon>{{ audioPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
+                  {{ audioPlaying ? 'Pause' : 'Play' }}
+                </button>
+                <div class="audio-progress-row" style="display:inline-flex;align-items:center;margin-left:12px;">
+                  <input type="range" min="0" [max]="audioDuration" step="0.01"
+                    [value]="audioCurrentTime"
+                    (input)="seekAudio.emit($any($event.target).valueAsNumber)"
+                    [disabled]="!audioControllable" style="width:240px;margin-right:8px;" />
+                  <span class="audio-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <button mat-stroked-button (click)="exportAudioWav.emit()"
+                  [disabled]="!selectedAudioBytes">
+                  <mat-icon>download</mat-icon> Export WAV
+                </button>
+                <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none"
+                  (change)="audioWavUpload.emit($event)" />
+                <button mat-stroked-button (click)="audioWavInput.click()" [disabled]="workerBusy"
+                  matTooltip="Upload a WAV file to replace this sound">
+                  <mat-icon>upload</mat-icon> Replace WAV
+                </button>
+              </div>
+            </div>
+          </div>
+        } @else if (selectedAudioId !== null) {
+          <div class="res-placeholder">
+            <mat-spinner diameter="32"></mat-spinner>
+          </div>
+        } @else {
+          <div class="res-placeholder">
+            <p class="muted">Select a sound from the list.</p>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="no-data-content">
+        <mat-icon class="no-data-icon">music_off</mat-icon>
+        <p>Sound entries from Pack 134 (kPackSnds) will appear here once a resources.dat is loaded.</p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

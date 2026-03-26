@@ -183,19 +183,71 @@ describe('App', () => {
     expect(app.canvasPanY()).toBe(640);
   });
 
-  it('should have site-nav in the DOM', async () => {
+  it('should show the toolbar in game mode with right-aligned site tabs', async () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.site-toolbar, .site-nav, mat-toolbar')).toBeTruthy();
+
+    const toolbar = (fixture.nativeElement as HTMLElement).querySelector('.site-toolbar');
+    expect(toolbar).toBeTruthy();
+    expect(toolbar?.textContent).toContain('Play Game');
+    expect(toolbar?.textContent).toContain('Level Editor');
+    expect(toolbar?.querySelector('.nav-tabs--editor')).toBeNull();
   });
 
-  it('should have nav tabs for game and editor', async () => {
+  it('should show load/upload controls in the editor when no level pack is loaded', async () => {
     const fixture = TestBed.createComponent(App);
+    fixture.componentInstance.setTab('editor');
     fixture.detectChanges();
     await fixture.whenStable();
-    const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('.nav-tab');
-    expect(tabs.length).toBe(2);
+
+    const toolbar = (fixture.nativeElement as HTMLElement).querySelector('.site-toolbar');
+    expect(toolbar?.textContent).toContain('Back to Game');
+    expect(toolbar?.textContent).toContain('Load Default');
+    expect(toolbar?.textContent).toContain('Upload resources.dat');
+    expect(toolbar?.textContent).not.toContain('Clear File');
+    expect(toolbar?.textContent).not.toContain('Download');
+    expect(toolbar?.querySelector('mat-select')).toBeNull();
+  });
+
+  it('should show clear/download controls and a level dropdown when the editor has data', async () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.componentInstance.setTab('editor');
+    fixture.componentInstance.hasEditorData.set(true);
+    fixture.componentInstance.parsedLevels.set([
+      {
+        resourceId: 140,
+        objects: [],
+        marks: [],
+        roadSegs: [],
+        roadSegCount: 0,
+        properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
+        objectGroups: [],
+        trackUp: [],
+        trackDown: [],
+        rawEntry1: new Uint8Array(0),
+        rawEntry2: new Uint8Array(0),
+        encrypted: false,
+      },
+    ]);
+    fixture.componentInstance.selectedLevelId.set(140);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const toolbar = (fixture.nativeElement as HTMLElement).querySelector('.site-toolbar');
+    expect(toolbar?.textContent).toContain('Back to Game');
+    expect(toolbar?.textContent).toContain('Clear File');
+    expect(toolbar?.textContent).toContain('Download');
+    expect(toolbar?.textContent).not.toContain('Load Default');
+    expect(toolbar?.textContent).not.toContain('Upload resources.dat');
+    expect(toolbar?.querySelector('mat-select')).toBeTruthy();
+
+    const tabs = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.nav-tab'));
+    expect(tabs.length).toBe(7);
+    expect(tabs[0]?.textContent).toContain('Back to Game');
+    expect(tabs[1]?.textContent).toContain('Properties');
+    expect(tabs[1]?.classList.contains('active')).toBe(true);
+    expect(tabs[2]?.textContent).toContain('Objects & Tracks');
   });
 
   // ── Road cache invalidation ──────────────────────────────────────────────

@@ -4,9 +4,6 @@
       <mat-card-title>
         Level {{ levelNum }} – Properties
         <span class="badge">Pack {{ selectedLevel.resourceId }}</span>
-        @if (selectedLevel.encrypted) {
-          <span class="badge badge--warn" matTooltip="XOR-encrypted; handled automatically">🔒 encrypted</span>
-        }
       </mat-card-title>
     </mat-card-header>
 

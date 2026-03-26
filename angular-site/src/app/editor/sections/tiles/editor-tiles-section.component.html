@@ -1,0 +1,76 @@
+<mat-card class="tab-panel-card">
+  <mat-card-header>
+    <mat-card-title>Road &amp; Background Tile Editor</mat-card-title>
+    <mat-card-subtitle>Pack 136 (kPackTx16 — 16-bit RGB555) &amp; Pack 133 (kPackTxtR — 8-bit)</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    @if (tileTileEntries.length > 0) {
+      <div class="tile-viewer">
+        <div class="pack-sprite-grid">
+          @for (tile of tileTileEntries; track tile.texId) {
+            @if (getTileDataUrl(tile.texId); as url) {
+              <div class="pack-sprite-cell"
+                [class.selected]="selectedTileId === tile.texId"
+                (click)="selectedTileIdChange.emit(tile.texId)"
+                [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
+                <img [src]="url" class="pack-sprite-thumb" [style.imageRendering]="'pixelated'" alt="" />
+                <span class="pack-sprite-label">#{{ tile.texId }}</span>
+              </div>
+            } @else {
+              <div class="pack-sprite-cell"
+                [class.selected]="selectedTileId === tile.texId"
+                (click)="selectedTileIdChange.emit(tile.texId)"
+                [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
+                <span class="pack-sprite-label">#{{ tile.texId }}</span>
+              </div>
+            }
+          }
+        </div>
+
+        @if (selectedTileId !== null) {
+          <div class="pack-sprite-detail">
+            @if (getTileDataUrl(selectedTileId); as url) {
+              <img [src]="url" class="pack-sprite-large" [style.imageRendering]="'pixelated'" alt="tile preview" />
+            } @else {
+              <div class="pack-sprite-large pack-sprite-large--placeholder">
+                <mat-icon>grid_view</mat-icon>
+                <span>Preview loading…</span>
+              </div>
+            }
+            <mat-card class="sprite-meta-card">
+              <mat-card-content>
+                <p class="sprite-meta">
+                  <strong>Tile</strong> #{{ selectedTileId }}<br>
+                  <strong>Size</strong> {{ getTileDimensions(selectedTileId) }}<br>
+                  <strong>Format</strong> RGB555 (16-bit)
+                </p>
+              </mat-card-content>
+            </mat-card>
+            <div class="sprite-actions">
+              <button mat-raised-button color="primary"
+                (click)="openTileEditor.emit(selectedTileId)"
+                [disabled]="workerBusy"
+                matTooltip="Open pixel editor for this tile">
+                <mat-icon>brush</mat-icon> Edit Pixels
+              </button>
+              <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
+                (change)="tilePngUpload.emit({ event: $event, texId: selectedTileId })" />
+              <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy"
+                matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
+                <mat-icon>upload</mat-icon> Upload PNG
+              </button>
+              <button mat-stroked-button (click)="exportTilePng.emit(selectedTileId)">
+                <mat-icon>download</mat-icon> Export PNG
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="no-data-content">
+        <mat-icon class="no-data-icon">grid_view</mat-icon>
+        <p>Road texture tiles from Pack 136 (kPackTx16) will appear here once decoded. Load a resources.dat to begin.</p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

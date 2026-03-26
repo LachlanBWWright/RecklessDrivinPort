@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, AfterViewInit, inject, signal, computed, effect, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnDestroy, OnInit, AfterViewInit, inject, signal, computed, effect, ChangeDetectionStrategy, ViewEncapsulation } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type {
   ParsedLevel,
@@ -26,6 +26,7 @@ import {
   worldDirToCanvasForwardVector,
   worldDirToCanvasRotationRad,
 } from './object-direction-utils';
+import type { EditorSection } from './layout/site-toolbar/site-toolbar.component';
 
 /** Worker response envelope sent from pack.worker.ts */
 interface WorkerResponse {
@@ -74,7 +75,6 @@ declare global {
 }
 
 export type AppTab = 'game' | 'editor';
-export type EditorSection = 'properties' | 'objects' | 'sprites' | 'tiles' | 'audio' | 'screens';
 
 const OBJ_PALETTE = [
   '#e53935', '#42a5f5', '#66bb6a', '#ffa726',
@@ -618,10 +618,14 @@ function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean 
   standalone: false,
   styleUrl: './app.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  encapsulation: ViewEncapsulation.None,
 })
 export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly typePalette = OBJ_PALETTE.map((hex, index) => ({ hex, typeId: index }));
   readonly getSpritePreviewDataUrlBound = this.getSpritePreviewDataUrl.bind(this);
+  readonly getPackSpriteDataUrlBound = this.getPackSpriteDataUrl.bind(this);
+  readonly getTileDataUrlBound = this.getTileDataUrl.bind(this);
+  readonly getIconThumbDataUrlBound = this.getIconThumbDataUrl.bind(this);
   readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
 
   /** Convert a level resource ID (140-149) to a human-readable level number (1-10). */
@@ -1589,6 +1593,49 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (section) this.setSection(section);
   }
 
+  /** Reset all editor-loaded pack data so the UI returns to the no-file state. */
+  private resetEditorData(): void {
+    this.hasEditorData.set(false);
+    this.editorError.set('');
+    this.resourcesStatus.set('No resources.dat loaded. Use the buttons above to load one.');
+    this.parsedLevels.set([]);
+    this.selectedLevelId.set(null);
+    this.availableTypeIds.set([]);
+    this.objectTypeDefinitions.clear();
+    this.spriteAssets.set([]);
+    this.selectedSpriteId.set(null);
+    this.packSpriteFrames.set([]);
+    this.selectedPackSpriteId.set(null);
+    this.tileTileEntries.set([]);
+    this.selectedTileId.set(null);
+    this.audioEntries.set([]);
+    this.selectedAudioId.set(null);
+    this.iconEntries.set([]);
+    this.selectedIconId.set(null);
+    this.selectedIconType.set('ICN#');
+    this.objects.set([]);
+    this.selectedObjIndex.set(null);
+    this.selectedMarkIndex.set(null);
+    this.marks.set([]);
+    this.editRoadInfo.set(0);
+    this.editTime.set(0);
+    this.editXStartPos.set(0);
+    this.editLevelEnd.set(0);
+    this.editObjectGroups.set([]);
+    this.propertiesDirty.set(false);
+    this.editTrackUp.set([]);
+    this.editTrackDown.set([]);
+    this.dragTrackWaypoint.set(null);
+    this.hoverTrackWaypoint.set(null);
+    this.hoverTrackMidpoint.set(null);
+    this.markingPreview.set([]);
+    this.stopAudio();
+    this._lastAudioBuffer = null;
+    this.audioCurrentTime.set(0);
+    this.audioDuration.set(0);
+    this.audioDecodeInProgress.set(false);
+  }
+
   /** Called when the volume slider value changes. Updates the signal and applies to WASM. */
   onVolumeSliderChange(pct: number): void {
     this.masterVolume.set(pct);
@@ -1628,6 +1675,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.resourcesStatus.set('Failed to load uploaded file.');
       this.workerBusy.set(false);
     }
+  }
+
+  clearEditorResources(): void {
+    this.resetEditorData();
+    this.snackBar.open('Editor file cleared', 'OK', { duration: 2500, panelClass: 'snack-success' });
   }
 
   async downloadEditedResources(): Promise<void> {
@@ -4540,7 +4592,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             // advanced controls are unavailable when falling back.
             this._lastAudioBuffer = null;
             const played = tryPlaySndResource(bytes, ctx);
-            if (!played) throw err ?? new Error('Unsupported snd format');
+            if (!played) throw err instanceof Error ? err : new Error(String(err ?? 'Unsupported snd format'));
             // Inform the user that we're in one-shot fallback mode
             this.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', { duration: 4000 });
           }

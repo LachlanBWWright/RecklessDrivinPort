@@ -1,0 +1,13 @@
+<app-properties-tab
+  [selectedLevel]="selectedLevel"
+  [levelNum]="levelNum"
+  [editRoadInfo]="editRoadInfo"
+  [editTime]="editTime"
+  [editLevelEnd]="editLevelEnd"
+  [editObjectGroups]="editObjectGroups"
+  [propertiesDirty]="propertiesDirty"
+  [workerBusy]="workerBusy"
+  (propsInput)="propsInput.emit($event)"
+  (objGroupInput)="objGroupInput.emit($event)"
+  (saveProperties)="saveProperties.emit()"
+></app-properties-tab>

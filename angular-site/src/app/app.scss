@@ -28,7 +28,8 @@
 .site-toolbar {
   background: #0d0d0d !important;
   border-bottom: 2px solid var(--accent) !important;
-  height: 56px !important;
+  min-height: 56px !important;
+  height: auto !important;
   padding: 0 16px !important;
   display: flex;
   align-items: center;
@@ -39,29 +40,35 @@
   box-shadow: 0 2px 12px rgba(0,0,0,0.6);
 }
 
-.site-logo {
-  font-size: 1.4rem;
-  line-height: 1;
-}
-
-.site-title {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: var(--accent);
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-}
-
 .toolbar-spacer { flex: 1; }
+
+.toolbar-editor-strip {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
 
 .nav-tabs {
   display: flex;
-  height: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
   gap: 4px;
 }
 
 .nav-tab {
-  height: 56px !important;
+  min-height: 56px !important;
   border-radius: 0 !important;
   border-bottom: 3px solid transparent !important;
   color: var(--muted) !important;
@@ -83,11 +90,71 @@
   }
 }
 
-.wip-badge {
-  font-size: 0.7rem;
-  font-weight: 500;
-  opacity: 0.7;
-  letter-spacing: 0.01em;
+.nav-tabs--editor .nav-tab {
+  flex: 0 0 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.nav-tabs--editor {
+  flex: 0 0 auto;
+}
+
+.nav-tabs--site {
+  flex: 0 0 auto;
+}
+
+.nav-tab--back {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.nav-tab--editor {
+  padding: 0 14px !important;
+}
+
+.level-select-field {
+  width: 190px;
+  flex: 0 0 auto;
+  margin-bottom: -1.25em;
+
+  ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  ::ng-deep .mat-mdc-text-field-wrapper {
+    height: 40px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-flex,
+  ::ng-deep .mat-mdc-form-field-infix {
+    min-height: 40px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-infix {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+.toolbar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.toolbar-status--error {
+  color: #ff9b9b;
+}
+
+.site-toolbar ::-webkit-scrollbar {
+  height: 0;
+  width: 0;
 }
 
 /* ======================================================
@@ -196,6 +263,12 @@ main {
   mat-card-title { font-size: 1rem !important; font-weight: 700; color: var(--on-surface); }
   mat-card-subtitle { color: var(--muted); font-size: 0.82rem !important; }
 
+  mat-card-content {
+    display: flex;
+    justify-content: center;
+    padding: 0 16px 16px !important;
+  }
+
   .fullscreen-btn {
     position: absolute;
     top: 8px;
@@ -218,10 +291,14 @@ main {
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
+  width: min(640px, calc(100vw - 32px));
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
 
   canvas {
     display: block;
-    max-width: 100%;
+    width: 100%;
+    height: 100%;
     image-rendering: pixelated;
   }
 }
@@ -506,6 +583,18 @@ main {
     .editor-tab-label {
       display: none;
     }
+  }
+
+  .toolbar-editor-strip {
+    gap: 6px;
+  }
+
+  .toolbar-actions {
+    gap: 6px;
+  }
+
+  .level-select-field {
+    width: 150px;
   }
 }
 
@@ -1112,25 +1201,6 @@ code {
 ::-webkit-scrollbar-track { background: var(--surface); }
 ::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
-/* ======================================================
-   SITE FOOTER
-   ====================================================== */
-.site-footer {
-  background: #0a0a0a;
-  border-top: 1px solid #1e1e1e;
-  padding: 12px 24px;
-  text-align: center;
-  flex-shrink: 0;
-
-  .footer-text {
-    font-size: 0.75rem;
-    color: #555;
-    line-height: 1.6;
-
-    a { color: #666; text-decoration: none; &:hover { color: #999; text-decoration: underline; } }
-  }
-}
 
 /* ======================================================
    RESOURCE BROWSER TAB

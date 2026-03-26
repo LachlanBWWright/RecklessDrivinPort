@@ -1,0 +1,93 @@
+<section id="panel-game" role="tabpanel" class="game-section" [class.tab-panel--hidden]="activeTab !== 'game'">
+  @if (activeTab === 'game') {
+    <mat-card class="hero-card">
+      <mat-card-header>
+        <mat-card-title>Reckless Drivin' — WebAssembly Port</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>
+          A fan-made SDL2 / Emscripten port of the classic Mac OS&nbsp;9 racing game
+          <em>Reckless Drivin'</em> by Jonas Echterhoff. Hold a number key when clicking Start to skip
+          directly to that level.
+        </p>
+        <p>
+          Ported by <a href="https://github.com/LachlanBWWright" target="_blank" rel="noopener">LachlanBWWright</a>,
+          built on <a href="https://github.com/natecraddock/open-reckless-drivin" target="_blank" rel="noopener">Nathan Craddock's port</a>
+          and <a href="https://github.com/jorio/Pomme" target="_blank" rel="noopener">Pomme</a>.
+          <a href="https://github.com/LachlanBWWright/RecklessDrivinPort" target="_blank" rel="noopener">View port repository</a>.
+        </p>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <mat-card class="game-card">
+    <mat-card-header>
+      <mat-card-title>Game</mat-card-title>
+      <mat-card-subtitle>{{ statusText }}</mat-card-subtitle>
+      <button mat-icon-button class="fullscreen-btn" (click)="toggleFullscreen.emit()" matTooltip="Fullscreen">
+        <mat-icon>fullscreen</mat-icon>
+      </button>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="canvas-wrapper">
+        <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
+        <div class="loading-overlay" [class.hidden]="!overlayVisible">
+          <mat-spinner diameter="48"></mat-spinner>
+          <p class="loading-msg">{{ statusText }}</p>
+          <mat-progress-bar mode="determinate" [value]="progressPct" class="loading-progress"></mat-progress-bar>
+        </div>
+      </div>
+    </mat-card-content>
+    <mat-card-footer>
+      <div class="controls-bar">
+        <span class="controls-label">Controls:</span>
+        <kbd>↑</kbd> Gas &nbsp;
+        <kbd>↓</kbd> Brake &nbsp;
+        <kbd>←</kbd><kbd>→</kbd> Steer &nbsp;
+        <kbd>Space</kbd> Handbrake &nbsp;
+        <kbd>Z</kbd> Mine &nbsp;
+        <kbd>X</kbd> Missile &nbsp;
+        <kbd>Esc</kbd> Menu
+      </div>
+      <div class="volume-row">
+        <mat-icon class="volume-icon">volume_up</mat-icon>
+        <mat-slider min="0" max="100" step="1" discrete class="volume-slider">
+          <input matSliderThumb [value]="masterVolume" (valueChange)="volumeChange.emit($event)" />
+        </mat-slider>
+        <span class="volume-value">{{ masterVolume }}%</span>
+      </div>
+      <div class="custom-resources-row">
+        <span class="controls-label">Custom resources.dat:</span>
+        <input #customResInput type="file" accept=".dat" style="display:none"
+               (change)="customResourcesFileSelected.emit($event)" />
+        <button mat-stroked-button (click)="customResInput.click()" matTooltip="Load a custom resources.dat to test edited levels">
+          <mat-icon>upload_file</mat-icon> Load Custom resources.dat
+        </button>
+        @if (customResourcesLoaded) {
+          <button mat-raised-button color="accent"
+            [disabled]="gameRestarting"
+            (click)="restartGameWithCustomResources.emit()"
+            matTooltip="Reload the page to apply the custom resources.dat">
+            @if (gameRestarting) {
+              <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
+            } @else {
+              <mat-icon>restart_alt</mat-icon>
+            }
+            Restart Game
+          </button>
+          <button mat-stroked-button color="warn"
+            (click)="clearCustomResources.emit()"
+            matTooltip="Remove the custom resources.dat and revert to the built-in defaults">
+            <mat-icon>delete</mat-icon> Clear
+          </button>
+        }
+        @if (customResourcesName) {
+          <span class="custom-res-badge">
+            <mat-icon class="badge-icon">check_circle</mat-icon>
+            {{ customResourcesName }} loaded
+          </span>
+        }
+      </div>
+    </mat-card-footer>
+  </mat-card>
+</section>

@@ -1,167 +1,39 @@
-<!-- Site navigation toolbar -->
-<mat-toolbar class="site-toolbar" color="primary">
-  <span class="site-logo">🏎</span>
-  <span class="site-title">Reckless Drivin'</span>
-  <span class="toolbar-spacer"></span>
-  <nav class="nav-tabs" role="tablist" aria-label="Site sections">
-    <button mat-button class="nav-tab" [class.active]="activeTab() === 'game'"
-      [attr.aria-selected]="activeTab() === 'game'" (click)="setTab('game')">
-      <mat-icon>sports_esports</mat-icon> Play Game
-    </button>
-    <button mat-button class="nav-tab" [class.active]="activeTab() === 'editor'"
-      [attr.aria-selected]="activeTab() === 'editor'" (click)="setTab('editor')">
-      <mat-icon>map</mat-icon> Level Editor <span class="wip-badge">(Work in Progress)</span>
-    </button>
-  </nav>
-</mat-toolbar>
+<app-site-toolbar
+  [activeTab]="activeTab()"
+  [activeEditorSection]="editorSection()"
+  [parsedLevels]="parsedLevels()"
+  [selectedLevelId]="selectedLevelId()"
+  [hasEditorData]="hasEditorData()"
+  [workerBusy]="workerBusy()"
+  [editorError]="editorError()"
+  (tabChange)="setTab($event)"
+  (editorSectionChange)="setSection($event)"
+  (loadDefaultResources)="loadDefaultResources()"
+  (resourceFileSelected)="onResourceFileSelected($event)"
+  (downloadEditedResources)="downloadEditedResources()"
+  (clearEditorFile)="clearEditorResources()"
+  (selectLevel)="selectLevel($event)"
+></app-site-toolbar>
 
 <main>
-  <!-- =================== GAME TAB =================== -->
-  <!-- Game panel – always in DOM so WASM survives tab switches -->
-  <section id="panel-game" role="tabpanel" class="game-section" [class.tab-panel--hidden]="activeTab() !== 'game'">
-  @if (activeTab() === 'game') {
-    <mat-card class="hero-card">
-      <mat-card-header>
-        <mat-card-title>Reckless Drivin' — WebAssembly Port</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>
-          A fan-made SDL2 / Emscripten port of the classic Mac OS&nbsp;9 racing game
-          <em>Reckless Drivin'</em> by Jonas Echterhoff. Hold a number key when clicking Start to skip
-          directly to that level.
-          <a href="https://github.com/LachlanBWWright/RecklessDrivinPort" target="_blank" rel="noopener">View port repository</a>.
-        </p>
-      </mat-card-content>
-    </mat-card>
-  }
+  <app-game-panel
+    [activeTab]="activeTab()"
+    [statusText]="statusText()"
+    [progressPct]="progressPct()"
+    [overlayVisible]="overlayVisible()"
+    [masterVolume]="masterVolume()"
+    [customResourcesLoaded]="customResourcesLoaded()"
+    [customResourcesName]="customResourcesName()"
+    [gameRestarting]="gameRestarting()"
+    (toggleFullscreen)="toggleFullscreen()"
+    (volumeChange)="onVolumeSliderChange($event)"
+    (customResourcesFileSelected)="onCustomResourcesFileSelected($event)"
+    (restartGameWithCustomResources)="restartGameWithCustomResources()"
+    (clearCustomResources)="clearCustomResources()"
+  ></app-game-panel>
 
-    <mat-card class="game-card">
-      <mat-card-header>
-        <mat-card-title>Game</mat-card-title>
-        <mat-card-subtitle>{{ statusText() }}</mat-card-subtitle>
-        <button mat-icon-button class="fullscreen-btn" (click)="toggleFullscreen()" matTooltip="Fullscreen">
-          <mat-icon>fullscreen</mat-icon>
-        </button>
-      </mat-card-header>
-      <mat-card-content>
-        <div class="canvas-wrapper">
-          <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
-          <div class="loading-overlay" [class.hidden]="!overlayVisible()">
-            <mat-spinner diameter="48"></mat-spinner>
-            <p class="loading-msg">{{ statusText() }}</p>
-            <mat-progress-bar mode="determinate" [value]="progressPct()" class="loading-progress"></mat-progress-bar>
-          </div>
-        </div>
-      </mat-card-content>
-      <mat-card-footer>
-        <div class="controls-bar">
-          <span class="controls-label">Controls:</span>
-          <kbd>↑</kbd> Gas &nbsp;
-          <kbd>↓</kbd> Brake &nbsp;
-          <kbd>←</kbd><kbd>→</kbd> Steer &nbsp;
-          <kbd>Space</kbd> Handbrake &nbsp;
-          <kbd>Z</kbd> Mine &nbsp;
-          <kbd>X</kbd> Missile &nbsp;
-          <kbd>Esc</kbd> Menu
-        </div>
-        <div class="volume-row">
-          <mat-icon class="volume-icon">volume_up</mat-icon>
-          <mat-slider min="0" max="100" step="1" discrete class="volume-slider">
-            <input matSliderThumb [value]="masterVolume()" (valueChange)="onVolumeSliderChange($event)" />
-          </mat-slider>
-          <span class="volume-value">{{ masterVolume() }}%</span>
-        </div>
-        <!-- Custom resources.dat loader -->
-        <div class="custom-resources-row">
-          <span class="controls-label">Custom resources.dat:</span>
-          <input #customResInput type="file" accept=".dat" style="display:none"
-                 (change)="onCustomResourcesFileSelected($event)" />
-          <button mat-stroked-button (click)="customResInput.click()" matTooltip="Load a custom resources.dat to test edited levels">
-            <mat-icon>upload_file</mat-icon> Load Custom resources.dat
-          </button>
-          @if (customResourcesLoaded()) {
-            <button mat-raised-button color="accent"
-              [disabled]="gameRestarting()"
-              (click)="restartGameWithCustomResources()"
-              matTooltip="Reload the page to apply the custom resources.dat">
-              @if (gameRestarting()) {
-                <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
-              } @else {
-                <mat-icon>restart_alt</mat-icon>
-              }
-              Restart Game
-            </button>
-            <button mat-stroked-button color="warn"
-              (click)="clearCustomResources()"
-              matTooltip="Remove the custom resources.dat and revert to the built-in defaults">
-              <mat-icon>delete</mat-icon> Clear
-            </button>
-          }
-          @if (customResourcesName()) {
-            <span class="custom-res-badge">
-              <mat-icon class="badge-icon">check_circle</mat-icon>
-              {{ customResourcesName() }} loaded
-            </span>
-          }
-        </div>
-      </mat-card-footer>
-    </mat-card>
-  </section>
-
-  <!-- =================== EDITOR TAB =================== -->
   @if (activeTab() === 'editor') {
     <section id="panel-editor" role="tabpanel" class="editor-section">
-
-        <!-- Toolbar row merged with level selector -->
-        <mat-card class="editor-toolbar-card">
-          <mat-card-content>
-            <div class="editor-toolbar-row">
-              <div class="toolbar-actions">
-                <button mat-stroked-button (click)="loadDefaultResources()" [disabled]="workerBusy()">
-                  <mat-icon>cloud_download</mat-icon> Load Default
-                </button>
-                <input #fileInput type="file" accept=".dat" (change)="onResourceFileSelected($event)" [disabled]="workerBusy()" style="display:none" />
-                <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy()">
-                  <mat-icon>folder_open</mat-icon> Upload resources.dat
-                </button>
-                <button mat-raised-button color="primary" (click)="downloadEditedResources()" [disabled]="!hasEditorData() || workerBusy()">
-                  <mat-icon>download</mat-icon> Download Edited
-                </button>
-                <button mat-raised-button color="accent" (click)="saveEditedResourcesToGame()" [disabled]="!hasEditorData() || workerBusy()"
-                  matTooltip="Save all edits (including sprites) to the game and prepare for restart">
-                  <mat-icon>save</mat-icon> Save to Game
-                </button>
-
-                <div class="level-btns-inline">
-                  <span class="level-label">Level</span>
-                  @for (level of parsedLevels(); track level.resourceId) {
-                    <button mat-mini-fab
-                      [color]="selectedLevelId() === level.resourceId ? 'primary' : undefined"
-                      class="level-btn"
-                      [class.level-btn--active]="selectedLevelId() === level.resourceId"
-                      (click)="selectLevel(level.resourceId)"
-                      [matTooltip]="'Level ' + levelDisplayNum(level.resourceId) + (level.encrypted ? ' (encrypted)' : '')">
-                      {{ levelDisplayNum(level.resourceId) }}
-                    </button>
-                  }
-                </div>
-              </div>
-              <div class="toolbar-status">
-                @if (workerBusy()) {
-                  <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
-                  <span class="muted">Processing…</span>
-                }
-                <!-- resourcesStatus contains a verbose "Loaded X levels and Y sprites" message; hide it to save vertical space -->
-                @if (editorError()) {
-                  <span class="editor-error">
-                    <mat-icon>warning</mat-icon> {{ editorError() }}
-                  </span>
-                }
-              </div>
-            </div>
-          </mat-card-content>
-        </mat-card>
-
       @if (!hasEditorData() && !workerBusy()) {
         <mat-card class="no-data-card">
           <mat-card-content>
@@ -169,7 +41,6 @@
               <mat-icon class="no-data-icon">folder_open</mat-icon>
               <h3>No data loaded</h3>
               <p>Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
-              <!-- Note: the level editor is a work in progress and should not be used for production edits. -->
             </div>
           </mat-card-content>
         </mat-card>
@@ -188,787 +59,179 @@
       }
 
       @if (hasEditorData()) {
-        <!-- Level selector now inlined into toolbar for vertical efficiency -->
+        @if (editorSection() === 'properties') {
+          <app-editor-properties-section
+            [selectedLevel]="selectedLevel()"
+            [levelNum]="selectedLevel() ? levelDisplayNum(selectedLevel()!.resourceId) : 0"
+            [editRoadInfo]="editRoadInfo()"
+            [editTime]="editTime()"
+            [editLevelEnd]="editLevelEnd()"
+            [editObjectGroups]="editObjectGroups()"
+            [propertiesDirty]="propertiesDirty()"
+            [workerBusy]="workerBusy()"
+            (propsInput)="onPropertiesTabInput($event)"
+            (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.event)"
+            (saveProperties)="saveLevelProperties()"
+          ></app-editor-properties-section>
+        }
 
-        <!-- Editor section tabs using mat-tab-group -->
-        <mat-tab-group class="editor-tabs" [(selectedIndex)]="editorSectionIndex" animationDuration="150ms">
+        @if (editorSection() === 'objects') {
+          <app-editor-objects-section
+            [selectedLevel]="selectedLevel()"
+            [levelNum]="selectedLevel() ? levelDisplayNum(selectedLevel()!.resourceId) : 0"
+            [objects]="objects()"
+            [selectedObjIndex]="selectedObjIndex()"
+            [marks]="marks()"
+            [selectedMarkIndex]="selectedMarkIndex()"
+            [showTrackOverlay]="showTrackOverlay()"
+            [showMarks]="showMarks()"
+            [barrierDrawSide]="barrierDrawSide()"
+            [drawMode]="drawMode()"
+            [canUndo]="canUndo()"
+            [canRedo]="canRedo()"
+            [trackUpCount]="selectedLevel() ? selectedLevel()!.trackUp.length : 0"
+            [trackDownCount]="selectedLevel() ? selectedLevel()!.trackDown.length : 0"
+            [roadSegCount]="selectedLevel() ? selectedLevel()!.roadSegCount : 0"
+            [zoom]="canvasZoom()"
+            [panX]="canvasPanX()"
+            [panY]="canvasPanY()"
+            [scrollYMax]="selectedLevel() ? ((selectedLevel()!.roadSegs.length - 1) * 2 + 500) : 5000"
+            [scrollXMin]="roadXMin()"
+            [scrollXMax]="roadXMax()"
+            [workerBusy]="workerBusy()"
+            [isDragging]="isDragging()"
+            [dragTrackWaypoint]="dragTrackWaypoint()"
+            [hoverTrackWaypoint]="hoverTrackWaypoint()"
+            [spaceDown]="spaceDown() || isPanning()"
+            [roadMaxY]="selectedLevel() ? (selectedLevel()!.roadSegs.length > 0 ? (selectedLevel()!.roadSegs.length - 1) * 2 : 0) : 0"
+            [objectCount]="objects().length"
+            [hasMarkingPreview]="markingPreview().length > 0"
+            [markCreateMode]="markCreateMode()"
+            [pendingMarkPointCount]="pendingMarkPointCount()"
+            [editObjDirDeg]="editObjDirDeg()"
+            [editObjTypeRes]="editObjTypeRes()"
+            [availableTypeIds]="availableTypeIds()"
+            [spriteUrl]="selectedObjIndex() !== null ? getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes) : null"
+            [getSpriteUrl]="getSpritePreviewDataUrlBound"
+            [getFallbackColor]="getObjFallbackColorBound"
+            [typePalette]="typePalette"
+            [visibleTypeFilter]="visibleTypeFilter()"
+            [typeDimLabel]="getObjTypeDimensionLabel(editObjTypeRes())"
+            [filteredIndices]="filteredObjectIndices()"
+            [searchTerm]="objectSearchTerm()"
+            (canvasMouseDown)="onCanvasMouseDown($event)"
+            (canvasMouseMove)="onCanvasMouseMove($event)"
+            (canvasMouseUp)="onCanvasMouseUp($event)"
+            (canvasDblClick)="onCanvasDoubleClick($event)"
+            (canvasContextMenu)="onCanvasContextMenu($event)"
+            (canvasKeyDown)="onCanvasKeyDown($event)"
+            (canvasKeyUp)="onCanvasKeyUp($event)"
+            (canvasWheel)="onCanvasWheel($event)"
+            (addObject)="addObject()"
+            (removeObject)="removeSelectedObject()"
+            (duplicateObject)="duplicateSelectedObject()"
+            (frameAll)="frameAllObjects()"
+            (centerSelected)="centerOnSelectedObject()"
+            (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
+            (toggleMarks)="showMarks.set(!showMarks())"
+            (barrierDrawSideChange)="barrierDrawSide.set($event)"
+            (drawModeChange)="drawMode.set($event)"
+            (undo)="undo()"
+            (redo)="redo()"
+            (zoomIn)="zoomIn()"
+            (zoomOut)="zoomOut()"
+            (resetView)="resetView()"
+            (panXChange)="canvasPanX.set($event)"
+            (panYChange)="canvasPanY.set($event)"
+            (addMark)="addMark()"
+            (removeMark)="removeSelectedMark()"
+            (startMarkCreate)="startMarkCreateMode()"
+            (confirmMarkCreate)="confirmMarkCreateMode()"
+            (generateSideMarks)="generateSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset)"
+            (generateCentreMarks)="generateCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashFrequency)"
+            (previewSideMarks)="previewSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset)"
+            (previewCentreMarks)="previewCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashFrequency)"
+            (clearMarkingPreview)="markingPreview.set([])"
+            (objectSelected)="selectObject($event, true)"
+            (searchTermChange)="objectSearchTerm.set($event)"
+            (dirDegInput)="onObjDirDegInput($event)"
+            (typeResChange)="onObjTypeResChange($event)"
+            (typeVisibilityToggle)="toggleTypeVisibility($event)"
+            (showAll)="showAllObjectTypes()"
+            (hideAll)="hideAllObjectTypes()"
+            (removeSelected)="removeSelectedObject()"
+            (deselect)="selectedObjIndex.set(null)"
+          ></app-editor-objects-section>
+        }
 
-          <!-- ===== PROPERTIES TAB ===== -->
-          <mat-tab aria-label="Properties">
-            <ng-template mat-tab-label>
-              <mat-icon>settings</mat-icon><span class="editor-tab-label">Properties</span>
-            </ng-template>
-            <app-properties-tab
-              [selectedLevel]="selectedLevel()"
-              [levelNum]="selectedLevel() ? levelDisplayNum(selectedLevel()!.resourceId) : 0"
-              [editRoadInfo]="editRoadInfo()"
-              [editTime]="editTime()"
-              [editLevelEnd]="editLevelEnd()"
-              [editObjectGroups]="editObjectGroups()"
-              [propertiesDirty]="propertiesDirty()"
-              [workerBusy]="workerBusy()"
-              (propsInput)="onPropertiesTabInput($event)"
-              (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.event)"
-              (saveProperties)="saveLevelProperties()"
-            ></app-properties-tab>
-          </mat-tab>
+        @if (editorSection() === 'sprites') {
+          <app-editor-sprites-section
+            [packSpriteFrames]="packSpriteFrames()"
+            [selectedPackSpriteId]="selectedPackSpriteId()"
+            [workerBusy]="workerBusy()"
+            [getPackSpriteDataUrl]="getPackSpriteDataUrlBound"
+            (selectedPackSpriteIdChange)="selectedPackSpriteId.set($event)"
+            (openSpriteEditor)="openSpriteEditor($event)"
+            (spritePngUpload)="onSpritePngUpload($event.event, $event.spriteId)"
+            (exportSpritePng)="exportSpritePng()"
+          ></app-editor-sprites-section>
+        }
 
-          <!-- ===== OBJECTS TAB ===== -->
-          <mat-tab aria-label="Objects & Tracks">
-            <ng-template mat-tab-label>
-              <mat-icon>view_in_ar</mat-icon><span class="editor-tab-label">Objects &amp; Tracks</span>
-            </ng-template>
-            @if (selectedLevel()) {
-              <mat-card class="tab-panel-card objects-panel-card">
-                <mat-card-header>
-                  <mat-card-title></mat-card-title>
-                </mat-card-header>
-                <mat-card-content class="objects-card-content">
-                  <div class="object-canvas-layout">
-                    <app-editor-canvas
-                      [objects]="objects()"
-                      [selectedObjIndex]="selectedObjIndex()"
-                      [marks]="marks()"
-                      [selectedMarkIndex]="selectedMarkIndex()"
-                      [showTrackOverlay]="showTrackOverlay()"
-                      [showMarks]="showMarks()"
-                      [barrierDrawSide]="barrierDrawSide()"
-                      [drawMode]="drawMode()"
-                      [canUndo]="canUndo()"
-                      [canRedo]="canRedo()"
-                      [trackUpCount]="selectedLevel()!.trackUp.length"
-                      [trackDownCount]="selectedLevel()!.trackDown.length"
-                      [roadSegCount]="selectedLevel()!.roadSegCount"
-                      [zoom]="canvasZoom()"
-                      [panX]="canvasPanX()"
-                      [panY]="canvasPanY()"
-                      [scrollYMax]="(selectedLevel()!.roadSegs.length - 1) * 2 + 500"
-                      [scrollXMin]="roadXMin()"
-                      [scrollXMax]="roadXMax()"
-                      [levelNum]="levelDisplayNum(selectedLevel()!.resourceId)"
-                      [workerBusy]="workerBusy()"
-                      [isDragging]="isDragging()"
-                      [dragTrackWaypoint]="dragTrackWaypoint()"
-                      [hoverTrackWaypoint]="hoverTrackWaypoint()"
-                      [spaceDown]="spaceDown() || isPanning()"
-                      [roadMaxY]="selectedLevel()!.roadSegs.length > 0 ? (selectedLevel()!.roadSegs.length - 1) * 2 : 0"
-                      [objectCount]="objects().length"
-                      [hasMarkingPreview]="markingPreview().length > 0"
-                      [markCreateMode]="markCreateMode()"
-                      [pendingMarkPointCount]="pendingMarkPointCount()"
-                      (canvasMouseDown)="onCanvasMouseDown($event)"
-                      (canvasMouseMove)="onCanvasMouseMove($event)"
-                      (canvasMouseUp)="onCanvasMouseUp($event)"
-                      (canvasDblClick)="onCanvasDoubleClick($event)"
-                      (canvasContextMenu)="onCanvasContextMenu($event)"
-                      (canvasKeyDown)="onCanvasKeyDown($event)"
-                      (canvasKeyUp)="onCanvasKeyUp($event)"
-                      (canvasWheel)="onCanvasWheel($event)"
-                      (addObject)="addObject()"
-                      (removeObject)="removeSelectedObject()"
-                      (duplicateObject)="duplicateSelectedObject()"
-                      (frameAll)="frameAllObjects()"
-                      (centerSelected)="centerOnSelectedObject()"
-                      (toggleTracks)="showTrackOverlay.set(!showTrackOverlay())"
-                      (toggleMarks)="showMarks.set(!showMarks())"
-                      (barrierDrawSideChange)="barrierDrawSide.set($event)"
-                      (drawModeChange)="drawMode.set($event)"
-                      (undo)="undo()"
-                      (redo)="redo()"
-                      (zoomIn)="zoomIn()"
-                      (zoomOut)="zoomOut()"
-                      (resetView)="resetView()"
-                      (panXChange)="canvasPanX.set($event)"
-                      (panYChange)="canvasPanY.set($event)"
-                      (addMark)="addMark()"
-                      (removeMark)="removeSelectedMark()"
-                      (startMarkCreate)="startMarkCreateMode()"
-                      (confirmMarkCreate)="confirmMarkCreateMode()"
-                      (generateSideMarks)="generateSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset)"
-                      (generateCentreMarks)="generateCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashFrequency)"
-                      (previewSideMarks)="previewSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset)"
-                      (previewCentreMarks)="previewCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashFrequency)"
-                      (clearMarkingPreview)="markingPreview.set([])"
-                    ></app-editor-canvas>
+        @if (editorSection() === 'tiles') {
+          <app-editor-tiles-section
+            [tileTileEntries]="tileTileEntries()"
+            [selectedTileId]="selectedTileId()"
+            [workerBusy]="workerBusy()"
+            [getTileDataUrl]="getTileDataUrlBound"
+            (selectedTileIdChange)="selectedTileId.set($event)"
+            (openTileEditor)="openTileEditor($event)"
+            (tilePngUpload)="onTilePngUpload($event.event, $event.texId)"
+            (exportTilePng)="exportTilePng($event)"
+          ></app-editor-tiles-section>
+        }
 
-                    <div class="object-form-col">
+        @if (editorSection() === 'audio') {
+          <app-editor-audio-section
+            [audioEntries]="audioEntries()"
+            [selectedAudioId]="selectedAudioId()"
+            [selectedAudioBytes]="selectedAudioBytes()"
+            [selectedAudioSndInfo]="selectedAudioSndInfo()"
+            [audioPlayerVolume]="audioPlayerVolume()"
+            [audioDecodeInProgress]="audioDecodeInProgress()"
+            [audioControllable]="audioControllable()"
+            [audioPlaying]="audioPlaying()"
+            [audioCurrentTime]="audioCurrentTime()"
+            [audioDuration]="audioDuration()"
+            [workerBusy]="workerBusy()"
+            (selectAudioEntry)="selectAudioEntry($event)"
+            (setAudioPlayerVolume)="setAudioPlayerVolume($event)"
+            (togglePlayPause)="togglePlayPause()"
+            (seekAudio)="seekAudio($event)"
+            (exportAudioWav)="exportAudioWav()"
+            (audioWavUpload)="onAudioWavUpload($event)"
+          ></app-editor-audio-section>
+        }
 
-                        <app-object-inspector
-                          [selectedIndex]="selectedObjIndex()"
-                        [editDirDeg]="editObjDirDeg()"
-                        [editTypeRes]="editObjTypeRes()"
-                        [availableTypeIds]="availableTypeIds()"
-                        [spriteUrl]="selectedObjIndex() !== null ? getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes) : null"
-                        [getSpriteUrl]="getSpritePreviewDataUrlBound"
-                        [getFallbackColor]="getObjFallbackColorBound"
-                        [typePalette]="typePalette"
-                        [visibleTypeFilter]="visibleTypeFilter()"
-                        [workerBusy]="workerBusy()"
-                        [typeDimLabel]="getObjTypeDimensionLabel(editObjTypeRes())"
-                        (dirDegInput)="onObjDirDegInput($event)"
-                        (typeResChange)="onObjTypeResChange($event)"
-                        (typeVisibilityToggle)="toggleTypeVisibility($event)"
-                        (showAll)="showAllObjectTypes()"
-                        (hideAll)="hideAllObjectTypes()"
-                        (removeSelected)="removeSelectedObject()"
-                          (deselect)="selectedObjIndex.set(null)"
-                        ></app-object-inspector>
-
-                      <app-object-list
-                        [objects]="objects()"
-                        [filteredIndices]="filteredObjectIndices()"
-                        [selectedIndex]="selectedObjIndex()"
-                        [searchTerm]="objectSearchTerm()"
-                        [getSpriteUrl]="getSpritePreviewDataUrlBound"
-                        [getFallbackColor]="getObjFallbackColorBound"
-                        (objectSelected)="selectObject($event, true)"
-                        (searchTermChange)="objectSearchTerm.set($event)"
-                      ></app-object-list>
-
-                    </div>
-                  </div>
-                </mat-card-content>
-                <mat-card-actions>
-                
-                </mat-card-actions>
-              </mat-card>
-            }
-          </mat-tab>
-
-          <!-- ===== SPRITES TAB ===== -->
-          <mat-tab aria-label="Sprites">
-            <ng-template mat-tab-label>
-              <mat-icon>palette</mat-icon><span class="editor-tab-label">Sprites</span>
-            </ng-template>
-            <mat-card class="tab-panel-card">
-              <mat-card-header>
-                <mat-card-title>Sprite Viewer &amp; PPic Asset Editor</mat-card-title>
-              </mat-card-header>
-              <mat-card-content>
-                @if (packSpriteFrames().length > 0) {
-                  <mat-expansion-panel [expanded]="true" class="sprite-panel">
-                    <mat-expansion-panel-header>
-                      <mat-panel-title>
-                        <mat-icon>image</mat-icon>&nbsp;Game Sprites (Pack 129/137)
-                      </mat-panel-title>
-                      <mat-panel-description>
-                        <span class="badge">{{ packSpriteFrames().length }} frames</span>
-                      </mat-panel-description>
-                    </mat-expansion-panel-header>
-
-                    <div class="pack-sprite-viewer">
-                      <div class="pack-sprite-grid">
-                        @for (frame of packSpriteFrames(); track $index) {
-                          @if (getPackSpriteDataUrl(frame.id); as url) {
-                            <div class="pack-sprite-cell"
-                              [class.selected]="selectedPackSpriteId() === frame.id"
-                              (click)="selectedPackSpriteId.set(frame.id)"
-                              [matTooltip]="'Frame #' + frame.id + ' · ' + frame.bitDepth + '-bit · ' + frame.width + '×' + frame.height">
-                              <img [src]="url" class="pack-sprite-thumb" alt="" />
-                              <span class="pack-sprite-label">#{{ frame.id }}</span>
-                            </div>
-                          }
-                        }
-                      </div>
-
-                      @if (selectedPackSpriteId() !== null) {
-                        @if (getPackSpriteDataUrl(selectedPackSpriteId()!); as url) {
-                          <div class="pack-sprite-detail">
-                            <img [src]="url" class="pack-sprite-large" alt="sprite preview" />
-                            <mat-card class="sprite-meta-card">
-                              <mat-card-content>
-                                <p class="sprite-meta">
-                                  <strong>Frame</strong> #{{ selectedPackSpriteId() }}<br>
-                                  <strong>Depth</strong> {{ selectedPackSpriteFrame()?.bitDepth ?? '?' }}-bit
-                                  ({{ getSpriteFormatLabel(selectedPackSpriteFrame()?.bitDepth) }})<br>
-                                  <strong>Size</strong> {{ selectedPackSpriteFrame()?.width ?? '?' }}×{{ selectedPackSpriteFrame()?.height ?? '?' }} px
-                                </p>
-                              </mat-card-content>
-                            </mat-card>
-                            <div class="sprite-actions">
-                              @if (selectedPackSpriteFrame()?.bitDepth === 16) {
-                                <button mat-raised-button color="primary"
-                                  (click)="openSpriteEditor(selectedPackSpriteId()!)"
-                                  [disabled]="workerBusy()">
-                                  <mat-icon>brush</mat-icon> Edit Pixels
-                                </button>
-                                <!-- PNG upload to replace the sprite directly -->
-                                <input #spritePngInput type="file" accept="image/png,image/*" style="display:none"
-                                  (change)="onSpritePngUpload($event, selectedPackSpriteId()!)" />
-                                <button mat-stroked-button (click)="spritePngInput.click()" [disabled]="workerBusy()"
-                                  matTooltip="Upload a PNG to replace this sprite (scaled to match dimensions)">
-                                  <mat-icon>upload</mat-icon> Upload PNG
-                                </button>
-                              }
-                              <button mat-stroked-button (click)="exportSpritePng()">
-                                <mat-icon>download</mat-icon> Export PNG
-                              </button>
-                            </div>
-                          </div>
-                        }
-                      }
-                    </div>
-                  </mat-expansion-panel>
-                } @else {
-                  <div class="no-data-content">
-                    <mat-icon class="no-data-icon">image_not_supported</mat-icon>
-                    <p>Game sprite frames from Pack 129/137 will appear here once decoded. Load a resources.dat to begin.</p>
-                  </div>
-                }
-              </mat-card-content>
-            </mat-card>
-          </mat-tab>
-
-          <!-- ===== TILES TAB ===== -->
-          <mat-tab aria-label="Tiles">
-            <ng-template mat-tab-label>
-              <mat-icon>grid_view</mat-icon><span class="editor-tab-label">Tiles</span>
-            </ng-template>
-            <mat-card class="tab-panel-card">
-              <mat-card-header>
-                <mat-card-title>Road &amp; Background Tile Editor</mat-card-title>
-                <mat-card-subtitle>Pack 136 (kPackTx16 — 16-bit RGB555) &amp; Pack 133 (kPackTxtR — 8-bit)</mat-card-subtitle>
-              </mat-card-header>
-              <mat-card-content>
-                @if (tileTileEntries().length > 0) {
-                  <div class="tile-viewer">
-                    <div class="pack-sprite-grid">
-                      @for (tile of tileTileEntries(); track tile.texId) {
-                        @if (getTileDataUrl(tile.texId); as url) {
-                          <div class="pack-sprite-cell"
-                            [class.selected]="selectedTileId() === tile.texId"
-                            (click)="selectedTileId.set(tile.texId)"
-                            [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
-                            <img [src]="url" class="pack-sprite-thumb"
-                              [style.imageRendering]="'pixelated'" alt="" />
-                            <span class="pack-sprite-label">#{{ tile.texId }}</span>
-                          </div>
-                        }
-                      }
-                    </div>
-
-                    @if (selectedTileId() !== null) {
-                      @if (getTileDataUrl(selectedTileId()!); as url) {
-                        <div class="pack-sprite-detail">
-                          <img [src]="url" class="pack-sprite-large"
-                            [style.imageRendering]="'pixelated'" alt="tile preview" />
-                          <mat-card class="sprite-meta-card">
-                            <mat-card-content>
-                              <p class="sprite-meta">
-                                <strong>Tile</strong> #{{ selectedTileId() }}<br>
-                                <strong>Size</strong> {{ getTileDimensions(selectedTileId()!) }}<br>
-                                <strong>Format</strong> RGB555 (16-bit)
-                              </p>
-                            </mat-card-content>
-                          </mat-card>
-                          <div class="sprite-actions">
-                            <!-- Edit pixels inline (reuses SpriteEditorComponent) -->
-                            <button mat-raised-button color="primary"
-                              (click)="openTileEditor(selectedTileId()!)"
-                              [disabled]="workerBusy()"
-                              matTooltip="Open pixel editor for this tile">
-                              <mat-icon>brush</mat-icon> Edit Pixels
-                            </button>
-                            <!-- PNG upload to replace this tile -->
-                            <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
-                              (change)="onTilePngUpload($event, selectedTileId()!)" />
-                            <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy()"
-                              matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
-                              <mat-icon>upload</mat-icon> Upload PNG
-                            </button>
-                            <button mat-stroked-button (click)="exportTilePng(selectedTileId()!)">
-                              <mat-icon>download</mat-icon> Export PNG
-                            </button>
-                          </div>
-                        </div>
-                      }
-                    }
-                  </div>
-                } @else {
-                  <div class="no-data-content">
-                    <mat-icon class="no-data-icon">grid_view</mat-icon>
-                    <p>Road texture tiles from Pack 136 (kPackTx16) will appear here once decoded. Load a resources.dat to begin.</p>
-                  </div>
-                }
-              </mat-card-content>
-            </mat-card>
-          </mat-tab>
-
-          <!-- ===== AUDIO TAB ===== -->
-          <mat-tab aria-label="Audio">
-            <ng-template mat-tab-label>
-              <mat-icon>music_note</mat-icon><span class="editor-tab-label">Audio</span>
-            </ng-template>
-            <mat-card class="tab-panel-card">
-              <mat-card-header>
-                <mat-card-title>Sound Editor</mat-card-title>
-                <mat-card-subtitle>Pack 134 (kPackSnds — Mac OS &#39;snd &#39; format)</mat-card-subtitle>
-              </mat-card-header>
-              <mat-card-content>
-                @if (audioEntries().length > 0) {
-                  <div class="audio-editor-layout">
-                    <!-- Left: list of sound entries -->
-                    <div class="audio-entry-list">
-                      @for (entry of audioEntries(); track entry.id) {
-                        <button class="audio-entry-btn"
-                          [class.audio-entry-btn--active]="selectedAudioId() === entry.id"
-                          (click)="selectAudioEntry(entry.id)">
-                          <mat-icon class="audio-entry-icon">audiotrack</mat-icon>
-                          <span>Sound #{{ entry.id }}</span>
-                          @if (entry.durationMs !== undefined) {
-                            <span class="res-size-badge">{{ entry.durationMs! / 1000 | number:'1.1-1' }}s</span>
-                          } @else {
-                            <span class="res-size-badge">{{ entry.sizeBytes | number }} B</span>
-                          }
-                        </button>
-                      }
-                    </div>
-
-                    <!-- Right: selected sound detail -->
-                    @if (selectedAudioId() !== null && selectedAudioBytes()) {
-                      <div class="audio-detail">
-                        <h4 class="audio-detail-title">Sound #{{ selectedAudioId() }}</h4>
-                        @if (selectedAudioSndInfo(); as info) {
-                          <div class="audio-meta">
-                            <span class="badge">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
-                            <span class="badge">{{ info.numChannels === 2 ? 'Stereo' : 'Mono' }}</span>
-                            <span class="badge">{{ (info.numFrames / info.sampleRate) | number:'1.1-1' }}s</span>
-                            <span class="badge">
-                              @if (info.encode === 0) { PCM 8-bit }
-                              @else if (info.encode === 255) { PCM 16-bit }
-                              @else { encode={{ info.encode }} }
-                            </span>
-                          </div>
-                        }
-                        <div class="audio-waveform-placeholder">
-                          <mat-icon class="waveform-icon">graphic_eq</mat-icon>
-                          <span>{{ selectedAudioBytes()!.length | number }} bytes</span>
-                        </div>
-                        <div class="audio-actions" style="display:flex;flex-direction:column;gap:8px;">
-                           <!-- Volume slider row -->
-                           <div style="display:flex;align-items:center;gap:10px;">
-                             <mat-icon style="font-size:18px;height:18px;width:18px;color:#8a8a8a">volume_up</mat-icon>
-                             <mat-slider min="0" max="100" step="1" discrete style="width:140px">
-                               <input matSliderThumb [value]="audioPlayerVolume()"
-                                 (valueChange)="setAudioPlayerVolume($event)" />
-                             </mat-slider>
-                             <span style="font-size:0.78rem;color:#8a8a8a;min-width:32px">{{ audioPlayerVolume() }}%</span>
-                           </div>
-                           <div style="display:flex;align-items:center;gap:12px;">
-                             <button mat-raised-button color="primary"
-                                (click)="togglePlayPause()"
-                                [disabled]="audioDecodeInProgress() || (!audioControllable() && !selectedAudioBytes())">
-                                  <mat-icon matButtonIcon>{{ audioPlaying() ? 'pause' : 'play_arrow' }}</mat-icon>
-                                  {{ audioPlaying() ? 'Pause' : 'Play' }}
-                              </button>
-                              <div class="audio-progress-row" style="display:inline-flex;align-items:center;margin-left:12px;">
-                                <input type="range" min="0" [max]="audioDuration()" step="0.01"
-                                  [value]="audioCurrentTime()"
-                                  (input)="seekAudio($any($event.target).valueAsNumber)"
-                                  [disabled]="!audioControllable()" style="width:240px;margin-right:8px;" />
-                                <span class="audio-time">{{ formatTime(audioCurrentTime()) }} / {{ formatTime(audioDuration()) }}</span>
-                              </div>
-                           </div>
-                           <div style="display:flex;align-items:center;gap:12px;">
-                             <button mat-stroked-button (click)="exportAudioWav()"
-                               [disabled]="!selectedAudioBytes()">
-                               <mat-icon>download</mat-icon> Export WAV
-                             </button>
-                             <!-- WAV upload to replace the sound -->
-                             <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none"
-                               (change)="onAudioWavUpload($event)" />
-                             <button mat-stroked-button (click)="audioWavInput.click()" [disabled]="workerBusy()"
-                               matTooltip="Upload a WAV file to replace this sound">
-                               <mat-icon>upload</mat-icon> Replace WAV
-                             </button>
-                           </div>
-                        </div>
-                      </div>
-                    } @else if (selectedAudioId() !== null) {
-                      <div class="res-placeholder">
-                        <mat-spinner diameter="32"></mat-spinner>
-                      </div>
-                    } @else {
-                      <div class="res-placeholder">
-                        <p class="muted">Select a sound from the list.</p>
-                      </div>
-                    }
-                  </div>
-                } @else {
-                  <div class="no-data-content">
-                    <mat-icon class="no-data-icon">music_off</mat-icon>
-                    <p>Sound entries from Pack 134 (kPackSnds) will appear here once a resources.dat is loaded.</p>
-                  </div>
-                }
-              </mat-card-content>
-            </mat-card>
-          </mat-tab>
-
-          <!-- ===== SCREENS / HUD TAB ===== -->
-          <mat-tab aria-label="Screens">
-            <ng-template mat-tab-label>
-              <mat-icon>image</mat-icon><span class="editor-tab-label">Screens</span>
-            </ng-template>
-            <mat-card class="tab-panel-card">
-              <mat-card-header>
-                <mat-card-title>Screens &amp; HUD Icons Editor</mat-card-title>
-                <mat-card-subtitle>Icon and screen image resources — ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</mat-card-subtitle>
-              </mat-card-header>
-              <mat-card-content>
-                @if (iconEntries().length > 0) {
-                  <div class="screens-layout">
-                    <!-- Left: icon list -->
-                    <div class="icon-entry-list">
-                      @for (icon of iconEntries(); track $index) {
-                        <button class="audio-entry-btn"
-                          [class.audio-entry-btn--active]="selectedIconId() === icon.id && selectedIconType() === icon.type"
-                          (click)="selectIconEntry(icon.type, icon.id)">
-                          @if (getIconThumbDataUrl(icon.type, icon.id); as thumbUrl) {
-                            <img [src]="thumbUrl" class="icon-list-thumb" alt="" />
-                          } @else {
-                            <mat-icon class="audio-entry-icon">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
-                          }
-                          <span>{{ icon.label }}</span>
-                          <span class="res-size-badge">{{ icon.type }}</span>
-                        </button>
-                      }
-                    </div>
-
-                    <!-- Right: icon detail -->
-                    @if (selectedIconId() !== null) {
-                      <div class="icon-detail">
-                        <h4 class="audio-detail-title">{{ selectedIconLabel() }}</h4>
-                        @if (iconPreviewCanvas(); as canvas) {
-                            <img [src]="canvas.toDataURL()" class="icon-large-preview"
-                              [style.imageRendering]="'pixelated'" alt="icon preview">
-                          } @else {
-                            <div class="icon-placeholder">
-                              <mat-spinner diameter="32"></mat-spinner>
-                            </div>
-                          }
-                          @if (selectedIconType() !== 'PICT') {
-                          <div class="sprite-actions">
-                            <button mat-stroked-button (click)="exportIconPng()">
-                              <mat-icon>download</mat-icon> Export PNG
-                            </button>
-                            <input #iconPngInput type="file" accept="image/png,image/*" style="display:none"
-                              (change)="onIconPngUpload($event)" />
-                            <button mat-stroked-button (click)="iconPngInput.click()" [disabled]="workerBusy()"
-                              [matTooltip]="selectedIconType() === 'icl8' ? 'Upload PNG (32×32), converted to 8-bit Mac palette'
-                                : selectedIconType() === 'ics8' ? 'Upload PNG (16×16), converted to 8-bit Mac palette'
-                                : 'Upload PNG (32×32), converted to 1-bit'">
-                              <mat-icon>upload</mat-icon> Replace PNG
-                            </button>
-                          </div>
-                          <p class="muted" style="margin-top:12px;font-size:0.85em">
-                            @if (selectedIconType() === 'ICN#' || selectedIconType() === 'ics#') {
-                              ICN# / ics# resources are 32×32 1-bit black-and-white bitmaps.
-                            } @else if (selectedIconType() === 'icl8') {
-                              icl8 resources are 32×32 8-bit colour-palette icons (Mac system palette).
-                            } @else if (selectedIconType() === 'ics8') {
-                              ics8 resources are 16×16 8-bit colour-palette icons (Mac system palette).
-                            }
-                          </p>
-                          } @else {
-                          <div class="sprite-actions">
-                            <button mat-stroked-button (click)="exportIconRaw()">
-                              <mat-icon>download</mat-icon> Export Raw
-                            </button>
-                          </div>
-                          }
-                      </div>
-                    } @else {
-                      <div class="res-placeholder">
-                        <p class="muted">Select an entry from the list.</p>
-                      </div>
-                    }
-                  </div>
-                } @else {
-                  <div class="no-data-content">
-                    <mat-icon class="no-data-icon">image_not_supported</mat-icon>
-                    <p>Screen and icon resources will appear here once a resources.dat is loaded.</p>
-                  </div>
-                }
-              </mat-card-content>
-            </mat-card>
-          </mat-tab>
-
-          @if (false) {
-          <!-- ===== RESOURCE BROWSER TAB (disabled) ===== -->
-          <mat-tab aria-label="Resources">
-            <ng-template mat-tab-label>
-              <mat-icon>data_object</mat-icon><span class="editor-tab-label">Resources</span>
-            </ng-template>
-            <mat-card class="tab-panel-card">
-              <mat-card-header>
-                <mat-card-title>Resource Browser</mat-card-title>
-                <mat-card-subtitle>Browse and edit all resources in resources.dat — struct fields, string lists, raw bytes</mat-card-subtitle>
-              </mat-card-header>
-              <mat-card-content>
-                @if (allResourceEntries().length > 0) {
-                  <div class="res-browser-layout">
-                    <!-- Left column: resource type list -->
-                    <div class="res-type-list">
-                      @for (group of allResourceTypes(); track group.type) {
-                        <mat-expansion-panel [expanded]="selectedResType() === group.type" class="res-type-panel">
-                          <mat-expansion-panel-header>
-                            <mat-panel-title class="res-type-title">
-                              <code>{{ group.type }}</code>
-                            </mat-panel-title>
-                            <mat-panel-description>
-                              <span class="badge">{{ group.entries.length }}</span>
-                            </mat-panel-description>
-                          </mat-expansion-panel-header>
-                          <div class="res-entry-list">
-                            @for (entry of group.entries; track entry.id) {
-                              <button class="res-entry-btn"
-                                [class.res-entry-btn--selected]="selectedResType() === group.type && selectedResId() === entry.id"
-                                (click)="selectResource(group.type, entry.id)">
-                                #{{ entry.id }}
-                                <span class="res-entry-size">{{ entry.size }}B</span>
-                              </button>
-                            }
-                          </div>
-                        </mat-expansion-panel>
-                      }
-                    </div>
-
-                    <!-- Right column: editor panel -->
-                    <div class="res-editor-panel">
-                      @if (resBrowserBusy()) {
-                        <div class="res-loading-row">
-                          <mat-spinner diameter="20"></mat-spinner>
-                          <span class="muted">Loading…</span>
-                        </div>
-                      }
-                      @if (selectedResType() !== null && selectedResId() !== null) {
-                        <div class="res-editor-header">
-                          <h3 class="res-editor-title">
-                            <code>{{ selectedResType() }}</code> #{{ selectedResId() }}
-                          </h3>
-                          <div class="res-editor-actions">
-                            <button mat-icon-button (click)="downloadSelectedResource()"
-                              matTooltip="Download raw bytes" [disabled]="!selectedResBytes()">
-                              <mat-icon>download</mat-icon>
-                            </button>
-                            <button mat-icon-button (click)="triggerUploadResource()"
-                              matTooltip="Replace with uploaded file" [disabled]="resBrowserBusy()">
-                              <mat-icon>upload</mat-icon>
-                            </button>
-                          </div>
-                        </div>
-
-                        @if (resBrowserStatus()) {
-                          <p class="res-status-error">{{ resBrowserStatus() }}</p>
-                        }
-
-                        <!-- STR# string list editor -->
-                        @if (selectedResType() === 'STR#' && selectedResStrings() !== null) {
-                          <div class="str-list-editor">
-                            @for (str of selectedResStrings()!; track $index) {
-                              <div class="str-list-row">
-                                <span class="str-idx">{{ $index }}</span>
-                                <input class="str-input mat-body-1"
-                                  [value]="str"
-                                  (input)="updateResString($index, $any($event.target).value)" />
-                                <button mat-icon-button (click)="removeResString($index)" matTooltip="Remove string">
-                                  <mat-icon>delete</mat-icon>
-                                </button>
-                              </div>
-                            }
-                            <div class="str-list-actions">
-                              <button mat-stroked-button (click)="addResString()">
-                                <mat-icon>add</mat-icon> Add String
-                              </button>
-                              <button mat-raised-button color="primary" (click)="saveStrList()" [disabled]="resBrowserBusy()">
-                                <mat-icon>save</mat-icon> Save STR#
-                              </button>
-                            </div>
-                          </div>
-                        }
-
-                        <!-- STR / TEXT text editor -->
-                        @else if ((selectedResType() === 'STR ' || selectedResType() === 'TEXT') && selectedResText() !== null) {
-                          <div class="res-text-editor-wrap">
-                            <textarea class="res-text-editor"
-                              [value]="selectedResText()!"
-                              (input)="selectedResText.set($any($event.target).value)"
-                              rows="12"></textarea>
-                            <button mat-raised-button color="primary" (click)="saveResText()" [disabled]="resBrowserBusy()">
-                              <mat-icon>save</mat-icon> Save Text
-                            </button>
-                          </div>
-                        }
-
-                        <!-- Pack resource: entry list + entry editor -->
-                        @else if (selectedResType() === 'Pack' && selectedPackEntries() !== null) {
-                          <div class="pack-layout">
-                            <div class="pack-entry-list">
-                              <span class="muted pack-entries-label">Entries ({{ selectedPackEntries()!.length }})</span>
-                              @for (entry of selectedPackEntries()!; track entry.id) {
-                                <button class="res-entry-btn"
-                                  [class.res-entry-btn--selected]="selectedPackEntryId() === entry.id"
-                                  (click)="selectPackEntry(selectedResId()!, entry.id)">
-                                  #{{ entry.id }}
-                                  <span class="res-entry-size">{{ entry.size }}B</span>
-                                </button>
-                              }
-                            </div>
-                            @if (selectedPackEntryId() !== null && selectedPackEntryBytes() !== null) {
-                              <div class="pack-entry-editor">
-                                <div class="pack-entry-header">
-                                  <span class="pack-entry-title">Entry #{{ selectedPackEntryId() }}</span>
-                                  <div class="pack-entry-actions">
-                                    <button mat-icon-button (click)="downloadSelectedPackEntry()" matTooltip="Download entry bytes">
-                                      <mat-icon>download</mat-icon>
-                                    </button>
-                                    <button mat-icon-button (click)="triggerUploadPackEntry()" matTooltip="Replace entry bytes" [disabled]="resBrowserBusy()">
-                                      <mat-icon>upload</mat-icon>
-                                    </button>
-                                  </div>
-                                </div>
-                                @if (selectedPackEntryFields().length > 0) {
-                                  <div class="res-fields-table">
-                                    @for (field of selectedPackEntryFields(); track $index) {
-                                      <div class="res-field-row">
-                                        <label class="res-field-name">{{ field.name }}</label>
-                                        <input class="res-field-input"
-                                          type="number"
-                                          [step]="field.type === 'f32' ? 'any' : '1'"
-                                          [value]="field.value"
-                                          (change)="onPackEntryFieldInput($index, $event)" />
-                                        <span class="res-field-type">{{ field.type }}</span>
-                                      </div>
-                                    }
-                                    <button mat-raised-button color="primary" (click)="savePackEntryFields()" [disabled]="resBrowserBusy()">
-                                      <mat-icon>save</mat-icon> Save Entry
-                                    </button>
-                                  </div>
-                                } @else {
-                                  <pre class="hex-dump">{{ getResHexDump(selectedPackEntryBytes()!) }}</pre>
-                                  <p class="muted">No schema for Pack #{{ selectedResId() }}. Use upload/download to edit raw bytes.</p>
-                                }
-                              </div>
-                            } @else {
-                              <p class="muted res-editor-placeholder">Select an entry to edit it.</p>
-                            }
-                          </div>
-                        }
-
-                        <!-- Known struct schema: editable field table -->
-                        @else if (selectedResFields().length > 0) {
-                          <div class="res-fields-table">
-                            @for (field of selectedResFields(); track $index) {
-                              <div class="res-field-row">
-                                <label class="res-field-name">{{ field.name }}</label>
-                                <input class="res-field-input"
-                                  type="number"
-                                  [step]="field.type === 'f32' ? 'any' : '1'"
-                                  [value]="field.value"
-                                  (change)="onResFieldInput($index, $event)" />
-                                <span class="res-field-type">{{ field.type }}</span>
-                              </div>
-                            }
-                            @if (selectedResFieldsTruncated()) {
-                              <p class="muted">… (additional bytes not shown; only first {{ selectedResFields().length }} auto-detected fields displayed)</p>
-                            }
-                            <button mat-raised-button color="primary" (click)="saveResFields()" [disabled]="resBrowserBusy()">
-                              <mat-icon>save</mat-icon> Save Fields
-                            </button>
-                          </div>
-                        }
-
-                        <!-- snd resource: audio metadata + play button -->
-                        @else if (selectedResIsAudio() && selectedResBytes() !== null) {
-                          <div class="res-audio-view">
-                            @if (selectedResSndInfo(); as info) {
-                              <dl class="res-meta-list">
-                                <dt>Sample Rate</dt><dd>{{ info?.sampleRate }} Hz</dd>
-                                <dt>Channels</dt><dd>{{ info?.numChannels }}</dd>
-                                <dt>Frames</dt><dd>{{ info?.numFrames }}</dd>
-                                <dt>Sample Size</dt><dd>{{ info?.sampleSize }}-bit</dd>
-                                <dt>Encoding</dt><dd>{{ info?.encode }}</dd>
-                              </dl>
-                            }
-                            <div class="audio-actions" style="display:flex;flex-direction:column;gap:8px;">
-                              <div style="display:flex;align-items:center;gap:12px;">
-                                <button mat-raised-button color="primary"
-                                  (click)="togglePlayPause()"
-                                  [disabled]="audioDecodeInProgress() || (!audioControllable() && !selectedResBytes())">
-                                  <mat-icon matButtonIcon>{{ audioPlaying() ? 'pause' : 'play_arrow' }}</mat-icon>
-                                  {{ audioPlaying() ? 'Pause' : 'Play' }}
-                                </button>
-                                <div class="audio-progress-row" style="display:inline-flex;align-items:center;margin-left:12px;">
-                                  <input type="range" min="0" [max]="audioDuration()" step="0.01"
-                                    [value]="audioCurrentTime()"
-                                    (input)="seekAudio($any($event.target).valueAsNumber)"
-                                    [disabled]="!audioControllable()" style="width:240px;margin-right:8px;" />
-                                  <span class="audio-time">{{ formatTime(audioCurrentTime()) }} / {{ formatTime(audioDuration()) }}</span>
-                                </div>
-                              </div>
-                              <div style="display:flex;align-items:center;gap:12px;">
-                                <button mat-stroked-button (click)="exportAudioWav()" [disabled]="!selectedResBytes()">
-                                  <mat-icon>download</mat-icon> Export WAV
-                                </button>
-                                <!-- WAV upload to replace the sound -->
-                                <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none" (change)="onAudioWavUpload($event)" />
-                                <button mat-stroked-button (click)="audioWavInput.click()" [disabled]="workerBusy()" matTooltip="Upload a WAV file to replace this sound">
-                                  <mat-icon>upload</mat-icon> Replace WAV
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        }
-
-                        <!-- Generic hex dump for unknown types -->
-                        @else if (selectedResBytes() !== null) {
-                          <div class="res-hex-view">
-                            <pre class="hex-dump">{{ getResHexDump(selectedResBytes()!) }}</pre>
-                            <p class="muted">{{ selectedResBytes()!.length }} bytes — no named schema. Use upload/download to edit raw bytes.</p>
-                          </div>
-                        }
-
-                        @else if (!resBrowserBusy()) {
-                          <p class="muted res-editor-placeholder">Loading resource data…</p>
-                        }
-
-                      } @else {
-                        <p class="muted res-editor-placeholder">Select a resource type and entry from the list to view and edit it.</p>
-                      }
-                    </div>
-                  </div>
-                } @else {
-                  <div class="no-data-content">
-                    <mat-icon class="no-data-icon">data_object</mat-icon>
-                    <p>Load a resources.dat file to browse all resources.</p>
-                  </div>
-                }
-              </mat-card-content>
-            </mat-card>
-            </mat-tab>
-          }
-
-
-        </mat-tab-group>
+        @if (editorSection() === 'screens') {
+          <app-editor-screens-section
+            [iconEntries]="iconEntries()"
+            [selectedIconId]="selectedIconId()"
+            [selectedIconType]="selectedIconType()"
+            [selectedIconLabel]="selectedIconLabel()"
+            [iconPreviewCanvas]="iconPreviewCanvas()"
+            [workerBusy]="workerBusy()"
+            [getIconThumbDataUrl]="getIconThumbDataUrlBound"
+            (selectIconEntry)="selectIconEntry($event.type, $event.id)"
+            (exportIconPng)="exportIconPng()"
+            (exportIconRaw)="exportIconRaw()"
+            (iconPngUpload)="onIconPngUpload($event)"
+          ></app-editor-screens-section>
+        }
       }
     </section>
   }
 </main>
 
-<!-- ---- Page footer ---- -->
-<footer class="site-footer">
-  <span class="footer-text">
-    Reckless Drivin' WebAssembly Port by
-    <a href="https://github.com/LachlanBWWright" target="_blank" rel="noopener">LachlanBWWright</a>
-    &mdash;
-    Original game by <a href="https://github.com/jechter/RecklessDrivin" target="_blank" rel="noopener">Jonas Echterhoff</a>
-    &mdash;
-    Built on <a href="https://github.com/natecraddock/open-reckless-drivin" target="_blank" rel="noopener">Nathan Craddock's port</a>
-    and <a href="https://github.com/jorio/Pomme" target="_blank" rel="noopener">Pomme</a>
-  </span>
-</footer>
-
-<!-- ---- Sprite pixel editor popup ---- -->
 <app-sprite-editor
   [frame]="spriteEditorFrame()"
   [open]="spriteEditorOpen()"
