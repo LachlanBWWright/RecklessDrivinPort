@@ -401,3 +401,77 @@ describe('serializeLevelRoadSegs round-trip', () => {
     expect(parsed.value.roadSegs[0].v0).toBe(100);
   });
 });
+
+import { rgb565ToRgba, rgbaToRgb555 } from './level-editor.service';
+
+describe('rgb565ToRgba', () => {
+  it('converts pure red (0xF800) to [255, 0, 0, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0xF800);
+    expect(r).toBe(255);
+    expect(g).toBe(0);
+    expect(b).toBe(0);
+    expect(a).toBe(255);
+  });
+
+  it('converts pure green (0x07E0) to [0, 255, 0, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0x07E0);
+    expect(r).toBe(0);
+    expect(g).toBe(255);
+    expect(b).toBe(0);
+    expect(a).toBe(255);
+  });
+
+  it('converts pure blue (0x001F) to [0, 0, 255, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0x001F);
+    expect(r).toBe(0);
+    expect(g).toBe(0);
+    expect(b).toBe(255);
+    expect(a).toBe(255);
+  });
+
+  it('converts black (0x0000) to [0, 0, 0, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0x0000);
+    expect(r).toBe(0);
+    expect(g).toBe(0);
+    expect(b).toBe(0);
+    expect(a).toBe(255);
+  });
+
+  it('converts white (0xFFFF) to [255, 255, 255, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0xFFFF);
+    expect(r).toBe(255);
+    expect(g).toBe(255);
+    expect(b).toBe(255);
+    expect(a).toBe(255);
+  });
+});
+
+describe('rgbaToRgb555', () => {
+  it('converts pure red (255, 0, 0) to 0x7C00', () => {
+    expect(rgbaToRgb555(255, 0, 0)).toBe(0x7C00);
+  });
+
+  it('converts pure green (0, 255, 0) to 0x03E0', () => {
+    expect(rgbaToRgb555(0, 255, 0)).toBe(0x03E0);
+  });
+
+  it('converts pure blue (0, 0, 255) to 0x001F', () => {
+    expect(rgbaToRgb555(0, 0, 255)).toBe(0x001F);
+  });
+
+  it('converts black (0, 0, 0) to 0x0000', () => {
+    expect(rgbaToRgb555(0, 0, 0)).toBe(0x0000);
+  });
+
+  it('converts white (255, 255, 255) to 0x7FFF', () => {
+    expect(rgbaToRgb555(255, 255, 255)).toBe(0x7FFF);
+  });
+
+  it('r5g5b5 channels are all 5-bit (0-31)', () => {
+    for (let i = 0; i < 256; i += 16) {
+      const val = rgbaToRgb555(i, i, i);
+      expect(val).toBeGreaterThanOrEqual(0);
+      expect(val).toBeLessThanOrEqual(0x7FFF);
+    }
+  });
+});

@@ -3832,7 +3832,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (cx < -50 || cx > W + 50 || cy < -50 || cy > H + 50) continue;
 
       ctx.globalAlpha = isFilteredOut ? 0.3 : 1.0;
-      const color = OBJ_PALETTE[typeIdx];
+      const color = OBJ_PALETTE[typeIdx] ?? '#888888';
       const preview = this.getObjectSpritePreview(obj.typeRes);
 
       // Use native sprite pixel dimensions (xSize × ySize from tSpriteHeader) scaled by
@@ -7012,7 +7012,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   getObjFallbackColor(typeRes: number): string {
     // FNV-1a style: rotate around the palette
     const paletteIdx = ((typeRes % OBJ_PALETTE.length) + OBJ_PALETTE.length) % OBJ_PALETTE.length;
-    return OBJ_PALETTE[paletteIdx];
+    return OBJ_PALETTE[paletteIdx] ?? '#888888';
   }
 
   private applyVolumeToWasm(pct: number): void {
