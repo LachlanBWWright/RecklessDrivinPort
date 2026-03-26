@@ -87,88 +87,14 @@ export class EditorCanvasComponent {
   @Output() previewCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashFrequency: number }>();
   @Output() clearMarkingPreview = new EventEmitter<void>();
 
-  // ── Marking popup local state ─────────────────────────────────────────────
   showMarkingPopup = false;
   showInfoPopup = false;
-  markingTab: 'side' | 'dash' = 'side';
-
-  // Side marks – road checkboxes
-  sideCombined = true;
-  sideLeft = true;
-  sideRight = true;
-  sideYStart = 0;
-  sideYEnd = 400;
-  sideInset = 10;
-
-  // Centre marks – road checkboxes
-  centreCombined = true;
-  centreLeft = true;
-  centreRight = true;
-  centreYStart = 0;
-  centreYEnd = 400;
-  dashFrequency = 32;
-
-  /** Debounce timer for auto-preview. */
-  private _previewDebounce: ReturnType<typeof setTimeout> | null = null;
-
-  /** Convert three checkbox values to a MarkingRoadSelection value. */
-  private checkboxesToSelection(combined: boolean, left: boolean, right: boolean): MarkingRoadSelection {
-    if (combined && (left || right)) return 'both';   // cover all cases
-    if (combined) return 'single';
-    if (left && right) return 'both';
-    if (left) return 'left';
-    if (right) return 'right';
-    return 'both'; // fallback: all
-  }
-
-  get sideRoadSelection(): MarkingRoadSelection {
-    return this.checkboxesToSelection(this.sideCombined, this.sideLeft, this.sideRight);
-  }
-
-  get centreRoadSelection(): MarkingRoadSelection {
-    return this.checkboxesToSelection(this.centreCombined, this.centreLeft, this.centreRight);
-  }
 
   toggleMarkingPopup(): void {
     this.showMarkingPopup = !this.showMarkingPopup;
     if (!this.showMarkingPopup) {
       this.clearMarkingPreview.emit();
-    } else {
-      // Show immediate preview when popup opens
-      this.schedulePreview(0);
     }
-  }
-
-  /** Schedule a debounced auto-preview after form field changes. */
-  schedulePreview(delayMs = 300): void {
-    if (this._previewDebounce !== null) clearTimeout(this._previewDebounce);
-    this._previewDebounce = setTimeout(() => {
-      this._previewDebounce = null;
-      this.onPreview();
-    }, delayMs);
-  }
-
-  onPreview(): void {
-    if (this.markingTab === 'side') {
-      this.previewSideMarks.emit({ roadSelection: this.sideRoadSelection, yStart: this.sideYStart, yEnd: this.sideYEnd, inset: this.sideInset });
-    } else {
-      this.previewCentreMarks.emit({ roadSelection: this.centreRoadSelection, yStart: this.centreYStart, yEnd: this.centreYEnd, dashFrequency: this.dashFrequency });
-    }
-  }
-
-  onTabChange(tab: 'side' | 'dash'): void {
-    this.markingTab = tab;
-    this.clearMarkingPreview.emit();
-    this.schedulePreview(0);
-  }
-
-  onGenerate(): void {
-    if (this.markingTab === 'side') {
-      this.generateSideMarks.emit({ roadSelection: this.sideRoadSelection, yStart: this.sideYStart, yEnd: this.sideYEnd, inset: this.sideInset });
-    } else {
-      this.generateCentreMarks.emit({ roadSelection: this.centreRoadSelection, yStart: this.centreYStart, yEnd: this.centreYEnd, dashFrequency: this.dashFrequency });
-    }
-    this.clearMarkingPreview.emit();
   }
 
   /** Typed handler for the vertical range-input scrollbar. */

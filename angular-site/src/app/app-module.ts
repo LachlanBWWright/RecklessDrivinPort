@@ -46,6 +46,7 @@ import { ObjectInspectorComponent } from './editor/object-inspector.component';
 import { ObjectListComponent } from './editor/object-list.component';
 import { PropertiesTabComponent } from './editor/properties-tab.component';
 import { SpriteEditorComponent } from './editor/sprite-editor.component';
+import { MarkingPopupComponent } from './editor/canvas-toolbar/marking-popup.component';
 
 const MATERIAL_MODULES = [
   MatButtonModule, MatIconModule, MatTooltipModule, MatInputModule,
@@ -75,6 +76,7 @@ const MATERIAL_MODULES = [
     ObjectListComponent,
     PropertiesTabComponent,
     SpriteEditorComponent,
+    MarkingPopupComponent,
   ],
   imports: [
     BrowserModule,
