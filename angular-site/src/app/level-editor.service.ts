@@ -28,6 +28,19 @@ export interface ObjectGroupRef {
   numObjs: number;  // SInt16
 }
 
+export interface ObjectGroupEntryData {
+  typeRes: number;   // SInt16
+  minOffs: number;   // SInt16
+  maxOffs: number;   // SInt16
+  probility: number;  // SInt16
+  dir: number;       // float
+}
+
+export interface ObjectGroupDefinition {
+  id: number;
+  entries: ObjectGroupEntryData[];
+}
+
 export interface TrackSeg {
   flags: number;  // UInt16
   x: number;      // SInt16
@@ -149,6 +162,8 @@ const SPRITE_HEADER_SIZE = 8;
 const ROAD_PACK_ID = 135;
 /** Pack ID for kPackTx16 (16-bit RGB555 textures, resource ID 136). */
 const TX16_PACK_ID = 136;
+/** Pack ID for kPackOgrp (object group definitions, resource ID 130). */
+const OBJECT_GROUP_PACK_ID = 130;
 
 /**
  * tRoadInfo struct – layout (all big-endian, no padding on PPC):
@@ -162,16 +177,44 @@ const TX16_PACK_ID = 136;
  *   SInt16 foregroundTex @20   ← road-surface texture ID in kPackTx16
  *   SInt16 roadLeftBorder  @22 ← left border (kerb) texture ID
  *   SInt16 roadRightBorder @24 ← right border (kerb) texture ID
- *   … (remaining fields not needed for rendering)
+ *   SInt16 tracks        @26
+ *   SInt16 skidSound     @28
+ *   SInt16 filler        @30
+ *   float xDrift         @32
+ *   float yDrift         @36
+ *   float xFrontDrift    @40
+ *   float yFrontDrift    @44
+ *   float trackSlide     @48
+ *   float dustSlide      @52
+ *   UInt8  dustColor     @56
  *   UInt8  water         @57
+ *   UInt16 filler2       @58
+ *   float slideFriction  @60
  */
+const ROAD_INFO_SIZE       = 64;
+const RI_OFFSET_FRICTION   = 0;
+const RI_OFFSET_AIR_RESIST = 4;
+const RI_OFFSET_BACK_RES   = 8;
+const RI_OFFSET_TOLERANCE  = 12;
+const RI_OFFSET_MARKS      = 14;
+const RI_OFFSET_DEATH_OFFS = 16;
 const RI_OFFSET_BG_TEX     = 18;
 const RI_OFFSET_FG_TEX     = 20;
 const RI_OFFSET_LEFT_BORD  = 22;
 const RI_OFFSET_RIGHT_BORD = 24;
+const RI_OFFSET_TRACKS     = 26;
+const RI_OFFSET_SKID_SND   = 28;
+const RI_OFFSET_FILLER     = 30;
+const RI_OFFSET_X_DRIFT    = 32;
+const RI_OFFSET_Y_DRIFT    = 36;
+const RI_OFFSET_X_FRONT    = 40;
+const RI_OFFSET_Y_FRONT    = 44;
+const RI_OFFSET_TRACK_SLIDE = 48;
+const RI_OFFSET_DUST_SLIDE = 52;
+const RI_OFFSET_DUST_COLOR = 56;
 const RI_OFFSET_WATER      = 57;
-/** sizeof(tRoadInfo) – reserved for future reference. */
-// const ROAD_INFO_SIZE = 64;
+const RI_OFFSET_FILLER2    = 58;
+const RI_OFFSET_SLIDE_FRICTION = 60;
 
 /** Texture dimensions (pixels) for tiles in kPackTx16. */
 // const BIG_TEX_SIZE = 128;   // background + road surface textures: 128×128 px
@@ -186,6 +229,12 @@ const BORDER_TEX_H   = 128;  // kerb border textures: 128 px tall
 export interface RoadInfoData {
   /** tRoadInfo entry ID (= roadInfo field in level data, e.g. 128–136). */
   id: number;
+  friction: number;
+  airResistance: number;
+  backResistance: number;
+  tolerance: number;
+  marks: number;
+  deathOffs: number;
   /** Texture ID in kPackTx16 for the off-road / background fill. */
   backgroundTex: number;
   /** Texture ID in kPackTx16 for the driveable road surface. */
@@ -194,8 +243,40 @@ export interface RoadInfoData {
   roadLeftBorder: number;
   /** Texture ID in kPackTx16 for the right (outside) kerb border. */
   roadRightBorder: number;
+  tracks: number;
+  skidSound: number;
+  filler: number;
+  xDrift: number;
+  yDrift: number;
+  xFrontDrift: number;
+  yFrontDrift: number;
+  trackSlide: number;
+  dustSlide: number;
+  dustColor: number;
   /** True for water levels (level 5 / roadInfo 133). */
   water: boolean;
+  filler2: number;
+  slideFriction: number;
+}
+
+/** Road-info picker entry used by the editor toolbar. */
+export interface RoadInfoOption {
+  id: number;
+  label: string;
+  previewUrl: string | null;
+  water: boolean;
+}
+
+export interface TextureTileEntry {
+  texId: number;
+  width: number;
+  height: number;
+}
+
+export interface RoadTileGroup {
+  roadInfoId: number;
+  label: string;
+  tiles: TextureTileEntry[];
 }
 
 /** Decoded 16-bit RGB555 texture ready for ImageData. */
@@ -478,6 +559,73 @@ export function serializeLevelProperties(rawEntry1: Uint8Array, props: LevelProp
   return out;
 }
 
+export function serializeRoadInfoData(roadInfo: RoadInfoData): Uint8Array {
+  const out = new Uint8Array(ROAD_INFO_SIZE);
+  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  view.setFloat32(RI_OFFSET_FRICTION, roadInfo.friction, false);
+  view.setFloat32(RI_OFFSET_AIR_RESIST, roadInfo.airResistance, false);
+  view.setFloat32(RI_OFFSET_BACK_RES, roadInfo.backResistance, false);
+  view.setUint16(RI_OFFSET_TOLERANCE, roadInfo.tolerance, false);
+  view.setInt16(RI_OFFSET_MARKS, roadInfo.marks, false);
+  view.setInt16(RI_OFFSET_DEATH_OFFS, roadInfo.deathOffs, false);
+  view.setInt16(RI_OFFSET_BG_TEX, roadInfo.backgroundTex, false);
+  view.setInt16(RI_OFFSET_FG_TEX, roadInfo.foregroundTex, false);
+  view.setInt16(RI_OFFSET_LEFT_BORD, roadInfo.roadLeftBorder, false);
+  view.setInt16(RI_OFFSET_RIGHT_BORD, roadInfo.roadRightBorder, false);
+  view.setInt16(RI_OFFSET_TRACKS, roadInfo.tracks, false);
+  view.setInt16(RI_OFFSET_SKID_SND, roadInfo.skidSound, false);
+  view.setInt16(RI_OFFSET_FILLER, roadInfo.filler, false);
+  view.setFloat32(RI_OFFSET_X_DRIFT, roadInfo.xDrift, false);
+  view.setFloat32(RI_OFFSET_Y_DRIFT, roadInfo.yDrift, false);
+  view.setFloat32(RI_OFFSET_X_FRONT, roadInfo.xFrontDrift, false);
+  view.setFloat32(RI_OFFSET_Y_FRONT, roadInfo.yFrontDrift, false);
+  view.setFloat32(RI_OFFSET_TRACK_SLIDE, roadInfo.trackSlide, false);
+  view.setFloat32(RI_OFFSET_DUST_SLIDE, roadInfo.dustSlide, false);
+  view.setUint8(RI_OFFSET_DUST_COLOR, roadInfo.dustColor);
+  view.setUint8(RI_OFFSET_WATER, roadInfo.water ? 1 : 0);
+  view.setUint16(RI_OFFSET_FILLER2, roadInfo.filler2, false);
+  view.setFloat32(RI_OFFSET_SLIDE_FRICTION, roadInfo.slideFriction, false);
+  return out;
+}
+
+function parseObjectGroupDefinition(data: Uint8Array): ObjectGroupDefinition | null {
+  if (data.length < 4) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const numEntries = view.getUint32(0, false);
+  if (numEntries > 1000) return null;
+
+  const entries: ObjectGroupEntryData[] = [];
+  let pos = 4;
+  for (let i = 0; i < numEntries && pos + 12 <= data.length; i++) {
+    entries.push({
+      typeRes: view.getInt16(pos, false),
+      minOffs: view.getInt16(pos + 2, false),
+      maxOffs: view.getInt16(pos + 4, false),
+      probility: view.getInt16(pos + 6, false),
+      dir: view.getFloat32(pos + 8, false),
+    });
+    pos += 12;
+  }
+
+  return { id: 0, entries };
+}
+
+function serializeObjectGroupDefinition(group: ObjectGroupDefinition): Uint8Array {
+  const buf = new Uint8Array(4 + group.entries.length * 12);
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  view.setUint32(0, group.entries.length, false);
+  for (let i = 0; i < group.entries.length; i++) {
+    const pos = 4 + i * 12;
+    const entry = group.entries[i];
+    view.setInt16(pos, entry.typeRes, false);
+    view.setInt16(pos + 2, entry.minOffs, false);
+    view.setInt16(pos + 4, entry.maxOffs, false);
+    view.setInt16(pos + 6, entry.probility, false);
+    view.setFloat32(pos + 8, entry.dir, false);
+  }
+  return buf;
+}
+
 export function serializeLevelTrack(
   rawEntry1: Uint8Array,
   trackUp: { x: number; y: number; flags: number; velo: number }[],
@@ -521,6 +669,42 @@ export function serializeLevelTrack(
   result.set(downBuf, before.length + upBuf.length);
   result.set(after,   before.length + upBuf.length + downBuf.length);
   return result;
+}
+
+export function extractObjectGroupDefinitions(resources: ResourceDatEntry[]): ObjectGroupDefinition[] {
+  const pack = resources.find((e) => e.type === 'Pack' && e.id === OBJECT_GROUP_PACK_ID);
+  if (!pack) return [];
+  try {
+    const entries = parsePackHandle(pack.data, pack.id);
+    return entries
+      .map((entry) => {
+        const parsed = parseObjectGroupDefinition(entry.data);
+        return parsed ? { id: entry.id, entries: parsed.entries } : null;
+      })
+      .filter((entry): entry is ObjectGroupDefinition => entry !== null)
+      .sort((a, b) => a.id - b.id);
+  } catch (err) {
+    console.warn('[LevelEditor] failed to parse object groups:', err);
+    return [];
+  }
+}
+
+export function applyObjectGroupDefinitions(
+  resources: ResourceDatEntry[],
+  groups: ObjectGroupDefinition[],
+): ResourceDatEntry[] {
+  return resources.map((res) => {
+    if (res.type !== 'Pack' || res.id !== OBJECT_GROUP_PACK_ID) return res;
+    try {
+      const newEntries = [...groups]
+        .sort((a, b) => a.id - b.id)
+        .map((group) => ({ id: group.id, data: serializeObjectGroupDefinition(group) }));
+      return { ...res, data: encodePackHandle(newEntries, OBJECT_GROUP_PACK_ID) };
+    } catch (err) {
+      console.warn('[LevelEditor] applyObjectGroupDefinitions error:', err);
+      return res;
+    }
+  });
 }
 
 export function serializeLevelObjects(rawEntry1: Uint8Array, objects: ObjectPos[]): Uint8Array {
@@ -645,6 +829,27 @@ export class LevelEditorService {
         return { ...res, data: encodePackHandle(newEntries, resourceId) };
       } catch (err) {
         console.error(`[LevelEditor] applyLevelProperties error id=${resourceId}:`, err);
+        return res;
+      }
+    });
+  }
+
+  applyRoadInfoData(
+    resources: ResourceDatEntry[],
+    roadInfoId: number,
+    roadInfo: RoadInfoData,
+  ): ResourceDatEntry[] {
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== ROAD_PACK_ID) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, res.id);
+        const newData = serializeRoadInfoData(roadInfo);
+        const newEntries = packEntries.some((entry) => entry.id === roadInfoId)
+          ? packEntries.map((entry) => (entry.id === roadInfoId ? { ...entry, data: newData } : entry))
+          : [...packEntries, { id: roadInfoId, data: newData }];
+        return { ...res, data: encodePackHandle(newEntries, ROAD_PACK_ID) };
+      } catch (err) {
+        console.error(`[LevelEditor] applyRoadInfoData error id=${roadInfoId}:`, err);
         return res;
       }
     });
@@ -1083,15 +1288,33 @@ export class LevelEditorService {
     try {
       const entries = parsePackHandle(pack.data, pack.id);
       for (const entry of entries) {
-        if (entry.data.length < RI_OFFSET_WATER + 1) continue;
+        if (entry.data.length < ROAD_INFO_SIZE) continue;
         const view = new DataView(entry.data.buffer, entry.data.byteOffset, entry.data.byteLength);
         result.set(entry.id, {
           id: entry.id,
+          friction: view.getFloat32(RI_OFFSET_FRICTION, false),
+          airResistance: view.getFloat32(RI_OFFSET_AIR_RESIST, false),
+          backResistance: view.getFloat32(RI_OFFSET_BACK_RES, false),
+          tolerance: view.getUint16(RI_OFFSET_TOLERANCE, false),
+          marks: view.getInt16(RI_OFFSET_MARKS, false),
+          deathOffs: view.getInt16(RI_OFFSET_DEATH_OFFS, false),
           backgroundTex:  view.getInt16(RI_OFFSET_BG_TEX,    false),
           foregroundTex:  view.getInt16(RI_OFFSET_FG_TEX,    false),
           roadLeftBorder: view.getInt16(RI_OFFSET_LEFT_BORD, false),
           roadRightBorder: view.getInt16(RI_OFFSET_RIGHT_BORD, false),
+          tracks: view.getInt16(RI_OFFSET_TRACKS, false),
+          skidSound: view.getInt16(RI_OFFSET_SKID_SND, false),
+          filler: view.getInt16(RI_OFFSET_FILLER, false),
+          xDrift: view.getFloat32(RI_OFFSET_X_DRIFT, false),
+          yDrift: view.getFloat32(RI_OFFSET_Y_DRIFT, false),
+          xFrontDrift: view.getFloat32(RI_OFFSET_X_FRONT, false),
+          yFrontDrift: view.getFloat32(RI_OFFSET_Y_FRONT, false),
+          trackSlide: view.getFloat32(RI_OFFSET_TRACK_SLIDE, false),
+          dustSlide: view.getFloat32(RI_OFFSET_DUST_SLIDE, false),
+          dustColor: view.getUint8(RI_OFFSET_DUST_COLOR),
           water: entry.data[RI_OFFSET_WATER] !== 0,
+          filler2: view.getUint16(RI_OFFSET_FILLER2, false),
+          slideFriction: view.getFloat32(RI_OFFSET_SLIDE_FRICTION, false),
         });
       }
     } catch (err) {

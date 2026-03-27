@@ -65,15 +65,36 @@
             [selectedLevel]="selectedLevel()"
             [levelNum]="selectedLevelNum()"
             [editRoadInfo]="editRoadInfo()"
-            [editTime]="editTime()"
-            [editLevelEnd]="editLevelEnd()"
+            [roadInfoData]="editRoadInfoData()"
             [editObjectGroups]="editObjectGroups()"
+            [tileTileEntries]="tileTileEntries()"
+            [audioEntries]="audioEntries()"
+            [getTileDataUrl]="getTileDataUrlBound"
             [propertiesDirty]="propertiesDirty()"
             [workerBusy]="workerBusy()"
-            (propsInput)="onPropertiesTabInput($event)"
+            (roadInfoInput)="onRoadInfoInput($event.field, $event.event)"
             (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.event)"
             (saveProperties)="saveLevelProperties()"
           ></app-editor-properties-section>
+        }
+
+        @if (editorSection() === 'object-groups') {
+          <app-editor-object-groups-section
+            [objectGroups]="objectGroupDefinitions()"
+            [selectedObjectGroupId]="selectedObjectGroupId()"
+            [availableTypeIds]="availableTypeIds()"
+            [getObjTypeDimensionLabel]="getObjTypeDimensionLabelBound"
+            [groupsDirty]="objectGroupsDirty()"
+            [workerBusy]="workerBusy()"
+            (selectedObjectGroupIdChange)="selectObjectGroup($event)"
+            (addGroup)="addObjectGroup()"
+            (duplicateGroup)="addObjectGroup(true)"
+            (deleteGroup)="deleteObjectGroup($event)"
+            (addEntry)="addObjectGroupEntry($event)"
+            (deleteEntry)="deleteObjectGroupEntry($event.groupId, $event.entryIndex)"
+            (entryInput)="onObjectGroupEntryInput($event.groupId, $event.entryIndex, $event.field, $event.event)"
+            (saveObjectGroups)="saveObjectGroups()"
+          ></app-editor-object-groups-section>
         }
 
         @if (editorSection() === 'objects') {
@@ -88,6 +109,9 @@
             [showMarks]="showMarks()"
             [barrierDrawSide]="barrierDrawSide()"
             [drawMode]="drawMode()"
+            [roadInfoOptions]="roadInfoOptions()"
+            [editRoadInfo]="editRoadInfo()"
+            [editTime]="editTime()"
             [canUndo]="canUndo()"
             [canRedo]="canRedo()"
             [trackUpCount]="selectedLevel()?.trackUp?.length ?? 0"
@@ -137,6 +161,8 @@
             (toggleMarks)="showMarks.set(!showMarks())"
             (barrierDrawSideChange)="barrierDrawSide.set($event)"
             (drawModeChange)="drawMode.set($event)"
+            (roadInfoChange)="onRoadInfoChange($event)"
+            (timeChange)="onTimeLimitChange($event)"
             (undo)="undo()"
             (redo)="redo()"
             (zoomIn)="zoomIn()"
@@ -181,6 +207,7 @@
         @if (editorSection() === 'tiles') {
           <app-editor-tiles-section
             [tileTileEntries]="tileTileEntries()"
+            [roadTileGroups]="roadTileGroups()"
             [selectedTileId]="selectedTileId()"
             [workerBusy]="workerBusy()"
             [getTileDataUrl]="getTileDataUrlBound"

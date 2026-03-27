@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
-import type { ObjectPos, MarkSeg, TrackWaypointRef } from '../level-editor.service';
+import type { ObjectPos, MarkSeg, RoadInfoOption, TrackWaypointRef } from '../level-editor.service';
 import type { MarkingRoadSelection } from '../road-marking-utils';
 
 export type DrawMode = 'none' | 'freehand' | 'straight' | 'curve';
@@ -21,6 +21,9 @@ export class EditorCanvasComponent {
   @Input() barrierDrawSide: 'v0' | 'v1' | 'i' | 'v2' | 'v3' = 'v0';
   /** Current draw mode.  'none' = select/pan only; other values activate barrier drawing. */
   @Input() drawMode: DrawMode = 'none';
+  @Input() roadInfoOptions: RoadInfoOption[] = [];
+  @Input() editRoadInfo = 0;
+  @Input() editTime = 0;
   @Input() canUndo = false;
   @Input() canRedo = false;
   @Input() trackUpCount = 0;
@@ -67,6 +70,8 @@ export class EditorCanvasComponent {
   @Output() resetView = new EventEmitter<void>();
   @Output() undo = new EventEmitter<void>();
   @Output() redo = new EventEmitter<void>();
+  @Output() roadInfoChange = new EventEmitter<number>();
+  @Output() timeChange = new EventEmitter<number>();
   @Output() toggleMarks = new EventEmitter<void>();
   @Output() barrierDrawSideChange = new EventEmitter<'v0' | 'v1' | 'i' | 'v2' | 'v3'>();
   @Output() drawModeChange = new EventEmitter<DrawMode>();
@@ -89,6 +94,17 @@ export class EditorCanvasComponent {
 
   showMarkingPopup = false;
   showInfoPopup = false;
+
+  getRoadInfoOption(roadInfoId: number): RoadInfoOption | undefined {
+    return this.roadInfoOptions.find((option) => option.id === roadInfoId);
+  }
+
+  onTimeLimitInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const nextValue = Number.parseInt(target?.value ?? '', 10);
+    if (Number.isNaN(nextValue)) return;
+    this.timeChange.emit(nextValue);
+  }
 
   toggleMarkingPopup(): void {
     this.showMarkingPopup = !this.showMarkingPopup;

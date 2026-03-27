@@ -1,13 +1,16 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, OnChanges, SimpleChanges } from '@angular/core';
+import type { RoadTileGroup, TextureTileEntry } from '../../../level-editor.service';
 
 @Component({
   selector: 'app-editor-tiles-section',
   templateUrl: './editor-tiles-section.component.html',
+  styleUrl: './editor-tiles-section.component.scss',
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorTilesSectionComponent implements OnChanges {
-  @Input() tileTileEntries: { texId: number; width: number; height: number }[] = [];
+  @Input() tileTileEntries: TextureTileEntry[] = [];
+  @Input() roadTileGroups: RoadTileGroup[] = [];
   @Input() selectedTileId: number | null = null;
   @Input() workerBusy = false;
   @Input() getTileDataUrl: (texId: number) => string | null = () => null;

@@ -20,9 +20,14 @@ import type {
   RoadSeg,
   ObjectTypeDefinition,
   RoadInfoData,
+  RoadInfoOption,
+  RoadTileGroup,
+  TextureTileEntry,
   DecodedSpriteFrame,
   TrackWaypointRef,
   TrackMidpointRef,
+  ObjectGroupDefinition,
+  ObjectGroupEntryData,
 } from './level-editor.service';
 import { KonvaEditorService } from './konva-editor.service';
 import {
@@ -47,6 +52,54 @@ interface WorkerResponse {
   result?: unknown;
   error?: string;
 }
+
+type EditorUndoKind = 'objects' | 'marks' | 'tracks' | 'props' | 'road';
+
+type EditorUndoSnapshot =
+  | {
+      kind: 'objects';
+      levelId: number | null;
+      objects: ObjectPos[];
+      selectedObjIndex: number | null;
+      editObjX: number;
+      editObjY: number;
+      editObjDir: number;
+      editObjTypeRes: number;
+    }
+  | {
+      kind: 'marks';
+      levelId: number | null;
+      marks: MarkSeg[];
+      selectedMarkIndex: number | null;
+      markingPreview: MarkSeg[];
+      markCreateMode: boolean;
+      pendingMarkPointCount: number;
+    }
+  | {
+      kind: 'tracks';
+      levelId: number | null;
+      editTrackUp: { x: number; y: number; flags: number; velo: number }[];
+      editTrackDown: { x: number; y: number; flags: number; velo: number }[];
+      dragTrackWaypoint: TrackWaypointRef | null;
+      hoverTrackWaypoint: TrackWaypointRef | null;
+      hoverTrackMidpoint: TrackMidpointRef | null;
+    }
+  | {
+      kind: 'props';
+      levelId: number | null;
+      editRoadInfo: number;
+      editRoadInfoData: RoadInfoData | null;
+      editTime: number;
+      editXStartPos: number;
+      editLevelEnd: number;
+      editObjectGroups: { resID: number; numObjs: number }[];
+      propertiesDirty: boolean;
+    }
+  | {
+      kind: 'road';
+      levelId: number | null;
+      roadSegs: RoadSeg[];
+    };
 
 /**
  * Subset of the Emscripten runtime module attached to window.Module.
@@ -212,6 +265,9 @@ const ROAD_THEMES: Record<number, RoadTheme> = {
 
 /** Default road theme for unknown roadInfo values. */
 const DEFAULT_ROAD_THEME: RoadTheme = ROAD_THEMES[128];
+const ROAD_INFO_IDS = Object.keys(ROAD_THEMES)
+  .map((id) => Number.parseInt(id, 10))
+  .sort((a, b) => a - b);
 
 /** Minimum canvas hit radius (px) for object click detection. */
 const MIN_HIT_RADIUS = 10;
@@ -225,6 +281,10 @@ const MARK_SEGMENT_HIT_THRESHOLD = 8;
 const MIN_START_MARKER_HIT_RADIUS = 14;
 /** Base world-space hit radius for player start marker drag. */
 const BASE_START_MARKER_HIT_RADIUS = 10;
+/** Min canvas hit radius (px) for finish-line drag. */
+const MIN_FINISH_LINE_HIT_RADIUS = 24;
+/** Base world-space hit radius for finish-line drag. */
+const BASE_FINISH_LINE_HIT_RADIUS = 20;
 /** Max storable UInt16 time value in the level pack. */
 const MAX_TIME_VALUE = 65535;
 
@@ -752,6 +812,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly getTileDataUrlBound = this.getTileDataUrl.bind(this);
   readonly getIconThumbDataUrlBound = this.getIconThumbDataUrl.bind(this);
   readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
+  readonly getObjTypeDimensionLabelBound = this.getObjTypeDimensionLabel.bind(this);
 
   /** Convert a level resource ID (140-149) to a human-readable level number (1-10). */
   levelDisplayNum(resourceId: number): number {
@@ -796,11 +857,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   // ---- Level properties editing ----
   editRoadInfo = signal(0);
+  editRoadInfoData = signal<RoadInfoData | null>(null);
   editTime = signal(0);
   editXStartPos = signal(0);
   editLevelEnd = signal(0);
   editObjectGroups = signal<{ resID: number; numObjs: number }[]>([]);
   propertiesDirty = signal(false);
+
+  // ---- Object group pack editing ----
+  objectGroupDefinitions = signal<ObjectGroupDefinition[]>([]);
+  selectedObjectGroupId = signal<number | null>(null);
+  objectGroupsDirty = signal(false);
 
   // ---- Object placement ----
   objects = signal<ObjectPos[]>([]);
@@ -837,6 +904,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   canvasPanY = signal(0);
   isDragging = signal(false);
   dragObjIndex = signal<number | null>(null);
+  /** True once the current object drag has captured its pre-drag undo snapshot. */
+  private _objectDragUndoCaptured = false;
 
   // Computed signals for horizontal scrollbar range based on full road data
   roadXMin = computed(() => {
@@ -859,6 +928,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _isPanning = false;
   /** True while barrier draw gesture is active (mouse held during draw mode). */
   private _barrierDrawing = false;
+  /** True once the current start-marker drag has captured its pre-drag undo snapshot. */
+  private _startMarkerDragUndoCaptured = false;
   /** World-coordinate points collected during the current barrier draw gesture. */
   private _barrierDrawPath: { wx: number; wy: number }[] = [];
   /** Start point for straight-line barrier draw mode (set on mousedown, cleared on mouseup). */
@@ -909,35 +980,164 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   drawMode = signal<'none' | 'freehand' | 'straight' | 'curve'>('none');
 
   // ---- Undo / Redo ----
-  /** Snapshot stack for undo. Each entry is a deep copy of the objects array. */
-  private _undoStack: ObjectPos[][] = [];
-  private _redoStack: ObjectPos[][] = [];
+  /** Snapshot stack for undo. Each entry captures the edited domain. */
+  private _undoStack: EditorUndoSnapshot[] = [];
+  private _redoStack: EditorUndoSnapshot[] = [];
   readonly canUndo = signal(false);
   readonly canRedo = signal(false);
 
-  /** Push a snapshot of the current objects list onto the undo stack. */
-  private _pushUndo(): void {
-    this._undoStack.push(this.objects().map((o) => ({ ...o })));
+  /** Capture the current state for a specific undo domain. */
+  private _captureUndoSnapshot(kind: EditorUndoKind): EditorUndoSnapshot {
+    const level = this.selectedLevel();
+    switch (kind) {
+      case 'objects':
+        return {
+          kind,
+          levelId: this.selectedLevelId(),
+          objects: this.objects().map((o) => ({ ...o })),
+          selectedObjIndex: this.selectedObjIndex(),
+          editObjX: this.editObjX(),
+          editObjY: this.editObjY(),
+          editObjDir: this.editObjDir(),
+          editObjTypeRes: this.editObjTypeRes(),
+        };
+      case 'marks':
+        return {
+          kind,
+          levelId: this.selectedLevelId(),
+          marks: this.marks().map((m) => ({ ...m })),
+          selectedMarkIndex: this.selectedMarkIndex(),
+          markingPreview: this.markingPreview().map((m) => ({ ...m })),
+          markCreateMode: this.markCreateMode(),
+          pendingMarkPointCount: this.pendingMarkPointCount(),
+        };
+      case 'tracks':
+        return {
+          kind,
+          levelId: this.selectedLevelId(),
+          editTrackUp: this.editTrackUp().map((s) => ({ ...s })),
+          editTrackDown: this.editTrackDown().map((s) => ({ ...s })),
+          dragTrackWaypoint: this.dragTrackWaypoint(),
+          hoverTrackWaypoint: this.hoverTrackWaypoint(),
+          hoverTrackMidpoint: this.hoverTrackMidpoint(),
+        };
+      case 'props':
+        return {
+          kind,
+          levelId: this.selectedLevelId(),
+          editRoadInfo: this.editRoadInfo(),
+          editRoadInfoData: this.editRoadInfoData() ? { ...this.editRoadInfoData()! } : null,
+          editTime: this.editTime(),
+          editXStartPos: this.editXStartPos(),
+          editLevelEnd: this.editLevelEnd(),
+          editObjectGroups: this.editObjectGroups().map((g) => ({ ...g })),
+          propertiesDirty: this.propertiesDirty(),
+        };
+      case 'road':
+        return {
+          kind,
+          levelId: this.selectedLevelId(),
+          roadSegs: level ? level.roadSegs.map((seg) => ({ ...seg })) : [],
+        };
+    }
+  }
+
+  /** Apply a previously captured undo snapshot. */
+  private _applyUndoSnapshot(snapshot: EditorUndoSnapshot): void {
+    if (snapshot.levelId !== this.selectedLevelId()) return;
+    switch (snapshot.kind) {
+      case 'objects':
+        this.objects.set(snapshot.objects.map((o) => ({ ...o })));
+        this.selectedObjIndex.set(snapshot.selectedObjIndex);
+        this.editObjX.set(snapshot.editObjX);
+        this.editObjY.set(snapshot.editObjY);
+        this.editObjDir.set(snapshot.editObjDir);
+        this.editObjTypeRes.set(snapshot.editObjTypeRes);
+        break;
+      case 'marks':
+        this.marks.set(snapshot.marks.map((m) => ({ ...m })));
+        this.selectedMarkIndex.set(snapshot.selectedMarkIndex);
+        this.markingPreview.set(snapshot.markingPreview.map((m) => ({ ...m })));
+        this.markCreateMode.set(snapshot.markCreateMode);
+        this.pendingMarkPointCount.set(snapshot.pendingMarkPointCount);
+        break;
+      case 'tracks':
+        this.editTrackUp.set(snapshot.editTrackUp.map((s) => ({ ...s })));
+        this.editTrackDown.set(snapshot.editTrackDown.map((s) => ({ ...s })));
+        this.dragTrackWaypoint.set(snapshot.dragTrackWaypoint);
+        this.hoverTrackWaypoint.set(snapshot.hoverTrackWaypoint);
+        this.hoverTrackMidpoint.set(snapshot.hoverTrackMidpoint);
+        break;
+      case 'props':
+        this.editRoadInfo.set(snapshot.editRoadInfo);
+        this.editRoadInfoData.set(snapshot.editRoadInfoData ? { ...snapshot.editRoadInfoData } : null);
+        if (snapshot.editRoadInfoData) {
+          this.roadInfoDataMap.set(snapshot.editRoadInfo, { ...snapshot.editRoadInfoData });
+          this.refreshRoadInfoDerivedState();
+          void this.dispatchWorker<unknown>('APPLY_ROAD_INFO', {
+            roadInfoId: snapshot.editRoadInfo,
+            roadInfo: snapshot.editRoadInfoData,
+          });
+        }
+        this.editTime.set(snapshot.editTime);
+        this.editXStartPos.set(snapshot.editXStartPos);
+        this.editLevelEnd.set(snapshot.editLevelEnd);
+        this.editObjectGroups.set(snapshot.editObjectGroups.map((g) => ({ ...g })));
+        this.propertiesDirty.set(snapshot.propertiesDirty);
+        break;
+      case 'road': {
+        const roadSegs = snapshot.roadSegs.map((seg) => ({ ...seg }));
+        this.parsedLevels.update((levels) =>
+          levels.map((level) =>
+            level.resourceId === snapshot.levelId ? { ...level, roadSegs } : level,
+          ),
+        );
+        this._roadOffscreenKey = '';
+        this.roadSegsVersion.update((v) => v + 1);
+        break;
+      }
+    }
+    this.scheduleCanvasRedraw();
+    this._objectDragUndoCaptured = false;
+    this._startMarkerDragUndoCaptured = false;
+  }
+
+  /** Push a snapshot of the current editable state onto the undo stack. */
+  private _pushUndo(kind: EditorUndoKind): void {
+    this._undoStack.push(this._captureUndoSnapshot(kind));
     if (this._undoStack.length > 50) this._undoStack.shift();
     this._redoStack = [];
     this.canUndo.set(true);
     this.canRedo.set(false);
   }
 
+  /** Clear undo/redo history for the current level. */
+  private _resetObjectHistory(): void {
+    this._undoStack = [];
+    this._redoStack = [];
+    this.canUndo.set(false);
+    this.canRedo.set(false);
+    this._objectDragUndoCaptured = false;
+    this._startMarkerDragUndoCaptured = false;
+    this._finishLineDragUndoCaptured = false;
+  }
+
   undo(): void {
     if (this._undoStack.length === 0) return;
-    this._redoStack.push(this.objects().map((o) => ({ ...o })));
+    const current = this._undoStack[this._undoStack.length - 1];
+    this._redoStack.push(this._captureUndoSnapshot(current.kind));
     const snapshot = this._undoStack.pop();
-    if (snapshot) this.objects.set(snapshot);
+    if (snapshot) this._applyUndoSnapshot(snapshot);
     this.canUndo.set(this._undoStack.length > 0);
     this.canRedo.set(true);
   }
 
   redo(): void {
     if (this._redoStack.length === 0) return;
-    this._undoStack.push(this.objects().map((o) => ({ ...o })));
+    const current = this._redoStack[this._redoStack.length - 1];
+    this._undoStack.push(this._captureUndoSnapshot(current.kind));
     const snapshot = this._redoStack.pop();
-    if (snapshot) this.objects.set(snapshot);
+    if (snapshot) this._applyUndoSnapshot(snapshot);
     this.canUndo.set(true);
     this.canRedo.set(this._redoStack.length > 0);
   }
@@ -956,6 +1156,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   dragMarkEndpoint = signal<{ markIdx: number; endpoint: 'p1' | 'p2' } | null>(null);
   /** True while user is dragging the player start X marker on the canvas. */
   private _draggingStartMarker = false;
+  /** True while user is dragging the finish line on the canvas. */
+  private _draggingFinishLine = false;
+  private _finishLineDragUndoCaptured = false;
   private _curveStartPoint: { wx: number; wy: number } | null = null;
   private _curveEndPoint: { wx: number; wy: number } | null = null;
 
@@ -1204,17 +1407,24 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _iconDataUrls = new Map<string, string>();
   /** Cached data URLs for road texture canvases. Cleared when textures are reloaded. */
   private _roadTextureDataUrls = new Map<number, string>();
+  /** Cached data URLs for road-info dropdown thumbnails. */
+  private _roadInfoPreviewDataUrls = new Map<number, string>();
   /** Decoded texture canvases from kPackTx16: texId → HTMLCanvasElement. */
   private roadTextureCanvases = new Map<number, HTMLCanvasElement>();
   /** Version signal bumped when road textures are loaded (triggers canvas redraw). */
   roadTexturesVersion = signal(0);
+  /** Version signal bumped when road-info data changes. */
+  roadInfoVersion = signal(0);
   /** Version signal bumped when road segment data changes (invalidates road offscreen cache). */
   private roadSegsVersion = signal(0);
 
   /** Tile viewer: all decoded texture tile entries for the Tiles tab. */
-  tileTileEntries = signal<{ texId: number; width: number; height: number }[]>([]);
+  tileTileEntries = signal<TextureTileEntry[]>([]);
+  roadTileGroups = signal<RoadTileGroup[]>([]);
   /** Currently selected tile ID in the tile viewer. */
   selectedTileId = signal<number | null>(null);
+  /** Road-info dropdown entries with preview thumbnails. */
+  roadInfoOptions = signal<RoadInfoOption[]>([]);
 
   // ---- Pack Worker ----
   private packWorker: Worker | null = null;
@@ -1242,6 +1452,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.visibleTypeFilter();
       this.spritePreviewsVersion();
       this.roadTexturesVersion();
+      this.roadInfoVersion();
       this.roadSegsVersion();
       this.showTrackOverlay();
       this.showObjects();
@@ -1261,6 +1472,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.pendingMarkPointCount();
       this.markingPreview();
       this.editXStartPos();
+      this.editLevelEnd();
       // Track the full selectedLevel (includes roadSegs) so any road-segment
       // mutation (barrier drag, merge/split) automatically triggers a redraw
       // without requiring explicit scheduleCanvasRedraw() calls.
@@ -1470,7 +1682,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.konva.onObjectDragEnd = (e) => {
       const objs = [...this.objects()];
       if (e.index < objs.length) {
-        this._pushUndo();
+        this._pushUndo('objects');
         objs[e.index] = { ...objs[e.index], x: e.worldX, y: e.worldY };
         this.objects.set(objs);
         if (this.selectedObjIndex() === e.index) {
@@ -1491,7 +1703,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const selIdx = this.selectedObjIndex();
       const typeRes = selIdx !== null && selIdx < objs.length ? objs[selIdx].typeRes : 128;
       // Push undo BEFORE mutating so undo restores the pre-add state.
-      this._pushUndo();
+      this._pushUndo('objects');
       objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes });
       this.objects.set(objs);
       this.selectObject(objs.length - 1);
@@ -1506,6 +1718,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.konva.onWaypointDragEnd = (e) => {
       // Deselect any selected object when a path waypoint is moved
       this.selectedObjIndex.set(null);
+      this._pushUndo('tracks');
       if (e.track === 'up') {
         const arr = [...this.editTrackUp()];
         if (e.segIdx < arr.length) {
@@ -1528,10 +1741,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.konva.onWaypointRightClick = (track, segIdx, _wx, _wy) => {
       // Remove the clicked waypoint
       if (track === 'up') {
+        this._pushUndo('tracks');
         const arr = [...this.editTrackUp()];
         arr.splice(segIdx, 1);
         this.editTrackUp.set(arr);
       } else {
+        this._pushUndo('tracks');
         const arr = [...this.editTrackDown()];
         arr.splice(segIdx, 1);
         this.editTrackDown.set(arr);
@@ -1542,7 +1757,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.konva.onMarkEndpointDragEnd = (e) => {
       // Deselect any selected object when a mark endpoint is moved
       this.selectedObjIndex.set(null);
-      this._pushUndo();
+      this._pushUndo('marks');
       const ms = [...this.marks()];
       if (e.markIdx >= ms.length) return;
       const m = ms[e.markIdx];
@@ -1574,6 +1789,28 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     this.konva.onMarkClick = (markIdx) => {
       this.selectedMarkIndex.set(markIdx);
+    };
+
+    this.konva.onFinishLineDragStart = (e) => {
+      this._draggingFinishLine = true;
+      if (!this._finishLineDragUndoCaptured) {
+        this._pushUndo('props');
+        this._finishLineDragUndoCaptured = true;
+      }
+      this.editLevelEnd.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(e.worldY))));
+      this.propertiesDirty.set(true);
+    };
+
+    this.konva.onFinishLineDragMove = (e) => {
+      this.editLevelEnd.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(e.worldY))));
+      this.propertiesDirty.set(true);
+    };
+
+    this.konva.onFinishLineDragEnd = (e) => {
+      this.editLevelEnd.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(e.worldY))));
+      this.propertiesDirty.set(true);
+      this._draggingFinishLine = false;
+      this._finishLineDragUndoCaptured = false;
     };
 
     // ── Pan via Konva stage mouse events ───────────────────────────────────
@@ -1626,7 +1863,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           BASE_START_MARKER_HIT_RADIUS / this.canvasZoom(),
         );
         if (dist2d(this.editXStartPos(), 0, wx, wy) < startHitR) {
-          this._draggingStartMarker = true;
+          this._beginStartMarkerDrag(null);
           return;
         }
       }
@@ -1682,6 +1919,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         const [wx] = this.canvasToWorld(cssX, cssY);
         this.editXStartPos.set(Math.round(wx));
         this.propertiesDirty.set(true);
+        return;
       }
     };
 
@@ -1717,11 +1955,34 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
                 ? 'crosshair'
                 : 'default';
         }
-        if (this._draggingStartMarker) {
+        if (this._draggingStartMarker || this._draggingFinishLine) {
           this._draggingStartMarker = false;
+          this._draggingFinishLine = false;
+          this._startMarkerDragUndoCaptured = false;
+          this._finishLineDragUndoCaptured = false;
         }
       }
     };
+  }
+
+  private _beginStartMarkerDrag(focusTarget: EventTarget | null): void {
+    this._draggingStartMarker = true;
+    this._startMarkerDragUndoCaptured = false;
+    this.selectedObjIndex.set(null);
+    const focusable = focusTarget as unknown as { focus?: () => void } | null;
+    if (focusable && typeof focusable.focus === 'function') {
+      focusable.focus();
+    }
+  }
+
+  private _beginFinishLineDrag(focusTarget: EventTarget | null): void {
+    this._draggingFinishLine = true;
+    this._finishLineDragUndoCaptured = false;
+    this.selectedObjIndex.set(null);
+    const focusable = focusTarget as unknown as { focus?: () => void } | null;
+    if (focusable && typeof focusable.focus === 'function') {
+      focusable.focus();
+    }
   }
 
   /** Handle track context menu at given world coordinates (extracted for re-use). */
@@ -1822,6 +2083,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   /** Maps EditorSection → mat-tab index for [(selectedIndex)] binding. */
   private readonly SECTION_ORDER: EditorSection[] = [
     'properties',
+    'object-groups',
     'objects',
     'sprites',
     'tiles',
@@ -1851,6 +2113,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedPackSpriteId.set(null);
     this.tileTileEntries.set([]);
     this.selectedTileId.set(null);
+    this.roadTextureCanvases.clear();
+    this.roadInfoDataMap.clear();
+    this.roadInfoOptions.set([]);
+    this._roadInfoPreviewDataUrls.clear();
+    this.roadTileGroups.set([]);
     this.audioEntries.set([]);
     this.selectedAudioId.set(null);
     this.iconEntries.set([]);
@@ -1858,14 +2125,21 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedIconType.set('ICN#');
     this.objects.set([]);
     this.selectedObjIndex.set(null);
+    this._resetObjectHistory();
+    this._draggingStartMarker = false;
+    this._draggingFinishLine = false;
     this.selectedMarkIndex.set(null);
     this.marks.set([]);
     this.editRoadInfo.set(0);
+    this.editRoadInfoData.set(null);
     this.editTime.set(0);
     this.editXStartPos.set(0);
     this.editLevelEnd.set(0);
     this.editObjectGroups.set([]);
     this.propertiesDirty.set(false);
+    this.objectGroupDefinitions.set([]);
+    this.selectedObjectGroupId.set(null);
+    this.objectGroupsDirty.set(false);
     this.editTrackUp.set([]);
     this.editTrackDown.set([]);
     this.dragTrackWaypoint.set(null);
@@ -1988,6 +2262,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           );
         }
       }
+      this.queueRoadInfoSync(syncPromises);
 
       // Wait for all pending edits to land in the worker before serializing.
       await Promise.all(syncPromises);
@@ -2075,6 +2350,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           );
         }
       }
+      this.queueRoadInfoSync(syncPromises);
       await Promise.all(syncPromises);
 
       this.resourcesStatus.set('Serializing…');
@@ -2847,12 +3123,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     return lines.join('\n');
   }
 
-  selectLevel(id: number): void {
+  selectLevel(id: number, options?: { preserveView?: boolean }): void {
+    const preserveView = options?.preserveView ?? false;
     this.selectedLevelId.set(id);
+    this._resetObjectHistory();
     this._roadOffscreenKey = ''; // invalidate road bitmap cache
     const level = this.parsedLevels().find((l) => l.resourceId === id);
     if (level) {
       this.editRoadInfo.set(level.properties.roadInfo);
+      this.editRoadInfoData.set(this.cloneRoadInfoData(this.roadInfoDataMap.get(level.properties.roadInfo)));
       this.editTime.set(level.properties.time);
       this.editXStartPos.set(level.properties.xStartPos);
       this.editLevelEnd.set(level.properties.levelEnd);
@@ -2873,8 +3152,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         level.trackDown.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })),
       );
       this.dragTrackWaypoint.set(null);
-      // Set a smart default zoom/pan so the road appears at correct game proportions.
-      this.resetViewToRoad(level);
+      if (!preserveView) {
+        // Set a smart default zoom/pan so the road appears at correct game proportions.
+        this.resetViewToRoad(level);
+      }
       this.scheduleCanvasRedraw();
       if (typeof window !== 'undefined') {
         window.requestAnimationFrame(() => this.scheduleCanvasRedraw());
@@ -2916,6 +3197,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const target = event.target as EventTarget & { value?: string };
     const val = Number.parseInt(target?.value ?? '', 10);
     if (Number.isNaN(val)) return;
+    this._pushUndo('props');
     switch (field) {
       case 'roadInfo':
         this.editRoadInfo.set(val);
@@ -2935,6 +3217,65 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.propertiesDirty.set(true);
   }
 
+  onRoadInfoChange(roadInfo: number): void {
+    const nextRoadInfo = Number(roadInfo);
+    if (Number.isNaN(nextRoadInfo)) return;
+    this._pushUndo('props');
+    this.editRoadInfo.set(nextRoadInfo);
+    this.editRoadInfoData.set(this.cloneRoadInfoData(this.roadInfoDataMap.get(nextRoadInfo)));
+    this.propertiesDirty.set(true);
+  }
+
+  onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, event: Event): void {
+    const currentId = this.editRoadInfo();
+    const current = this.editRoadInfoData();
+    if (!current) return;
+    const target = event.target as EventTarget & { value?: string; checked?: boolean };
+    const next = { ...current } as RoadInfoData;
+    this._pushUndo('props');
+    let parsed: number | boolean = 0;
+    switch (field) {
+      case 'friction':
+      case 'airResistance':
+      case 'backResistance':
+      case 'xDrift':
+      case 'yDrift':
+      case 'xFrontDrift':
+      case 'yFrontDrift':
+      case 'trackSlide':
+      case 'dustSlide':
+      case 'slideFriction':
+        parsed = Number.parseFloat(target?.value ?? '');
+        break;
+      case 'water':
+        parsed = !!target?.checked;
+        break;
+      default:
+        parsed = Number.parseInt(target?.value ?? '', 10);
+        break;
+    }
+    if (field !== 'water' && Number.isNaN(parsed as number)) return;
+    const mutableNext = next as unknown as Record<string, number | boolean>;
+    mutableNext[field] = parsed;
+    this.editRoadInfoData.set(next);
+    this.roadInfoDataMap.set(currentId, next);
+    this.refreshRoadInfoDerivedState();
+    void this.dispatchWorker<unknown>('APPLY_ROAD_INFO', {
+      roadInfoId: currentId,
+      roadInfo: next,
+    }).catch((error) => {
+      this.editorError.set(error instanceof Error ? error.message : 'Failed to save road info');
+    });
+  }
+
+  onTimeLimitChange(value: number): void {
+    const nextValue = Number(value);
+    if (Number.isNaN(nextValue)) return;
+    this._pushUndo('props');
+    this.editTime.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(nextValue))));
+    this.propertiesDirty.set(true);
+  }
+
   /** Bridge for PropertiesTabComponent propsInput output. */
   onPropertiesTabInput(e: { field: keyof LevelProperties; event: Event }): void {
     this.onPropsInput(e.field, e.event);
@@ -2945,11 +3286,40 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const target = event.target as EventTarget & { value?: string };
     const val = Number.parseInt(target?.value ?? '', 10);
     if (Number.isNaN(val)) return;
+    this._pushUndo('props');
     const groups = this.editObjectGroups().slice();
     const existing = groups[index] ?? { resID: 0, numObjs: 0 };
     groups[index] = { ...existing, [field]: val };
     this.editObjectGroups.set(groups);
     this.propertiesDirty.set(true);
+  }
+
+  private cloneRoadInfoData(roadInfo: RoadInfoData | null | undefined): RoadInfoData | null {
+    return roadInfo ? { ...roadInfo } : null;
+  }
+
+  private refreshRoadInfoDerivedState(): void {
+    this._roadInfoPreviewDataUrls.clear();
+    const roadInfoOptions = ROAD_INFO_IDS.map((id) => ({
+      id,
+      label: `Road ${id}`,
+      previewUrl: this.getRoadInfoPreviewDataUrl(id),
+      water: ROAD_THEMES[id]?.water ?? false,
+    }));
+    this.roadInfoOptions.set(roadInfoOptions);
+    this.roadTileGroups.set(this.buildRoadTileGroups(this.tileTileEntries()));
+    this.roadInfoVersion.update((v) => v + 1);
+  }
+
+  private queueRoadInfoSync(syncPromises: Promise<unknown>[]): void {
+    for (const [roadInfoId, roadInfo] of this.roadInfoDataMap.entries()) {
+      syncPromises.push(
+        this.dispatchWorker<unknown>('APPLY_ROAD_INFO', {
+          roadInfoId,
+          roadInfo,
+        }),
+      );
+    }
   }
 
   async saveLevelProperties(): Promise<void> {
@@ -2964,11 +3334,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     };
     try {
       this.workerBusy.set(true);
+      const syncPromises: Promise<unknown>[] = [];
+      this.queueRoadInfoSync(syncPromises);
+      await Promise.all(syncPromises);
       const result = await this.dispatchWorker<{ levels: ParsedLevel[] }>('APPLY_PROPS', {
         resourceId: id,
         props,
       });
-      this.applyLevelsResult(result.levels);
+      this.applyLevelsResult(result.levels, {
+        preserveCanvasView: true,
+        refreshSelectedLevelState: false,
+      });
       this.propertiesDirty.set(false);
       this.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
       this.snackBar.open(`✓ Level ${id - 139} properties saved`, 'OK', {
@@ -2977,6 +3353,126 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Save failed';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
+  // ---- Object group pack ----
+
+  private cloneObjectGroupDefinitions(groups = this.objectGroupDefinitions()): ObjectGroupDefinition[] {
+    return groups.map((group) => ({
+      id: group.id,
+      entries: group.entries.map((entry) => ({ ...entry })),
+    }));
+  }
+
+  private nextObjectGroupId(groups = this.objectGroupDefinitions()): number {
+    const used = new Set(groups.map((group) => group.id));
+    let candidate = 128;
+    while (used.has(candidate)) candidate++;
+    return candidate;
+  }
+
+  private defaultObjectGroupEntry(): ObjectGroupEntryData {
+    return {
+      typeRes: this.availableTypeIds()[0] ?? 128,
+      minOffs: 0,
+      maxOffs: 0,
+      probility: 1,
+      dir: 0,
+    };
+  }
+
+  private selectedObjectGroup(): ObjectGroupDefinition | null {
+    const id = this.selectedObjectGroupId();
+    if (id === null) return null;
+    return this.objectGroupDefinitions().find((group) => group.id === id) ?? null;
+  }
+
+  selectObjectGroup(groupId: number): void {
+    this.selectedObjectGroupId.set(groupId);
+  }
+
+  addObjectGroup(duplicateSelected = false): void {
+    const groups = this.cloneObjectGroupDefinitions();
+    const selected = duplicateSelected ? this.selectedObjectGroup() : null;
+    const id = this.nextObjectGroupId(groups);
+    groups.push({
+      id,
+      entries: selected ? selected.entries.map((entry) => ({ ...entry })) : [this.defaultObjectGroupEntry()],
+    });
+    this.objectGroupDefinitions.set(groups);
+    this.selectedObjectGroupId.set(id);
+    this.objectGroupsDirty.set(true);
+  }
+
+  deleteObjectGroup(groupId: number): void {
+    const groups = this.cloneObjectGroupDefinitions().filter((group) => group.id !== groupId);
+    this.objectGroupDefinitions.set(groups);
+    this.selectedObjectGroupId.set(groups[0]?.id ?? null);
+    this.objectGroupsDirty.set(true);
+  }
+
+  addObjectGroupEntry(groupId: number): void {
+    const groups = this.cloneObjectGroupDefinitions();
+    const group = groups.find((item) => item.id === groupId);
+    if (!group) return;
+    group.entries.push(this.defaultObjectGroupEntry());
+    this.objectGroupDefinitions.set(groups);
+    this.objectGroupsDirty.set(true);
+  }
+
+  deleteObjectGroupEntry(groupId: number, entryIndex: number): void {
+    const groups = this.cloneObjectGroupDefinitions();
+    const group = groups.find((item) => item.id === groupId);
+    if (!group) return;
+    group.entries.splice(entryIndex, 1);
+    this.objectGroupDefinitions.set(groups);
+    this.objectGroupsDirty.set(true);
+  }
+
+  onObjectGroupEntryInput(
+    groupId: number,
+    entryIndex: number,
+    field: keyof ObjectGroupEntryData,
+    event: Event,
+  ): void {
+    const target = event.target as EventTarget & { value?: string };
+    const rawValue = target?.value ?? '';
+    const parsed = field === 'dir' ? Number.parseFloat(rawValue) : Number.parseInt(rawValue, 10);
+    if (Number.isNaN(parsed)) return;
+    const groups = this.cloneObjectGroupDefinitions();
+    const group = groups.find((item) => item.id === groupId);
+    if (!group) return;
+    const entry = group.entries[entryIndex];
+    if (!entry) return;
+    group.entries[entryIndex] = { ...entry, [field]: parsed };
+    this.objectGroupDefinitions.set(groups);
+    this.objectGroupsDirty.set(true);
+  }
+
+  async saveObjectGroups(): Promise<void> {
+    const groups = this.objectGroupDefinitions();
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ objectGroups: ObjectGroupDefinition[] }>('APPLY_OBJECT_GROUPS', {
+        objectGroups: groups,
+      });
+      this.objectGroupDefinitions.set(result.objectGroups);
+      if (!result.objectGroups.some((group) => group.id === this.selectedObjectGroupId())) {
+        this.selectedObjectGroupId.set(result.objectGroups[0]?.id ?? null);
+      }
+      this.objectGroupsDirty.set(false);
+      this.resourcesStatus.set(`Saved ${result.objectGroups.length} object group(s).`);
+      this.snackBar.open(`✓ Object groups saved`, 'OK', {
+        duration: 3000,
+        panelClass: 'snack-success',
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Object group save failed';
       this.editorError.set(msg);
       this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
@@ -3058,7 +3554,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (idx === null) return;
     const objs = [...this.objects()];
     if (idx < 0 || idx >= objs.length) return;
-    this._pushUndo();
+    this._pushUndo('objects');
     objs[idx] = {
       x: this.editObjX(),
       y: this.editObjY(),
@@ -3069,7 +3565,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   addObject(): void {
-    this._pushUndo();
+    this._pushUndo('objects');
     const objs = [...this.objects()];
     objs.push({
       x: Math.round(this.canvasPanX()),
@@ -3086,7 +3582,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (idx === null) return;
     const objs = [...this.objects()];
     if (idx < 0 || idx >= objs.length) return;
-    this._pushUndo();
+    this._pushUndo('objects');
     const original = objs[idx];
     objs.push({ ...original, x: original.x + 50 });
     this.objects.set(objs);
@@ -3121,7 +3617,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   removeSelectedObject(): void {
     const idx = this.selectedObjIndex();
     if (idx === null) return;
-    this._pushUndo();
+    this._pushUndo('objects');
     const objs = this.objects().filter((_, i) => i !== idx);
     this.objects.set(objs);
     this.selectedObjIndex.set(objs.length > 0 ? Math.min(idx, objs.length - 1) : null);
@@ -3136,7 +3632,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         resourceId: id,
         objects: this.objects(),
       });
-      this.applyLevelsResult(result.levels);
+      this.applyLevelsResult(result.levels, {
+        preserveCanvasView: true,
+        refreshSelectedLevelState: false,
+      });
       const msg = `Saved ${this.objects().length} objects for level ${id - 139}.`;
       this.resourcesStatus.set(msg);
       this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
@@ -3159,7 +3658,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         trackUp: this.editTrackUp(),
         trackDown: this.editTrackDown(),
       });
-      this.applyLevelsResult(result.levels);
+      this.applyLevelsResult(result.levels, {
+        preserveCanvasView: true,
+        refreshSelectedLevelState: false,
+      });
       const msg = `Saved track waypoints for level ${id - 139}.`;
       this.resourcesStatus.set(msg);
       this.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
@@ -3280,9 +3782,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       BASE_START_MARKER_HIT_RADIUS / this.canvasZoom(),
     );
     if (dist2d(this.editXStartPos(), 0, wx, wy) < startHitR) {
-      this._draggingStartMarker = true;
-      this.selectedObjIndex.set(null);
-      (event.target as HTMLCanvasElement).focus();
+      this._beginStartMarkerDrag(event.target);
       return;
     }
 
@@ -3300,6 +3800,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.selectObject(closest);
       this.isDragging.set(true);
       this.dragObjIndex.set(closest);
+      this._objectDragUndoCaptured = false;
     } else {
       this.selectedObjIndex.set(null);
     }
@@ -3333,6 +3834,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
     // Start marker drag (X only)
     if (this._draggingStartMarker) {
+      if (!this._startMarkerDragUndoCaptured) {
+        this._pushUndo('props');
+        this._startMarkerDragUndoCaptured = true;
+      }
       const [wx] = this.canvasToWorld(event.offsetX, event.offsetY);
       this.editXStartPos.set(Math.round(wx));
       this.propertiesDirty.set(true);
@@ -3391,6 +3896,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const dragIdx = this.dragObjIndex();
     if (dragIdx === null) return;
     const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
+    if (!this._objectDragUndoCaptured) {
+      this._pushUndo('objects');
+      this._objectDragUndoCaptured = true;
+    }
     const objs = [...this.objects()];
     objs[dragIdx] = { ...objs[dragIdx], x: Math.round(wx), y: Math.round(wy) };
     this.objects.set(objs);
@@ -3410,6 +3919,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const twp = this.dragTrackWaypoint();
       const pos = this._pendingWaypointDragPos;
       if (twp && pos) {
+        this._pushUndo('tracks');
         if (twp.track === 'up') {
           const arr = [...this.editTrackUp()];
           arr[twp.segIdx] = { ...arr[twp.segIdx], x: pos.x, y: pos.y };
@@ -3425,22 +3935,23 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     // Finish start marker drag
-    if (this._draggingStartMarker) {
+    if (this._draggingStartMarker || this._draggingFinishLine) {
       this._draggingStartMarker = false;
+      this._draggingFinishLine = false;
+      this._startMarkerDragUndoCaptured = false;
+      this._finishLineDragUndoCaptured = false;
       return;
     }
-    const wasDragging = this.isDragging();
     this.isDragging.set(false);
     this.dragObjIndex.set(null);
-    if (wasDragging) {
-      this.applyObjEdit();
-    }
+    this._objectDragUndoCaptured = false;
   }
 
   onCanvasDoubleClick(event: MouseEvent): void {
     if (this.markCreateMode() || this.drawMode() !== 'none') return;
     const [wx, wy] = this.canvasToWorld(event.offsetX, event.offsetY);
     const objs = [...this.objects()];
+    this._pushUndo('objects');
     objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: 128 });
     this.objects.set(objs);
     this.selectObject(objs.length - 1);
@@ -3465,6 +3976,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // 1. Check removal – right-click on existing waypoint
     for (let i = 0; i < trackUp.length; i++) {
       if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
+        this._pushUndo('tracks');
         const arr = trackUp.filter((_, j) => j !== i);
         this.editTrackUp.set(arr);
         this._roadOffscreenKey = '';
@@ -3473,6 +3985,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
     for (let i = 0; i < trackDown.length; i++) {
       if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
+        this._pushUndo('tracks');
         const arr = trackDown.filter((_, j) => j !== i);
         this.editTrackDown.set(arr);
         this._roadOffscreenKey = '';
@@ -3514,8 +4027,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (trackDown.length === 1) nearestSegDistDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
 
     if (nearestSegDistUp <= nearestSegDistDown || trackDown.length === 0) {
+      this._pushUndo('tracks');
       this.editTrackUp.set(insertBetweenClosestSegment(trackUp, wx, wy));
     } else {
+      this._pushUndo('tracks');
       this.editTrackDown.set(insertBetweenClosestSegment(trackDown, wx, wy));
     }
     this._roadOffscreenKey = '';
@@ -3532,7 +4047,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       flags: 0,
       velo: 0,
     };
-    this._pushUndo();
+    this._pushUndo('tracks');
     const copy = [...source];
     copy.splice(segIdx + 1, 0, inserted);
     if (track === 'up') this.editTrackUp.set(copy);
@@ -3809,7 +4324,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const segs = level.roadSegs;
       const N = Math.max(1, Math.floor(segs.length / 20));
       const panYQ = Math.round(panY / 8) * 8;
-      let barrierKey = `${segs.length}:${zoom.toFixed(2)}:${panYQ}`;
+      let barrierKey = `${level.resourceId}:${this.roadSegsVersion()}:${segs.length}:${zoom.toFixed(2)}:${panYQ}`;
       for (let ki = 0; ki < segs.length; ki += N) {
         const s = segs[ki];
         barrierKey += `:${s.v0},${s.v1},${s.v2},${s.v3}`;
@@ -3828,11 +4343,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Draw objects
     const baseRadius = Math.min(20, Math.max(5, 8 * zoom));
     const labelFont = `${Math.max(9, 10 * zoom)}px monospace`;
-    // When Konva is initialized it renders the same sprite images on top of the main canvas,
-    // so we skip the ctx.drawImage() / arc() fills here to avoid redundant GPU work.
-    // We still draw direction arrows, bounding-box outlines, labels, and selection rings
-    // since those are NOT rendered by the Konva overlay.
-    const konvaRendersSprites = this._konvaInitialized;
+    // Keep sprite pixels in the main canvas even after Konva comes online.
+    // The Konva layer owns interaction and selection affordances, but the editor
+    // must remain visually correct even if that overlay has not drawn yet.
+    const konvaRendersSprites = false;
     const objsVisible = this.showObjects();
     for (let i = 0; i < objs.length; i++) {
       const obj = objs[i];
@@ -3967,10 +4481,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Finish line at levelEnd Y
-    if (level && level.properties.levelEnd > 0) {
-      const [, finishY] = this.worldToCanvas(0, level.properties.levelEnd);
+    const liveFinishY = this.editLevelEnd();
+    if (level && liveFinishY >= 0) {
+      const [, finishY] = this.worldToCanvas(0, liveFinishY);
       if (finishY > -2 && finishY < H + 2) {
-        ctx.strokeStyle = '#f9a825';
+        const isDraggingFinish = this._draggingFinishLine;
+        ctx.strokeStyle = isDraggingFinish ? '#ffffff' : '#f9a825';
         ctx.lineWidth = 2;
         ctx.setLineDash([10, 6]);
         ctx.beginPath();
@@ -3978,9 +4494,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         ctx.lineTo(W, finishY);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = '#f9a825';
+        ctx.fillStyle = isDraggingFinish ? '#ffffff' : '#f9a825';
         ctx.font = `${Math.max(9, 11 * zoom)}px monospace`;
-        ctx.fillText('FINISH', 6, finishY - 4);
+        ctx.fillText(`FINISH Y=${liveFinishY}`, 6, finishY - 4);
       }
     }
 
@@ -4022,6 +4538,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.konva.clearMarks();
     }
 
+    if (level) {
+      this.konva.setFinishLine(liveFinishY, zoom, panX, panY);
+    } else {
+      this.konva.clearFinishLine();
+    }
+
     // ── SYNCHRONOUS flush ──────────────────────────────────────────────────
     // Draw all Konva layers NOW, in the same requestAnimationFrame callback
     // as the road canvas above.  This keeps both canvases in the same
@@ -4033,6 +4555,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   // ---- Mark segment editor ----
 
   addMark(): void {
+    this._pushUndo('marks');
     const ms = [...this.marks()];
     ms.push({ x1: -100, y1: 0, x2: 100, y2: 0 });
     this.marks.set(ms);
@@ -4122,6 +4645,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   removeSelectedMark(): void {
     const idx = this.selectedMarkIndex();
     if (idx === null) return;
+    this._pushUndo('marks');
     const ms = this.marks().filter((_, i) => i !== idx);
     this.marks.set(ms);
     this.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
@@ -4135,7 +4659,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       });
       return;
     }
-    this._pushUndo();
+    this._pushUndo('marks');
     const marks = [...this.marks(), ...generated];
     this.marks.set(marks);
     this.selectedMarkIndex.set(marks.length - 1);
@@ -4148,7 +4672,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private _addMarkCreatePoint(x: number, y: number): void {
     const last = this._pendingMarkPoints[this._pendingMarkPoints.length - 1];
     if (last) {
-      this._pushUndo();
+      this._pushUndo('marks');
       const marks = [...this.marks(), { x1: last.x, y1: last.y, x2: x, y2: y }];
       this.marks.set(marks);
       this.selectedMarkIndex.set(marks.length - 1);
@@ -4192,7 +4716,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const ms = [...this.marks()];
     const sel = ms[selIdx];
     if (!sel) return;
-    this._pushUndo();
+    this._pushUndo('marks');
     // Nudge offset (1 world unit) so they visually separate
     const NUDGE = 1;
     for (const ep of ['p1', 'p2'] as const) {
@@ -4269,7 +4793,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       });
       return;
     }
-    this._pushUndo();
+    this._pushUndo('marks');
     const bestJEpY = bestJEpX === 'x1' ? ('y1' as const) : ('y2' as const);
     ms[bestJ] = { ...ms[bestJ], [bestJEpX]: srcX, [bestJEpY]: srcY };
     this.marks.set(ms);
@@ -4282,6 +4806,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const target = event.target as EventTarget & { value?: string };
     const val = Number.parseInt(target?.value ?? '', 10);
     if (Number.isNaN(val)) return;
+    this._pushUndo('marks');
     const ms = [...this.marks()];
     ms[markIdx] = { ...ms[markIdx], [field]: val };
     this.marks.set(ms);
@@ -4297,7 +4822,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         resourceId: id,
         marks: this.marks(),
       });
-      this.applyLevelsResult(result.levels);
+      this.applyLevelsResult(result.levels, {
+        preserveCanvasView: true,
+        refreshSelectedLevelState: false,
+      });
       const msg = `Saved ${this.marks().length} mark segments for level ${id - 139}.`;
       this.resourcesStatus.set(msg);
     } catch (error) {
@@ -4419,7 +4947,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       return sorted[lo].wx + t * (sorted[hi].wx - sorted[lo].wx);
     };
 
-    this._pushUndo();
+    this._pushUndo('road');
     const segs = level.roadSegs.map((seg, i) => {
       const segWy = i * 2; // world Y of segment i
       if (segWy < minWy || segWy > maxWy) return seg;
@@ -4748,6 +5276,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         levels: ParsedLevel[];
         sprites: EditableSpriteAsset[];
         objectTypesArr: [number, ObjectTypeDefinition][];
+        roadInfoArr: [number, RoadInfoData][];
+        objectGroups: ObjectGroupDefinition[];
       };
       const result = await this.dispatchWorker<LoadResult>('LOAD', buffer, [buffer]);
 
@@ -4761,6 +5291,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       // Clear previews — fresh ones will arrive shortly from DECODE_SPRITE_PREVIEWS
       this.objectSpritePreviews.clear();
       this._spritePreviewDataUrls.clear();
+      this.roadTextureCanvases.clear();
+      this.roadInfoOptions.set([]);
+      this._roadInfoPreviewDataUrls.clear();
+      this.roadTileGroups.set([]);
+      this.tileTileEntries.set([]);
+      this.roadInfoDataMap.clear();
+      for (const [id, roadInfo] of result.roadInfoArr) {
+        this.roadInfoDataMap.set(id, roadInfo);
+      }
+      this.refreshRoadInfoDerivedState();
+
+      this.objectGroupDefinitions.set(result.objectGroups);
+      this.selectedObjectGroupId.set(result.objectGroups[0]?.id ?? null);
+      this.objectGroupsDirty.set(false);
 
       this.parsedLevels.set(result.levels);
       this.spriteAssets.set(result.sprites);
@@ -4777,6 +5321,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.selectLevel(result.levels[0].resourceId);
       } else {
         this.selectedLevelId.set(null);
+        this.editRoadInfoData.set(null);
       }
       if (result.sprites.length > 0 && this.selectedSpriteId() === null) {
         void this.selectSprite(result.sprites[0].id);
@@ -4835,7 +5380,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private async decodeRoadTexturesInBackground(): Promise<void> {
     try {
       type RoadTexResult = {
-        roadInfoArr: [number, RoadInfoData][];
         textures: { texId: number; width: number; height: number; pixels: ArrayBuffer }[];
       };
       type AllTilesResult = {
@@ -4848,12 +5392,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.dispatchWorker<AllTilesResult>('DECODE_ALL_ROAD_TEXTURES'),
       ]);
 
-      // Rebuild road info map
-      this.roadInfoDataMap.clear();
       this._roadTextureDataUrls.clear();
-      for (const [id, ri] of result.roadInfoArr) {
-        this.roadInfoDataMap.set(id, ri);
-      }
 
       // Helper: build canvas from decoded texture
       const buildCanvas = (
@@ -4892,6 +5431,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         }
       }
       this.tileTileEntries.set(tileEntries);
+      this.refreshRoadInfoDerivedState();
       // Bump version to trigger canvas redraw with real textures
       this.roadTexturesVersion.update((v) => v + 1);
       this._roadOffscreenKey = '';
@@ -4975,11 +5515,102 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** Return a data URL for a road-info dropdown thumbnail. */
+  getRoadInfoPreviewDataUrl(roadInfoId: number): string | null {
+    const cached = this._roadInfoPreviewDataUrls.get(roadInfoId);
+    if (cached) return cached;
+    const canvas = this.buildRoadInfoPreviewCanvas(roadInfoId);
+    if (!canvas) return null;
+    try {
+      const url = canvas.toDataURL();
+      this._roadInfoPreviewDataUrls.set(roadInfoId, url);
+      return url;
+    } catch {
+      return null;
+    }
+  }
+
   /** Return "WxH px" label for a tile by texId, or '?' if not found. */
   getTileDimensions(texId: number): string {
     const entry = this.tileTileEntries().find((t) => t.texId === texId);
     if (!entry) return '?';
     return `${entry.width}×${entry.height} px`;
+  }
+
+  private buildRoadTileGroups(entries: TextureTileEntry[]): RoadTileGroup[] {
+    const sortedEntries = [...entries].sort((a, b) => a.texId - b.texId);
+    const entryByTexId = new Map(sortedEntries.map((entry) => [entry.texId, entry]));
+    const groups: RoadTileGroup[] = [];
+
+    for (const roadInfoId of ROAD_INFO_IDS) {
+      const ri = this.roadInfoDataMap.get(roadInfoId);
+      if (!ri) continue;
+      const ids = [ri.backgroundTex, ri.foregroundTex, ri.roadLeftBorder, ri.roadRightBorder];
+      const seen = new Set<number>();
+      const tiles: TextureTileEntry[] = [];
+      for (const texId of ids) {
+        if (texId < 0 || seen.has(texId)) continue;
+        seen.add(texId);
+        const entry = entryByTexId.get(texId);
+        if (entry) tiles.push(entry);
+      }
+      if (tiles.length > 0) {
+        groups.push({ roadInfoId, label: `Road ${roadInfoId}`, tiles });
+      }
+    }
+
+    const referenced = new Set<number>(groups.flatMap((group) => group.tiles.map((tile) => tile.texId)));
+    const unassigned = sortedEntries.filter((tile) => !referenced.has(tile.texId));
+    if (unassigned.length > 0) {
+      groups.push({ roadInfoId: -1, label: 'Unassigned', tiles: unassigned });
+    }
+
+    return groups;
+  }
+
+  private buildRoadInfoPreviewCanvas(roadInfoId: number): HTMLCanvasElement | null {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 56;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const theme = ROAD_THEMES[roadInfoId] ?? DEFAULT_ROAD_THEME;
+    const ri = this.roadInfoDataMap.get(roadInfoId);
+    const makePattern = (texId: number, texWorldSize: number): CanvasPattern | string | null => {
+      const tc = this.roadTextureCanvases.get(texId);
+      if (!tc) return null;
+      try {
+        const pat = ctx.createPattern(tc, 'repeat');
+        if (!pat) return null;
+        const scale = texWorldSize / tc.width;
+        pat.setTransform(new DOMMatrix([scale, 0, 0, scale, 0, 0]));
+        return pat;
+      } catch {
+        return null;
+      }
+    };
+
+    const bgFill = ri ? (makePattern(ri.backgroundTex, 128) ?? theme.bg) : theme.bg;
+    const roadFill = ri ? (makePattern(ri.foregroundTex, 128) ?? theme.road) : theme.road;
+    const leftFill = ri ? (makePattern(ri.roadLeftBorder, 16) ?? theme.kerbA) : theme.kerbA;
+    const rightFill = ri ? (makePattern(ri.roadRightBorder, 16) ?? theme.kerbB) : theme.kerbB;
+
+    ctx.fillStyle = bgFill;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = theme.dirt;
+    ctx.fillRect(0, 36, canvas.width, 20);
+    ctx.fillStyle = roadFill;
+    ctx.fillRect(20, 18, 120, 20);
+    ctx.fillStyle = leftFill;
+    ctx.fillRect(8, 18, 12, 20);
+    ctx.fillStyle = rightFill;
+    ctx.fillRect(140, 18, 12, 20);
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+    return canvas;
   }
 
   // ---- Tile editor (reuses SpriteEditorComponent) ----
@@ -6147,7 +6778,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         'APPLY_SPRITE_PACK_PIXELS',
         { frameId, bitDepth, pixels: imageData.data },
       );
-      this.applyLevelsResult(result.levels);
+      this.applyLevelsResult(result.levels, {
+        preserveCanvasView: true,
+        refreshSelectedLevelState: false,
+      });
       this.decodePackSpritesInBackground();
       this.resourcesStatus.set(`Sprite frame #${frameId} replaced from PNG.`);
     } catch (err) {
@@ -6175,7 +6809,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         'APPLY_SPRITE_PACK_PIXELS',
         { frameId: event.frameId, bitDepth, pixels: event.pixels },
       );
-      this.applyLevelsResult(result.levels);
+      this.applyLevelsResult(result.levels, {
+        preserveCanvasView: true,
+        refreshSelectedLevelState: false,
+      });
       // Refresh sprite canvases to reflect edited pixels
       this.decodePackSpritesInBackground();
       this.resourcesStatus.set(`Sprite frame #${event.frameId} saved.`);
@@ -6187,7 +6824,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Apply fresh level list received from the worker after a save operation. */
-  private applyLevelsResult(levels: ParsedLevel[]): void {
+  private applyLevelsResult(
+    levels: ParsedLevel[],
+    options?: { preserveCanvasView?: boolean; refreshSelectedLevelState?: boolean },
+  ): void {
+    const preserveCanvasView = options?.preserveCanvasView ?? false;
+    const refreshSelectedLevelState = options?.refreshSelectedLevelState ?? true;
     // Preserve in-memory road segments: barrier drags update parsedLevels directly (in-memory)
     // but are NOT flushed to the worker until download time. If the worker returns stale levels
     // (e.g., after a sprite/tile edit), we must keep the locally-edited road segs.
@@ -6199,9 +6841,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.parsedLevels.set(merged);
     this._roadOffscreenKey = ''; // road segs may have changed; invalidate the road cache
     this.roadSegsVersion.update((v) => v + 1);
+    if (!refreshSelectedLevelState) {
+      return;
+    }
     const curId = this.selectedLevelId();
     if (curId !== null && merged.some((l) => l.resourceId === curId)) {
-      this.selectLevel(curId);
+      this.selectLevel(curId, { preserveView: preserveCanvasView });
     } else if (merged.length > 0) {
       this.selectLevel(merged[0].resourceId);
     } else {
@@ -6481,7 +7126,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     // Instead we re-render only when panY moves outside the pre-rendered overhang.
     // roadSegsVersion is bumped whenever road segment data changes so that barrier
     // drags and merge/split operations invalidate the cached road bitmap automatically.
-    const staticKey = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${panX.toFixed(0)}|${this.roadTexturesVersion()}|${this.roadSegsVersion()}`;
+    const staticKey = `${level.resourceId}|${W}|${H}|${zoom.toFixed(3)}|${panX.toFixed(0)}|${this.roadTexturesVersion()}|${this.roadInfoVersion()}|${this.roadSegsVersion()}`;
 
     // How far (in canvas pixels) has panY moved from the offscreen centre?
     const offscreenCentreCanvasY = OVERHANG + H / 2;
@@ -6775,7 +7420,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     // Finish line: checkerboard band at levelEnd Y
     const levelEnd = level.properties.levelEnd;
-    if (levelEnd > 0 && level.roadSegs.length > 0) {
+    if (levelEnd >= 0 && level.roadSegs.length > 0) {
       const endSegIdx = Math.min(Math.floor(levelEnd / 2), level.roadSegs.length - 1);
       const seg = level.roadSegs[endSegIdx];
       const [leftX, lineY] = wtc(seg.v1, levelEnd);

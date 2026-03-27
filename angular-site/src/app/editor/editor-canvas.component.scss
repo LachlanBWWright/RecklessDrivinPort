@@ -100,6 +100,83 @@
   }
 }
 
+.canvas-property-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.canvas-inline-field {
+  width: auto;
+  flex: 0 0 auto;
+  margin-bottom: 0;
+
+  ::ng-deep .mat-mdc-text-field-wrapper {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-infix {
+    min-height: 34px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  .mat-mdc-select-trigger {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+}
+
+.canvas-inline-field--road {
+  min-width: 186px;
+  max-width: 240px;
+}
+
+.canvas-inline-field--time {
+  min-width: 118px;
+  max-width: 128px;
+}
+
+.road-info-trigger,
+.road-info-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.road-info-option-label {
+  white-space: nowrap;
+}
+
+.road-info-thumb,
+.road-info-thumb--fallback {
+  width: 48px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid #4a4a4a;
+  flex: 0 0 auto;
+  object-fit: cover;
+  background: linear-gradient(135deg, #555, #2c2c2c);
+}
+
+.road-info-thumb--fallback.water {
+  background: linear-gradient(135deg, #0a7a1e, #354ab5);
+}
+
+.canvas-inline-field--time ::ng-deep .mat-mdc-input-element {
+  text-align: right;
+}
+
 .toolbar-divider {
   height: 20px !important;
   border-right-color: #444 !important;

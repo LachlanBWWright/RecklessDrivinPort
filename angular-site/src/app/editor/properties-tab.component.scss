@@ -13,43 +13,19 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 16px; /* consistent inner spacing */
-  box-sizing: border-box;
+  overflow: hidden;
 }
 
-/* Content area — use a responsive grid for the small form fields */
+/* Content area */
 .props-card-content {
-  padding: 0; /* card already padded above */
+  padding: 16px 20px !important;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.props-form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
-  align-items: start;
-  /* Small top/bottom padding so floating labels and hints aren't clipped
-     against the header or the divider */
-  padding-top: 8px;
-  /* Add bottom padding so mat-hint text doesn't clip into the divider below */
-  padding-bottom: 28px;
-  margin-bottom: 8px;
-}
-
-/* Allow content inside the card to show any floating labels/hints
-   that may extend outside the content box so they don't get clipped. */
-.tab-panel-card mat-card-content {
-  overflow: visible;
-}
-
-.prop-field { width: 100%; }
-
-/* Ensure mat-form-field rows are tall enough for hints */
-.prop-field .mat-mdc-form-field-subscript-wrapper {
-  overflow: visible;
+  overflow: auto;
+  box-sizing: border-box;
 }
 
 /* Table: make sure it fits the card and long content wraps or scrolls */
@@ -88,6 +64,72 @@
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: middle;
+}
+
+.road-info-section {
+  margin-bottom: 16px;
+}
+
+.road-info-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.road-info-table td:first-child {
+  width: 190px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.road-info-input {
+  width: 120px;
+}
+
+.road-info-checkbox {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+.texture-select-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.texture-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.texture-option--trigger {
+  width: 100%;
+}
+
+.texture-option-label {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.texture-thumb,
+.texture-thumb--fallback {
+  width: 48px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  flex: 0 0 auto;
+  object-fit: cover;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(0, 0, 0, 0.22));
+}
+
+.texture-thumb--fallback {
+  background: linear-gradient(135deg, #555, #2c2c2c);
 }
 
 /* Small spacing tweak for actions */

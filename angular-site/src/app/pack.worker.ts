@@ -15,6 +15,7 @@
  *   LOAD                   payload: ArrayBuffer (raw resources.dat bytes)
  *   DECODE_SPRITE_PREVIEWS payload: { objectTypesArr: [number, ObjectTypeDefinition?][] }
  *   APPLY_PROPS            payload: { resourceId, props }
+ *   APPLY_ROAD_INFO        payload: { roadInfoId, roadInfo }
  *   APPLY_OBJECTS          payload: { resourceId, objects }
  *   APPLY_TRACK            payload: { resourceId, trackUp, trackDown }
  *   APPLY_MARKS            payload: { resourceId, marks }
@@ -41,9 +42,19 @@ import {
   getRawResource, putRawResource, listResources,
   parseStrList, encodeStrList,
   listPackEntries, getPackEntryRaw, putPackEntryRaw,
+  extractObjectGroupDefinitions, applyObjectGroupDefinitions,
 } from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
-import type { LevelProperties, ObjectPos, MarkSeg, RoadSeg, ObjectTypeDefinition, DecodedRoadTexture } from './level-editor.service';
+import type {
+  LevelProperties,
+  ObjectPos,
+  MarkSeg,
+  RoadSeg,
+  ObjectTypeDefinition,
+  DecodedRoadTexture,
+  RoadInfoData,
+  ObjectGroupDefinition,
+} from './level-editor.service';
 
 const resourceDatSvc = new ResourceDatService();
 const levelEditorSvc = new LevelEditorService();
@@ -59,12 +70,17 @@ function extractAll(): {
   levels: ReturnType<typeof levelEditorSvc.extractParsedLevels>;
   sprites: ReturnType<typeof levelEditorSvc.extractSpriteAssets>;
   objectTypesArr: [number, ObjectTypeDefinition][];
+  roadInfoArr: [number, RoadInfoData][];
+  objectGroups: ObjectGroupDefinition[];
 } {
   const objectTypesMap = levelEditorSvc.extractObjectTypeDefinitions(resources);
+  const roadInfoMap = levelEditorSvc.extractRoadInfos(resources);
   return {
     levels: levelEditorSvc.extractParsedLevels(resources),
     sprites: levelEditorSvc.extractSpriteAssets(resources),
     objectTypesArr: [...objectTypesMap.entries()],
+    roadInfoArr: [...roadInfoMap.entries()],
+    objectGroups: extractObjectGroupDefinitions(resources),
   };
 }
 
@@ -106,9 +122,14 @@ self.addEventListener('message', (event: MessageEvent) => {
       case 'LOAD': {
         const bytes = new Uint8Array(payload as ArrayBuffer);
         resources = resourceDatSvc.parse(bytes);
-        const { levels, sprites, objectTypesArr } = extractAll();
+        const { levels, sprites, objectTypesArr, roadInfoArr, objectGroups } = extractAll();
         // Reply immediately without sprite pre-decoding (sprites decode separately).
-        self.postMessage({ id, ok: true, cmd, result: { levels, sprites, objectTypesArr } });
+        self.postMessage({
+          id,
+          ok: true,
+          cmd,
+          result: { levels, sprites, objectTypesArr, roadInfoArr, objectGroups },
+        });
         break;
       }
 
@@ -177,6 +198,14 @@ self.addEventListener('message', (event: MessageEvent) => {
         break;
       }
 
+      case 'APPLY_ROAD_INFO': {
+        const { roadInfoId, roadInfo } = payload as { roadInfoId: number; roadInfo: RoadInfoData };
+        resources = levelEditorSvc.applyRoadInfoData(resources, roadInfoId, roadInfo);
+        const { levels } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { levels } });
+        break;
+      }
+
       case 'APPLY_OBJECTS': {
         const { resourceId, objects } = payload as { resourceId: number; objects: ObjectPos[] };
         resources = levelEditorSvc.applyLevelObjects(resources, resourceId, objects);
@@ -232,6 +261,14 @@ self.addEventListener('message', (event: MessageEvent) => {
         // Return updated levels so canvas previews refresh
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
+        break;
+      }
+
+      case 'APPLY_OBJECT_GROUPS': {
+        const { objectGroups } = payload as { objectGroups: ObjectGroupDefinition[] };
+        resources = applyObjectGroupDefinitions(resources, objectGroups);
+        const { objectGroups: updatedObjectGroups } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { objectGroups: updatedObjectGroups } });
         break;
       }
 

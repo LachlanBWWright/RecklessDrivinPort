@@ -42,9 +42,11 @@ export class ObjectInspectorComponent implements OnChanges {
     const target = event.target as HTMLInputElement | null;
     if (!target) return;
     this.dirDegText = target.value;
-    if (this.dirDegFocused) {
-      this.dirDegInput.emit(this.dirDegText);
-    }
+  }
+
+  /** Commit the current direction text to the parent model. */
+  commitDirDegText(): void {
+    this.dirDegInput.emit(this.dirDegText);
   }
 
   ngOnChanges(changes: SimpleChanges): void {

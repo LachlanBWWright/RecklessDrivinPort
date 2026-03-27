@@ -1,0 +1,172 @@
+<mat-card class="tab-panel-card">
+  <mat-card-header>
+    <mat-card-title>Object Group Editor</mat-card-title>
+    <mat-card-subtitle>Pack 130 (kPackOgrp) - shared spawn tables referenced by level object-group slots</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    @if (objectGroups.length > 0) {
+      <div class="object-group-viewer">
+        <aside class="object-group-sidebar">
+          <div class="object-group-sidebar-header">
+            <div>
+              <div class="object-group-sidebar-title">Groups</div>
+              <div class="object-group-sidebar-subtitle">{{ objectGroups.length }} definitions</div>
+            </div>
+            <button mat-icon-button color="primary" (click)="addGroup.emit()" [disabled]="workerBusy" matTooltip="Create a new group">
+              <mat-icon>add</mat-icon>
+            </button>
+          </div>
+
+          <div class="object-group-list">
+          @for (group of objectGroups; track trackGroup($index, group)) {
+            <button
+              class="object-group-item"
+              [class.object-group-item--active]="selectedObjectGroupId === group.id"
+              (click)="selectedObjectGroupIdChange.emit(group.id)">
+              <span class="object-group-item__main">
+                <span class="object-group-item__title">Group #{{ group.id }}</span>
+                <span class="object-group-item__meta">{{ group.entries.length }} entries</span>
+              </span>
+              <mat-icon class="object-group-item__chevron">chevron_right</mat-icon>
+            </button>
+          }
+          </div>
+
+          <div class="object-group-sidebar-actions">
+            <button mat-stroked-button (click)="duplicateGroup.emit()" [disabled]="workerBusy || selectedGroup === null">
+              <mat-icon>content_copy</mat-icon> Duplicate Selected
+            </button>
+          </div>
+        </aside>
+
+        @if (selectedGroup; as group) {
+          <div class="object-group-detail">
+            <div class="object-group-detail-header">
+              <div>
+                <h4 class="audio-detail-title">Group #{{ group.id }}</h4>
+                <p class="muted object-group-detail-copy">
+                  Each row is one spawn candidate. The game picks an entry using the <code>probility</code> weights,
+                  then spawns up to the level slot's <code>numObjs</code> objects from that group.
+                </p>
+              </div>
+              <div class="object-group-detail-actions">
+                <button mat-raised-button color="primary" (click)="addEntry.emit(group.id)" [disabled]="workerBusy">
+                  <mat-icon>add</mat-icon> Add Entry
+                </button>
+                <button mat-stroked-button color="warn" (click)="deleteGroup.emit(group.id)" [disabled]="workerBusy">
+                  <mat-icon>delete</mat-icon> Delete Group
+                </button>
+              </div>
+            </div>
+
+            @if (group.entries.length > 0) {
+              <table class="data-table plain-table object-group-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>typeRes</th>
+                    <th>minOffs</th>
+                    <th>maxOffs</th>
+                    <th>probility</th>
+                    <th>dir</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (entry of group.entries; track trackEntry($index)) {
+                    <tr>
+                      <td>{{ $index }}</td>
+                      <td>
+                        <mat-form-field appearance="outline" class="object-group-type-field">
+                          <mat-select
+                            [value]="entry.typeRes"
+                            [disabled]="workerBusy"
+                            (selectionChange)="onTypeResChange(group.id, $index, $event.value)">
+                            <mat-select-trigger>
+                              <span class="texture-option texture-option--trigger">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">{{ getTypeLabel(entry.typeRes) }}</span>
+                              </span>
+                            </mat-select-trigger>
+                            @for (typeRes of availableTypeIds; track typeRes) {
+                              <mat-option [value]="typeRes">
+                                <span class="texture-option">
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                  <span class="texture-option-label">{{ getTypeLabel(typeRes) }}</span>
+                                </span>
+                              </mat-option>
+                            }
+                            @if (hasCustomType(entry.typeRes)) {
+                              <mat-option [value]="entry.typeRes">
+                                <span class="texture-option">
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                  <span class="texture-option-label">#{{ entry.typeRes }} (custom)</span>
+                                </span>
+                              </mat-option>
+                            }
+                          </mat-select>
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <input class="obj-group-input" type="number" [value]="entry.minOffs"
+                          [disabled]="workerBusy"
+                          (change)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'minOffs', event: $event })" />
+                      </td>
+                      <td>
+                        <input class="obj-group-input" type="number" [value]="entry.maxOffs"
+                          [disabled]="workerBusy"
+                          (change)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'maxOffs', event: $event })" />
+                      </td>
+                      <td>
+                        <input class="obj-group-input" type="number" [value]="entry.probility"
+                          [disabled]="workerBusy"
+                          (change)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'probility', event: $event })" />
+                      </td>
+                      <td>
+                        <input class="obj-group-input" type="number" step="0.01" [value]="entry.dir"
+                          [disabled]="workerBusy"
+                          (change)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'dir', event: $event })" />
+                      </td>
+                      <td>
+                        <button mat-icon-button color="warn"
+                          (click)="deleteEntry.emit({ groupId: group.id, entryIndex: $index })"
+                          [disabled]="workerBusy">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <div class="res-placeholder object-group-placeholder">
+                <p class="muted">This group has no entries yet.</p>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="object-group-detail object-group-detail--empty">
+            <div class="res-placeholder">
+              <p class="muted">Select a group from the list.</p>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="object-group-footer">
+        <button mat-raised-button color="primary" (click)="saveObjectGroups.emit()" [disabled]="!groupsDirty || workerBusy">
+          <mat-icon>save</mat-icon>
+          {{ workerBusy ? 'Saving…' : 'Save Object Groups' }}
+        </button>
+        @if (!groupsDirty) {
+          <span class="muted">No unsaved changes.</span>
+        }
+      </div>
+    } @else {
+      <div class="no-data-content">
+        <mat-icon class="no-data-icon">inventory_2</mat-icon>
+        <p>Object group definitions from Pack 130 (kPackOgrp) will appear here once a resources.dat is loaded.</p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

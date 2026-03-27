@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
-import type { MarkSeg, ObjectPos, TrackWaypointRef } from '../../../level-editor.service';
+import type { MarkSeg, ObjectPos, RoadInfoOption, TrackWaypointRef } from '../../../level-editor.service';
 import type { DrawMode } from '../../../editor/editor-canvas.component';
 import type { MarkingRoadSelection } from '../../../road-marking-utils';
 
@@ -26,6 +26,9 @@ export class EditorObjectsSectionComponent {
   @Input() showMarks = true;
   @Input() barrierDrawSide: 'v0' | 'v1' | 'i' | 'v2' | 'v3' = 'v0';
   @Input() drawMode: DrawMode = 'none';
+  @Input() roadInfoOptions: RoadInfoOption[] = [];
+  @Input() editRoadInfo = 0;
+  @Input() editTime = 0;
   @Input() canUndo = false;
   @Input() canRedo = false;
   @Input() trackUpCount = 0;
@@ -78,6 +81,8 @@ export class EditorObjectsSectionComponent {
   @Output() resetView = new EventEmitter<void>();
   @Output() undo = new EventEmitter<void>();
   @Output() redo = new EventEmitter<void>();
+  @Output() roadInfoChange = new EventEmitter<number>();
+  @Output() timeChange = new EventEmitter<number>();
   @Output() toggleMarks = new EventEmitter<void>();
   @Output() barrierDrawSideChange = new EventEmitter<'v0' | 'v1' | 'i' | 'v2' | 'v3'>();
   @Output() drawModeChange = new EventEmitter<DrawMode>();

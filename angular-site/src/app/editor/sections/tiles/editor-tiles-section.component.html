@@ -6,24 +6,34 @@
   <mat-card-content>
     @if (tileTileEntries.length > 0) {
       <div class="tile-viewer sprite-viewer-layout">
-        <div class="pack-sprite-grid sprite-list-column tile-list-column">
-          @for (tile of tileTileEntries; track tile.texId) {
-            @if (getTileDataUrl(tile.texId); as url) {
-              <div class="pack-sprite-cell"
-                [class.selected]="selectedTileId === tile.texId"
-                (click)="selectedTileIdChange.emit(tile.texId)"
-                [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
-                <img [src]="url" class="pack-sprite-thumb" [style.imageRendering]="'pixelated'" alt="" />
-                <span class="pack-sprite-label">#{{ tile.texId }}</span>
+        <div class="tile-list-column">
+          @for (group of roadTileGroups; track group.roadInfoId) {
+            <section class="tile-road-group">
+              <div class="tile-road-group-header">
+                <span class="tile-road-group-title">{{ group.label }}</span>
+                <span class="tile-road-group-count">{{ group.tiles.length }} tiles</span>
               </div>
-            } @else {
-              <div class="pack-sprite-cell"
-                [class.selected]="selectedTileId === tile.texId"
-                (click)="selectedTileIdChange.emit(tile.texId)"
-                [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
-                <span class="pack-sprite-label">#{{ tile.texId }}</span>
+              <div class="pack-sprite-grid">
+                @for (tile of group.tiles; track tile.texId) {
+                  @if (getTileDataUrl(tile.texId); as url) {
+                    <div class="pack-sprite-cell"
+                      [class.selected]="selectedTileId === tile.texId"
+                      (click)="selectedTileIdChange.emit(tile.texId)"
+                      [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
+                      <img [src]="url" class="pack-sprite-thumb" [style.imageRendering]="'pixelated'" alt="" />
+                      <span class="pack-sprite-label">#{{ tile.texId }}</span>
+                    </div>
+                  } @else {
+                    <div class="pack-sprite-cell"
+                      [class.selected]="selectedTileId === tile.texId"
+                      (click)="selectedTileIdChange.emit(tile.texId)"
+                      [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
+                      <span class="pack-sprite-label">#{{ tile.texId }}</span>
+                    </div>
+                  }
+                }
               </div>
-            }
+            </section>
           }
         </div>
 

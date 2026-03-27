@@ -206,6 +206,7 @@ main {
 
 app-game-panel {
   flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -213,12 +214,14 @@ app-game-panel {
 
 .game-section {
   flex: 1;
-  overflow: visible;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   padding: 20px 20px 40px;
   gap: 16px;
+  overscroll-behavior: contain;
 }
 /* ======================================================
    SHARED HELPERS
@@ -291,7 +294,8 @@ app-game-panel {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
   width: 100%;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 
@@ -307,7 +311,6 @@ app-game-panel {
 
   mat-card-content {
     display: flex;
-    flex: 1 1 auto;
     min-height: 0;
     align-items: stretch;
     justify-content: center;

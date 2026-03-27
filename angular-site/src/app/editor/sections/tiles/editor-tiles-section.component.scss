@@ -1,0 +1,54 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.tile-list-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  flex: 0 0 340px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  align-self: stretch;
+
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 3px; }
+}
+
+.tile-road-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tile-road-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.tile-road-group-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tile-road-group-count {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tile-road-group .pack-sprite-grid {
+  flex: 0 0 auto;
+  align-self: stretch;
+}

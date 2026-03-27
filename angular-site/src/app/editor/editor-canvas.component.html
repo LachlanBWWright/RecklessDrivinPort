@@ -68,6 +68,62 @@
         <mat-icon>timeline</mat-icon>
       </mat-button-toggle>
     </mat-button-toggle-group>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <div class="canvas-property-controls">
+      <mat-form-field appearance="outline" class="canvas-inline-field canvas-inline-field--road">
+        <mat-label>Road Info</mat-label>
+        <mat-select
+          [value]="editRoadInfo"
+          (valueChange)="roadInfoChange.emit($event)"
+          [disabled]="workerBusy || !roadInfoOptions.length"
+          aria-label="Road info selector"
+        >
+          <mat-select-trigger>
+            @if (getRoadInfoOption(editRoadInfo); as selectedRoadInfo) {
+              <span class="road-info-trigger">
+                @if (selectedRoadInfo.previewUrl) {
+                  <img class="road-info-thumb" [src]="selectedRoadInfo.previewUrl" [alt]="'Road info ' + selectedRoadInfo.id" />
+                } @else {
+                  <span class="road-info-thumb road-info-thumb--fallback" [class.water]="selectedRoadInfo.water"></span>
+                }
+                <span>{{ selectedRoadInfo.label }}</span>
+              </span>
+            } @else {
+              <span class="road-info-trigger">
+                <span class="road-info-thumb road-info-thumb--fallback"></span>
+                <span>Road {{ editRoadInfo }}</span>
+              </span>
+            }
+          </mat-select-trigger>
+          @for (option of roadInfoOptions; track option.id) {
+            <mat-option [value]="option.id">
+              <span class="road-info-option">
+                @if (option.previewUrl) {
+                  <img class="road-info-thumb" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
+                } @else {
+                  <span class="road-info-thumb road-info-thumb--fallback" [class.water]="option.water"></span>
+                }
+                <span class="road-info-option-label">{{ option.label }}</span>
+              </span>
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="canvas-inline-field canvas-inline-field--time">
+        <mat-label>Time Limit</mat-label>
+        <input
+          matInput
+          type="number"
+          min="0"
+          max="65535"
+          [value]="editTime"
+          [disabled]="workerBusy"
+          (input)="onTimeLimitInput($event)"
+          aria-label="Time limit in seconds"
+        />
+      </mat-form-field>
+    </div>
     @if (drawMode !== 'none') {
       <mat-button-toggle-group [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
                                matTooltip="Select which barrier side to draw">
@@ -152,4 +208,3 @@
     <span class="legend-item" style="color:#00e5ff">&#9650; Start X</span>
   </div>
 </div>
-

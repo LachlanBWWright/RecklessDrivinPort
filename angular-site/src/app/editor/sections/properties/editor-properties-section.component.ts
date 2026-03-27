@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
-import type { ParsedLevel, LevelProperties, ObjectGroupRef } from '../../../level-editor.service';
+import type { ParsedLevel, ObjectGroupRef, RoadInfoData, TextureTileEntry } from '../../../level-editor.service';
 
 @Component({
   selector: 'app-editor-properties-section',
@@ -11,13 +11,15 @@ export class EditorPropertiesSectionComponent {
   @Input() selectedLevel: ParsedLevel | null = null;
   @Input() levelNum = 0;
   @Input() editRoadInfo = 0;
-  @Input() editTime = 0;
-  @Input() editLevelEnd = 0;
+  @Input() roadInfoData: RoadInfoData | null = null;
   @Input() editObjectGroups: ObjectGroupRef[] = [];
+  @Input() tileTileEntries: TextureTileEntry[] = [];
+  @Input() audioEntries: { id: number; sizeBytes: number; durationMs?: number }[] = [];
+  @Input() getTileDataUrl: (texId: number) => string | null = () => null;
   @Input() propertiesDirty = false;
   @Input() workerBusy = false;
 
-  @Output() propsInput = new EventEmitter<{ field: keyof LevelProperties; event: Event }>();
+  @Output() roadInfoInput = new EventEmitter<{ field: Exclude<keyof RoadInfoData, 'id'>; event: Event }>();
   @Output() objGroupInput = new EventEmitter<{ index: number; field: 'resID' | 'numObjs'; event: Event }>();
   @Output() saveProperties = new EventEmitter<void>();
 }

@@ -56,6 +56,7 @@ import type {
   KonvaDragEndEvent,
   KonvaWaypointDragEndEvent,
   KonvaMarkDragEndEvent,
+  KonvaFinishLineDragEvent,
   KonvaWorldNode,
 } from './konva-editor.types';
 import {
@@ -86,6 +87,9 @@ export class KonvaEditorService implements OnDestroy {
   private barrierLayer: Konva.Layer | null = null;
   private barrierWorldGroup: Konva.Group | null = null;
   private _barrierDrawPreviewLine: Konva.Line | null = null;
+  private finishLayer: Konva.Layer | null = null;
+  private finishWorldGroup: Konva.Group | null = null;
+  private _finishLineNode: Konva.Line | null = null;
   // Background offscreen-bitmap layer (prototype)
   private bgLayer: Konva.Layer | null = null;
   private bgImageNode: Konva.Image | null = null;
@@ -99,6 +103,9 @@ export class KonvaEditorService implements OnDestroy {
   onWaypointDoubleClick?: (track: 'up' | 'down', segIdx: number) => void;
   onMarkEndpointDragEnd?: (e: KonvaMarkDragEndEvent) => void;
   onMarkClick?: (markIdx: number) => void;
+  onFinishLineDragStart?: (e: KonvaFinishLineDragEvent) => void;
+  onFinishLineDragMove?: (e: KonvaFinishLineDragEvent) => void;
+  onFinishLineDragEnd?: (e: KonvaFinishLineDragEvent) => void;
   onStageDblClick?: (worldX: number, worldY: number) => void;
   onStageRightClick?: (worldX: number, worldY: number) => void;
 
@@ -142,6 +149,7 @@ export class KonvaEditorService implements OnDestroy {
     this._markLayerDirty(this.trackLayer);
     this._markLayerDirty(this.marksLayer);
     this._markLayerDirty(this.barrierLayer);
+    this._markLayerDirty(this.finishLayer);
   }
 
   // ── Interaction state ─────────────────────────────────────────────────────
@@ -189,9 +197,11 @@ export class KonvaEditorService implements OnDestroy {
     this.objectsLayer    = new Konva.Layer();
     this.trackLayer      = new Konva.Layer();
     this.marksLayer      = new Konva.Layer();
+    this.finishLayer     = new Konva.Layer();
     this.worldGroup      = new Konva.Group();
     this.trackWorldGroup = new Konva.Group();
     this.marksWorldGroup = new Konva.Group();
+    this.finishWorldGroup = new Konva.Group();
 
     // Background layer (offscreen-bitmap prototype) — add first so it sits behind others
     this.bgLayer = new Konva.Layer({ listening: false });
@@ -209,7 +219,8 @@ export class KonvaEditorService implements OnDestroy {
     this.objectsLayer.add(this.worldGroup);
     this.trackLayer.add(this.trackWorldGroup);
     this.marksLayer.add(this.marksWorldGroup);
-    this.stage.add(this.bgLayer, this.objectsLayer, this.trackLayer, this.marksLayer);
+    this.finishLayer.add(this.finishWorldGroup);
+    this.stage.add(this.bgLayer, this.objectsLayer, this.trackLayer, this.marksLayer, this.finishLayer);
 
     this.barrierLayer = new Konva.Layer();
     this.barrierWorldGroup = new Konva.Group();
@@ -319,6 +330,7 @@ export class KonvaEditorService implements OnDestroy {
       this.trackWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
       this.marksWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
       this.barrierWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
+      this.finishWorldGroup?.setAttrs({ x: gx, y: gy, scaleX: sx, scaleY: sy });
       // keep background image transform in sync as well
       _applyBackgroundTransform(this.bgImageNode, this._zoom, this._panX, this._panY, this._cssW, this._cssH, this._logicalW, this._logicalH);
       // All layers need redraw when the transform changes
@@ -369,6 +381,9 @@ export class KonvaEditorService implements OnDestroy {
       for (const node of this.marksWorldGroup.children) {
         (node as Konva.Node).draggable(!isPan);
       }
+    }
+    if (this._finishLineNode) {
+      this._finishLineNode.draggable(!isPan);
     }
   }
 
@@ -536,6 +551,70 @@ export class KonvaEditorService implements OnDestroy {
     t.end();
   }
 
+  setFinishLine(
+    levelEnd: number,
+    zoom: number,
+    panX: number,
+    panY: number,
+  ): void {
+    void panX;
+    void panY;
+    if (!this.finishWorldGroup || !this.finishLayer) return;
+    const sy = zoom * (this._cssH / this._logicalH);
+    const fixedX = -this._logicalW * 2;
+    const fixedW = this._logicalW * 4;
+    const strokeWidth = Math.max(2, 2.5 / Math.max(0.0001, sy));
+    const dash = [10 / Math.max(0.0001, sy), 6 / Math.max(0.0001, sy)];
+
+    if (!this._finishLineNode) {
+      const node = new Konva.Line({
+        points: [fixedX, 0, fixedW, 0],
+        x: 0,
+        y: -levelEnd,
+        stroke: '#f9a825',
+        strokeWidth,
+        dash,
+        lineCap: 'round',
+        lineJoin: 'round',
+        listening: true,
+        draggable: !this._panMode,
+        id: 'finish-line',
+        hitStrokeWidth: 28,
+      });
+      node.dragBoundFunc((pos) => ({ x: 0, y: pos.y }));
+      const emit = () => ({ worldY: Math.round(-node.y()) });
+      node.on('dragstart', () => {
+        document.body.style.cursor = 'grabbing';
+        this.onFinishLineDragStart?.(emit());
+      });
+      node.on('dragmove', () => {
+        this.onFinishLineDragMove?.(emit());
+      });
+      node.on('dragend', () => {
+        document.body.style.cursor = '';
+        this.onFinishLineDragEnd?.(emit());
+      });
+      node.on('mouseenter', () => { document.body.style.cursor = 'ns-resize'; });
+      node.on('mouseleave', () => { if (!node.isDragging()) document.body.style.cursor = ''; });
+      this.finishWorldGroup.add(node);
+      this._finishLineNode = node;
+    }
+
+    this._finishLineNode.points([fixedX, 0, fixedW, 0]);
+    this._finishLineNode.y(-levelEnd);
+    this._finishLineNode.strokeWidth(strokeWidth);
+    this._finishLineNode.dash(dash);
+    this._finishLineNode.draggable(!this._panMode);
+    this._markLayerDirty(this.finishLayer);
+  }
+
+  clearFinishLine(): void {
+    this._finishLineNode?.destroy();
+    this._finishLineNode = null;
+    this.finishWorldGroup?.destroyChildren();
+    this._markLayerDirty(this.finishLayer);
+  }
+
   clearMarks(): void {
     this._lastMarks             = null;
     this._lastSelectedMarkIndex = null;
@@ -693,6 +772,9 @@ export class KonvaEditorService implements OnDestroy {
     this._lastSelectedMarkIndex = null;
     this.barrierLayer           = null;
     this.barrierWorldGroup      = null;
+    this.finishLayer            = null;
+    this.finishWorldGroup       = null;
+    this._finishLineNode        = null;
     this._dirtyLayers.clear();
     this._lastGx = NaN; this._lastGy = NaN; this._lastSx = NaN; this._lastSy = NaN;
   }

@@ -135,6 +135,162 @@ describe('App', () => {
     expect(app.selectedObjIndex()).toBe(1);
   });
 
+  it('should undo and redo a dragged object', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.objects.set([{ x: 100, y: 200, dir: 0, typeRes: 128 }]);
+    app.selectObject(0);
+
+    let canvasToWorldCall = 0;
+    app.canvasToWorld = (() => {
+      canvasToWorldCall += 1;
+      return canvasToWorldCall === 1 ? [100, 200] : [150, 240];
+    }) as typeof app.canvasToWorld;
+
+    const mouseEvent = (x: number, y: number) =>
+      ({
+        button: 0,
+        offsetX: x,
+        offsetY: y,
+        preventDefault: () => {},
+        target: { focus: () => {} },
+      }) as unknown as MouseEvent;
+
+    app.onCanvasMouseDown(mouseEvent(0, 0));
+    app.onCanvasMouseMove(mouseEvent(0, 0));
+    app.onCanvasMouseUp(mouseEvent(0, 0));
+
+    expect(app.objects()[0]).toEqual({ x: 150, y: 240, dir: 0, typeRes: 128 });
+
+    app.undo();
+    expect(app.objects()[0]).toEqual({ x: 100, y: 200, dir: 0, typeRes: 128 });
+    expect(app.canRedo()).toBe(true);
+
+    app.redo();
+    expect(app.objects()[0]).toEqual({ x: 150, y: 240, dir: 0, typeRes: 128 });
+  });
+
+  it('should undo and redo a dragged start marker', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.editXStartPos.set(100);
+
+    let canvasToWorldCall = 0;
+    app.canvasToWorld = (() => {
+      canvasToWorldCall += 1;
+      return canvasToWorldCall === 1 ? [100, 0] : [150, 0];
+    }) as typeof app.canvasToWorld;
+
+    const mouseEvent = (x: number, y: number) =>
+      ({
+        button: 0,
+        offsetX: x,
+        offsetY: y,
+        preventDefault: () => {},
+        target: { focus: () => {} },
+      }) as unknown as MouseEvent;
+
+    app.onCanvasMouseDown(mouseEvent(0, 0));
+    app.onCanvasMouseMove(mouseEvent(0, 0));
+    app.onCanvasMouseUp(mouseEvent(0, 0));
+
+    expect(app.editXStartPos()).toBe(150);
+    expect(app.propertiesDirty()).toBe(true);
+
+    app.undo();
+    expect(app.editXStartPos()).toBe(100);
+    expect(app.canRedo()).toBe(true);
+
+    app.redo();
+    expect(app.editXStartPos()).toBe(150);
+  });
+
+  it('should undo and redo a dragged finish line', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.editLevelEnd.set(500);
+
+    let canvasToWorldCall = 0;
+    app.canvasToWorld = (() => {
+      canvasToWorldCall += 1;
+      return canvasToWorldCall === 1 ? [0, 500] : [0, 650];
+    }) as typeof app.canvasToWorld;
+
+    const mouseEvent = (x: number, y: number) =>
+      ({
+        button: 0,
+        offsetX: x,
+        offsetY: y,
+        preventDefault: () => {},
+        target: { focus: () => {} },
+      }) as unknown as MouseEvent;
+
+    app.onCanvasMouseDown(mouseEvent(0, 0));
+    app.onCanvasMouseMove(mouseEvent(0, 0));
+    app.onCanvasMouseUp(mouseEvent(0, 0));
+
+    expect(app.editLevelEnd()).toBe(650);
+    expect(app.propertiesDirty()).toBe(true);
+
+    app.undo();
+    expect(app.editLevelEnd()).toBe(500);
+    expect(app.canRedo()).toBe(true);
+
+    app.redo();
+    expect(app.editLevelEnd()).toBe(650);
+  });
+
+  it('should undo and redo a double-click object add', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.canvasToWorld = (() => [10, 20]) as typeof app.canvasToWorld;
+
+    app.onCanvasDoubleClick({
+      offsetX: 0,
+      offsetY: 0,
+    } as MouseEvent);
+
+    expect(app.objects()).toEqual([{ x: 10, y: 20, dir: 0, typeRes: 128 }]);
+
+    app.undo();
+    expect(app.objects()).toEqual([]);
+    expect(app.canRedo()).toBe(true);
+
+    app.redo();
+    expect(app.objects()).toEqual([{ x: 10, y: 20, dir: 0, typeRes: 128 }]);
+  });
+
+  it('should undo and redo a property edit', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+
+    app.onPropsInput('time', { target: { value: '45' } } as unknown as Event);
+    expect(app.editTime()).toBe(45);
+
+    app.undo();
+    expect(app.editTime()).toBe(0);
+    expect(app.canRedo()).toBe(true);
+
+    app.redo();
+    expect(app.editTime()).toBe(45);
+  });
+
+  it('should undo and redo a track waypoint removal', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.editTrackUp.set([{ x: 0, y: 0, flags: 0, velo: 0 }]);
+    app.showTrackOverlay.set(true);
+    app.canvasToWorld = (() => [0, 0]) as typeof app.canvasToWorld;
+
+    app.onCanvasContextMenu({
+      offsetX: 0,
+      offsetY: 0,
+      preventDefault: () => {},
+    } as MouseEvent);
+
+    expect(app.editTrackUp().length).toBe(0);
+
+    app.undo();
+    expect(app.editTrackUp()).toEqual([{ x: 0, y: 0, flags: 0, velo: 0 }]);
+
+    app.redo();
+    expect(app.editTrackUp().length).toBe(0);
+  });
+
   it('should update time when editing time directly (seconds stored as-is)', () => {
     const app = TestBed.createComponent(App).componentInstance;
 
@@ -243,18 +399,19 @@ describe('App', () => {
     expect(toolbar?.querySelector('mat-select')).toBeTruthy();
 
     const tabs = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.nav-tab'));
-    expect(tabs.length).toBe(7);
+    expect(tabs.length).toBe(8);
     expect(tabs[0]?.textContent).toContain('Back to Game');
     expect(tabs[1]?.textContent).toContain('Properties');
     expect(tabs[1]?.classList.contains('active')).toBe(true);
-    expect(tabs[2]?.textContent).toContain('Objects & Tracks');
+    expect(tabs[2]?.textContent).toContain('Object Groups');
+    expect(tabs[3]?.textContent).toContain('Objects & Tracks');
   });
 
   // ── Road cache invalidation ──────────────────────────────────────────────
 
-  it('should clear road offscreen key when mergeMiddleBarriers is called', () => {
+  it('should clear road offscreen key when removing a track waypoint from the context menu', () => {
     const app = TestBed.createComponent(App).componentInstance;
-    // Set up a level with a median so mergeMiddleBarriers has something to merge
+    app.showTrackOverlay.set(true);
     const roadSegs = Array.from({ length: 5 }, () => ({ v0: -100, v1: -20, v2: 20, v3: 100 }));
     app.parsedLevels.set([{
       resourceId: 140,
@@ -264,24 +421,31 @@ describe('App', () => {
       roadSegCount: roadSegs.length,
       properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
       objectGroups: [],
-      trackUp: [],
+      trackUp: [{ x: 0, y: 0, flags: 0, velo: 0 }],
       trackDown: [],
       rawEntry1: new Uint8Array(0),
       rawEntry2: new Uint8Array(0),
       encrypted: false,
     }]);
     app.selectedLevelId.set(140);
+    app.editTrackUp.set([{ x: 0, y: 0, flags: 0, velo: 0 }]);
+    app.canvasToWorld = (() => [0, 0]) as typeof app.canvasToWorld;
 
     // Simulate a stale road key
     (app as unknown as Record<string, unknown>)['_roadOffscreenKey'] = 'stale-key';
 
-    app.mergeMiddleBarriers();
+    app.onCanvasContextMenu({
+      offsetX: 0,
+      offsetY: 0,
+    } as MouseEvent);
 
     expect((app as unknown as Record<string, unknown>)['_roadOffscreenKey']).toBe('');
+    expect(app.editTrackUp().length).toBe(0);
   });
 
-  it('should clear road offscreen key when splitMiddleBarriers is called', () => {
+  it('should clear road offscreen key when inserting a waypoint from the context menu', () => {
     const app = TestBed.createComponent(App).componentInstance;
+    app.showTrackOverlay.set(true);
     const roadSegs = Array.from({ length: 5 }, () => ({ v0: -100, v1: -10, v2: 10, v3: 100 }));
     app.parsedLevels.set([{
       resourceId: 140,
@@ -291,19 +455,26 @@ describe('App', () => {
       roadSegCount: roadSegs.length,
       properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
       objectGroups: [],
-      trackUp: [],
-      trackDown: [],
+      trackUp: [{ x: -100, y: 0, flags: 0, velo: 0 }, { x: 100, y: 20, flags: 0, velo: 0 }],
+      trackDown: [{ x: -100, y: 0, flags: 0, velo: 0 }, { x: 100, y: 20, flags: 0, velo: 0 }],
       rawEntry1: new Uint8Array(0),
       rawEntry2: new Uint8Array(0),
       encrypted: false,
     }]);
     app.selectedLevelId.set(140);
+    app.editTrackUp.set([{ x: -100, y: 0, flags: 0, velo: 0 }, { x: 100, y: 20, flags: 0, velo: 0 }]);
+    app.editTrackDown.set([{ x: -100, y: 0, flags: 0, velo: 0 }, { x: 100, y: 20, flags: 0, velo: 0 }]);
+    app.canvasToWorld = (() => [0, 200]) as typeof app.canvasToWorld;
 
     (app as unknown as Record<string, unknown>)['_roadOffscreenKey'] = 'stale-key';
 
-    app.splitMiddleBarriers();
+    app.onCanvasContextMenu({
+      offsetX: 0,
+      offsetY: 0,
+    } as MouseEvent);
 
     expect((app as unknown as Record<string, unknown>)['_roadOffscreenKey']).toBe('');
+    expect(app.editTrackUp().length).toBe(3);
   });
 
   // ── Custom resources persistence ─────────────────────────────────────────
