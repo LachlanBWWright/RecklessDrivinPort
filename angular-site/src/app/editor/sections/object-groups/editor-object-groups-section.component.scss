@@ -169,20 +169,97 @@
   gap: 8px;
 }
 
-.object-group-table {
-  width: 100%;
-  flex: 0 0 auto;
+.object-group-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.object-group-table th,
-.object-group-table td {
-  vertical-align: middle;
+.object-group-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.object-group-entry__top {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.object-group-entry__index {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.object-group-entry__bottom {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.object-group-number-field {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0;
+
+  ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  ::ng-deep .mat-mdc-text-field-wrapper {
+    height: 40px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-flex,
+  ::ng-deep .mat-mdc-form-field-infix {
+    min-height: 40px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-infix {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
 }
 
 .object-group-type-field {
   width: 100%;
   min-width: 290px;
   margin-bottom: 0;
+}
+
+.object-group-dir-field {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0;
+
+  ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  ::ng-deep .mat-mdc-text-field-wrapper {
+    height: 40px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-flex,
+  ::ng-deep .mat-mdc-form-field-infix {
+    min-height: 40px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-infix {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
 }
 
 .object-group-placeholder {
@@ -259,7 +336,8 @@
 }
 
 .object-group-dir-field {
-  width: 130px;
+  width: 100%;
+  min-width: 0;
   margin-bottom: 0;
 }
 
@@ -306,5 +384,12 @@
 
   .object-group-detail-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .object-group-entry__top,
+  .object-group-entry__bottom {
+    grid-template-columns: 1fr;
   }
 }
