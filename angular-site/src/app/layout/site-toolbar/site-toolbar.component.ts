@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from 
 import type { ParsedLevel } from '../../level-editor.service';
 
 export type SiteTab = 'game' | 'editor';
-export type EditorSection = 'properties' | 'object-groups' | 'objects' | 'sprites' | 'tiles' | 'audio' | 'screens';
+export type EditorSection = 'properties' | 'object-groups' | 'object-types' | 'objects' | 'sprites' | 'tiles' | 'audio' | 'screens';
 
 @Component({
   selector: 'app-site-toolbar',
@@ -29,6 +29,7 @@ export class SiteToolbarComponent {
   readonly editorSections: { id: EditorSection; label: string; icon: string }[] = [
     { id: 'properties', label: 'Properties', icon: 'tune' },
     { id: 'object-groups', label: 'Object Groups', icon: 'inventory_2' },
+    { id: 'object-types', label: 'Object Types', icon: 'category' },
     { id: 'objects', label: 'Objects & Tracks', icon: 'route' },
     { id: 'sprites', label: 'Sprites', icon: 'photo_library' },
     { id: 'tiles', label: 'Tiles', icon: 'grid_on' },

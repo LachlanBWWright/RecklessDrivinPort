@@ -13,12 +13,12 @@ export class EditorObjectGroupsSectionComponent {
   @Input() selectedObjectGroupId: number | null = null;
   @Input() availableTypeIds: number[] = [];
   @Input() getObjTypeDimensionLabel: (typeRes: number) => string = () => '';
+  @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
   @Input() groupsDirty = false;
   @Input() workerBusy = false;
 
   @Output() selectedObjectGroupIdChange = new EventEmitter<number>();
   @Output() addGroup = new EventEmitter<void>();
-  @Output() duplicateGroup = new EventEmitter<void>();
   @Output() deleteGroup = new EventEmitter<number>();
   @Output() addEntry = new EventEmitter<number>();
   @Output() deleteEntry = new EventEmitter<{ groupId: number; entryIndex: number }>();
@@ -40,6 +40,24 @@ export class EditorObjectGroupsSectionComponent {
     return dims ? `#${typeRes} · ${dims}` : `#${typeRes}`;
   }
 
+  getSpriteLabel(typeRes: number): string {
+    return this.getTypeLabel(typeRes);
+  }
+
+  getDirArrowRotation(dir: number): string {
+    const safeDir = Number.isFinite(dir) ? dir : 0;
+    const rotation = (safeDir * 180) / Math.PI;
+    return `rotate(${rotation}deg)`;
+  }
+
+  isAutoDir(dir: number): boolean {
+    return dir === -1;
+  }
+
+  getDirLabel(dir: number): string {
+    return this.isAutoDir(dir) ? 'Auto / track-aligned' : `dir ${dir.toFixed(2)}`;
+  }
+
   hasCustomType(typeRes: number): boolean {
     return !this.availableTypeIds.includes(typeRes);
   }
@@ -59,5 +77,9 @@ export class EditorObjectGroupsSectionComponent {
       field: 'typeRes',
       event: { target: { value: String(typeRes) } } as unknown as Event,
     });
+  }
+
+  trackTypeOption(typeRes: number): number {
+    return typeRes;
   }
 }

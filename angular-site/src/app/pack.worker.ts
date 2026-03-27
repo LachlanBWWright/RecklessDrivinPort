@@ -16,7 +16,9 @@
  *   DECODE_SPRITE_PREVIEWS payload: { objectTypesArr: [number, ObjectTypeDefinition?][] }
  *   APPLY_PROPS            payload: { resourceId, props }
  *   APPLY_ROAD_INFO        payload: { roadInfoId, roadInfo }
+ *   REMOVE_ROAD_INFO       payload: { roadInfoId }
  *   APPLY_OBJECTS          payload: { resourceId, objects }
+ *   APPLY_OBJECT_TYPES     payload: { objectTypes }
  *   APPLY_TRACK            payload: { resourceId, trackUp, trackDown }
  *   APPLY_MARKS            payload: { resourceId, marks }
  *   APPLY_ROAD_SEGS        payload: { resourceId, roadSegs }
@@ -43,6 +45,7 @@ import {
   parseStrList, encodeStrList,
   listPackEntries, getPackEntryRaw, putPackEntryRaw,
   extractObjectGroupDefinitions, applyObjectGroupDefinitions,
+  applyObjectTypeDefinitions,
 } from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
 import type {
@@ -201,8 +204,16 @@ self.addEventListener('message', (event: MessageEvent) => {
       case 'APPLY_ROAD_INFO': {
         const { roadInfoId, roadInfo } = payload as { roadInfoId: number; roadInfo: RoadInfoData };
         resources = levelEditorSvc.applyRoadInfoData(resources, roadInfoId, roadInfo);
-        const { levels } = extractAll();
-        self.postMessage({ id, ok: true, cmd, result: { levels } });
+        const { roadInfoArr } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { roadInfoArr } });
+        break;
+      }
+
+      case 'REMOVE_ROAD_INFO': {
+        const { roadInfoId } = payload as { roadInfoId: number };
+        resources = levelEditorSvc.removeRoadInfoData(resources, roadInfoId);
+        const { roadInfoArr } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { roadInfoArr } });
         break;
       }
 
@@ -211,6 +222,14 @@ self.addEventListener('message', (event: MessageEvent) => {
         resources = levelEditorSvc.applyLevelObjects(resources, resourceId, objects);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
+        break;
+      }
+
+      case 'APPLY_OBJECT_TYPES': {
+        const { objectTypes } = payload as { objectTypes: ObjectTypeDefinition[] };
+        resources = applyObjectTypeDefinitions(resources, objectTypes);
+        const { objectTypesArr } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { objectTypesArr } });
         break;
       }
 

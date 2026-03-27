@@ -234,10 +234,27 @@ describe('LevelEditorService', () => {
     const defs = svc.extractObjectTypeDefinitions(resources);
     expect(defs.get(150)).toEqual({
       typeRes: 150,
+      mass: 0,
+      maxEngineForce: 0,
+      maxNegEngineForce: 0,
+      friction: 0,
+      flags: 0,
+      deathObj: 0,
       frame: 321,
       numFrames: 4,
+      frameDuration: 0,
+      wheelWidth: 0,
+      wheelLength: 0,
+      steering: 0,
       width: 36,
       length: 52,
+      score: 0,
+      flags2: 0,
+      creationSound: 0,
+      otherSound: 0,
+      maxDamage: 0,
+      weaponObj: 0,
+      weaponInfo: 0,
     });
   });
 

@@ -1,0 +1,357 @@
+<mat-card class="tab-panel-card">
+  <mat-card-header>
+    <mat-card-title>Object Type Editor</mat-card-title>
+    <mat-card-subtitle>Pack 128 (kPackObTy) - reusable object definitions used by placed objects and object groups</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    @if (objectTypes.length > 0) {
+      <div class="object-type-viewer">
+        <aside class="object-type-sidebar">
+          <div class="object-type-sidebar-header">
+            <div>
+              <div class="object-type-sidebar-title">Types</div>
+              <div class="object-type-sidebar-subtitle">{{ objectTypes.length }} definitions</div>
+            </div>
+            <button mat-icon-button color="primary" (click)="addType.emit()" [disabled]="workerBusy" matTooltip="Create a new type">
+              <mat-icon>add</mat-icon>
+            </button>
+          </div>
+
+          <div class="object-type-list">
+            @for (type of objectTypes; track trackType($index, type)) {
+              <button
+                class="object-type-item"
+                [class.object-type-item--active]="selectedObjectTypeId === type.typeRes"
+                (click)="selectedObjectTypeIdChange.emit(type.typeRes)">
+                <span class="object-type-item__thumb">
+                  @if (getSpriteUrl(type.frame); as url) {
+                    <img [src]="url" class="object-type-item__img" [style.imageRendering]="'pixelated'" alt="" />
+                  } @else {
+                    <span class="object-type-item__img object-type-item__img--fallback">{{ type.frame }}</span>
+                  }
+                </span>
+                <span class="object-type-item__main">
+                  <span class="object-type-item__title">Type #{{ type.typeRes }}</span>
+                  <span class="object-type-item__meta">{{ getFrameLabel(type.frame) }}</span>
+                  <span class="object-type-item__meta">{{ type.width.toFixed(1) }}×{{ type.length.toFixed(1) }} m</span>
+                </span>
+                <mat-icon class="object-type-item__chevron">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+
+        </aside>
+
+        @if (selectedType; as type) {
+          <div class="object-type-detail">
+            <div class="object-type-detail-header">
+              <div>
+                <h4 class="audio-detail-title">Type #{{ type.typeRes }}</h4>
+                <p class="muted object-type-detail-copy">
+                  This definition controls the sprite frame, animation, collision, physics, scoring, and special gameplay flags.
+                </p>
+              </div>
+              <div class="object-type-detail-actions">
+                <button mat-raised-button color="primary" (click)="addType.emit()" [disabled]="workerBusy">
+                  <mat-icon>add</mat-icon> Add Type
+                </button>
+                <button mat-stroked-button color="warn" (click)="deleteType.emit(type.typeRes)" [disabled]="workerBusy">
+                  <mat-icon>delete</mat-icon> Delete Type
+                </button>
+              </div>
+            </div>
+
+            <div class="object-type-hero">
+              <div class="object-type-preview-shell">
+                @if (getSpriteUrl(getPreviewFrameId(type)); as url) {
+                  <img [src]="url" class="object-type-preview" [style.imageRendering]="'pixelated'" alt="object type preview" />
+                } @else {
+                  <div class="object-type-preview object-type-preview--placeholder">
+                    <mat-icon>photo_library</mat-icon>
+                    <span>Preview unavailable</span>
+                  </div>
+                }
+                @if (hasPreviewFrameControls(type)) {
+                  <button
+                    mat-icon-button
+                    class="object-type-preview-nav object-type-preview-nav--left"
+                    [disabled]="workerBusy"
+                    aria-label="Previous preview frame"
+                    matTooltip="Previous frame"
+                    (click)="stepPreviewFrame(type.typeRes, -1)">
+                    <mat-icon>chevron_left</mat-icon>
+                  </button>
+                  <button
+                    mat-icon-button
+                    class="object-type-preview-nav object-type-preview-nav--right"
+                    [disabled]="workerBusy"
+                    aria-label="Next preview frame"
+                    matTooltip="Next frame"
+                    (click)="stepPreviewFrame(type.typeRes, 1)">
+                    <mat-icon>chevron_right</mat-icon>
+                  </button>
+                }
+              </div>
+              <mat-card class="sprite-meta-card object-type-meta-card">
+                <mat-card-content>
+                  <p class="sprite-meta">
+                    <strong>Preview</strong> {{ getFrameLabel(getPreviewFrameId(type)) }}<br>
+                    <strong>Base</strong> {{ getFrameLabel(type.frame) }}<br>
+                    <strong>Collision</strong> {{ type.width.toFixed(1) }}×{{ type.length.toFixed(1) }} m<br>
+                    <strong>Sprite</strong> referenced from Pack 129 / 137
+                  </p>
+                </mat-card-content>
+              </mat-card>
+            </div>
+
+            <div class="object-type-field-stack">
+              <div class="object-type-field-section">
+                <div class="object-type-section-title">Sprite frame</div>
+                <mat-form-field appearance="outline" class="object-type-sprite-frame-field">
+                  <mat-label>Sprite Frame</mat-label>
+                  <mat-select
+                    panelClass="object-type-frame-select-panel"
+                    [value]="type.frame"
+                    [disabled]="workerBusy"
+                    (selectionChange)="onFrameChange(type.typeRes, $event.value)">
+                    <mat-select-trigger>
+                      {{ getFrameLabel(type.frame) }}
+                    </mat-select-trigger>
+                    @for (frame of spriteFrames; track trackFrame($index, frame)) {
+                      <mat-option [value]="frame.id">{{ getFrameLabel(frame.id) }}</mat-option>
+                    }
+                    @if (hasCustomFrame(type.frame)) {
+                      <mat-option [value]="type.frame">#{{ type.frame }} (custom)</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div class="object-type-field-section">
+                <div class="object-type-section-title">Core data</div>
+                <div class="object-type-field-grid object-type-field-grid--dense">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Frame Count</mat-label>
+                    <input matInput type="number" [value]="type.numFrames"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'numFrames', $event)" />
+                    <mat-hint>Raw `numFrames` encoding from the game</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Frame Duration</mat-label>
+                    <input matInput type="number" step="0.01" [value]="type.frameDuration"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'frameDuration', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Mass</mat-label>
+                    <input matInput type="number" step="0.1" [value]="type.mass"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'mass', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Engine Force</mat-label>
+                    <input matInput type="number" step="0.1" [value]="type.maxEngineForce"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'maxEngineForce', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Reverse Force</mat-label>
+                    <input matInput type="number" step="0.1" [value]="type.maxNegEngineForce"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'maxNegEngineForce', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Friction</mat-label>
+                    <input matInput type="number" step="0.01" [value]="type.friction"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'friction', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Steering</mat-label>
+                    <input matInput type="number" step="0.01" [value]="type.steering"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'steering', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Wheel Width</mat-label>
+                    <input matInput type="number" step="0.01" [value]="type.wheelWidth"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'wheelWidth', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Wheel Length</mat-label>
+                    <input matInput type="number" step="0.01" [value]="type.wheelLength"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'wheelLength', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Collision Width</mat-label>
+                    <input matInput type="number" step="0.01" [value]="type.width"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'width', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Collision Length</mat-label>
+                    <input matInput type="number" step="0.01" [value]="type.length"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'length', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Score</mat-label>
+                    <input matInput type="number" [value]="type.score"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'score', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Max Damage</mat-label>
+                    <input matInput type="number" step="0.1" [value]="type.maxDamage"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'maxDamage', $event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Weapon Info</mat-label>
+                    <input matInput type="number" [value]="type.weaponInfo"
+                      [disabled]="workerBusy"
+                      (change)="onFieldInput(type.typeRes, 'weaponInfo', $event)" />
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <div class="object-type-field-section">
+                <div class="object-type-section-title">References</div>
+                <div class="object-type-field-grid object-type-field-grid--dense">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Death Object</mat-label>
+                    <mat-select [value]="type.deathObj" [disabled]="workerBusy"
+                      (selectionChange)="onReferenceChange(type.typeRes, 'deathObj', $event.value)">
+                      <mat-select-trigger>{{ getObjectTypeLabel(type.deathObj) }}</mat-select-trigger>
+                      <mat-option [value]="-1">None</mat-option>
+                      @for (refType of objectTypes; track trackType($index, refType)) {
+                        <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
+                      }
+                      @if (type.deathObj !== -1 && hasCustomObjectType(type.deathObj)) {
+                        <mat-option [value]="type.deathObj">{{ getObjectTypeLabel(type.deathObj) }} (custom)</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Creation Sound</mat-label>
+                    <mat-select [value]="type.creationSound" [disabled]="workerBusy"
+                      (selectionChange)="onReferenceChange(type.typeRes, 'creationSound', $event.value)">
+                      <mat-select-trigger>{{ getSoundLabel(type.creationSound) }}</mat-select-trigger>
+                      <mat-option [value]="0">None</mat-option>
+                      @for (sound of audioEntries; track sound.id) {
+                        @if (sound.id !== 0) {
+                        <mat-option [value]="sound.id">{{ getSoundLabel(sound.id) }}</mat-option>
+                        }
+                      }
+                      @if (type.creationSound !== 0 && hasCustomSound(type.creationSound)) {
+                        <mat-option [value]="type.creationSound">{{ getSoundLabel(type.creationSound) }} (custom)</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Other Sound</mat-label>
+                    <mat-select [value]="type.otherSound" [disabled]="workerBusy"
+                      (selectionChange)="onReferenceChange(type.typeRes, 'otherSound', $event.value)">
+                      <mat-select-trigger>{{ getSoundLabel(type.otherSound) }}</mat-select-trigger>
+                      <mat-option [value]="0">None</mat-option>
+                      @for (sound of audioEntries; track sound.id) {
+                        @if (sound.id !== 0) {
+                        <mat-option [value]="sound.id">{{ getSoundLabel(sound.id) }}</mat-option>
+                        }
+                      }
+                      @if (type.otherSound !== 0 && hasCustomSound(type.otherSound)) {
+                        <mat-option [value]="type.otherSound">{{ getSoundLabel(type.otherSound) }} (custom)</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Weapon Object</mat-label>
+                    <mat-select [value]="type.weaponObj" [disabled]="workerBusy"
+                      (selectionChange)="onReferenceChange(type.typeRes, 'weaponObj', $event.value)">
+                      <mat-select-trigger>{{ type.weaponObj === 0 ? 'None' : getObjectTypeLabel(type.weaponObj) }}</mat-select-trigger>
+                      <mat-option [value]="0">None</mat-option>
+                      @for (refType of objectTypes; track trackType($index, refType)) {
+                        @if (refType.typeRes !== 0) {
+                          <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
+                        }
+                      }
+                      @if (type.weaponObj !== 0 && hasCustomObjectType(type.weaponObj)) {
+                        <mat-option [value]="type.weaponObj">{{ getObjectTypeLabel(type.weaponObj) }} (custom)</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <div class="object-type-field-section">
+                <div class="object-type-section-title">Flags</div>
+                <div class="object-type-flag-panel">
+                  <div class="object-type-flag-group">
+                    <div class="object-type-flag-group-title">flags</div>
+                    <div class="object-type-flag-grid">
+                      @for (flag of flagOptions.flags; track flag.bit) {
+                        <mat-checkbox
+                          [checked]="hasFlag(type.flags, flag.bit)"
+                          [disabled]="workerBusy"
+                          [matTooltip]="flag.hint"
+                          (change)="onFlagToggle(type.typeRes, 'flags', flag.bit, $event.checked)">
+                          {{ flag.label }}
+                        </mat-checkbox>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="object-type-flag-group">
+                    <div class="object-type-flag-group-title">flags2</div>
+                    <div class="object-type-flag-grid">
+                      @for (flag of flagOptions.flags2; track flag.bit) {
+                        <mat-checkbox
+                          [checked]="hasFlag(type.flags2, flag.bit)"
+                          [disabled]="workerBusy"
+                          [matTooltip]="flag.hint"
+                          (change)="onFlagToggle(type.typeRes, 'flags2', flag.bit, $event.checked)">
+                          {{ flag.label }}
+                        </mat-checkbox>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        } @else {
+          <div class="object-type-detail object-type-detail--empty">
+            <div class="res-placeholder">
+              <p class="muted">Select an object type from the list.</p>
+            </div>
+          </div>
+        }
+      </div>
+
+    } @else {
+      <div class="no-data-content">
+        <mat-icon class="no-data-icon">category</mat-icon>
+        <p>Object type definitions from Pack 128 (kPackObTy) will appear here once a resources.dat is loaded.</p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

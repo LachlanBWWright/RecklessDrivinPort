@@ -112,6 +112,8 @@ describe('App', () => {
     const app = TestBed.createComponent(App).componentInstance;
     app.setSection('objects');
     expect(app.editorSection()).toBe('objects');
+    app.setSection('object-types');
+    expect(app.editorSection()).toBe('object-types');
     app.setSection('sprites');
     expect(app.editorSection()).toBe('sprites');
     app.setSection('properties');
@@ -133,6 +135,67 @@ describe('App', () => {
     expect(app.objects().length).toBe(2);
     expect(app.objects()[1]).toEqual({ x: 150, y: 200, dir: 1.5, typeRes: 136 });
     expect(app.selectedObjIndex()).toBe(1);
+  });
+
+  it('should flush dirty object types before downloading resources', async () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.hasEditorData.set(true);
+    app.parsedLevels.set([]);
+    app.selectedLevelId.set(null);
+    app.objectTypeDefinitions.set([{
+      typeRes: 200,
+      mass: 1,
+      maxEngineForce: 0,
+      maxNegEngineForce: 0,
+      friction: 1,
+      flags: 1 << 13,
+      deathObj: -1,
+      frame: 128,
+      numFrames: 1,
+      frameDuration: 0,
+      wheelWidth: 0,
+      wheelLength: 0,
+      steering: 0,
+      width: 0,
+      length: 0,
+      score: 0,
+      flags2: 0,
+      creationSound: -1,
+      otherSound: -1,
+      maxDamage: 0,
+      weaponObj: -1,
+      weaponInfo: -1,
+    }]);
+    app.objectTypesDirty.set(true);
+
+    const dispatchCalls: string[] = [];
+    const originalDispatchWorker = (app as unknown as { dispatchWorker: unknown }).dispatchWorker;
+    (app as unknown as { dispatchWorker: unknown }).dispatchWorker = async (cmd: string) => {
+      dispatchCalls.push(cmd);
+      if (cmd === 'APPLY_OBJECT_TYPES') {
+        return { objectTypesArr: [[200, app.objectTypeDefinitions()[0]]] } as unknown;
+      }
+      if (cmd === 'SERIALIZE') {
+        return new ArrayBuffer(8) as unknown;
+      }
+      return {} as unknown;
+    };
+
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:mock', configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, configurable: true });
+
+    try {
+      await app.downloadEditedResources();
+    } finally {
+      (app as unknown as { dispatchWorker: unknown }).dispatchWorker = originalDispatchWorker;
+      Object.defineProperty(URL, 'createObjectURL', { value: originalCreateObjectURL, configurable: true });
+      Object.defineProperty(URL, 'revokeObjectURL', { value: originalRevokeObjectURL, configurable: true });
+    }
+
+    expect(dispatchCalls).toContain('APPLY_OBJECT_TYPES');
+    expect(dispatchCalls).toContain('SERIALIZE');
   });
 
   it('should undo and redo a dragged object', () => {
@@ -399,12 +462,13 @@ describe('App', () => {
     expect(toolbar?.querySelector('mat-select')).toBeTruthy();
 
     const tabs = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.nav-tab'));
-    expect(tabs.length).toBe(8);
+    expect(tabs.length).toBe(9);
     expect(tabs[0]?.textContent).toContain('Back to Game');
     expect(tabs[1]?.textContent).toContain('Properties');
     expect(tabs[1]?.classList.contains('active')).toBe(true);
     expect(tabs[2]?.textContent).toContain('Object Groups');
-    expect(tabs[3]?.textContent).toContain('Objects & Tracks');
+    expect(tabs[3]?.textContent).toContain('Object Types');
+    expect(tabs[4]?.textContent).toContain('Objects & Tracks');
   });
 
   // ── Road cache invalidation ──────────────────────────────────────────────

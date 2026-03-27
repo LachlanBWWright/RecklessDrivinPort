@@ -1,86 +1,415 @@
 <mat-card class="tab-panel-card">
   <mat-card-header>
     <mat-card-title>Road &amp; Background Tile Editor</mat-card-title>
-    <mat-card-subtitle>Pack 136 (kPackTx16 — 16-bit RGB555) &amp; Pack 133 (kPackTxtR — 8-bit)</mat-card-subtitle>
+    <mat-card-subtitle>Pack 136 (kPackTx16 — 16-bit RGB555) &amp; shared road definitions from Pack 135</mat-card-subtitle>
   </mat-card-header>
   <mat-card-content>
-    @if (tileTileEntries.length > 0) {
-      <div class="tile-viewer sprite-viewer-layout">
-        <div class="tile-list-column">
-          @for (group of roadTileGroups; track group.roadInfoId) {
-            <section class="tile-road-group">
-              <div class="tile-road-group-header">
-                <span class="tile-road-group-title">{{ group.label }}</span>
-                <span class="tile-road-group-count">{{ group.tiles.length }} tiles</span>
-              </div>
-              <div class="pack-sprite-grid">
-                @for (tile of group.tiles; track tile.texId) {
-                  @if (getTileDataUrl(tile.texId); as url) {
-                    <div class="pack-sprite-cell"
-                      [class.selected]="selectedTileId === tile.texId"
-                      (click)="selectedTileIdChange.emit(tile.texId)"
-                      [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
-                      <img [src]="url" class="pack-sprite-thumb" [style.imageRendering]="'pixelated'" alt="" />
-                      <span class="pack-sprite-label">#{{ tile.texId }}</span>
-                    </div>
-                  } @else {
-                    <div class="pack-sprite-cell"
-                      [class.selected]="selectedTileId === tile.texId"
-                      (click)="selectedTileIdChange.emit(tile.texId)"
-                      [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
-                      <span class="pack-sprite-label">#{{ tile.texId }}</span>
-                    </div>
-                  }
-                }
-              </div>
-            </section>
-          }
-        </div>
-
-        @if (selectedTileId !== null) {
-          <div class="pack-sprite-detail">
-            @if (getTileDataUrl(selectedTileId); as url) {
-              <img [src]="url" class="pack-sprite-large" [style.imageRendering]="'pixelated'" alt="tile preview" />
-            } @else {
-              <div class="pack-sprite-large pack-sprite-large--placeholder">
-                <mat-icon>grid_view</mat-icon>
-                <span>Preview loading…</span>
-              </div>
-            }
-            <mat-card class="sprite-meta-card">
-              <mat-card-content>
-                <p class="sprite-meta">
-                  <strong>Tile</strong> #{{ selectedTileId }}<br>
-                  <strong>Size</strong> {{ selectedTileDimensions }}<br>
-                  <strong>Format</strong> RGB555 (16-bit)
-                </p>
-              </mat-card-content>
-            </mat-card>
-            <div class="sprite-actions">
-              <button mat-raised-button color="primary"
-                (click)="openTileEditor.emit(selectedTileId)"
-                [disabled]="workerBusy"
-                matTooltip="Open pixel editor for this tile">
-                <mat-icon>brush</mat-icon> Edit Pixels
-              </button>
-              <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
-                (change)="tilePngUpload.emit({ event: $event, texId: selectedTileId })" />
-              <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy"
-                matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
-                <mat-icon>upload</mat-icon> Upload PNG
-              </button>
-              <button mat-stroked-button (click)="exportTilePng.emit(selectedTileId)">
-                <mat-icon>download</mat-icon> Export PNG
+    <section class="road-manager-panel">
+      @if (roadInfoOptions.length > 0) {
+        <div class="road-manager-layout">
+          <div class="road-list-column">
+            <div class="road-list-header">
+              <span class="tile-road-group-title">Road records</span>
+              <span class="tile-road-group-count">{{ roadInfoOptions.length }} roads</span>
+            </div>
+            <div class="road-list">
+              @for (option of roadInfoOptions; track option.id) {
+                <div class="road-list-item" [class.selected]="selectedRoadInfoId === option.id">
+                  <button
+                    type="button"
+                    class="road-list-item-main"
+                    (click)="selectedRoadInfoIdChange.emit(option.id)">
+                    @if (option.previewUrl) {
+                      <img class="road-list-thumb" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
+                    } @else {
+                      <span class="road-list-thumb road-list-thumb--fallback" [class.water]="option.water"></span>
+                    }
+                    <span class="road-list-label">{{ option.label }}</span>
+                  </button>
+                  <span class="road-list-delete-wrap" [matTooltip]="getRoadDeleteTooltip(option.id)">
+                    <button
+                      type="button"
+                      mat-icon-button
+                      color="warn"
+                      class="road-list-delete-button"
+                      [disabled]="!canDeleteRoadInfo(option.id)"
+                      (click)="$event.stopPropagation(); deleteRoadInfo.emit(option.id)"
+                      [attr.aria-label]="'Delete road ' + option.id">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </span>
+                </div>
+              }
+            </div>
+            <div class="road-list-footer">
+              <button mat-raised-button color="primary" class="road-list-create-button" (click)="createRoadInfo.emit()" [disabled]="workerBusy">
+                <mat-icon>add</mat-icon>
+                New Road
               </button>
             </div>
           </div>
+
+          <div class="road-detail-column">
+            @if (selectedRoadInfoData) {
+              <h4 class="section-subtitle">Road {{ selectedRoadInfoData.id }}</h4>
+              <p class="muted hint-text">
+                Texture references are stored with the shared road record. Physics fields remain on the Properties tab.
+              </p>
+
+              <table class="data-table plain-table road-info-table">
+                <tbody>
+                  <tr><th colspan="2">Road Assets</th></tr>
+                  <tr>
+                    <td>backgroundTex</td>
+                    <td>
+                      <mat-form-field appearance="outline" class="texture-select-field">
+                        <mat-select [value]="getRoadValue('backgroundTex')" [disabled]="workerBusy" (selectionChange)="setRoadValue('backgroundTex', $event.value)">
+                          <mat-select-trigger>
+                            @if (getTextureEntry(getRoadValue('backgroundTex')); as selectedTexture) {
+                              <span class="texture-option texture-option--trigger">
+                                @if (getTileDataUrl(selectedTexture.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                              </span>
+                            } @else {
+                              <span class="texture-option texture-option--trigger">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">#{{ getRoadValue('backgroundTex') }}</span>
+                              </span>
+                            }
+                          </mat-select-trigger>
+                          @for (tile of tileTileEntries; track tile.texId) {
+                            <mat-option [value]="tile.texId">
+                              <span class="texture-option">
+                                @if (getTileDataUrl(tile.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                              </span>
+                            </mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>foregroundTex</td>
+                    <td>
+                      <mat-form-field appearance="outline" class="texture-select-field">
+                        <mat-select [value]="getRoadValue('foregroundTex')" [disabled]="workerBusy" (selectionChange)="setRoadValue('foregroundTex', $event.value)">
+                          <mat-select-trigger>
+                            @if (getTextureEntry(getRoadValue('foregroundTex')); as selectedTexture) {
+                              <span class="texture-option texture-option--trigger">
+                                @if (getTileDataUrl(selectedTexture.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                              </span>
+                            } @else {
+                              <span class="texture-option texture-option--trigger">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">#{{ getRoadValue('foregroundTex') }}</span>
+                              </span>
+                            }
+                          </mat-select-trigger>
+                          @for (tile of tileTileEntries; track tile.texId) {
+                            <mat-option [value]="tile.texId">
+                              <span class="texture-option">
+                                @if (getTileDataUrl(tile.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                              </span>
+                            </mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>roadLeftBorder</td>
+                    <td>
+                      <mat-form-field appearance="outline" class="texture-select-field">
+                        <mat-select [value]="getRoadValue('roadLeftBorder')" [disabled]="workerBusy" (selectionChange)="setRoadValue('roadLeftBorder', $event.value)">
+                          <mat-select-trigger>
+                            @if (getTextureEntry(getRoadValue('roadLeftBorder')); as selectedTexture) {
+                              <span class="texture-option texture-option--trigger">
+                                @if (getTileDataUrl(selectedTexture.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                              </span>
+                            } @else {
+                              <span class="texture-option texture-option--trigger">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">#{{ getRoadValue('roadLeftBorder') }}</span>
+                              </span>
+                            }
+                          </mat-select-trigger>
+                          @for (tile of tileTileEntries; track tile.texId) {
+                            <mat-option [value]="tile.texId">
+                              <span class="texture-option">
+                                @if (getTileDataUrl(tile.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                              </span>
+                            </mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>roadRightBorder</td>
+                    <td>
+                      <mat-form-field appearance="outline" class="texture-select-field">
+                        <mat-select [value]="getRoadValue('roadRightBorder')" [disabled]="workerBusy" (selectionChange)="setRoadValue('roadRightBorder', $event.value)">
+                          <mat-select-trigger>
+                            @if (getTextureEntry(getRoadValue('roadRightBorder')); as selectedTexture) {
+                              <span class="texture-option texture-option--trigger">
+                                @if (getTileDataUrl(selectedTexture.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                              </span>
+                            } @else {
+                              <span class="texture-option texture-option--trigger">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">#{{ getRoadValue('roadRightBorder') }}</span>
+                              </span>
+                            }
+                          </mat-select-trigger>
+                          @for (tile of tileTileEntries; track tile.texId) {
+                            <mat-option [value]="tile.texId">
+                              <span class="texture-option">
+                                @if (getTileDataUrl(tile.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                              </span>
+                            </mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>marks</td>
+                    <td>
+                      <mat-form-field appearance="outline" class="texture-select-field">
+                        <mat-select [value]="getRoadValue('marks')" [disabled]="workerBusy" (selectionChange)="setRoadValue('marks', $event.value)">
+                          <mat-select-trigger>
+                            @if (getTextureEntry(getRoadValue('marks')); as selectedTexture) {
+                              <span class="texture-option texture-option--trigger">
+                                @if (getTileDataUrl(selectedTexture.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                              </span>
+                            } @else {
+                              <span class="texture-option texture-option--trigger">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">#{{ getRoadValue('marks') }}</span>
+                              </span>
+                            }
+                          </mat-select-trigger>
+                          @for (tile of tileTileEntries; track tile.texId) {
+                            <mat-option [value]="tile.texId">
+                              <span class="texture-option">
+                                @if (getTileDataUrl(tile.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                              </span>
+                            </mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>tracks</td>
+                    <td>
+                      <mat-form-field appearance="outline" class="texture-select-field">
+                        <mat-select [value]="getRoadValue('tracks')" [disabled]="workerBusy" (selectionChange)="setRoadValue('tracks', $event.value)">
+                          <mat-select-trigger>
+                            @if (getTextureEntry(getRoadValue('tracks')); as selectedTexture) {
+                              <span class="texture-option texture-option--trigger">
+                                @if (getTileDataUrl(selectedTexture.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                              </span>
+                            } @else {
+                              <span class="texture-option texture-option--trigger">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">#{{ getRoadValue('tracks') }}</span>
+                              </span>
+                            }
+                          </mat-select-trigger>
+                          @for (tile of tileTileEntries; track tile.texId) {
+                            <mat-option [value]="tile.texId">
+                              <span class="texture-option">
+                                @if (getTileDataUrl(tile.texId); as url) {
+                                  <img [src]="url" class="texture-thumb" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                                } @else {
+                                  <span class="texture-thumb texture-thumb--fallback"></span>
+                                }
+                                <span class="texture-option-label">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                              </span>
+                            </mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>skidSound</td>
+                    <td>
+                      <mat-form-field appearance="outline" class="texture-select-field">
+                        <mat-select [value]="getRoadValue('skidSound')" [disabled]="workerBusy" (selectionChange)="setRoadValue('skidSound', $event.value)">
+                          <mat-select-trigger>
+                            <span class="texture-option texture-option--trigger">
+                              <span class="texture-thumb texture-thumb--fallback"></span>
+                              <span class="texture-option-label">{{ getAudioLabel(getRoadValue('skidSound')) }}</span>
+                            </span>
+                          </mat-select-trigger>
+                          @for (audio of audioEntries; track audio.id) {
+                            <mat-option [value]="audio.id">
+                              <span class="texture-option">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">{{ getAudioLabel(audio.id) }}</span>
+                              </span>
+                            </mat-option>
+                          }
+                          @if (!getAudioEntry(getRoadValue('skidSound'))) {
+                            <mat-option [value]="getRoadValue('skidSound')">
+                              <span class="texture-option">
+                                <span class="texture-thumb texture-thumb--fallback"></span>
+                                <span class="texture-option-label">#{{ getRoadValue('skidSound') }} (custom)</span>
+                              </span>
+                            </mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            } @else {
+              <div class="no-data-content">
+                <mat-icon class="no-data-icon">route</mat-icon>
+                <p>Select a road record to edit its tile assignments.</p>
+              </div>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="no-data-content">
+          <mat-icon class="no-data-icon">route</mat-icon>
+          <p>No shared road records are loaded yet.</p>
+          <button mat-raised-button color="primary" (click)="createRoadInfo.emit()" [disabled]="workerBusy">
+            <mat-icon>add</mat-icon>
+            Create First Road
+          </button>
+        </div>
+      }
+    </section>
+
+    <div class="tile-viewer sprite-viewer-layout">
+      <div class="tile-list-column">
+        @for (group of roadTileGroups; track group.roadInfoId) {
+          <section class="tile-road-group">
+            <div class="tile-road-group-header">
+              <span class="tile-road-group-title">{{ group.label }}</span>
+              <span class="tile-road-group-count">{{ group.tiles.length }} tiles</span>
+            </div>
+            <div class="pack-sprite-grid">
+              @for (tile of group.tiles; track tile.texId) {
+                @if (getTileDataUrl(tile.texId); as url) {
+                  <div class="pack-sprite-cell"
+                    [class.selected]="selectedTileId === tile.texId"
+                    (click)="selectedTileIdChange.emit(tile.texId)"
+                    [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
+                    <img [src]="url" class="pack-sprite-thumb" [style.imageRendering]="'pixelated'" alt="" />
+                    <span class="pack-sprite-label">#{{ tile.texId }}</span>
+                  </div>
+                } @else {
+                  <div class="pack-sprite-cell"
+                    [class.selected]="selectedTileId === tile.texId"
+                    (click)="selectedTileIdChange.emit(tile.texId)"
+                    [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
+                    <span class="pack-sprite-label">#{{ tile.texId }}</span>
+                  </div>
+                }
+              }
+            </div>
+          </section>
         }
       </div>
-    } @else {
-      <div class="no-data-content">
-        <mat-icon class="no-data-icon">grid_view</mat-icon>
-        <p>Road texture tiles from Pack 136 (kPackTx16) will appear here once decoded. Load a resources.dat to begin.</p>
-      </div>
-    }
+
+      @if (selectedTileId !== null) {
+        <div class="pack-sprite-detail">
+          @if (getTileDataUrl(selectedTileId); as url) {
+            <img [src]="url" class="pack-sprite-large" [style.imageRendering]="'pixelated'" alt="tile preview" />
+          } @else {
+            <div class="pack-sprite-large pack-sprite-large--placeholder">
+              <mat-icon>grid_view</mat-icon>
+              <span>Preview loading…</span>
+            </div>
+          }
+          <mat-card class="sprite-meta-card">
+            <mat-card-content>
+              <p class="sprite-meta">
+                <strong>Tile</strong> #{{ selectedTileId }}<br>
+                <strong>Size</strong> {{ selectedTileDimensions }}<br>
+                <strong>Format</strong> RGB555 (16-bit)
+              </p>
+            </mat-card-content>
+          </mat-card>
+          <div class="sprite-actions">
+            <button mat-raised-button color="primary"
+              (click)="openTileEditor.emit(selectedTileId)"
+              [disabled]="workerBusy"
+              matTooltip="Open pixel editor for this tile">
+              <mat-icon>brush</mat-icon> Edit Pixels
+            </button>
+            <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
+              (change)="tilePngUpload.emit({ event: $event, texId: selectedTileId })" />
+            <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy"
+              matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
+              <mat-icon>upload</mat-icon> Upload PNG
+            </button>
+            <button mat-stroked-button (click)="exportTilePng.emit(selectedTileId)">
+              <mat-icon>download</mat-icon> Export PNG
+            </button>
+          </div>
+        </div>
+      }
+    </div>
   </mat-card-content>
 </mat-card>

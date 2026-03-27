@@ -36,6 +36,7 @@ import { GamePanelComponent } from './game/game-panel/game-panel.component';
 import { EditorToolbarComponent } from './editor/toolbar/editor-toolbar.component';
 import { EditorPropertiesSectionComponent } from './editor/sections/properties/editor-properties-section.component';
 import { EditorObjectGroupsSectionComponent } from './editor/sections/object-groups/editor-object-groups-section.component';
+import { EditorObjectTypesSectionComponent } from './editor/sections/object-types/editor-object-types-section.component';
 import { EditorObjectsSectionComponent } from './editor/sections/objects/editor-objects-section.component';
 import { EditorSpritesSectionComponent } from './editor/sections/sprites/editor-sprites-section.component';
 import { EditorTilesSectionComponent } from './editor/sections/tiles/editor-tiles-section.component';
@@ -68,6 +69,7 @@ const MATERIAL_MODULES = [
     EditorToolbarComponent,
     EditorPropertiesSectionComponent,
     EditorObjectGroupsSectionComponent,
+    EditorObjectTypesSectionComponent,
     EditorObjectsSectionComponent,
     EditorSpritesSectionComponent,
     EditorTilesSectionComponent,

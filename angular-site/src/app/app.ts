@@ -84,11 +84,13 @@ type EditorUndoSnapshot =
       hoverTrackWaypoint: TrackWaypointRef | null;
       hoverTrackMidpoint: TrackMidpointRef | null;
     }
-  | {
+    | {
       kind: 'props';
       levelId: number | null;
       editRoadInfo: number;
       editRoadInfoData: RoadInfoData | null;
+      selectedRoadInfoId: number | null;
+      selectedRoadInfoData: RoadInfoData | null;
       editTime: number;
       editXStartPos: number;
       editLevelEnd: number;
@@ -265,9 +267,10 @@ const ROAD_THEMES: Record<number, RoadTheme> = {
 
 /** Default road theme for unknown roadInfo values. */
 const DEFAULT_ROAD_THEME: RoadTheme = ROAD_THEMES[128];
-const ROAD_INFO_IDS = Object.keys(ROAD_THEMES)
-  .map((id) => Number.parseInt(id, 10))
-  .sort((a, b) => a - b);
+
+function sortRoadInfoIds(ids: Iterable<number>): number[] {
+  return [...ids].sort((a, b) => a - b);
+}
 
 /** Minimum canvas hit radius (px) for object click detection. */
 const MIN_HIT_RADIUS = 10;
@@ -813,6 +816,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly getIconThumbDataUrlBound = this.getIconThumbDataUrl.bind(this);
   readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
   readonly getObjTypeDimensionLabelBound = this.getObjTypeDimensionLabel.bind(this);
+  readonly getRoadReferenceLevelNumsBound = this.getRoadReferenceLevelNums.bind(this);
 
   /** Convert a level resource ID (140-149) to a human-readable level number (1-10). */
   levelDisplayNum(resourceId: number): number {
@@ -858,16 +862,28 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   // ---- Level properties editing ----
   editRoadInfo = signal(0);
   editRoadInfoData = signal<RoadInfoData | null>(null);
+  selectedRoadInfoId = signal<number | null>(null);
+  selectedRoadInfoData = signal<RoadInfoData | null>(null);
   editTime = signal(0);
   editXStartPos = signal(0);
   editLevelEnd = signal(0);
   editObjectGroups = signal<{ resID: number; numObjs: number }[]>([]);
   propertiesDirty = signal(false);
+  private propertiesSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private propertiesSaveLevelId: number | null = null;
+  private propertiesEditRevision = 0;
 
   // ---- Object group pack editing ----
   objectGroupDefinitions = signal<ObjectGroupDefinition[]>([]);
   selectedObjectGroupId = signal<number | null>(null);
   objectGroupsDirty = signal(false);
+  private objectGroupsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private objectGroupsEditRevision = 0;
+
+  // ---- Object type pack editing ----
+  objectTypeDefinitions = signal<ObjectTypeDefinition[]>([]);
+  selectedObjectTypeId = signal<number | null>(null);
+  objectTypesDirty = signal(false);
 
   // ---- Object placement ----
   objects = signal<ObjectPos[]>([]);
@@ -1027,6 +1043,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           levelId: this.selectedLevelId(),
           editRoadInfo: this.editRoadInfo(),
           editRoadInfoData: this.editRoadInfoData() ? { ...this.editRoadInfoData()! } : null,
+          selectedRoadInfoId: this.selectedRoadInfoId(),
+          selectedRoadInfoData: this.selectedRoadInfoData() ? { ...this.selectedRoadInfoData()! } : null,
           editTime: this.editTime(),
           editXStartPos: this.editXStartPos(),
           editLevelEnd: this.editLevelEnd(),
@@ -1071,6 +1089,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       case 'props':
         this.editRoadInfo.set(snapshot.editRoadInfo);
         this.editRoadInfoData.set(snapshot.editRoadInfoData ? { ...snapshot.editRoadInfoData } : null);
+        this.selectedRoadInfoId.set(snapshot.selectedRoadInfoId);
+        this.selectedRoadInfoData.set(snapshot.selectedRoadInfoData ? { ...snapshot.selectedRoadInfoData } : null);
         if (snapshot.editRoadInfoData) {
           this.roadInfoDataMap.set(snapshot.editRoadInfo, { ...snapshot.editRoadInfoData });
           this.refreshRoadInfoDerivedState();
@@ -1396,7 +1416,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private objectTypeDefinitions = new Map<number, ObjectTypeDefinition>();
+  private objectTypeDefinitionMap = new Map<number, ObjectTypeDefinition>();
   private objectSpritePreviews = new Map<number, HTMLCanvasElement | null>();
 
   /** Decoded road info from kPackRoad: roadInfoId → texture IDs + flags. */
@@ -1798,17 +1818,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this._finishLineDragUndoCaptured = true;
       }
       this.editLevelEnd.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(e.worldY))));
-      this.propertiesDirty.set(true);
+      this.markPropertiesDirty();
     };
 
     this.konva.onFinishLineDragMove = (e) => {
       this.editLevelEnd.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(e.worldY))));
-      this.propertiesDirty.set(true);
+      this.markPropertiesDirty();
     };
 
     this.konva.onFinishLineDragEnd = (e) => {
       this.editLevelEnd.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(e.worldY))));
-      this.propertiesDirty.set(true);
+      this.markPropertiesDirty();
       this._draggingFinishLine = false;
       this._finishLineDragUndoCaptured = false;
     };
@@ -1918,7 +1938,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (this._draggingStartMarker) {
         const [wx] = this.canvasToWorld(cssX, cssY);
         this.editXStartPos.set(Math.round(wx));
-        this.propertiesDirty.set(true);
+        this.markPropertiesDirty();
         return;
       }
     };
@@ -2084,6 +2104,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private readonly SECTION_ORDER: EditorSection[] = [
     'properties',
     'object-groups',
+    'object-types',
     'objects',
     'sprites',
     'tiles',
@@ -2106,7 +2127,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.parsedLevels.set([]);
     this.selectedLevelId.set(null);
     this.availableTypeIds.set([]);
-    this.objectTypeDefinitions.clear();
+    this.objectTypeDefinitionMap.clear();
+    this.objectTypeDefinitions.set([]);
+    this.selectedObjectTypeId.set(null);
+    this.objectTypesDirty.set(false);
+    if (this.objectTypesSaveTimer !== null) {
+      clearTimeout(this.objectTypesSaveTimer);
+      this.objectTypesSaveTimer = null;
+    }
+    this.objectTypesEditRevision = 0;
     this.spriteAssets.set([]);
     this.selectedSpriteId.set(null);
     this.packSpriteFrames.set([]);
@@ -2137,9 +2166,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.editLevelEnd.set(0);
     this.editObjectGroups.set([]);
     this.propertiesDirty.set(false);
+    this.propertiesSaveLevelId = null;
+    if (this.propertiesSaveTimer !== null) {
+      clearTimeout(this.propertiesSaveTimer);
+      this.propertiesSaveTimer = null;
+    }
     this.objectGroupDefinitions.set([]);
     this.selectedObjectGroupId.set(null);
     this.objectGroupsDirty.set(false);
+    if (this.objectGroupsSaveTimer !== null) {
+      clearTimeout(this.objectGroupsSaveTimer);
+      this.objectGroupsSaveTimer = null;
+    }
     this.editTrackUp.set([]);
     this.editTrackDown.set([]);
     this.dragTrackWaypoint.set(null);
@@ -2262,6 +2300,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           );
         }
       }
+      this.queuePackSync(syncPromises);
       this.queueRoadInfoSync(syncPromises);
 
       // Wait for all pending edits to land in the worker before serializing.
@@ -2350,6 +2389,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
           );
         }
       }
+      this.queuePackSync(syncPromises);
       this.queueRoadInfoSync(syncPromises);
       await Promise.all(syncPromises);
 
@@ -3125,13 +3165,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   selectLevel(id: number, options?: { preserveView?: boolean }): void {
     const preserveView = options?.preserveView ?? false;
+    const currentLevelId = this.selectedLevelId();
+    if (currentLevelId !== null && currentLevelId !== id && this.propertiesDirty()) {
+      void this.saveLevelProperties();
+    }
     this.selectedLevelId.set(id);
     this._resetObjectHistory();
     this._roadOffscreenKey = ''; // invalidate road bitmap cache
     const level = this.parsedLevels().find((l) => l.resourceId === id);
     if (level) {
-      this.editRoadInfo.set(level.properties.roadInfo);
-      this.editRoadInfoData.set(this.cloneRoadInfoData(this.roadInfoDataMap.get(level.properties.roadInfo)));
+      this.setLevelRoadInfo(level.properties.roadInfo);
       this.editTime.set(level.properties.time);
       this.editXStartPos.set(level.properties.xStartPos);
       this.editLevelEnd.set(level.properties.levelEnd);
@@ -3139,6 +3182,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         level.objectGroups.map((g) => ({ resID: g.resID, numObjs: g.numObjs })),
       );
       this.propertiesDirty.set(false);
+      this.propertiesSaveLevelId = null;
+      if (this.propertiesSaveTimer !== null) {
+        clearTimeout(this.propertiesSaveTimer);
+        this.propertiesSaveTimer = null;
+      }
       this.objects.set([...level.objects]);
       this.selectedObjIndex.set(null);
       this.visibleTypeFilter.set(new Set(this.typePalette.map((item) => item.typeId)));
@@ -3214,22 +3262,36 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.editLevelEnd.set(Math.max(0, val));
         break;
     }
-    this.propertiesDirty.set(true);
+    this.markPropertiesDirty();
   }
 
   onRoadInfoChange(roadInfo: number): void {
     const nextRoadInfo = Number(roadInfo);
     if (Number.isNaN(nextRoadInfo)) return;
     this._pushUndo('props');
-    this.editRoadInfo.set(nextRoadInfo);
-    this.editRoadInfoData.set(this.cloneRoadInfoData(this.roadInfoDataMap.get(nextRoadInfo)));
-    this.propertiesDirty.set(true);
+    this.setLevelRoadInfo(nextRoadInfo);
+    this.markPropertiesDirty();
+  }
+
+  selectRoadInfo(roadInfo: number): void {
+    const nextRoadInfo = Number(roadInfo);
+    if (Number.isNaN(nextRoadInfo)) return;
+    this.setSelectedRoadInfo(nextRoadInfo);
   }
 
   onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, event: Event): void {
-    const currentId = this.editRoadInfo();
-    const current = this.editRoadInfoData();
-    if (!current) return;
+    const assetFields = new Set<Exclude<keyof RoadInfoData, 'id'>>([
+      'backgroundTex',
+      'foregroundTex',
+      'roadLeftBorder',
+      'roadRightBorder',
+      'marks',
+      'tracks',
+      'skidSound',
+    ]);
+    const currentId = assetFields.has(field) ? this.selectedRoadInfoId() : this.editRoadInfo();
+    const current = currentId !== null ? this.cloneRoadInfoData(this.roadInfoDataMap.get(currentId)) : null;
+    if (currentId === null || !current) return;
     const target = event.target as EventTarget & { value?: string; checked?: boolean };
     const next = { ...current } as RoadInfoData;
     this._pushUndo('props');
@@ -3257,7 +3319,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (field !== 'water' && Number.isNaN(parsed as number)) return;
     const mutableNext = next as unknown as Record<string, number | boolean>;
     mutableNext[field] = parsed;
-    this.editRoadInfoData.set(next);
+    if (currentId === this.selectedRoadInfoId()) {
+      this.editRoadInfoData.set(next);
+    }
     this.roadInfoDataMap.set(currentId, next);
     this.refreshRoadInfoDerivedState();
     void this.dispatchWorker<unknown>('APPLY_ROAD_INFO', {
@@ -3273,7 +3337,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (Number.isNaN(nextValue)) return;
     this._pushUndo('props');
     this.editTime.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(nextValue))));
-    this.propertiesDirty.set(true);
+    this.markPropertiesDirty();
   }
 
   /** Bridge for PropertiesTabComponent propsInput output. */
@@ -3291,16 +3355,89 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const existing = groups[index] ?? { resID: 0, numObjs: 0 };
     groups[index] = { ...existing, [field]: val };
     this.editObjectGroups.set(groups);
-    this.propertiesDirty.set(true);
+    this.markPropertiesDirty();
   }
 
   private cloneRoadInfoData(roadInfo: RoadInfoData | null | undefined): RoadInfoData | null {
     return roadInfo ? { ...roadInfo } : null;
   }
 
+  private getSortedRoadInfoIds(): number[] {
+    return sortRoadInfoIds(this.roadInfoDataMap.keys());
+  }
+
+  private getRoadReferenceLevelNums(roadInfoId: number): number[] {
+    return this.parsedLevels()
+      .filter((level) => level.properties.roadInfo === roadInfoId)
+      .map((level) => level.resourceId - 139)
+      .sort((a, b) => a - b);
+  }
+
+  private getNextRoadInfoId(): number {
+    const ids = this.getSortedRoadInfoIds();
+    const base = ids.length > 0 ? ids[ids.length - 1] + 1 : 128;
+    let candidate = base;
+    while (this.roadInfoDataMap.has(candidate)) candidate += 1;
+    return candidate;
+  }
+
+  private makeDefaultRoadInfo(roadInfoId: number): RoadInfoData {
+    return {
+      id: roadInfoId,
+      friction: 0,
+      airResistance: 0,
+      backResistance: 0,
+      tolerance: 0,
+      marks: 0,
+      deathOffs: 0,
+      backgroundTex: 0,
+      foregroundTex: 0,
+      roadLeftBorder: 0,
+      roadRightBorder: 0,
+      tracks: 0,
+      skidSound: 0,
+      filler: 0,
+      xDrift: 0,
+      yDrift: 0,
+      xFrontDrift: 0,
+      yFrontDrift: 0,
+      trackSlide: 0,
+      dustSlide: 0,
+      dustColor: 0,
+      water: false,
+      filler2: 0,
+      slideFriction: 0,
+    };
+  }
+
+  private setSelectedRoadInfo(roadInfoId: number | null): void {
+    const nextId = roadInfoId !== null && this.roadInfoDataMap.has(roadInfoId) ? roadInfoId : null;
+    this.selectedRoadInfoId.set(nextId);
+    this.selectedRoadInfoData.set(this.cloneRoadInfoData(nextId === null ? null : this.roadInfoDataMap.get(nextId)));
+  }
+
+  private setLevelRoadInfo(roadInfoId: number): void {
+    this.editRoadInfo.set(roadInfoId);
+    this.editRoadInfoData.set(this.cloneRoadInfoData(this.roadInfoDataMap.get(roadInfoId)));
+    this.setSelectedRoadInfo(roadInfoId);
+  }
+
+  private syncSelectedRoadInfoSelection(preferredId: number | null = this.selectedRoadInfoId()): void {
+    const availableIds = this.getSortedRoadInfoIds();
+    let nextId = preferredId;
+    if (nextId === null || !this.roadInfoDataMap.has(nextId)) {
+      if (this.roadInfoDataMap.has(this.editRoadInfo())) {
+        nextId = this.editRoadInfo();
+      } else {
+        nextId = availableIds[0] ?? null;
+      }
+    }
+    this.setSelectedRoadInfo(nextId);
+  }
+
   private refreshRoadInfoDerivedState(): void {
     this._roadInfoPreviewDataUrls.clear();
-    const roadInfoOptions = ROAD_INFO_IDS.map((id) => ({
+    const roadInfoOptions = this.getSortedRoadInfoIds().map((id) => ({
       id,
       label: `Road ${id}`,
       previewUrl: this.getRoadInfoPreviewDataUrl(id),
@@ -3309,6 +3446,88 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.roadInfoOptions.set(roadInfoOptions);
     this.roadTileGroups.set(this.buildRoadTileGroups(this.tileTileEntries()));
     this.roadInfoVersion.update((v) => v + 1);
+  }
+
+  private async applyRoadInfoDataToWorker(roadInfoId: number, roadInfo: RoadInfoData): Promise<void> {
+    await this.dispatchWorker<unknown>('APPLY_ROAD_INFO', {
+      roadInfoId,
+      roadInfo,
+    });
+  }
+
+  async createRoadInfo(): Promise<void> {
+    const baseId = this.selectedRoadInfoId() ?? this.editRoadInfo();
+    const baseRoad = baseId !== null ? this.roadInfoDataMap.get(baseId) ?? null : null;
+    const newRoadInfoId = this.getNextRoadInfoId();
+    const newRoadInfo = baseRoad ? { ...baseRoad, id: newRoadInfoId } : this.makeDefaultRoadInfo(newRoadInfoId);
+
+    const previousMap = new Map(this.roadInfoDataMap);
+    const previousSelectedRoadId = this.selectedRoadInfoId();
+    const previousEditRoadInfo = this.editRoadInfoData() ? { ...this.editRoadInfoData()! } : null;
+
+    this.roadInfoDataMap.set(newRoadInfoId, newRoadInfo);
+    this.refreshRoadInfoDerivedState();
+    this.setSelectedRoadInfo(newRoadInfoId);
+
+    try {
+      this.workerBusy.set(true);
+      await this.applyRoadInfoDataToWorker(newRoadInfoId, newRoadInfo);
+      this.resourcesStatus.set(`Created road ${newRoadInfoId}.`);
+      this.snackBar.open(`✓ Road ${newRoadInfoId} created`, 'OK', {
+        duration: 3000,
+        panelClass: 'snack-success',
+      });
+    } catch (error) {
+      this.roadInfoDataMap.clear();
+      for (const [id, roadInfo] of previousMap.entries()) this.roadInfoDataMap.set(id, roadInfo);
+      this.refreshRoadInfoDerivedState();
+      this.setSelectedRoadInfo(previousSelectedRoadId);
+      this.editRoadInfoData.set(previousEditRoadInfo);
+      const msg = error instanceof Error ? error.message : 'Failed to create road';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
+  async deleteRoadInfo(roadInfoId: number | null = this.selectedRoadInfoId()): Promise<void> {
+    if (roadInfoId === null) return;
+    const refs = this.getRoadReferenceLevelNums(roadInfoId);
+    if (refs.length > 0) {
+      const msg = `Road ${roadInfoId} is still used by level${refs.length > 1 ? 's' : ''} ${refs.join(', ')}. Reassign those level road selections first.`;
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 6000, panelClass: 'snack-error' });
+      return;
+    }
+
+    const previousMap = new Map(this.roadInfoDataMap);
+    const previousSelectedRoadId = this.selectedRoadInfoId();
+    const previousEditRoadInfo = this.editRoadInfoData() ? { ...this.editRoadInfoData()! } : null;
+    this.roadInfoDataMap.delete(roadInfoId);
+    this.refreshRoadInfoDerivedState();
+    this.syncSelectedRoadInfoSelection(previousSelectedRoadId === roadInfoId ? this.editRoadInfo() : previousSelectedRoadId);
+
+    try {
+      this.workerBusy.set(true);
+      await this.dispatchWorker<unknown>('REMOVE_ROAD_INFO', { roadInfoId });
+      this.resourcesStatus.set(`Deleted road ${roadInfoId}.`);
+      this.snackBar.open(`✓ Road ${roadInfoId} deleted`, 'OK', {
+        duration: 3000,
+        panelClass: 'snack-success',
+      });
+    } catch (error) {
+      this.roadInfoDataMap.clear();
+      for (const [id, roadInfo] of previousMap.entries()) this.roadInfoDataMap.set(id, roadInfo);
+      this.refreshRoadInfoDerivedState();
+      this.setSelectedRoadInfo(previousSelectedRoadId);
+      this.editRoadInfoData.set(previousEditRoadInfo);
+      const msg = error instanceof Error ? error.message : 'Failed to delete road';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    } finally {
+      this.workerBusy.set(false);
+    }
   }
 
   private queueRoadInfoSync(syncPromises: Promise<unknown>[]): void {
@@ -3322,9 +3541,60 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * Flush editor-side pack data that is edited outside the selected level.
+   * These packs do not ride along with level property/object synchronization.
+   */
+  private queuePackSync(syncPromises: Promise<unknown>[]): void {
+    if (this.objectGroupsDirty()) {
+      syncPromises.push(
+        this.dispatchWorker<unknown>('APPLY_OBJECT_GROUPS', {
+          objectGroups: this.objectGroupDefinitions(),
+        }),
+      );
+    }
+    if (this.objectTypesDirty()) {
+      syncPromises.push(
+        this.dispatchWorker<unknown>('APPLY_OBJECT_TYPES', {
+          objectTypes: this.objectTypeDefinitions(),
+        }),
+      );
+    }
+  }
+
+  private schedulePropertiesAutoSave(): void {
+    if (this.propertiesSaveTimer !== null) clearTimeout(this.propertiesSaveTimer);
+    this.propertiesSaveTimer = setTimeout(() => {
+      this.propertiesSaveTimer = null;
+      void this.saveLevelProperties();
+    }, 300);
+  }
+
+  private markPropertiesDirty(): void {
+    this.propertiesDirty.set(true);
+    this.propertiesSaveLevelId = this.selectedLevelId();
+    this.propertiesEditRevision += 1;
+    this.schedulePropertiesAutoSave();
+  }
+
+  private scheduleObjectGroupsAutoSave(): void {
+    if (this.objectGroupsSaveTimer !== null) clearTimeout(this.objectGroupsSaveTimer);
+    this.objectGroupsSaveTimer = setTimeout(() => {
+      this.objectGroupsSaveTimer = null;
+      void this.saveObjectGroups();
+    }, 300);
+  }
+
+  private markObjectGroupsDirty(): void {
+    this.objectGroupsDirty.set(true);
+    this.objectGroupsEditRevision += 1;
+    this.scheduleObjectGroupsAutoSave();
+  }
+
   async saveLevelProperties(): Promise<void> {
     const id = this.selectedLevelId();
-    if (id === null) return;
+    if (id === null || !this.propertiesDirty()) return;
+    if (this.propertiesSaveLevelId !== null && this.propertiesSaveLevelId !== id) return;
     const props: LevelProperties = {
       roadInfo: this.editRoadInfo(),
       time: this.editTime(),
@@ -3332,7 +3602,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       levelEnd: this.editLevelEnd(),
       objectGroups: this.editObjectGroups(),
     };
+    const saveRevision = this.propertiesEditRevision;
     try {
+      if (this.workerBusy()) {
+        this.schedulePropertiesAutoSave();
+        return;
+      }
       this.workerBusy.set(true);
       const syncPromises: Promise<unknown>[] = [];
       this.queueRoadInfoSync(syncPromises);
@@ -3345,12 +3620,17 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         preserveCanvasView: true,
         refreshSelectedLevelState: false,
       });
-      this.propertiesDirty.set(false);
-      this.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
-      this.snackBar.open(`✓ Level ${id - 139} properties saved`, 'OK', {
-        duration: 3000,
-        panelClass: 'snack-success',
-      });
+      if (this.propertiesEditRevision === saveRevision) {
+        this.propertiesDirty.set(false);
+        this.propertiesSaveLevelId = null;
+        this.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
+        this.snackBar.open(`✓ Level ${id - 139} properties saved`, 'OK', {
+          duration: 3000,
+          panelClass: 'snack-success',
+        });
+      } else {
+        this.markPropertiesDirty();
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Save failed';
       this.editorError.set(msg);
@@ -3406,14 +3686,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     });
     this.objectGroupDefinitions.set(groups);
     this.selectedObjectGroupId.set(id);
-    this.objectGroupsDirty.set(true);
+    this.markObjectGroupsDirty();
   }
 
   deleteObjectGroup(groupId: number): void {
     const groups = this.cloneObjectGroupDefinitions().filter((group) => group.id !== groupId);
     this.objectGroupDefinitions.set(groups);
     this.selectedObjectGroupId.set(groups[0]?.id ?? null);
-    this.objectGroupsDirty.set(true);
+    this.markObjectGroupsDirty();
   }
 
   addObjectGroupEntry(groupId: number): void {
@@ -3422,7 +3702,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (!group) return;
     group.entries.push(this.defaultObjectGroupEntry());
     this.objectGroupDefinitions.set(groups);
-    this.objectGroupsDirty.set(true);
+    this.markObjectGroupsDirty();
   }
 
   deleteObjectGroupEntry(groupId: number, entryIndex: number): void {
@@ -3431,7 +3711,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (!group) return;
     group.entries.splice(entryIndex, 1);
     this.objectGroupDefinitions.set(groups);
-    this.objectGroupsDirty.set(true);
+    this.markObjectGroupsDirty();
   }
 
   onObjectGroupEntryInput(
@@ -3451,12 +3731,18 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     if (!entry) return;
     group.entries[entryIndex] = { ...entry, [field]: parsed };
     this.objectGroupDefinitions.set(groups);
-    this.objectGroupsDirty.set(true);
+    this.markObjectGroupsDirty();
   }
 
   async saveObjectGroups(): Promise<void> {
     const groups = this.objectGroupDefinitions();
+    if (!this.objectGroupsDirty()) return;
+    const saveRevision = this.objectGroupsEditRevision;
     try {
+      if (this.workerBusy()) {
+        this.scheduleObjectGroupsAutoSave();
+        return;
+      }
       this.workerBusy.set(true);
       const result = await this.dispatchWorker<{ objectGroups: ObjectGroupDefinition[] }>('APPLY_OBJECT_GROUPS', {
         objectGroups: groups,
@@ -3465,14 +3751,203 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       if (!result.objectGroups.some((group) => group.id === this.selectedObjectGroupId())) {
         this.selectedObjectGroupId.set(result.objectGroups[0]?.id ?? null);
       }
-      this.objectGroupsDirty.set(false);
-      this.resourcesStatus.set(`Saved ${result.objectGroups.length} object group(s).`);
-      this.snackBar.open(`✓ Object groups saved`, 'OK', {
+      if (this.objectGroupsEditRevision === saveRevision) {
+        this.objectGroupsDirty.set(false);
+        this.resourcesStatus.set(`Saved ${result.objectGroups.length} object group(s).`);
+        this.snackBar.open(`✓ Object groups saved`, 'OK', {
+          duration: 3000,
+          panelClass: 'snack-success',
+        });
+      } else {
+        this.markObjectGroupsDirty();
+        this.scheduleObjectGroupsAutoSave();
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Object group save failed';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
+  // ---- Object type pack ----
+  private objectTypesSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private objectTypesEditRevision = 0;
+
+  private cloneObjectTypeDefinitions(defs = this.objectTypeDefinitions()): ObjectTypeDefinition[] {
+    return defs.map((def) => ({ ...def }));
+  }
+
+  private syncObjectTypeLookup(defs = this.objectTypeDefinitions()): void {
+    this.objectTypeDefinitionMap.clear();
+    for (const def of defs) this.objectTypeDefinitionMap.set(def.typeRes, def);
+    this.availableTypeIds.set(defs.map((def) => def.typeRes).sort((a, b) => a - b));
+  }
+
+  private nextObjectTypeId(defs = this.objectTypeDefinitions()): number {
+    const used = new Set(defs.map((def) => def.typeRes));
+    let candidate = 128;
+    while (used.has(candidate)) candidate++;
+    return candidate;
+  }
+
+  private selectedObjectType(): ObjectTypeDefinition | null {
+    const id = this.selectedObjectTypeId();
+    if (id === null) return null;
+    return this.objectTypeDefinitions().find((def) => def.typeRes === id) ?? null;
+  }
+
+  private scheduleObjectTypesAutoSave(): void {
+    if (this.objectTypesSaveTimer !== null) clearTimeout(this.objectTypesSaveTimer);
+    this.objectTypesSaveTimer = setTimeout(() => {
+      this.objectTypesSaveTimer = null;
+      void this.saveObjectTypes();
+    }, 300);
+  }
+
+  private markObjectTypesDirty(defs: ObjectTypeDefinition[]): void {
+    this.objectTypeDefinitions.set(defs);
+    this.syncObjectTypeLookup(defs);
+    this.objectTypesDirty.set(true);
+    this.objectTypesEditRevision += 1;
+    this.scheduleObjectTypesAutoSave();
+  }
+
+  private defaultObjectTypeDefinition(typeRes: number, source?: ObjectTypeDefinition | null): ObjectTypeDefinition {
+    const frameId = source?.frame ?? this.packSpriteFrames()[0]?.id ?? 128;
+    return {
+      typeRes,
+      mass: source?.mass ?? 1,
+      maxEngineForce: source?.maxEngineForce ?? 0,
+      maxNegEngineForce: source?.maxNegEngineForce ?? 0,
+      friction: source?.friction ?? 1,
+      flags: source?.flags ?? 0,
+      deathObj: source?.deathObj ?? -1,
+      frame: frameId,
+      numFrames: source?.numFrames ?? 1,
+      frameDuration: source?.frameDuration ?? 0,
+      wheelWidth: source?.wheelWidth ?? 0,
+      wheelLength: source?.wheelLength ?? 0,
+      steering: source?.steering ?? 0,
+      width: source?.width ?? 0,
+      length: source?.length ?? 0,
+      score: source?.score ?? 0,
+      flags2: source?.flags2 ?? 0,
+      creationSound: source?.creationSound ?? -1,
+      otherSound: source?.otherSound ?? -1,
+      maxDamage: source?.maxDamage ?? 0,
+      weaponObj: source?.weaponObj ?? -1,
+      weaponInfo: source?.weaponInfo ?? -1,
+    };
+  }
+
+  selectObjectType(typeRes: number): void {
+    this.selectedObjectTypeId.set(typeRes);
+  }
+
+  addObjectType(duplicateSelected = false): void {
+    const defs = this.cloneObjectTypeDefinitions();
+    const selected = duplicateSelected ? this.selectedObjectType() : null;
+    const typeRes = this.nextObjectTypeId(defs);
+    defs.push(this.defaultObjectTypeDefinition(typeRes, selected));
+    this.selectedObjectTypeId.set(typeRes);
+    this.markObjectTypesDirty(defs);
+  }
+
+  deleteObjectType(typeRes: number): void {
+    const defs = this.cloneObjectTypeDefinitions().filter((def) => def.typeRes !== typeRes);
+    this.selectedObjectTypeId.set(defs[0]?.typeRes ?? null);
+    this.markObjectTypesDirty(defs);
+  }
+
+  onObjectTypeFieldInput(
+    typeRes: number,
+    field: Exclude<keyof ObjectTypeDefinition, 'typeRes'>,
+    event: Event,
+  ): void {
+    const target = event.target as EventTarget & { value?: string };
+    const rawValue = target?.value ?? '';
+    const parsed = [
+      'mass', 'maxEngineForce', 'maxNegEngineForce', 'friction',
+      'frameDuration', 'wheelWidth', 'wheelLength', 'steering',
+      'width', 'length', 'maxDamage',
+    ].includes(field)
+      ? Number.parseFloat(rawValue)
+      : Number.parseInt(rawValue, 10);
+    if (Number.isNaN(parsed)) return;
+    const defs = this.cloneObjectTypeDefinitions();
+    const def = defs.find((item) => item.typeRes === typeRes);
+    if (!def) return;
+    def[field] = parsed;
+    this.markObjectTypesDirty(defs);
+  }
+
+  onObjectTypeReferenceChange(
+    typeRes: number,
+    field: 'deathObj' | 'creationSound' | 'otherSound' | 'weaponObj',
+    value: number,
+  ): void {
+    const defs = this.cloneObjectTypeDefinitions();
+    const def = defs.find((item) => item.typeRes === typeRes);
+    if (!def) return;
+    def[field] = value;
+    this.markObjectTypesDirty(defs);
+  }
+
+  onObjectTypeFlagToggle(
+    typeRes: number,
+    field: 'flags' | 'flags2',
+    bit: number,
+    checked: boolean,
+  ): void {
+    const defs = this.cloneObjectTypeDefinitions();
+    const def = defs.find((item) => item.typeRes === typeRes);
+    if (!def) return;
+    def[field] = checked ? (def[field] | bit) : (def[field] & ~bit);
+    this.markObjectTypesDirty(defs);
+  }
+
+  onObjectTypeFrameChange(typeRes: number, frame: number): void {
+    const defs = this.cloneObjectTypeDefinitions();
+    const def = defs.find((item) => item.typeRes === typeRes);
+    if (!def) return;
+    def.frame = frame;
+    this.markObjectTypesDirty(defs);
+  }
+
+  async saveObjectTypes(): Promise<void> {
+    if (this.workerBusy()) {
+      this.scheduleObjectTypesAutoSave();
+      return;
+    }
+    const objectTypes = this.objectTypeDefinitions();
+    const saveRevision = this.objectTypesEditRevision;
+    try {
+      this.workerBusy.set(true);
+      const result = await this.dispatchWorker<{ objectTypesArr: [number, ObjectTypeDefinition][] }>('APPLY_OBJECT_TYPES', {
+        objectTypes,
+      });
+      const defs = result.objectTypesArr.map(([, def]) => def).filter((def): def is ObjectTypeDefinition => !!def);
+      this.objectTypeDefinitions.set(defs);
+      this.syncObjectTypeLookup(defs);
+      if (!defs.some((def) => def.typeRes === this.selectedObjectTypeId())) {
+        this.selectedObjectTypeId.set(defs[0]?.typeRes ?? null);
+      }
+      if (this.objectTypesEditRevision === saveRevision) {
+        this.objectTypesDirty.set(false);
+      } else {
+        this.objectTypesDirty.set(true);
+        this.scheduleObjectTypesAutoSave();
+      }
+      void this.decodeSpritePreviewsInBackground(result.objectTypesArr);
+      this.resourcesStatus.set(`Saved ${defs.length} object type(s).`);
+      this.snackBar.open(`✓ Object types saved`, 'OK', {
         duration: 3000,
         panelClass: 'snack-success',
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Object group save failed';
+      const msg = error instanceof Error ? error.message : 'Object type save failed';
       this.editorError.set(msg);
       this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
@@ -3609,7 +4084,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
   /** Return a short human-readable physics-dimension string for a type resource ID (e.g. "1.5×3.0 m"). */
   getObjTypeDimensionLabel(typeRes: number): string {
-    const def = this.objectTypeDefinitions.get(typeRes);
+    const def = this.objectTypeDefinitionMap.get(typeRes);
     if (!def) return '';
     return `${def.width.toFixed(1)}×${def.length.toFixed(1)} m`;
   }
@@ -3840,7 +4315,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       }
       const [wx] = this.canvasToWorld(event.offsetX, event.offsetY);
       this.editXStartPos.set(Math.round(wx));
-      this.propertiesDirty.set(true);
+      this.markPropertiesDirty();
       return;
     }
     if (!this.isDragging()) {
@@ -5282,11 +5757,20 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       const result = await this.dispatchWorker<LoadResult>('LOAD', buffer, [buffer]);
 
       // Rebuild object type definitions map
-      this.objectTypeDefinitions.clear();
-      for (const [typeRes, def] of result.objectTypesArr) {
-        if (def) this.objectTypeDefinitions.set(typeRes, def);
+      this.objectTypeDefinitionMap.clear();
+      const objectTypes = result.objectTypesArr
+        .map(([, def]) => def)
+        .filter((def): def is ObjectTypeDefinition => !!def)
+        .sort((a, b) => a.typeRes - b.typeRes);
+      this.objectTypeDefinitions.set(objectTypes);
+      this.syncObjectTypeLookup(objectTypes);
+      this.selectedObjectTypeId.set(objectTypes[0]?.typeRes ?? null);
+      this.objectTypesDirty.set(false);
+      if (this.objectTypesSaveTimer !== null) {
+        clearTimeout(this.objectTypesSaveTimer);
+        this.objectTypesSaveTimer = null;
       }
-      this.availableTypeIds.set([...this.objectTypeDefinitions.keys()].sort((a, b) => a - b));
+      this.objectTypesEditRevision = 0;
 
       // Clear previews — fresh ones will arrive shortly from DECODE_SPRITE_PREVIEWS
       this.objectSpritePreviews.clear();
@@ -5305,6 +5789,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.objectGroupDefinitions.set(result.objectGroups);
       this.selectedObjectGroupId.set(result.objectGroups[0]?.id ?? null);
       this.objectGroupsDirty.set(false);
+      if (this.objectGroupsSaveTimer !== null) {
+        clearTimeout(this.objectGroupsSaveTimer);
+        this.objectGroupsSaveTimer = null;
+      }
 
       this.parsedLevels.set(result.levels);
       this.spriteAssets.set(result.sprites);
@@ -5321,7 +5809,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.selectLevel(result.levels[0].resourceId);
       } else {
         this.selectedLevelId.set(null);
-        this.editRoadInfoData.set(null);
+        this.syncSelectedRoadInfoSelection();
       }
       if (result.sprites.length > 0 && this.selectedSpriteId() === null) {
         void this.selectSprite(result.sprites[0].id);
@@ -5542,7 +6030,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const entryByTexId = new Map(sortedEntries.map((entry) => [entry.texId, entry]));
     const groups: RoadTileGroup[] = [];
 
-    for (const roadInfoId of ROAD_INFO_IDS) {
+    for (const roadInfoId of this.getSortedRoadInfoIds()) {
       const ri = this.roadInfoDataMap.get(roadInfoId);
       if (!ri) continue;
       const ids = [ri.backgroundTex, ri.foregroundTex, ri.roadLeftBorder, ri.roadRightBorder];

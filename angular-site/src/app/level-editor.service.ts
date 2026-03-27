@@ -126,10 +126,27 @@ export interface EditableSpriteAsset {
 
 export interface ObjectTypeDefinition {
   typeRes: number;
+  mass: number;
+  maxEngineForce: number;
+  maxNegEngineForce: number;
+  friction: number;
+  flags: number;
+  deathObj: number;
   frame: number;
   numFrames: number;
+  frameDuration: number;
+  wheelWidth: number;
+  wheelLength: number;
+  steering: number;
   width: number;
   length: number;
+  score: number;
+  flags2: number;
+  creationSound: number;
+  otherSound: number;
+  maxDamage: number;
+  weaponObj: number;
+  weaponInfo: number;
 }
 
 export interface DecodedSpriteFrame {
@@ -164,6 +181,28 @@ const ROAD_PACK_ID = 135;
 const TX16_PACK_ID = 136;
 /** Pack ID for kPackOgrp (object group definitions, resource ID 130). */
 const OBJECT_GROUP_PACK_ID = 130;
+
+const OT_OFFSET_MASS = 0;
+const OT_OFFSET_MAX_ENGINE_FORCE = 4;
+const OT_OFFSET_MAX_NEG_ENGINE_FORCE = 8;
+const OT_OFFSET_FRICTION = 12;
+const OT_OFFSET_FLAGS = 16;
+const OT_OFFSET_DEATH_OBJ = 18;
+const OT_OFFSET_FRAME = 20;
+const OT_OFFSET_NUM_FRAMES = 22;
+const OT_OFFSET_FRAME_DURATION = 24;
+const OT_OFFSET_WHEEL_WIDTH = 28;
+const OT_OFFSET_WHEEL_LENGTH = 32;
+const OT_OFFSET_STEERING = 36;
+const OT_OFFSET_WIDTH = 40;
+const OT_OFFSET_LENGTH = 44;
+const OT_OFFSET_SCORE = 48;
+const OT_OFFSET_FLAGS2 = 50;
+const OT_OFFSET_CREATION_SOUND = 52;
+const OT_OFFSET_OTHER_SOUND = 54;
+const OT_OFFSET_MAX_DAMAGE = 56;
+const OT_OFFSET_WEAPON_OBJ = 60;
+const OT_OFFSET_WEAPON_INFO = 62;
 
 /**
  * tRoadInfo struct – layout (all big-endian, no padding on PPC):
@@ -588,6 +627,64 @@ export function serializeRoadInfoData(roadInfo: RoadInfoData): Uint8Array {
   return out;
 }
 
+function parseObjectTypeDefinition(data: Uint8Array): ObjectTypeDefinition | null {
+  if (data.length < OBJECT_TYPE_SIZE) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  return {
+    typeRes: 0,
+    mass: view.getFloat32(OT_OFFSET_MASS, false),
+    maxEngineForce: view.getFloat32(OT_OFFSET_MAX_ENGINE_FORCE, false),
+    maxNegEngineForce: view.getFloat32(OT_OFFSET_MAX_NEG_ENGINE_FORCE, false),
+    friction: view.getFloat32(OT_OFFSET_FRICTION, false),
+    flags: view.getUint16(OT_OFFSET_FLAGS, false),
+    deathObj: view.getInt16(OT_OFFSET_DEATH_OBJ, false),
+    frame: view.getInt16(OT_OFFSET_FRAME, false),
+    numFrames: view.getUint16(OT_OFFSET_NUM_FRAMES, false),
+    frameDuration: view.getFloat32(OT_OFFSET_FRAME_DURATION, false),
+    wheelWidth: view.getFloat32(OT_OFFSET_WHEEL_WIDTH, false),
+    wheelLength: view.getFloat32(OT_OFFSET_WHEEL_LENGTH, false),
+    steering: view.getFloat32(OT_OFFSET_STEERING, false),
+    width: view.getFloat32(OT_OFFSET_WIDTH, false),
+    length: view.getFloat32(OT_OFFSET_LENGTH, false),
+    score: view.getUint16(OT_OFFSET_SCORE, false),
+    flags2: view.getUint16(OT_OFFSET_FLAGS2, false),
+    creationSound: view.getInt16(OT_OFFSET_CREATION_SOUND, false),
+    otherSound: view.getInt16(OT_OFFSET_OTHER_SOUND, false),
+    maxDamage: view.getFloat32(OT_OFFSET_MAX_DAMAGE, false),
+    weaponObj: view.getInt16(OT_OFFSET_WEAPON_OBJ, false),
+    weaponInfo: view.getInt16(OT_OFFSET_WEAPON_INFO, false),
+  };
+}
+
+function serializeObjectTypeDefinition(def: ObjectTypeDefinition, baseData?: Uint8Array): Uint8Array {
+  const out = baseData && baseData.length >= OBJECT_TYPE_SIZE
+    ? baseData.slice(0, OBJECT_TYPE_SIZE)
+    : new Uint8Array(OBJECT_TYPE_SIZE);
+  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  view.setFloat32(OT_OFFSET_MASS, def.mass, false);
+  view.setFloat32(OT_OFFSET_MAX_ENGINE_FORCE, def.maxEngineForce, false);
+  view.setFloat32(OT_OFFSET_MAX_NEG_ENGINE_FORCE, def.maxNegEngineForce, false);
+  view.setFloat32(OT_OFFSET_FRICTION, def.friction, false);
+  view.setUint16(OT_OFFSET_FLAGS, def.flags, false);
+  view.setInt16(OT_OFFSET_DEATH_OBJ, def.deathObj, false);
+  view.setInt16(OT_OFFSET_FRAME, def.frame, false);
+  view.setUint16(OT_OFFSET_NUM_FRAMES, def.numFrames, false);
+  view.setFloat32(OT_OFFSET_FRAME_DURATION, def.frameDuration, false);
+  view.setFloat32(OT_OFFSET_WHEEL_WIDTH, def.wheelWidth, false);
+  view.setFloat32(OT_OFFSET_WHEEL_LENGTH, def.wheelLength, false);
+  view.setFloat32(OT_OFFSET_STEERING, def.steering, false);
+  view.setFloat32(OT_OFFSET_WIDTH, def.width, false);
+  view.setFloat32(OT_OFFSET_LENGTH, def.length, false);
+  view.setUint16(OT_OFFSET_SCORE, def.score, false);
+  view.setUint16(OT_OFFSET_FLAGS2, def.flags2, false);
+  view.setInt16(OT_OFFSET_CREATION_SOUND, def.creationSound, false);
+  view.setInt16(OT_OFFSET_OTHER_SOUND, def.otherSound, false);
+  view.setFloat32(OT_OFFSET_MAX_DAMAGE, def.maxDamage, false);
+  view.setInt16(OT_OFFSET_WEAPON_OBJ, def.weaponObj, false);
+  view.setInt16(OT_OFFSET_WEAPON_INFO, def.weaponInfo, false);
+  return out;
+}
+
 function parseObjectGroupDefinition(data: Uint8Array): ObjectGroupDefinition | null {
   if (data.length < 4) return null;
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -847,9 +944,30 @@ export class LevelEditorService {
         const newEntries = packEntries.some((entry) => entry.id === roadInfoId)
           ? packEntries.map((entry) => (entry.id === roadInfoId ? { ...entry, data: newData } : entry))
           : [...packEntries, { id: roadInfoId, data: newData }];
+        newEntries.sort((a, b) => a.id - b.id);
         return { ...res, data: encodePackHandle(newEntries, ROAD_PACK_ID) };
       } catch (err) {
         console.error(`[LevelEditor] applyRoadInfoData error id=${roadInfoId}:`, err);
+        return res;
+      }
+    });
+  }
+
+  removeRoadInfoData(
+    resources: ResourceDatEntry[],
+    roadInfoId: number,
+  ): ResourceDatEntry[] {
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== ROAD_PACK_ID) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, res.id);
+        if (!packEntries.some((entry) => entry.id === roadInfoId)) return res;
+        const newEntries = packEntries
+          .filter((entry) => entry.id !== roadInfoId)
+          .sort((a, b) => a.id - b.id);
+        return { ...res, data: encodePackHandle(newEntries, ROAD_PACK_ID) };
+      } catch (err) {
+        console.error(`[LevelEditor] removeRoadInfoData error id=${roadInfoId}:`, err);
         return res;
       }
     });
@@ -1011,15 +1129,9 @@ export class LevelEditorService {
     try {
       const entries = parsePackHandle(pack.data, pack.id);
       for (const entry of entries) {
-        if (entry.data.length < OBJECT_TYPE_SIZE) continue;
-        const view = new DataView(entry.data.buffer, entry.data.byteOffset, entry.data.byteLength);
-        defs.set(entry.id, {
-          typeRes: entry.id,
-          frame: view.getInt16(20, false),
-          numFrames: view.getUint16(22, false),
-          width: view.getFloat32(40, false),
-          length: view.getFloat32(44, false),
-        });
+        const def = parseObjectTypeDefinition(entry.data);
+        if (!def) continue;
+        defs.set(entry.id, { ...def, typeRes: entry.id });
       }
     } catch (err) {
       console.warn('[LevelEditor] failed to parse object types:', err);
@@ -1435,6 +1547,29 @@ export class LevelEditorService {
     }
     return result;
   }
+}
+
+export function applyObjectTypeDefinitions(
+  resources: ResourceDatEntry[],
+  objectTypes: ObjectTypeDefinition[],
+): ResourceDatEntry[] {
+  return resources.map((res) => {
+    if (res.type !== 'Pack' || res.id !== OBJECT_TYPES_PACK_ID) return res;
+    try {
+      const packEntries = parsePackHandle(res.data, res.id);
+      const existingById = new Map(packEntries.map((entry) => [entry.id, entry.data] as const));
+      const newEntries = [...objectTypes]
+        .sort((a, b) => a.typeRes - b.typeRes)
+        .map((def) => ({
+          id: def.typeRes,
+          data: serializeObjectTypeDefinition(def, existingById.get(def.typeRes)),
+        }));
+      return { ...res, data: encodePackHandle(newEntries, OBJECT_TYPES_PACK_ID) };
+    } catch (err) {
+      console.error('[LevelEditor] applyObjectTypeDefinitions error:', err);
+      return res;
+    }
+  });
 }
 
 // ------------------------------------------------------------------

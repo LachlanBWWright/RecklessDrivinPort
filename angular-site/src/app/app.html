@@ -65,16 +65,16 @@
             [selectedLevel]="selectedLevel()"
             [levelNum]="selectedLevelNum()"
             [editRoadInfo]="editRoadInfo()"
+            [roadInfoOptions]="roadInfoOptions()"
             [roadInfoData]="editRoadInfoData()"
             [editObjectGroups]="editObjectGroups()"
-            [tileTileEntries]="tileTileEntries()"
-            [audioEntries]="audioEntries()"
-            [getTileDataUrl]="getTileDataUrlBound"
+            [objectGroupDefinitions]="objectGroupDefinitions()"
+            [getSpriteUrl]="getSpritePreviewDataUrlBound"
             [propertiesDirty]="propertiesDirty()"
             [workerBusy]="workerBusy()"
+            (roadInfoChange)="onRoadInfoChange($event)"
             (roadInfoInput)="onRoadInfoInput($event.field, $event.event)"
             (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.event)"
-            (saveProperties)="saveLevelProperties()"
           ></app-editor-properties-section>
         }
 
@@ -84,17 +84,37 @@
             [selectedObjectGroupId]="selectedObjectGroupId()"
             [availableTypeIds]="availableTypeIds()"
             [getObjTypeDimensionLabel]="getObjTypeDimensionLabelBound"
+            [getSpriteUrl]="getSpritePreviewDataUrlBound"
             [groupsDirty]="objectGroupsDirty()"
             [workerBusy]="workerBusy()"
             (selectedObjectGroupIdChange)="selectObjectGroup($event)"
             (addGroup)="addObjectGroup()"
-            (duplicateGroup)="addObjectGroup(true)"
             (deleteGroup)="deleteObjectGroup($event)"
             (addEntry)="addObjectGroupEntry($event)"
             (deleteEntry)="deleteObjectGroupEntry($event.groupId, $event.entryIndex)"
             (entryInput)="onObjectGroupEntryInput($event.groupId, $event.entryIndex, $event.field, $event.event)"
             (saveObjectGroups)="saveObjectGroups()"
           ></app-editor-object-groups-section>
+        }
+
+        @if (editorSection() === 'object-types') {
+          <app-editor-object-types-section
+            [objectTypes]="objectTypeDefinitions()"
+            [selectedObjectTypeId]="selectedObjectTypeId()"
+            [spriteFrames]="packSpriteFrames()"
+            [audioEntries]="audioEntries()"
+            [getSpriteUrl]="getPackSpriteDataUrlBound"
+            [typesDirty]="objectTypesDirty()"
+            [workerBusy]="workerBusy()"
+            (selectedObjectTypeIdChange)="selectObjectType($event)"
+            (addType)="addObjectType()"
+            (deleteType)="deleteObjectType($event)"
+            (fieldInput)="onObjectTypeFieldInput($event.typeRes, $event.field, $event.event)"
+            (referenceChange)="onObjectTypeReferenceChange($event.typeRes, $event.field, $event.value)"
+            (flagToggle)="onObjectTypeFlagToggle($event.typeRes, $event.field, $event.bit, $event.checked)"
+            (frameChange)="onObjectTypeFrameChange($event.typeRes, $event.frame)"
+            (saveObjectTypes)="saveObjectTypes()"
+          ></app-editor-object-types-section>
         }
 
         @if (editorSection() === 'objects') {
@@ -208,9 +228,18 @@
           <app-editor-tiles-section
             [tileTileEntries]="tileTileEntries()"
             [roadTileGroups]="roadTileGroups()"
+            [roadInfoOptions]="roadInfoOptions()"
+            [selectedRoadInfoId]="selectedRoadInfoId()"
+            [selectedRoadInfoData]="selectedRoadInfoData()"
+            [getRoadReferenceLevelNums]="getRoadReferenceLevelNumsBound"
+            [audioEntries]="audioEntries()"
             [selectedTileId]="selectedTileId()"
             [workerBusy]="workerBusy()"
             [getTileDataUrl]="getTileDataUrlBound"
+            (selectedRoadInfoIdChange)="selectRoadInfo($event)"
+            (createRoadInfo)="createRoadInfo()"
+            (deleteRoadInfo)="deleteRoadInfo($event)"
+            (roadInfoInput)="onRoadInfoInput($event.field, $event.event)"
             (selectedTileIdChange)="selectedTileId.set($event)"
             (openTileEditor)="openTileEditor($event)"
             (tilePngUpload)="onTilePngUpload($event.event, $event.texId)"

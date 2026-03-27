@@ -1,12 +1,17 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
-import type { ParsedLevel, ObjectGroupRef, RoadInfoData, TextureTileEntry } from '../level-editor.service';
+import type {
+  ObjectGroupDefinition,
+  ParsedLevel,
+  ObjectGroupRef,
+  RoadInfoData,
+  RoadInfoOption,
+} from '../level-editor.service';
 
-type TextureField = 'backgroundTex' | 'foregroundTex' | 'roadLeftBorder' | 'roadRightBorder';
-type RoadField = TextureField | 'marks' | 'tracks' | 'skidSound';
+type RoadField = Exclude<keyof RoadInfoData, 'id'>;
 
 /**
  * Level Properties tab — extracted from app.html for better component separation.
- * Displays and edits road-info records plus object group references.
+ * Lets the user choose the level road and edit non-texture road fields.
  */
 @Component({
   selector: 'app-properties-tab',
@@ -19,55 +24,24 @@ export class PropertiesTabComponent {
   @Input() selectedLevel: ParsedLevel | null = null;
   @Input() levelNum = 0;
   @Input() editRoadInfo = 0;
+  @Input() roadInfoOptions: RoadInfoOption[] = [];
   @Input() roadInfoData: RoadInfoData | null = null;
   @Input() editObjectGroups: ObjectGroupRef[] = [];
-  @Input() tileTileEntries: TextureTileEntry[] = [];
-  @Input() audioEntries: { id: number; sizeBytes: number; durationMs?: number }[] = [];
-  @Input() getTileDataUrl: (texId: number) => string | null = () => null;
+  @Input() objectGroupDefinitions: ObjectGroupDefinition[] = [];
+  @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
   @Input() propertiesDirty = false;
   @Input() workerBusy = false;
 
-  @Output() roadInfoInput = new EventEmitter<{ field: Exclude<keyof RoadInfoData, 'id'>; event: Event }>();
+  @Output() roadInfoChange = new EventEmitter<number>();
+  @Output() roadInfoInput = new EventEmitter<{ field: RoadField; event: Event }>();
   @Output() objGroupInput = new EventEmitter<{ index: number; field: 'resID' | 'numObjs'; event: Event }>();
-  @Output() saveProperties = new EventEmitter<void>();
 
-  readonly textureFields: { field: TextureField; label: string }[] = [
-    { field: 'backgroundTex', label: 'backgroundTex' },
-    { field: 'foregroundTex', label: 'foregroundTex' },
-    { field: 'roadLeftBorder', label: 'roadLeftBorder' },
-    { field: 'roadRightBorder', label: 'roadRightBorder' },
-  ];
-
-  get textureEntries(): TextureTileEntry[] {
-    return [...this.tileTileEntries].sort((a, b) => a.texId - b.texId);
-  }
-
-  getTextureEntry(texId: number): TextureTileEntry | null {
-    return this.tileTileEntries.find((tile) => tile.texId === texId) ?? null;
-  }
-
-  hasTextureEntry(texId: number): boolean {
-    return this.getTextureEntry(texId) !== null;
-  }
-
-  getTextureLabel(texId: number): string {
-    const tile = this.getTextureEntry(texId);
-    return tile ? `#${tile.texId} · ${tile.width}×${tile.height} px` : `#${texId}`;
-  }
-
-  getTextureValue(field: TextureField): number {
-    return this.roadInfoData?.[field] ?? 0;
-  }
-
-  setTextureValue(field: TextureField, texId: number): void {
-    this.roadInfoInput.emit({
-      field,
-      event: { target: { value: String(texId) } } as unknown as Event,
-    });
+  getRoadInfoOption(roadInfoId: number): RoadInfoOption | undefined {
+    return this.roadInfoOptions.find((option) => option.id === roadInfoId);
   }
 
   getRoadValue(field: RoadField): number {
-    return this.roadInfoData?.[field] ?? 0;
+    return Number(this.roadInfoData?.[field] ?? 0);
   }
 
   setRoadValue(field: RoadField, value: number): void {
@@ -77,15 +51,26 @@ export class PropertiesTabComponent {
     });
   }
 
-  getAudioEntry(audioId: number): { id: number; sizeBytes: number; durationMs?: number } | null {
-    return this.audioEntries.find((entry) => entry.id === audioId) ?? null;
+  getObjectGroupLabel(resId: number): string {
+    if (resId === 0) return '0 · empty slot';
+    const group = this.objectGroupDefinitions.find((item) => item.id === resId);
+    return group ? `#${group.id}` : `#${resId} (custom)`;
   }
 
-  getAudioLabel(audioId: number): string {
-    const entry = this.getAudioEntry(audioId);
-    if (!entry) return `#${audioId}`;
-    return entry.durationMs !== undefined
-      ? `#${entry.id} · ${(entry.durationMs / 1000).toFixed(1)}s`
-      : `#${entry.id} · ${entry.sizeBytes.toLocaleString()} B`;
+  hasObjectGroupDefinition(resId: number): boolean {
+    return this.objectGroupDefinitions.some((item) => item.id === resId);
+  }
+
+  getObjectGroupSprites(resId: number): number[] {
+    const group = this.objectGroupDefinitions.find((item) => item.id === resId);
+    return group?.entries.map((entry) => entry.typeRes) ?? [];
+  }
+
+  setObjectGroupValue(index: number, resId: number): void {
+    this.objGroupInput.emit({
+      index,
+      field: 'resID',
+      event: { target: { value: String(resId) } } as unknown as Event,
+    });
   }
 }
