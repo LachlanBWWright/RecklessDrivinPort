@@ -38,6 +38,15 @@ export class ObjectInspectorComponent implements OnChanges {
     return `rotate(${deg}deg)`;
   }
 
+  onDirDegTextInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    if (!target) return;
+    this.dirDegText = target.value;
+    if (this.dirDegFocused) {
+      this.dirDegInput.emit(this.dirDegText);
+    }
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     // Only update the text input when the user is NOT actively editing it.
     // Without this guard, every Angular change-detection cycle (triggered by

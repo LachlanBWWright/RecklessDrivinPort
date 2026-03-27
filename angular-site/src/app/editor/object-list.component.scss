@@ -5,6 +5,8 @@
 :host {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -20,6 +22,8 @@ $accent2:   #42a5f5;
 .object-list-container {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   background: $surface2;
   border-top: 1px solid $border;
 }
@@ -54,8 +58,10 @@ $accent2:   #42a5f5;
 }
 
 .object-list {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  max-height: min(340px, 45vh);
+  max-height: none;
   padding: 4px 0;
 
   &::-webkit-scrollbar { width: 6px; }

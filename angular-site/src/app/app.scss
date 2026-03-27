@@ -200,7 +200,8 @@ main {
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  overflow: visible;
+  min-height: 0;
+  overflow: hidden;
 }
 
 app-game-panel {
@@ -789,6 +790,8 @@ app-properties-tab {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    min-height: 0;
   }
   mat-card-content.props-card-content { padding: 16px 20px !important; }
 }
@@ -799,10 +802,14 @@ app-properties-tab {
   align-items: stretch;
   width: 100%;
   flex: 1; /* fill the card content height */
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 
   app-editor-canvas {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
   }
@@ -818,6 +825,7 @@ app-properties-tab {
     border-left: 1px solid var(--border);
     background: var(--surface2);
     padding: 0 0 12px 0;
+    min-height: 0;
 
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-thumb { background: var(--surface4); border-radius: 3px; }
@@ -843,6 +851,21 @@ app-properties-tab {
 
     .objects-side-help { margin-top: 8px; color: var(--muted); font-size: 0.8rem; }
     .objects-side-help kbd { font-size: 0.75rem; }
+  }
+}
+
+@media (max-width: 1200px) {
+  .object-canvas-layout {
+    flex-direction: column;
+  }
+
+  .object-canvas-layout .object-form-col {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    max-height: 42vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
   }
 }
 

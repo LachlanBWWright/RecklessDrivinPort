@@ -39,10 +39,10 @@
       <mat-form-field appearance="outline" class="inspector-field">
         <mat-label>Direction (°)</mat-label>
         <input matInput type="text" inputmode="decimal"
-          [(ngModel)]="dirDegText"
+          [value]="dirDegText"
+          (input)="onDirDegTextInput($event)"
           (focus)="dirDegFocused = true"
-          (blur)="dirDegFocused = false; dirDegInput.emit(dirDegText)"
-          (change)="dirDegInput.emit(dirDegText)" />
+          (blur)="dirDegFocused = false; dirDegInput.emit(dirDegText)" />
         <span matSuffix class="dir-arrow-suffix">
           <mat-icon class="dir-arrow-icon" [style.transform]="dirArrowRotation">north</mat-icon>
         </span>
@@ -113,4 +113,3 @@
     </div>
   }
 </div>
-
