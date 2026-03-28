@@ -17,6 +17,7 @@ export class EditorSpritesSectionComponent {
   @Output() openSpriteEditor = new EventEmitter<number>();
   @Output() spritePngUpload = new EventEmitter<{ event: Event; spriteId: number }>();
   @Output() exportSpritePng = new EventEmitter<void>();
+  @Output() addSpriteFrame = new EventEmitter<void>();
 
   get selectedPackSpriteFrame(): { id: number; bitDepth: 8 | 16; width: number; height: number } | null {
     if (this.selectedPackSpriteId === null) return null;

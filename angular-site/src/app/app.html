@@ -221,6 +221,7 @@
             (openSpriteEditor)="openSpriteEditor($event)"
             (spritePngUpload)="onSpritePngUpload($event.event, $event.spriteId)"
             (exportSpritePng)="exportSpritePng()"
+            (addSpriteFrame)="addSpriteFrame()"
           ></app-editor-sprites-section>
         }
 
@@ -246,6 +247,7 @@
             (openTileEditor)="openTileEditor($event)"
             (tilePngUpload)="onTilePngUpload($event.event, $event.texId)"
             (exportTilePng)="exportTilePng($event)"
+            (addTileImage)="addTileImage()"
           ></app-editor-tiles-section>
         }
 
@@ -268,6 +270,7 @@
             (seekAudio)="seekAudio($event)"
             (exportAudioWav)="exportAudioWav()"
             (audioWavUpload)="onAudioWavUpload($event)"
+            (addAudioEntry)="addAudioEntry()"
           ></app-editor-audio-section>
         }
 
@@ -284,6 +287,7 @@
             (exportIconPng)="exportIconPng()"
             (exportIconRaw)="exportIconRaw()"
             (iconPngUpload)="onIconPngUpload($event)"
+            (addIconEntry)="addIconEntry()"
           ></app-editor-screens-section>
         }
       }

@@ -73,8 +73,9 @@
               mat-icon-button
               color="primary"
               class="tile-sidebar-add-button"
-              [disabled]="true"
-              matTooltip="Add a new tile image (not wired yet)">
+              [disabled]="workerBusy"
+              matTooltip="Upload a PNG to add a new 128×128 tile image"
+              (click)="addTileImage.emit()">
               <mat-icon>add</mat-icon>
             </button>
           </mat-card-header>

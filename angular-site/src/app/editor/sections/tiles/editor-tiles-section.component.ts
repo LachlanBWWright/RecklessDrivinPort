@@ -32,6 +32,7 @@ export class EditorTilesSectionComponent implements OnChanges {
   @Output() openTileEditor = new EventEmitter<number>();
   @Output() tilePngUpload = new EventEmitter<{ event: Event; texId: number }>();
   @Output() exportTilePng = new EventEmitter<number>();
+  @Output() addTileImage = new EventEmitter<void>();
 
   /** Cached dimensions label for the currently selected tile. */
   selectedTileDimensions = '?';

@@ -27,6 +27,7 @@ export class EditorAudioSectionComponent {
   @Output() seekAudio = new EventEmitter<number>();
   @Output() exportAudioWav = new EventEmitter<void>();
   @Output() audioWavUpload = new EventEmitter<Event>();
+  @Output() addAudioEntry = new EventEmitter<void>();
 
   formatTime(seconds: number): string {
     if (!Number.isFinite(seconds) || seconds <= 0) return '0:00';

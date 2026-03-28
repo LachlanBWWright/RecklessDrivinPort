@@ -15,8 +15,9 @@
             <button
               mat-icon-button
               color="primary"
-              [disabled]="true"
-              matTooltip="Screen creation is not wired up yet">
+              [disabled]="workerBusy"
+              matTooltip="Upload a PNG to add a new 32×32 icon (ICN#)"
+              (click)="addIconEntry.emit()">
               <mat-icon>add</mat-icon>
             </button>
           </div>
@@ -57,7 +58,7 @@
                 <mat-spinner diameter="32"></mat-spinner>
               </div>
             }
-            @if (selectedIconType !== 'PICT') {
+            @if (selectedIconType !== 'PICT' && selectedIconType !== 'PPic') {
               <div class="sprite-actions">
                 <button mat-stroked-button (click)="exportIconPng.emit()">
                   <mat-icon>download</mat-icon> Export PNG
@@ -67,6 +68,7 @@
                 <button mat-stroked-button (click)="iconPngInput.click()" [disabled]="workerBusy"
                   [matTooltip]="selectedIconType === 'icl8' ? 'Upload PNG (32×32), converted to 8-bit Mac palette'
                     : selectedIconType === 'ics8' ? 'Upload PNG (16×16), converted to 8-bit Mac palette'
+                    : selectedIconType === 'ics#' ? 'Upload PNG (16×16), converted to 1-bit'
                     : 'Upload PNG (32×32), converted to 1-bit'">
                   <mat-icon>upload</mat-icon> Replace PNG
                 </button>

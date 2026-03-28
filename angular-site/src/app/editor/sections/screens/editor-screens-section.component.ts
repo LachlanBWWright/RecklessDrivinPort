@@ -20,6 +20,7 @@ export class EditorScreensSectionComponent implements OnChanges {
   @Output() exportIconPng = new EventEmitter<void>();
   @Output() exportIconRaw = new EventEmitter<void>();
   @Output() iconPngUpload = new EventEmitter<Event>();
+  @Output() addIconEntry = new EventEmitter<void>();
 
   /** Cached data URL for the large preview canvas — recomputed only when the canvas reference changes. */
   iconPreviewDataUrl: string | null = null;

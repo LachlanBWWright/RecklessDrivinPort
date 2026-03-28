@@ -38,6 +38,7 @@ import {
   type MarkingRoadSelection,
 } from './road-marking-utils';
 import { decodeIMA4, parseSndHeader, buildWav, SndInfo } from './snd-codec';
+import { packHandleDecompress } from './lzrw.service';
 import {
   worldDirToCanvasForwardVector,
   worldDirToCanvasRotationRad,
@@ -1673,6 +1674,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       outline:none;
       cursor:default;
     `;
+
+    // Sync canvas pixel buffer to match its CSS display size at init time.
+    // Without this the Konva stage uses the default canvas dimensions (300×150)
+    // as its "logical" size, causing a stretch artefact on the first render.
+    if (canvas.width !== cssW || canvas.height !== cssH) {
+      canvas.width = cssW;
+      canvas.height = cssH;
+      this._roadOffscreenKey = '';
+      this._roadOffscreen = null;
+    }
 
     this.konva.init('konva-container', canvas.width, canvas.height, cssW, cssH);
     this._konvaInitialized = true;
@@ -3583,6 +3594,54 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     } finally {
       this.workerBusy.set(false);
     }
+  }
+
+  /** Add a new tile image by uploading a PNG – the image is scaled to 128×128 px and stored as RGB555. */
+  async addTileImage(): Promise<void> {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        this.workerBusy.set(true);
+        const url = URL.createObjectURL(file);
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = reject;
+          i.src = url;
+        });
+        URL.revokeObjectURL(url);
+        // Scale to 128×128 (standard tile size)
+        const W = 128, H = 128;
+        const offscreen = document.createElement('canvas');
+        offscreen.width = W;
+        offscreen.height = H;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) throw new Error('Failed to get 2D context');
+        ctx.drawImage(img, 0, 0, W, H);
+        const imageData = ctx.getImageData(0, 0, W, H);
+        const pixels = new Uint8ClampedArray(imageData.data);
+        // Pick next free tile ID (use highest existing + 1, stay in safe range)
+        const existing = this.tileTileEntries().map((t) => t.texId);
+        const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 200;
+        if (nextId > 9999) throw new Error('Too many tile images (max ID 9999)');
+        await this.dispatchWorker<Record<string, never>>('APPLY_TILE16_PIXELS', { texId: nextId, pixels });
+        await this.decodeRoadTexturesInBackground();
+        this.selectedTileId.set(nextId);
+        this.resourcesStatus.set(`New tile #${nextId} created.`);
+        this.snackBar.open(`✓ Tile #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to add tile';
+        this.editorError.set(msg);
+        this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      } finally {
+        this.workerBusy.set(false);
+      }
+    };
+    input.click();
   }
 
   private queueRoadInfoSync(syncPromises: Promise<unknown>[]): void {
@@ -6443,6 +6502,39 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** Add a new sound entry from a WAV file upload. */
+  async addAudioEntry(): Promise<void> {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.wav,audio/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        this.workerBusy.set(true);
+        const arrBuf = await file.arrayBuffer();
+        const sndBytes = this._wavToSnd(new Uint8Array(arrBuf));
+        // Pick next free entry ID
+        const existing = this.audioEntries().map((e) => e.id);
+        const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 128;
+        if (nextId > 9999) throw new Error('Too many sound entries (max ID 9999)');
+        const buf = sndBytes.buffer.slice(sndBytes.byteOffset, sndBytes.byteOffset + sndBytes.byteLength);
+        await this.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 134, entryId: nextId, bytes: buf }, [buf]);
+        await this.loadAudioEntries();
+        this.selectAudioEntry(nextId);
+        this.resourcesStatus.set(`New sound #${nextId} created.`);
+        this.snackBar.open(`✓ Sound #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to add sound';
+        this.editorError.set(msg);
+        this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      } finally {
+        this.workerBusy.set(false);
+      }
+    };
+    input.click();
+  }
+
   /**
    * Convert a Mac OS 'snd ' resource to PCM WAV.
    * Only handles uncompressed 8-bit mono (encode=0).
@@ -6580,7 +6672,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     try {
       type ListResult = { entries: { type: string; id: number; size: number }[] };
       const result = await this.dispatchWorker<ListResult>('LIST_RESOURCES');
-      const SCREEN_TYPES = new Set(['ICN#', 'icl8', 'ics8', 'PICT']);
+      const SCREEN_TYPES = new Set(['ICN#', 'ics#', 'icl8', 'ics8', 'PICT', 'PPic']);
       const entries = result.entries
         .filter((e) => SCREEN_TYPES.has(e.type))
         .map((e) => ({
@@ -6603,13 +6695,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.selectedIconId.set(id);
     this.selectedIconType.set(type);
     this.iconPreviewCanvas.set(null);
-    if (type === 'PICT') {
+    if (type === 'PICT' || type === 'PPic') {
       try {
         type RawResult = { bytes: ArrayBuffer | null };
         const result = await this.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
         if (result.bytes) {
           const bytes = new Uint8Array(result.bytes);
-          const canvas = this._renderPictBytes(bytes);
+          const pictBytes = type === 'PPic' ? packHandleDecompress(bytes) : bytes;
+          const canvas = this._renderPictBytes(pictBytes);
           if (canvas) {
             this.iconPreviewCanvas.set(canvas);
             const cacheKey = `${type}:${id}`;
@@ -6745,6 +6838,54 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** Add a new ICN# 32×32 icon entry from a PNG upload. */
+  async addIconEntry(): Promise<void> {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        this.workerBusy.set(true);
+        const url = URL.createObjectURL(file);
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = reject;
+          i.src = url;
+        });
+        URL.revokeObjectURL(url);
+        const offscreen = document.createElement('canvas');
+        offscreen.width = 32;
+        offscreen.height = 32;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) throw new Error('Failed to get 2D context');
+        ctx.drawImage(img, 0, 0, 32, 32);
+        const iconBytes = this._imageDataToIconHash(ctx.getImageData(0, 0, 32, 32).data);
+        // Pick next free ICN# resource ID
+        const existing = this.iconEntries()
+          .filter((e) => e.type === 'ICN#')
+          .map((e) => e.id);
+        const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 200;
+        if (nextId > 9999) throw new Error('Too many icon entries');
+        const buf = iconBytes.buffer.slice(iconBytes.byteOffset, iconBytes.byteOffset + iconBytes.byteLength);
+        await this.dispatchWorker('PUT_RESOURCE_RAW', { type: 'ICN#', id: nextId, bytes: buf }, [buf]);
+        await this.loadIconEntries();
+        this.selectIconEntry('ICN#', nextId);
+        this.resourcesStatus.set(`New ICN# #${nextId} created.`);
+        this.snackBar.open(`✓ Icon #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to add icon';
+        this.editorError.set(msg);
+        this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      } finally {
+        this.workerBusy.set(false);
+      }
+    };
+    input.click();
+  }
+
   private _iconLabel(type: string, id: number): string {
     const iconLabels: Record<number, string> = {
       128: 'Application Icon',
@@ -6758,6 +6899,12 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       129: 'Game Over Screen',
       130: 'About Box',
     };
+    const ppicLabels: Record<number, string> = {
+      128: 'Main Menu Background',
+      129: 'In-Game HUD',
+      130: 'Level Complete Screen',
+    };
+    if (type === 'PPic') return ppicLabels[id] ?? `PPic #${id}`;
     if (type === 'ICN#' || type === 'ics#') return iconLabels[id] ?? `ICN# #${id}`;
     if (type === 'icl8') return iconLabels[id] ?? `icl8 #${id} (32×32 color)`;
     if (type === 'ics8') return iconLabels[id] ?? `ics8 #${id} (16×16 color)`;
@@ -6795,8 +6942,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (!result.bytes) continue;
         const bytes = new Uint8Array(result.bytes);
         let canvas: HTMLCanvasElement | null = null;
-        if (entry.type === 'PICT') {
-          canvas = this._renderPictBytes(bytes);
+        if (entry.type === 'PICT' || entry.type === 'PPic') {
+          const pictBytes = entry.type === 'PPic' ? packHandleDecompress(bytes) : bytes;
+          canvas = this._renderPictBytes(pictBytes);
         } else if (entry.type === 'ICN#' || entry.type === 'ics#') {
           canvas = this._renderIconBytes(bytes);
         } else if (entry.type === 'icl8') {
@@ -7334,6 +7482,85 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     } finally {
       this.workerBusy.set(false);
     }
+  }
+
+  /** Add a new 16-bit sprite frame from a PNG upload. */
+  async addSpriteFrame(): Promise<void> {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        this.workerBusy.set(true);
+        const url = URL.createObjectURL(file);
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = reject;
+          i.src = url;
+        });
+        URL.revokeObjectURL(url);
+        // Clamp to max 512×512 to avoid oversized sprites
+        const W = Math.min(img.naturalWidth, 512);
+        const H = Math.min(img.naturalHeight, 512);
+        if (W <= 0 || H <= 0) throw new Error('Invalid image dimensions');
+        const offscreen = document.createElement('canvas');
+        offscreen.width = W;
+        offscreen.height = H;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) throw new Error('Failed to get 2D context');
+        ctx.drawImage(img, 0, 0, W, H);
+        const imageData = ctx.getImageData(0, 0, W, H);
+        const rgba = imageData.data;
+        // Build sprite binary: header + RGB555 pixel data
+        const log2xSize = Math.ceil(Math.log2(Math.max(W, 1)));
+        const stride = 1 << log2xSize;
+        const MASK_COLOUR = 0x7C1F; // magenta-ish transparent sentinel
+        const HEADER_SIZE = 8;
+        const dataSize = HEADER_SIZE + H * stride * 2;
+        const data = new Uint8Array(dataSize);
+        const view = new DataView(data.buffer);
+        view.setUint16(0, W, false);
+        view.setUint16(2, H, false);
+        data[4] = log2xSize;
+        // data[5..7] = 0 (reserved)
+        view.setUint16(HEADER_SIZE, MASK_COLOUR, false);
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const si = (y * W + x) * 4;
+            const a = rgba[si + 3];
+            const off = HEADER_SIZE + (y * stride + x) * 2;
+            if (off + 2 > data.length) continue;
+            if (a === 0) {
+              view.setUint16(off, MASK_COLOUR, false);
+            } else {
+              const r = rgba[si], g = rgba[si + 1], b = rgba[si + 2];
+              const rgb = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+              view.setUint16(off, rgb === MASK_COLOUR ? (rgb ^ 1) : rgb, false);
+            }
+          }
+        }
+        // Pick next free frame ID
+        const existing = this.packSpriteFrames().map((f) => f.id);
+        const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 128;
+        if (nextId > 9999) throw new Error('Too many sprite frames (max ID 9999)');
+        const buf = data.buffer.slice(0);
+        await this.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 137, entryId: nextId, bytes: buf }, [buf]);
+        await this.decodePackSpritesInBackground();
+        this.selectedPackSpriteId.set(nextId);
+        this.resourcesStatus.set(`New sprite frame #${nextId} created.`);
+        this.snackBar.open(`✓ Sprite #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to add sprite';
+        this.editorError.set(msg);
+        this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      } finally {
+        this.workerBusy.set(false);
+      }
+    };
+    input.click();
   }
 
   /** Handle save event from sprite editor – route to tile or sprite save. */

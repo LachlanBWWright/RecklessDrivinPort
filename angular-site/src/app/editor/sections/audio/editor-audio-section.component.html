@@ -15,8 +15,9 @@
             <button
               mat-icon-button
               color="primary"
-              [disabled]="true"
-              matTooltip="Sound creation is not wired up yet">
+              [disabled]="workerBusy"
+              matTooltip="Upload a WAV file to add a new sound"
+              (click)="addAudioEntry.emit()">
               <mat-icon>add</mat-icon>
             </button>
           </div>

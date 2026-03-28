@@ -14,8 +14,9 @@
             <button
               mat-icon-button
               color="primary"
-              [disabled]="true"
-              matTooltip="Sprite creation is not wired up yet">
+              [disabled]="workerBusy"
+              matTooltip="Upload a PNG to add a new 16-bit sprite frame"
+              (click)="addSpriteFrame.emit()">
               <mat-icon>add</mat-icon>
             </button>
           </div>
