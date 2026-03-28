@@ -264,7 +264,7 @@
               type="number"
               [value]="objGroup.numObjs"
               [disabled]="workerBusy"
-              (change)="objGroupInput.emit({ index: $index, field: 'numObjs', event: $event })"
+              (input)="objGroupInput.emit({ index: $index, field: 'numObjs', event: $event })"
             />
           </mat-form-field>
         </div>
