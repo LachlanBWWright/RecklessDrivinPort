@@ -3295,6 +3295,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     const current = currentId !== null ? this.cloneRoadInfoData(this.roadInfoDataMap.get(currentId)) : null;
     if (currentId === null || !current) return;
     const target = event.target as EventTarget & { value?: string; checked?: boolean };
+    if (field !== 'water' && (target?.value ?? '') === '') return;
     const next = { ...current } as RoadInfoData;
     this._pushUndo('props');
     let parsed: number | boolean = 0;
@@ -3776,6 +3777,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   ): void {
     const target = event.target as EventTarget & { value?: string };
     const rawValue = target?.value ?? '';
+    if (rawValue === '') return;
     const parsed = field === 'dir' ? Number.parseFloat(rawValue) : Number.parseInt(rawValue, 10);
     if (Number.isNaN(parsed)) return;
     const groups = this.cloneObjectGroupDefinitions();
@@ -3922,6 +3924,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   ): void {
     const target = event.target as EventTarget & { value?: string };
     const rawValue = target?.value ?? '';
+    if (rawValue === '') return;
     const parsed = [
       'mass', 'maxEngineForce', 'maxNegEngineForce', 'friction',
       'frameDuration', 'wheelWidth', 'wheelLength', 'steering',

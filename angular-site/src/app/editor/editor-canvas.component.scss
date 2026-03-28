@@ -162,6 +162,8 @@
 .road-info-thumb--fallback {
   width: 48px;
   height: 24px;
+  max-height: 24px;
+  max-width: 48px;
   border-radius: 4px;
   border: 1px solid #4a4a4a;
   flex: 0 0 auto;

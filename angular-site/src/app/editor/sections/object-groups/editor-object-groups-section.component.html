@@ -129,25 +129,25 @@
                         <mat-label>minOffs</mat-label>
                         <input matInput type="number" [value]="entry.minOffs"
                           [disabled]="workerBusy"
-                          (change)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'minOffs', event: $event })" />
+                          (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'minOffs', event: $event })" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-number-field">
                         <mat-label>maxOffs</mat-label>
                         <input matInput type="number" [value]="entry.maxOffs"
                           [disabled]="workerBusy"
-                          (change)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'maxOffs', event: $event })" />
+                          (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'maxOffs', event: $event })" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-number-field">
                         <mat-label>probility</mat-label>
                         <input matInput type="number" [value]="entry.probility"
                           [disabled]="workerBusy"
-                          (change)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'probility', event: $event })" />
+                          (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'probility', event: $event })" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-dir-field">
                         <mat-label>Direction</mat-label>
                         <input matInput type="number" step="0.01" [value]="entry.dir"
                           [disabled]="workerBusy"
-                          (change)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'dir', event: $event })" />
+                          (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'dir', event: $event })" />
                         <span matSuffix class="dir-arrow-suffix">
                           @if (isAutoDir(entry.dir)) {
                             <span class="dir-auto-badge" matTooltip="Auto / track-aligned">AUTO</span>
