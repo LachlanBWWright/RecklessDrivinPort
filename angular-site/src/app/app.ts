@@ -817,6 +817,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly getObjFallbackColorBound = this.getObjFallbackColor.bind(this);
   readonly getObjTypeDimensionLabelBound = this.getObjTypeDimensionLabel.bind(this);
   readonly getRoadReferenceLevelNumsBound = this.getRoadReferenceLevelNums.bind(this);
+  readonly getTileReferenceRoadInfoIdsBound = this.getTileReferenceRoadInfoIds.bind(this);
 
   /** Convert a level resource ID (140-149) to a human-readable level number (1-10). */
   levelDisplayNum(resourceId: number): number {
@@ -1667,6 +1668,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     konvaContainer.style.cssText = `
       position:absolute; top:0; left:0;
       width:${cssW}px; height:${cssH}px;
+      overflow:hidden;
       pointer-events:all;
       outline:none;
       cursor:default;
@@ -3373,6 +3375,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       .sort((a, b) => a - b);
   }
 
+  private getTileReferenceRoadInfoIds(texId: number): number[] {
+    return this.getSortedRoadInfoIds().filter((roadInfoId) => {
+      const ri = this.roadInfoDataMap.get(roadInfoId);
+      if (!ri) return false;
+      return (
+        ri.backgroundTex === texId ||
+        ri.foregroundTex === texId ||
+        ri.roadLeftBorder === texId ||
+        ri.roadRightBorder === texId
+      );
+    });
+  }
+
   private getNextRoadInfoId(): number {
     const ids = this.getSortedRoadInfoIds();
     const base = ids.length > 0 ? ids[ids.length - 1] + 1 : 128;
@@ -3523,6 +3538,45 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       this.setSelectedRoadInfo(previousSelectedRoadId);
       this.editRoadInfoData.set(previousEditRoadInfo);
       const msg = error instanceof Error ? error.message : 'Failed to delete road';
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    } finally {
+      this.workerBusy.set(false);
+    }
+  }
+
+  async deleteTileImage(texId: number): Promise<void> {
+    const refs = this.getTileReferenceRoadInfoIds(texId);
+    if (refs.length > 0) {
+      const msg = `Tile ${texId} is still used by road${refs.length > 1 ? 's' : ''} ${refs.join(', ')}. Reassign those road textures first.`;
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 6000, panelClass: 'snack-error' });
+      return;
+    }
+
+    if (!this.tileTileEntries().some((entry) => entry.texId === texId)) {
+      const msg = `Tile ${texId} was not found.`;
+      this.editorError.set(msg);
+      this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      return;
+    }
+
+    const previousSelectedTileId = this.selectedTileId();
+
+    try {
+      this.workerBusy.set(true);
+      await this.dispatchWorker<unknown>('REMOVE_TILE16_TEXTURE', { texId });
+      await this.decodeRoadTexturesInBackground();
+      if (previousSelectedTileId === texId) {
+        this.selectedTileId.set(this.tileTileEntries()[0]?.texId ?? null);
+      }
+      this.resourcesStatus.set(`Deleted tile #${texId}.`);
+      this.snackBar.open(`✓ Tile #${texId} deleted`, 'OK', {
+        duration: 3000,
+        panelClass: 'snack-success',
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to delete tile';
       this.editorError.set(msg);
       this.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
     } finally {
@@ -7941,30 +7995,6 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillText(`${wy}`, W - 60, tickY - 2);
     }
 
-    // Vertical scrollbar-like position indicator (right edge)
-    if (level.roadSegs.length > 1) {
-      const totalWorldH = (level.roadSegs.length - 1) * 2;
-      const viewWorldMin = panY - canvasH / (2 * zoom);
-      const viewWorldMax = panY + canvasH / (2 * zoom);
-      const barX = W - 8;
-      const barW = 6;
-      const barH = canvasH - 20;
-      const barY = 10;
-      // Track background
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.fillRect(barX, barY, barW, barH);
-      // Thumb: top of bar = finish (high Y), bottom = start (Y=0)
-      const thumbTop = Math.max(barY, (1 - Math.min(1, viewWorldMax / totalWorldH)) * barH + barY);
-      const thumbBottom = Math.min(
-        barH + barY,
-        (1 - Math.max(0, viewWorldMin / totalWorldH)) * barH + barY,
-      );
-      const thumbH = Math.max(12, thumbBottom - thumbTop);
-      ctx.fillStyle = 'rgba(66, 165, 245, 0.55)';
-      ctx.beginPath();
-      ctx.roundRect(barX, thumbTop, barW, thumbH, 3);
-      ctx.fill();
-    }
   }
 
   /**

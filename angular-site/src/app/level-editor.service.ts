@@ -1498,6 +1498,11 @@ export class LevelEditorService {
     });
   }
 
+  /** Remove a single tile entry from kPackTx16 (Pack ID 136). */
+  removeTile16Texture(resources: ResourceDatEntry[], texId: number): ResourceDatEntry[] {
+    return removePackEntryRaw(resources, TX16_PACK_ID, texId);
+  }
+
   /**
    * Decode all textures needed for road rendering from kPackTx16 (Pack ID 136).
    * Returns decoded RGBA8888 textures keyed by texture ID.
@@ -1713,6 +1718,30 @@ export function putPackEntryRaw(
     const newEntries = entries.some((e) => e.id === entryId)
       ? entries.map((e) => (e.id === entryId ? { ...e, data: data.slice() } : e))
       : [...entries, { id: entryId, data: data.slice() }];
+    const newPackData = encodePackHandle(newEntries, packId);
+    return resources.map((e) =>
+      e.type === 'Pack' && e.id === packId ? { ...e, data: newPackData } : e,
+    );
+  } catch {
+    return resources;
+  }
+}
+
+/**
+ * Remove a single entry from a Pack resource.
+ * Returns the original resources array unchanged if the pack or entry is missing.
+ */
+export function removePackEntryRaw(
+  resources: ResourceDatEntry[],
+  packId: number,
+  entryId: number,
+): ResourceDatEntry[] {
+  const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+  if (!pack) return resources;
+  try {
+    const entries = parsePackHandle(pack.data, packId);
+    if (!entries.some((e) => e.id === entryId)) return resources;
+    const newEntries = entries.filter((e) => e.id !== entryId);
     const newPackData = encodePackHandle(newEntries, packId);
     return resources.map((e) =>
       e.type === 'Pack' && e.id === packId ? { ...e, data: newPackData } : e,

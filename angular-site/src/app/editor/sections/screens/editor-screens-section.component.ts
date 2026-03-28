@@ -3,6 +3,7 @@ import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, OnChan
 @Component({
   selector: 'app-editor-screens-section',
   templateUrl: './editor-screens-section.component.html',
+  styleUrls: ['./editor-screens-section.component.scss'],
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

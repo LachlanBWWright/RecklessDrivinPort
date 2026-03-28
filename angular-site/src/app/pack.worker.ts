@@ -23,7 +23,8 @@
  *   APPLY_MARKS            payload: { resourceId, marks }
  *   APPLY_ROAD_SEGS        payload: { resourceId, roadSegs }
  *   APPLY_SPRITE_BYTE      payload: { spriteId, offset, value }
- *   APPLY_TILE16_PIXELS  payload: { texId: number; pixels: Uint8ClampedArray }
+ *   APPLY_TILE16_PIXELS   payload: { texId: number; pixels: Uint8ClampedArray }
+ *   REMOVE_TILE16_TEXTURE  payload: { texId: number }
  *   APPLY_SPRITE_PACK_PIXELS payload: { frameId: number; bitDepth: 8 | 16; pixels: Uint8ClampedArray }
  *   DECODE_ALL_ROAD_TEXTURES (no payload) → { textures: DecodedRoadTexture[] }
  *   GET_SPRITE_BYTES       payload: { spriteId }
@@ -189,6 +190,13 @@ self.addEventListener('message', (event: MessageEvent) => {
       case 'APPLY_TILE16_PIXELS': {
         const { texId, pixels } = payload as { texId: number; pixels: Uint8ClampedArray };
         resources = levelEditorSvc.applyTile16Pixels(resources, texId, pixels);
+        self.postMessage({ id, ok: true, cmd, result: {} });
+        break;
+      }
+
+      case 'REMOVE_TILE16_TEXTURE': {
+        const { texId } = payload as { texId: number };
+        resources = levelEditorSvc.removeTile16Texture(resources, texId);
         self.postMessage({ id, ok: true, cmd, result: {} });
         break;
       }

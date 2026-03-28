@@ -4,6 +4,7 @@ import type { SndInfo } from '../../../snd-codec';
 @Component({
   selector: 'app-editor-audio-section',
   templateUrl: './editor-audio-section.component.html',
+  styleUrls: ['./editor-audio-section.component.scss'],
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

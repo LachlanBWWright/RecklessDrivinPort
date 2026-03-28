@@ -1,26 +1,47 @@
 <mat-card class="tab-panel-card">
   <mat-card-header>
     <mat-card-title>Sound Editor</mat-card-title>
-    <mat-card-subtitle>Pack 134 (kPackSnds — Mac OS &#39;snd &#39; format)</mat-card-subtitle>
+    <mat-card-subtitle>Pack 134 (kPackSnds - Mac OS 'snd ' format)</mat-card-subtitle>
   </mat-card-header>
   <mat-card-content>
     @if (audioEntries.length > 0) {
-      <div class="audio-editor-layout">
-        <div class="audio-entry-list">
-          @for (entry of audioEntries; track entry.id) {
-            <button class="audio-entry-btn"
-              [class.audio-entry-btn--active]="selectedAudioId === entry.id"
-              (click)="selectAudioEntry.emit(entry.id)">
-              <mat-icon class="audio-entry-icon">audiotrack</mat-icon>
-              <span>Sound #{{ entry.id }}</span>
-              @if (entry.durationMs !== undefined) {
-                <span class="res-size-badge">{{ entry.durationMs / 1000 | number:'1.1-1' }}s</span>
-              } @else {
-                <span class="res-size-badge">{{ entry.sizeBytes | number }} B</span>
-              }
+      <div class="audio-sidebar-layout">
+        <aside class="audio-sidebar">
+          <div class="audio-sidebar-header">
+            <div>
+              <div class="audio-sidebar-title">Sounds</div>
+              <div class="audio-sidebar-subtitle">{{ audioEntries.length }} entries</div>
+            </div>
+            <button
+              mat-icon-button
+              color="primary"
+              [disabled]="true"
+              matTooltip="Sound creation is not wired up yet">
+              <mat-icon>add</mat-icon>
             </button>
-          }
-        </div>
+          </div>
+
+          <div class="audio-list">
+            @for (entry of audioEntries; track entry.id) {
+              <button
+                type="button"
+                class="audio-list-item"
+                [class.audio-list-item--active]="selectedAudioId === entry.id"
+                (click)="selectAudioEntry.emit(entry.id)">
+                <mat-icon class="audio-list-item__icon">audiotrack</mat-icon>
+                <span class="audio-list-item__main">
+                  <span class="audio-list-item__title">Sound #{{ entry.id }}</span>
+                  @if (entry.durationMs !== undefined) {
+                    <span class="audio-list-item__meta">{{ entry.durationMs / 1000 | number:'1.1-1' }}s</span>
+                  } @else {
+                    <span class="audio-list-item__meta">{{ entry.sizeBytes | number }} B</span>
+                  }
+                </span>
+                <mat-icon class="audio-list-item__chevron">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        </aside>
 
         @if (selectedAudioId !== null && selectedAudioBytes) {
           <div class="audio-detail">
@@ -41,33 +62,39 @@
               <mat-icon class="waveform-icon">graphic_eq</mat-icon>
               <span>{{ selectedAudioBytes.length | number }} bytes</span>
             </div>
-            <div class="audio-actions" style="display:flex;flex-direction:column;gap:8px;">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <mat-icon style="font-size:18px;height:18px;width:18px;color:#8a8a8a">volume_up</mat-icon>
-                <mat-slider min="0" max="100" step="1" discrete style="width:140px">
+            <div class="audio-actions">
+              <div class="audio-volume-row">
+                <mat-icon class="audio-volume-icon">volume_up</mat-icon>
+                <mat-slider min="0" max="100" step="1" discrete class="audio-volume-slider">
                   <input matSliderThumb [value]="audioPlayerVolume"
                     (valueChange)="setAudioPlayerVolume.emit($event)" />
                 </mat-slider>
-                <span style="font-size:0.78rem;color:#8a8a8a;min-width:32px">{{ audioPlayerVolume }}%</span>
+                <span class="audio-volume-value">{{ audioPlayerVolume }}%</span>
               </div>
-              <div style="display:flex;align-items:center;gap:12px;">
-                <button mat-raised-button color="primary"
+              <div class="audio-playback-row">
+                <button
+                  mat-raised-button
+                  color="primary"
                   (click)="togglePlayPause.emit()"
                   [disabled]="audioDecodeInProgress || (!audioControllable && !selectedAudioBytes)">
                   <mat-icon matButtonIcon>{{ audioPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
                   {{ audioPlaying ? 'Pause' : 'Play' }}
                 </button>
-                <div class="audio-progress-row" style="display:inline-flex;align-items:center;margin-left:12px;">
-                  <input type="range" min="0" [max]="audioDuration" step="0.01"
+                <div class="audio-progress-row">
+                  <input
+                    type="range"
+                    min="0"
+                    [max]="audioDuration"
+                    step="0.01"
                     [value]="audioCurrentTime"
                     (input)="seekAudio.emit($any($event.target).valueAsNumber)"
-                    [disabled]="!audioControllable" style="width:240px;margin-right:8px;" />
+                    [disabled]="!audioControllable"
+                    class="audio-progress-slider" />
                   <span class="audio-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span>
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:12px;">
-                <button mat-stroked-button (click)="exportAudioWav.emit()"
-                  [disabled]="!selectedAudioBytes">
+              <div class="audio-export-row">
+                <button mat-stroked-button (click)="exportAudioWav.emit()" [disabled]="!selectedAudioBytes">
                   <mat-icon>download</mat-icon> Export WAV
                 </button>
                 <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none"

@@ -1,26 +1,50 @@
 <mat-card class="tab-panel-card">
   <mat-card-header>
     <mat-card-title>Screens &amp; HUD Icons Editor</mat-card-title>
-    <mat-card-subtitle>Icon and screen image resources — ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</mat-card-subtitle>
+    <mat-card-subtitle>Icon and screen image resources - ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</mat-card-subtitle>
   </mat-card-header>
   <mat-card-content>
     @if (iconEntries.length > 0) {
-      <div class="screens-layout">
-        <div class="icon-entry-list">
-          @for (icon of iconEntries; track trackIconEntry($index, icon)) {
-            <button class="audio-entry-btn"
-              [class.audio-entry-btn--active]="selectedIconId === icon.id && selectedIconType === icon.type"
-              (click)="selectIconEntry.emit({ type: icon.type, id: icon.id })">
-              @if (getIconThumbDataUrl(icon.type, icon.id); as thumbUrl) {
-                <img [src]="thumbUrl" class="icon-list-thumb" alt="" />
-              } @else {
-                <mat-icon class="audio-entry-icon">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
-              }
-              <span>{{ icon.label }}</span>
-              <span class="res-size-badge">{{ icon.type }}</span>
+      <div class="screens-sidebar-layout">
+        <aside class="screens-sidebar">
+          <div class="screens-sidebar-header">
+            <div>
+              <div class="screens-sidebar-title">Screens</div>
+              <div class="screens-sidebar-subtitle">{{ iconEntries.length }} resources</div>
+            </div>
+            <button
+              mat-icon-button
+              color="primary"
+              [disabled]="true"
+              matTooltip="Screen creation is not wired up yet">
+              <mat-icon>add</mat-icon>
             </button>
-          }
-        </div>
+          </div>
+
+          <div class="screens-list">
+            @for (icon of iconEntries; track trackIconEntry($index, icon)) {
+              <button
+                type="button"
+                class="screens-list-item"
+                [class.screens-list-item--active]="selectedIconId === icon.id && selectedIconType === icon.type"
+                (click)="selectIconEntry.emit({ type: icon.type, id: icon.id })">
+                <span class="screens-list-item__thumb">
+                  @if (getIconThumbDataUrl(icon.type, icon.id); as thumbUrl) {
+                    <img [src]="thumbUrl" class="screens-list-item__img" alt="" />
+                  } @else {
+                    <mat-icon class="screens-list-item__icon">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
+                  }
+                </span>
+                <span class="screens-list-item__main">
+                  <span class="screens-list-item__title">{{ icon.label }}</span>
+                  <span class="screens-list-item__meta">{{ icon.type }}</span>
+                </span>
+                <span class="res-size-badge">{{ icon.type }}</span>
+                <mat-icon class="screens-list-item__chevron">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        </aside>
 
         @if (selectedIconId !== null) {
           <div class="icon-detail">

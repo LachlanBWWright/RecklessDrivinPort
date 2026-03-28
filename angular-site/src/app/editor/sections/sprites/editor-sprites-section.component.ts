@@ -3,6 +3,7 @@ import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from 
 @Component({
   selector: 'app-editor-sprites-section',
   templateUrl: './editor-sprites-section.component.html',
+  styleUrls: ['./editor-sprites-section.component.scss'],
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

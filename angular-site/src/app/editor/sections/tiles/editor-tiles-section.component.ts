@@ -17,6 +17,7 @@ export class EditorTilesSectionComponent implements OnChanges {
   @Input() selectedRoadInfoId: number | null = null;
   @Input() selectedRoadInfoData: RoadInfoData | null = null;
   @Input() getRoadReferenceLevelNums: (roadInfoId: number) => number[] = () => [];
+  @Input() getTileReferenceRoadInfoIds: (texId: number) => number[] = () => [];
   @Input() audioEntries: { id: number; sizeBytes: number; durationMs?: number }[] = [];
   @Input() selectedTileId: number | null = null;
   @Input() workerBusy = false;
@@ -27,6 +28,7 @@ export class EditorTilesSectionComponent implements OnChanges {
   @Output() deleteRoadInfo = new EventEmitter<number>();
   @Output() roadInfoInput = new EventEmitter<{ field: Exclude<keyof RoadInfoData, 'id'>; event: Event }>();
   @Output() selectedTileIdChange = new EventEmitter<number | null>();
+  @Output() deleteTileImage = new EventEmitter<number>();
   @Output() openTileEditor = new EventEmitter<number>();
   @Output() tilePngUpload = new EventEmitter<{ event: Event; texId: number }>();
   @Output() exportTilePng = new EventEmitter<number>();
@@ -41,6 +43,10 @@ export class EditorTilesSectionComponent implements OnChanges {
         : undefined;
       this.selectedTileDimensions = entry ? `${entry.width}×${entry.height}` : '?';
     }
+  }
+
+  get totalTileCount(): number {
+    return this.tileTileEntries.length;
   }
 
   getRoadInfoOption(roadInfoId: number): RoadInfoOption | undefined {
@@ -58,6 +64,18 @@ export class EditorTilesSectionComponent implements OnChanges {
   getTextureLabel(texId: number): string {
     const tile = this.getTextureEntry(texId);
     return tile ? `#${tile.texId} · ${tile.width}×${tile.height} px` : `#${texId}`;
+  }
+
+  canDeleteTileImage(texId: number): boolean {
+    return !this.workerBusy && this.getTileReferenceRoadInfoIds(texId).length === 0;
+  }
+
+  getTileDeleteTooltip(texId: number): string {
+    const refs = this.getTileReferenceRoadInfoIds(texId);
+    if (refs.length > 0) {
+      return `Referenced by road${refs.length > 1 ? 's' : ''} ${refs.join(', ')}. Reassign those road textures first.`;
+    }
+    return this.workerBusy ? 'Wait until the current operation finishes.' : 'Delete this tile image.';
   }
 
   getAudioEntry(audioId: number): { id: number; sizeBytes: number; durationMs?: number } | null {
