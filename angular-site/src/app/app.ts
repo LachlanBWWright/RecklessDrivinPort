@@ -7171,6 +7171,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
           let pixelSize = 1;
           let packType = 0;
+          let cmpCount = 1;
           let colorTable: number[] | null = null;
 
           if (isPixMap) {
@@ -7188,8 +7189,13 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
             if (pos + 2 > bytes.length) break outer;
             pixelSize = view.getUint16(pos, false);
             pos += 2;
-            if (pos + 6 > bytes.length) break outer;
-            pos += 6; // cmpCount + cmpSize + planeBytes
+            if (pos + 2 > bytes.length) break outer;
+            cmpCount = view.getUint16(pos, false);
+            pos += 2; // cmpCount
+            if (pos + 2 > bytes.length) break outer;
+            pos += 2; // cmpSize
+            if (pos + 4 > bytes.length) break outer;
+            pos += 4; // planeBytes
             if (pos + 4 > bytes.length) break outer;
             pos += 4; // pmTable (ignored, read below for 8-bit)
             if (pos + 4 > bytes.length) break outer;
@@ -7265,13 +7271,31 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
                 imgData.data[di + 2] = ((pixel & 0x1f) * 255) / 31;
                 imgData.data[di + 3] = 255;
               } else if (pixelSize === 32) {
-                // 32-bit ARGB
-                const pixOff = col * 4;
-                if (pixOff + 4 > rowData.length) break;
-                imgData.data[di] = rowData[pixOff + 1] ?? 0;
-                imgData.data[di + 1] = rowData[pixOff + 2] ?? 0;
-                imgData.data[di + 2] = rowData[pixOff + 3] ?? 0;
-                imgData.data[di + 3] = rowData[pixOff] || 255; // alpha (or 255 if 0)
+                // 32-bit direct color — data is in PLANAR format, not interleaved.
+                // For cmpCount=3 (RGB): row = [R0..R(W-1), G0..G(W-1), B0..B(W-1)]
+                // For cmpCount=4 (ARGB): row = [A0..A(W-1), R0..R(W-1), G0..G(W-1), B0..B(W-1)]
+                const planeStride = imgW; // one byte per pixel per component plane
+                if (cmpCount >= 4) {
+                  const aOff = col;
+                  const rOff = planeStride + col;
+                  const gOff = planeStride * 2 + col;
+                  const bOff = planeStride * 3 + col;
+                  if (bOff >= rowData.length) break;
+                  imgData.data[di]     = rowData[rOff] ?? 0;
+                  imgData.data[di + 1] = rowData[gOff] ?? 0;
+                  imgData.data[di + 2] = rowData[bOff] ?? 0;
+                  imgData.data[di + 3] = rowData[aOff] || 255;
+                } else {
+                  // cmpCount === 3: RGB only, no alpha plane
+                  const rOff = col;
+                  const gOff = planeStride + col;
+                  const bOff = planeStride * 2 + col;
+                  if (bOff >= rowData.length) break;
+                  imgData.data[di]     = rowData[rOff] ?? 0;
+                  imgData.data[di + 1] = rowData[gOff] ?? 0;
+                  imgData.data[di + 2] = rowData[bOff] ?? 0;
+                  imgData.data[di + 3] = 255;
+                }
               } else if (pixelSize === 8) {
                 // 8-bit indexed or grayscale
                 const idx = rowData[col] ?? 0;
