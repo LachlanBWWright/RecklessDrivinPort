@@ -1665,10 +1665,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         if (el) el.focus({ preventScroll: true });
       });
     }
-    // Always update the container CSS to match the current canvas display size
+    // Always update the container CSS to overlay the canvas grid cell.
+    // Using absolute positioning with inset: 0 ensures the container
+    // stays synced with the grid cell even before the ResizeObserver fires.
     konvaContainer.style.cssText = `
-      position:absolute; top:0; left:0;
-      width:${cssW}px; height:${cssH}px;
+      position:absolute; inset:0;
       overflow:hidden;
       pointer-events:all;
       outline:none;
