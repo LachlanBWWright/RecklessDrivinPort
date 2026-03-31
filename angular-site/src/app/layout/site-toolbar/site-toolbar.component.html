@@ -33,6 +33,12 @@
             [disabled]="workerBusy || parsedLevels.length === 0"
             aria-label="Level selector"
           >
+            <mat-select-trigger>
+              @if (selectedLevelId !== null) {
+                <span class="level-select-trigger level-select-trigger--full">Level {{ levelDisplayNum(selectedLevelId) }}</span>
+                <span class="level-select-trigger level-select-trigger--short">{{ levelDisplayNum(selectedLevelId) }}</span>
+              }
+            </mat-select-trigger>
             @for (level of parsedLevels; track level.resourceId) {
               <mat-option [value]="level.resourceId">
                 <span class="level-option-label">Level </span>{{ levelDisplayNum(level.resourceId) }}

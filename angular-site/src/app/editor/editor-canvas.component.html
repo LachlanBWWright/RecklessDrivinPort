@@ -10,7 +10,7 @@
     </button>
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
     <!-- Object actions -->
-    <button mat-stroked-button (click)="addObject.emit()" matTooltip="Add new object">
+    <button mat-stroked-button class="canvas-add-object-button" (click)="addObject.emit()" matTooltip="Add new object">
       <mat-icon>add</mat-icon> Object
     </button>
     <button mat-icon-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">

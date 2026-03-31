@@ -32,24 +32,30 @@
   height: auto !important;
   padding: 0 16px !important;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 12px;
   position: sticky;
   top: 0;
   z-index: 200;
   box-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) #222;
+  scrollbar-gutter: stable;
 }
 
 .toolbar-spacer { flex: 1; }
 
 .toolbar-editor-strip {
-  flex: 1;
+  flex: 1 0 auto;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .toolbar-actions {
@@ -62,8 +68,9 @@
 .nav-tabs {
   display: flex;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: max-content;
+  width: max-content;
   gap: 4px;
 }
 
@@ -104,6 +111,11 @@
   flex: 0 0 auto;
 }
 
+.nav-tabs--site .nav-tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .nav-tab--back {
   flex: 0 0 auto;
   white-space: nowrap;
@@ -111,6 +123,28 @@
 
 .nav-tab--editor {
   padding: 0 14px !important;
+}
+
+.toolbar-editor-strip::-webkit-scrollbar {
+  height: 0;
+}
+
+.site-toolbar::-webkit-scrollbar {
+  height: 10px;
+}
+
+.site-toolbar::-webkit-scrollbar-track {
+  background: #222;
+  border-radius: 999px;
+}
+
+.site-toolbar::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.site-toolbar::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-light);
 }
 
 .level-select-field {
@@ -137,6 +171,10 @@
   }
 }
 
+.level-select-trigger--short {
+  display: none;
+}
+
 .toolbar-status {
   display: inline-flex;
   align-items: center;
@@ -152,16 +190,23 @@
   color: #ff9b9b;
 }
 
-.site-toolbar ::-webkit-scrollbar {
-  height: 0;
-  width: 0;
-}
-
-@media (max-width: 1299px) {
+@media (max-width: 1685px) {
   .site-toolbar {
     .nav-tab-label,
     .level-option-label {
       display: none !important;
+    }
+
+    .level-select-field {
+      width: 74px;
+    }
+
+    .level-select-trigger--full {
+      display: none;
+    }
+
+    .level-select-trigger--short {
+      display: inline;
     }
 
     .nav-tab,
