@@ -6,10 +6,12 @@
   <mat-card-content>
     <div class="tile-viewer sprite-viewer-layout">
       <aside class="tile-sidebar-column">
-        <mat-card class="tile-sidebar-card tile-road-card">
-          <mat-card-header class="tile-sidebar-card__header">
-            <mat-card-title class="tile-sidebar-card__title">Road Records</mat-card-title>
-            <mat-card-subtitle class="tile-sidebar-card__subtitle">{{ roadInfoOptions.length }} roads</mat-card-subtitle>
+        <div class="tile-sidebar-card tile-road-card">
+          <div class="tile-sidebar-card__header">
+            <div>
+              <div class="tile-sidebar-card__title">Road Records</div>
+              <div class="tile-sidebar-card__subtitle">{{ roadInfoOptions.length }} roads</div>
+            </div>
             <button
               mat-icon-button
               color="primary"
@@ -18,8 +20,8 @@
               matTooltip="Create a new road">
               <mat-icon>add</mat-icon>
             </button>
-          </mat-card-header>
-          <mat-card-content class="tile-sidebar-card__content">
+          </div>
+          <div class="tile-sidebar-card__content">
             @if (roadInfoOptions.length > 0) {
               <div class="road-list">
                 @for (option of roadInfoOptions; track option.id) {
@@ -60,15 +62,15 @@
                 </button>
               </div>
             }
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </div>
 
-        <mat-card class="tile-sidebar-card tile-image-card">
-          <mat-card-header class="tile-sidebar-card__header">
-            <mat-card-title class="tile-sidebar-card__title">Tile Images</mat-card-title>
-            <mat-card-subtitle class="tile-sidebar-card__subtitle">
-              {{ totalTileCount }} tiles
-            </mat-card-subtitle>
+        <div class="tile-sidebar-card tile-image-card">
+          <div class="tile-sidebar-card__header">
+            <div>
+              <div class="tile-sidebar-card__title">Tile Images</div>
+              <div class="tile-sidebar-card__subtitle">{{ totalTileCount }} tiles</div>
+            </div>
             <button
               mat-icon-button
               color="primary"
@@ -78,8 +80,8 @@
               (click)="addTileImage.emit()">
               <mat-icon>add</mat-icon>
             </button>
-          </mat-card-header>
-          <mat-card-content class="tile-sidebar-card__content">
+          </div>
+          <div class="tile-sidebar-card__content">
             @if (tileTileEntries.length > 0) {
               <div class="road-list tile-image-list">
                 @for (tile of tileTileEntries; track tile.texId) {
@@ -117,8 +119,8 @@
                 <p>Tile images will appear here once road textures are loaded.</p>
               </div>
             }
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </div>
       </aside>
 
       <div class="tile-detail-column">

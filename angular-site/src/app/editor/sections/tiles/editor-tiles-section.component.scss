@@ -49,7 +49,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 0;
+  padding: 0 0 4px;
 }
 
 .tile-sidebar-card__title {
@@ -172,6 +172,7 @@
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
+  margin-left: 4px;
 }
 
 .road-list-delete-button {
