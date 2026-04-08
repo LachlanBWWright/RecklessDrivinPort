@@ -1,11 +1,19 @@
 import { ok } from 'neverthrow';
 import { packHandleDecompress } from './lzrw.service';
 import { imageDataToIconHash, imageDataToIcl8, renderIconBytes, renderIcl8Bytes, renderIcs8Bytes, renderPictBytes } from './image-resource-codec';
-import { parseSndHeader, sndToWav, tryPlaySndResource, wavToSnd } from './snd-codec';
-import { ensureAudioCtx, startAudioBuffer } from './app-audio';
 import { failEditor } from './app-loaders';
 
 import type { App } from './app';
+
+export {
+  addAudioEntry,
+  exportAudioWav,
+  loadAudioEntries,
+  loadSelectedAudioBytes,
+  onAudioWavUpload,
+  playAudioEntry,
+  selectAudioEntry,
+} from './app-media-audio';
 
 function triggerBytesDownload(bytes: Uint8Array, filename: string): void {
   const blob = new Blob([new Uint8Array(bytes).buffer], { type: 'application/octet-stream' });
@@ -15,208 +23,6 @@ function triggerBytesDownload(bytes: Uint8Array, filename: string): void {
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
-}
-
-export async function loadAudioEntries(host: App): Promise<void> {
-  try {
-    type EntriesResult = { entries: { id: number; size: number }[] | null };
-    const result: EntriesResult = await host.runtime.dispatchWorker<EntriesResult>('LIST_PACK_ENTRIES', {
-      packId: 134,
-    });
-    const entries = result.entries ?? [];
-    host.audioEntries.set(entries.map((e: { id: number; size: number }) => ({ id: e.id, sizeBytes: e.size })));
-    if (entries.length > 0 && host.selectedAudioId() === null) {
-      host.selectedAudioId.set(entries[0].id);
-      await loadSelectedAudioBytes(host, entries[0].id);
-    }
-    void loadAudioDurations(host, entries.map((e) => e.id));
-  } catch {
-    /* non-fatal */
-  }
-}
-
-async function loadAudioDurations(host: App, ids: number[]): Promise<void> {
-  type RawResult = { bytes: ArrayBuffer | null };
-  type AudioEntry = { id: number; sizeBytes: number; durationMs?: number };
-  for (const id of ids) {
-    try {
-      const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', {
-        packId: 134,
-        entryId: id,
-      });
-      if (!result.bytes) continue;
-      const info = parseSndHeader(new Uint8Array(result.bytes));
-      if (!info || info.sampleRate <= 0) continue;
-      const durationMs = (info.numFrames / info.sampleRate) * 1000;
-      host.audioEntries.update((prev: AudioEntry[]) =>
-        prev.map((entry) => (entry.id === id ? { ...entry, durationMs } : entry)),
-      );
-    } catch {
-      /* ignore individual failures */
-    }
-  }
-}
-
-export async function selectAudioEntry(host: App, id: number): Promise<void> {
-  host.selectedAudioId.set(id);
-  host.media.stopAudio();
-  host._lastAudioBuffer = null;
-  host.audioCurrentTime.set(0);
-  host.audioDuration.set(0);
-  await loadSelectedAudioBytes(host, id);
-}
-
-export async function loadSelectedAudioBytes(host: App, id: number): Promise<void> {
-  try {
-    type RawResult = { bytes: ArrayBuffer | null };
-    const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', {
-      packId: 134,
-      entryId: id,
-    });
-    host.selectedAudioBytes.set(result.bytes ? new Uint8Array(result.bytes) : null);
-  } catch {
-    host.selectedAudioBytes.set(null);
-  }
-}
-
-export function exportAudioWav(host: App): void {
-  const id = host.selectedAudioId();
-  const bytes = host.selectedAudioBytes();
-  if (id === null || !bytes) return;
-  const wavBytes = sndToWav(bytes);
-  const blob = new Blob([new Uint8Array(wavBytes).buffer], { type: 'audio/wav' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `sound-${id}.wav`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-export async function playAudioEntry(host: App): Promise<void> {
-  const bytes = host.selectedAudioBytes();
-  if (!bytes) return;
-  const ctx = ensureAudioCtx(host);
-  if (ctx.state === 'suspended') {
-    try {
-      await ctx.resume();
-    } catch {
-      /* ignore */
-    }
-  }
-  if (ctx.state === 'suspended') {
-    host.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', {
-      duration: 4000,
-    });
-    return;
-  }
-  try {
-    const sndInfo = parseSndHeader(bytes);
-    if (sndInfo) {
-      const wavBytes = sndToWav(bytes);
-      try {
-        const ab = new Uint8Array(wavBytes).buffer;
-        const audioBuf = await ctx.decodeAudioData(ab);
-        host._lastAudioBuffer = audioBuf;
-        startAudioBuffer(host, audioBuf, 0);
-      } catch (err) {
-        host._lastAudioBuffer = null;
-        const played = tryPlaySndResource(bytes, ctx);
-        if (!played) {
-          host.snackBar.open(
-            `⚠ Audio error: ${err instanceof Error ? err.message : String(err ?? 'Unsupported snd format')}`,
-            'OK',
-            { duration: 4000 },
-          );
-          return;
-        }
-        host.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', {
-          duration: 4000,
-        });
-      }
-    } else {
-      const played = tryPlaySndResource(bytes, ctx);
-      if (!played) {
-        host.snackBar.open('⚠ Cannot play: compressed or unsupported snd format', 'OK', {
-          duration: 4000,
-        });
-      }
-    }
-  } catch (e) {
-    host.snackBar.open(`⚠ Audio error: ${e instanceof Error ? e.message : String(e)}`, 'OK', {
-      duration: 4000,
-    });
-  }
-}
-
-export async function onAudioWavUpload(host: App, event: Event): Promise<void> {
-  const input = event.target instanceof HTMLInputElement ? event.target : null;
-  if (!input) return;
-  const file = input.files?.[0];
-  if (!file) return;
-  input.value = '';
-  const id = host.selectedAudioId();
-  if (id === null) return;
-  try {
-    host.workerBusy.set(true);
-    const arrBuf = await file.arrayBuffer();
-    const sndBytesResult = wavToSnd(new Uint8Array(arrBuf));
-    if (!sndBytesResult.isOk()) {
-      failEditor(host, sndBytesResult.error);
-      return;
-    }
-    const sndBytes = sndBytesResult.value;
-    await host.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', {
-      packId: 134,
-      entryId: id,
-      bytes: sndBytes.buffer,
-    });
-    await loadSelectedAudioBytes(host, id);
-    host.resourcesStatus.set(`Sound #${id} replaced from WAV.`);
-  } catch (err) {
-    host.editorError.set(err instanceof Error ? err.message : 'WAV upload failed');
-  } finally {
-    host.workerBusy.set(false);
-  }
-}
-
-export async function addAudioEntry(host: App): Promise<void> {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.wav,audio/*';
-  input.onchange = async () => {
-    const file = input.files?.[0];
-    if (!file) return;
-    try {
-      host.workerBusy.set(true);
-      const arrBuf = await file.arrayBuffer();
-      const sndBytesResult = wavToSnd(new Uint8Array(arrBuf));
-      if (!sndBytesResult.isOk()) {
-        failEditor(host, sndBytesResult.error);
-        return;
-      }
-      const sndBytes = sndBytesResult.value;
-      const existing = host.audioEntries().map((e) => e.id);
-      const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 128;
-      if (nextId > 9999) {
-        failEditor(host, 'Too many sound entries (max ID 9999)');
-        return;
-      }
-      const buf = sndBytes.buffer.slice(sndBytes.byteOffset, sndBytes.byteOffset + sndBytes.byteLength);
-      await host.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 134, entryId: nextId, bytes: buf }, [buf]);
-      await loadAudioEntries(host);
-      await selectAudioEntry(host, nextId);
-      host.resourcesStatus.set(`New sound #${nextId} created.`);
-      host.snackBar.open(`✓ Sound #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to add sound';
-      host.editorError.set(msg);
-      host.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
-    } finally {
-      host.workerBusy.set(false);
-    }
-  };
-  input.click();
 }
 
 export async function loadIconEntries(host: App): Promise<void> {
