@@ -21,6 +21,7 @@ import {
   setupEmscriptenModule as setupEmscriptenModuleHelper,
   syncGameLoopWithActiveTab as syncGameLoopWithActiveTabHelper,
 } from './app-platform';
+import { bindAppAction } from './bind-app-action';
 
 export function createRuntimeActions(app: App): {
   scheduleCanvasRedraw(): void;
@@ -60,7 +61,7 @@ export function createRuntimeActions(app: App): {
     setSection: (section) => {
       app.editorSection.set(section);
     },
-    toggleFullscreen: () => toggleFullscreenHelper(),
+    toggleFullscreen: toggleFullscreenHelper,
     onVolumeChange: (event) => {
       const target = event.target;
       const value = target instanceof HTMLInputElement ? Number.parseInt(target.value, 10) : NaN;
@@ -76,22 +77,23 @@ export function createRuntimeActions(app: App): {
     applyVolume: () => {
       applyVolumeToWasmHelper(app, app.masterVolume());
     },
-    loadDefaultResources: () => loadDefaultResourcesHelper(app),
-    onResourceFileSelected: (event) => onResourceFileSelectedHelper(app, event),
-    clearEditorResources: () => clearEditorResourcesHelper(app),
-    downloadEditedResources: () => downloadEditedResourcesHelper(app),
-    saveEditedResourcesToGame: () => saveEditedResourcesToGameHelper(app),
-    initPackWorker: () => initPackWorkerHelper(app),
-    dispatchWorker: (cmd, payload, transferables) => dispatchWorkerHelper(app, cmd, payload, transferables),
-    setupEmscriptenModule: () => setupEmscriptenModuleHelper(app),
-    loadWasmScript: () => loadWasmScriptHelper(app),
-    assetUrl: (path) => assetUrlHelper(app, path),
-    readAssetBytes: (path) => readAssetBytesHelper(app, path),
-    applyVolumeToWasm: (pct) => applyVolumeToWasmHelper(app, pct),
-    syncGameLoopWithActiveTab: () => syncGameLoopWithActiveTabHelper(app),
-    onCustomResourcesFileSelected: (event) => onCustomResourcesFileSelectedHelper(app, event),
-    restartGameWithCustomResources: () => restartGameWithCustomResourcesHelper(app),
-    clearCustomResources: () => clearCustomResourcesHelper(app),
-    mountCustomResourcesFs: (bytes) => mountCustomResourcesFsHelper(app, bytes),
+    loadDefaultResources: bindAppAction(app, loadDefaultResourcesHelper),
+    onResourceFileSelected: bindAppAction(app, onResourceFileSelectedHelper),
+    clearEditorResources: bindAppAction(app, clearEditorResourcesHelper),
+    downloadEditedResources: bindAppAction(app, downloadEditedResourcesHelper),
+    saveEditedResourcesToGame: bindAppAction(app, saveEditedResourcesToGameHelper),
+    initPackWorker: bindAppAction(app, initPackWorkerHelper),
+    dispatchWorker: <T>(cmd: string, payload?: unknown, transferables?: Transferable[]) =>
+      dispatchWorkerHelper<T>(app, cmd, payload, transferables),
+    setupEmscriptenModule: bindAppAction(app, setupEmscriptenModuleHelper),
+    loadWasmScript: bindAppAction(app, loadWasmScriptHelper),
+    assetUrl: bindAppAction(app, assetUrlHelper),
+    readAssetBytes: bindAppAction(app, readAssetBytesHelper),
+    applyVolumeToWasm: bindAppAction(app, applyVolumeToWasmHelper),
+    syncGameLoopWithActiveTab: bindAppAction(app, syncGameLoopWithActiveTabHelper),
+    onCustomResourcesFileSelected: bindAppAction(app, onCustomResourcesFileSelectedHelper),
+    restartGameWithCustomResources: bindAppAction(app, restartGameWithCustomResourcesHelper),
+    clearCustomResources: bindAppAction(app, clearCustomResourcesHelper),
+    mountCustomResourcesFs: bindAppAction(app, mountCustomResourcesFsHelper),
   };
 }

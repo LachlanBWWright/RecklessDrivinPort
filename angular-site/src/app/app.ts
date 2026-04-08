@@ -87,11 +87,8 @@ import {
 } from './object-canvas';
 import { OBJ_PALETTE } from './object-canvas';
 import {
-  beginFinishLineDrag,
-  beginStartMarkerDrag,
   destroyApp,
   formatTime,
-  handleTrackContextMenuAtWorld,
   initializeKonvaOverlay,
   getEditorSectionIndex as getEditorSectionIndexHelper,
   onAfterViewInit as onAfterViewInitHelper,
@@ -100,6 +97,7 @@ import {
   setEditorSectionIndex as setEditorSectionIndexHelper,
   SECTION_ORDER as APP_SECTION_ORDER,
 } from './app-runtime';
+import { beginFinishLineDrag, beginStartMarkerDrag, handleTrackContextMenuAtWorld } from './app-runtime-track';
 import {
   getPackSpriteDataUrl,
   getRoadInfoPreviewDataUrl,
