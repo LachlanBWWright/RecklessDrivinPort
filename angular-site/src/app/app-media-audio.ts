@@ -25,9 +25,12 @@ export async function loadAudioEntries(host: App) {
     }),
     'Failed to load sound entries',
   );
-  if (entriesResult.isErr()) return;
+  const entries = entriesResult.match(
+    (result) => result.entries ?? [],
+    () => null,
+  );
+  if (!entries) return;
 
-  const entries = entriesResult.value.entries ?? [];
   host.audioEntries.set(entries.map((entry) => ({ id: entry.id, sizeBytes: entry.size })));
   if (entries.length > 0 && host.selectedAudioId() === null) {
     host.selectedAudioId.set(entries[0].id);
@@ -38,13 +41,19 @@ export async function loadAudioEntries(host: App) {
 
 async function loadAudioDurations(host: App, ids: number[]) {
   for (const id of ids) {
-    const bytesResult = await getAudioBytes(host, id);
-    if (bytesResult.isErr() || !bytesResult.value.bytes) continue;
+    const durationMs = (await getAudioBytes(host, id)).match(
+      ({ bytes }) => {
+        if (!bytes) return null;
+        return parseSndHeaderSafe(new Uint8Array(bytes)).match(
+          (sndInfo) =>
+            !sndInfo || sndInfo.sampleRate <= 0 ? null : (sndInfo.numFrames / sndInfo.sampleRate) * 1000,
+          () => null,
+        );
+      },
+      () => null,
+    );
+    if (durationMs === null) continue;
 
-    const sndInfoResult = parseSndHeaderSafe(new Uint8Array(bytesResult.value.bytes));
-    if (sndInfoResult.isErr() || !sndInfoResult.value || sndInfoResult.value.sampleRate <= 0) continue;
-
-    const durationMs = (sndInfoResult.value.numFrames / sndInfoResult.value.sampleRate) * 1000;
     host.audioEntries.update((prev) =>
       prev.map((entry) => (entry.id === id ? { ...entry, durationMs } : entry)),
     );
@@ -61,9 +70,11 @@ export async function selectAudioEntry(host: App, id: number) {
 }
 
 export async function loadSelectedAudioBytes(host: App, id: number) {
-  const bytesResult = await getAudioBytes(host, id);
   host.selectedAudioBytes.set(
-    bytesResult.isOk() && bytesResult.value.bytes ? new Uint8Array(bytesResult.value.bytes) : null,
+    (await getAudioBytes(host, id)).match(
+      ({ bytes }) => (bytes ? new Uint8Array(bytes) : null),
+      () => null,
+    ),
   );
 }
 
@@ -72,10 +83,13 @@ export function exportAudioWav(host: App) {
   const bytes = host.selectedAudioBytes();
   if (id === null || !bytes) return;
 
-  const wavBytesResult = sndToWavSafe(bytes);
-  if (wavBytesResult.isErr()) return;
+  const wavBytes = sndToWavSafe(bytes).match(
+    (value) => value,
+    () => null,
+  );
+  if (!wavBytes) return;
 
-  const blob = new Blob([new Uint8Array(wavBytesResult.value).buffer], { type: 'audio/wav' });
+  const blob = new Blob([new Uint8Array(wavBytes).buffer], { type: 'audio/wav' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -90,7 +104,11 @@ export async function playAudioEntry(host: App) {
 
   const ctx = ensureAudioCtx(host);
   if (ctx.state === 'suspended') {
-    await resultFromPromise(ctx.resume(), 'Failed to resume audio context');
+    const resumeResult = await resultFromPromise(ctx.resume(), 'Failed to resume audio context');
+    resumeResult.match(
+      () => undefined,
+      () => undefined,
+    );
   }
   if (ctx.state === 'suspended') {
     host.snackBar.open('⚠ Click/interact with the page first to allow audio playback.', 'OK', {
@@ -99,51 +117,70 @@ export async function playAudioEntry(host: App) {
     return;
   }
 
-  const sndInfoResult = parseSndHeaderSafe(bytes);
-  if (sndInfoResult.isErr()) {
-    host.snackBar.open(`⚠ Audio error: ${sndInfoResult.error}`, 'OK', { duration: 4000 });
-    return;
-  }
+  const sndInfo = parseSndHeaderSafe(bytes).match(
+    (value) => value,
+    (error) => {
+      host.snackBar.open(`⚠ Audio error: ${error}`, 'OK', { duration: 4000 });
+      return null;
+    },
+  );
+  if (sndInfo === null) return;
 
   const tryLegacyPlayback = (errorMessage?: string) => {
     host._lastAudioBuffer = null;
-    const legacyPlaybackResult = tryPlaySndResourceSafe(bytes, ctx);
-    if (legacyPlaybackResult.isErr() || !legacyPlaybackResult.value) {
-      const fallbackMessage = legacyPlaybackResult.isErr()
-        ? legacyPlaybackResult.error
-        : errorMessage ?? 'Unsupported snd format';
-      host.snackBar.open(`⚠ Audio error: ${errorMessage ?? fallbackMessage}`, 'OK', {
-        duration: 4000,
-      });
-      return;
-    }
-    host.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', {
-      duration: 4000,
-    });
+    tryPlaySndResourceSafe(bytes, ctx).match(
+      (played) => {
+        if (!played) {
+          host.snackBar.open(`⚠ Audio error: ${errorMessage ?? 'Unsupported snd format'}`, 'OK', {
+            duration: 4000,
+          });
+          return;
+        }
+        host.snackBar.open('Playing using legacy one-shot player — pause/seek unavailable.', 'OK', {
+          duration: 4000,
+        });
+      },
+      (error) => {
+        host.snackBar.open(`⚠ Audio error: ${errorMessage ?? error}`, 'OK', {
+          duration: 4000,
+        });
+      },
+    );
   };
 
-  if (!sndInfoResult.value) {
+  if (!sndInfo) {
     tryLegacyPlayback('Cannot play: compressed or unsupported snd format');
     return;
   }
 
-  const wavBytesResult = sndToWavSafe(bytes);
-  if (wavBytesResult.isErr()) {
-    tryLegacyPlayback(wavBytesResult.error);
+  const wavBytes = sndToWavSafe(bytes).match(
+    (value) => value,
+    (error) => {
+      tryLegacyPlayback(error);
+      return null;
+    },
+  );
+  if (!wavBytes) {
     return;
   }
 
   const audioBufferResult = await resultFromPromise(
-    ctx.decodeAudioData(new Uint8Array(wavBytesResult.value).buffer),
+    ctx.decodeAudioData(new Uint8Array(wavBytes).buffer),
     'Unsupported snd format',
   );
-  if (audioBufferResult.isErr()) {
-    tryLegacyPlayback(audioBufferResult.error);
+  const audioBuffer = audioBufferResult.match(
+    (value) => value,
+    (error) => {
+      tryLegacyPlayback(error);
+      return null;
+    },
+  );
+  if (!audioBuffer) {
     return;
   }
 
-  host._lastAudioBuffer = audioBufferResult.value;
-  startAudioBuffer(host, audioBufferResult.value, 0);
+  host._lastAudioBuffer = audioBuffer;
+  startAudioBuffer(host, audioBuffer, 0);
 }
 
 export async function onAudioWavUpload(host: App, event: Event) {
@@ -160,15 +197,26 @@ export async function onAudioWavUpload(host: App, event: Event) {
   host.workerBusy.set(true);
 
   const arrayBufferResult = await resultFromPromise(file.arrayBuffer(), 'Failed to read WAV file');
-  if (arrayBufferResult.isErr()) {
-    host.editorError.set(arrayBufferResult.error);
+  const arrayBuffer = arrayBufferResult.match(
+    (value) => value,
+    (error) => {
+      host.editorError.set(error);
+      return null;
+    },
+  );
+  if (!arrayBuffer) {
     host.workerBusy.set(false);
     return;
   }
 
-  const sndBytesResult = wavToSnd(new Uint8Array(arrayBufferResult.value));
-  if (sndBytesResult.isErr()) {
-    failEditor(host, sndBytesResult.error);
+  const sndBytes = wavToSnd(new Uint8Array(arrayBuffer)).match(
+    (value) => value,
+    (error) => {
+      failEditor(host, error);
+      return null;
+    },
+  );
+  if (!sndBytes) {
     host.workerBusy.set(false);
     return;
   }
@@ -177,12 +225,18 @@ export async function onAudioWavUpload(host: App, event: Event) {
     host.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', {
       packId: 134,
       entryId: id,
-      bytes: sndBytesResult.value.buffer,
+      bytes: sndBytes.buffer,
     }),
     'WAV upload failed',
   );
-  if (saveResult.isErr()) {
-    host.editorError.set(saveResult.error);
+  const saveSucceeded = saveResult.match(
+    () => true,
+    (error) => {
+      host.editorError.set(error);
+      return false;
+    },
+  );
+  if (!saveSucceeded) {
     host.workerBusy.set(false);
     return;
   }
@@ -203,19 +257,30 @@ export async function addAudioEntry(host: App) {
     host.workerBusy.set(true);
 
     const arrayBufferResult = await resultFromPromise(file.arrayBuffer(), 'Failed to read sound file');
-    if (arrayBufferResult.isErr()) {
-      host.editorError.set(arrayBufferResult.error);
-      host.snackBar.open(`✗ ${arrayBufferResult.error}`, 'Dismiss', {
-        duration: 5000,
-        panelClass: 'snack-error',
-      });
+    const arrayBuffer = arrayBufferResult.match(
+      (value) => value,
+      (error) => {
+        host.editorError.set(error);
+        host.snackBar.open(`✗ ${error}`, 'Dismiss', {
+          duration: 5000,
+          panelClass: 'snack-error',
+        });
+        return null;
+      },
+    );
+    if (!arrayBuffer) {
       host.workerBusy.set(false);
       return;
     }
 
-    const sndBytesResult = wavToSnd(new Uint8Array(arrayBufferResult.value));
-    if (sndBytesResult.isErr()) {
-      failEditor(host, sndBytesResult.error);
+    const sndBytes = wavToSnd(new Uint8Array(arrayBuffer)).match(
+      (value) => value,
+      (error) => {
+        failEditor(host, error);
+        return null;
+      },
+    );
+    if (!sndBytes) {
       host.workerBusy.set(false);
       return;
     }
@@ -228,15 +293,18 @@ export async function addAudioEntry(host: App) {
       return;
     }
 
-    const bytes = sndBytesResult.value;
-    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    const saveResult = await resultFromPromise(
+    const buffer = sndBytes.buffer.slice(sndBytes.byteOffset, sndBytes.byteOffset + sndBytes.byteLength);
+    const addSoundResult = await resultFromPromise(
       host.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 134, entryId: nextId, bytes: buffer }, [buffer]),
       'Failed to add sound',
     );
-    if (saveResult.isErr()) {
-      host.editorError.set(saveResult.error);
-      host.snackBar.open(`✗ ${saveResult.error}`, 'Dismiss', {
+    const saveError = addSoundResult.match(
+      () => null,
+      (error) => error,
+    );
+    if (saveError) {
+      host.editorError.set(saveError);
+      host.snackBar.open(`✗ ${saveError}`, 'Dismiss', {
         duration: 5000,
         panelClass: 'snack-error',
       });

@@ -1,7 +1,7 @@
 // @ts-check
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
-import neverthrow from 'eslint-plugin-neverthrow';
+import neverthrow from './eslint-neverthrow-patched.mjs';
 
 export default [
   {
@@ -40,10 +40,7 @@ export default [
       '@typescript-eslint/only-throw-error': 'error',
 
       // ── neverthrow ────────────────────────────────────────────────────────
-      // NOTE: eslint-plugin-neverthrow@1.1.4 is not yet compatible with ESLint v10
-      // (uses the deprecated context.parserServices API). The plugin is installed
-      // and the rule will be enforced once the plugin is updated.
-      // 'neverthrow/must-use-result': 'error',
+      'neverthrow/must-use-result': 'error',
     },
   },
 ];

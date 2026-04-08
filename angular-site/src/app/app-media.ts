@@ -62,8 +62,12 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
       if (result.bytes) {
         const bytes = new Uint8Array(result.bytes);
         const pictResult = type === 'PPic' ? packHandleDecompress(bytes) : ok(bytes);
-        if (!pictResult.isOk()) return;
-        const canvas = renderPictBytes(pictResult.value);
+        const pictBytes = pictResult.match(
+          (value) => value,
+          () => null,
+        );
+        if (!pictBytes) return;
+        const canvas = renderPictBytes(pictBytes);
         if (canvas) {
           host.iconPreviewCanvas.set(canvas);
           const cacheKey = `${type}:${id}`;
@@ -296,8 +300,12 @@ export async function loadAllIconThumbnails(host: App): Promise<void> {
       let canvas: HTMLCanvasElement | null = null;
       if (entry.type === 'PICT' || entry.type === 'PPic') {
         const pictResult = entry.type === 'PPic' ? packHandleDecompress(bytes) : ok(bytes);
-        if (!pictResult.isOk()) continue;
-        canvas = renderPictBytes(pictResult.value);
+        const pictBytes = pictResult.match(
+          (value) => value,
+          () => null,
+        );
+        if (!pictBytes) continue;
+        canvas = renderPictBytes(pictBytes);
       } else if (entry.type === 'ICN#' || entry.type === 'ics#') {
         canvas = renderIconBytes(bytes);
       } else if (entry.type === 'icl8') {

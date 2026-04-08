@@ -888,12 +888,14 @@ export class LevelEditorService {
         const e2 = packEntries.find((e) => e.id === 2);
         if (!e1) continue;
 
-        const parseResult = parseLevelEntry(e1.data);
-        if (parseResult.isErr()) {
-          console.warn(`[LevelEditor] parse error for Pack #${entry.id}:`, parseResult.error);
-          continue;
-        }
-        const partial = parseResult.value;
+        const partial = parseLevelEntry(e1.data).match(
+          (value) => value,
+          (error) => {
+            console.warn(`[LevelEditor] parse error for Pack #${entry.id}:`, error);
+            return null;
+          },
+        );
+        if (!partial) continue;
         const marks   = e2 ? parseMarkSegs(e2.data) : [];
 
         levels.push({

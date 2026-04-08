@@ -68,12 +68,15 @@ export class ResourceDatService {
         return err(`Invalid resources.dat: truncated payload for ${record.type}#${record.id}`);
       }
 
-      const typeBytes = hexToBytes(record.type);
-      if ('error' in typeBytes) {
-        return err(`Invalid resources.dat header at offset ${offset}: ${typeBytes.error}`);
+      const typeBytes = hexToBytes(record.type).match(
+        (value) => value,
+        () => null,
+      );
+      if (!typeBytes) {
+        return err(`Invalid resources.dat header at offset ${offset}: invalid type ${record.type}`);
       }
       entries.push({
-        type: decodeResourceType(typeBytes.value),
+        type: decodeResourceType(typeBytes),
         id: record.id,
         data: raw.slice(dataStart, dataEnd),
       });

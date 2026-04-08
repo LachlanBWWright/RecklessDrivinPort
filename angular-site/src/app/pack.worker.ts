@@ -125,12 +125,15 @@ self.addEventListener('message', (event: MessageEvent) => {
     switch (cmd) {
       case 'LOAD': {
         const bytes = new Uint8Array(payload as ArrayBuffer);
-        const parsed = resourceDatSvc.parse(bytes);
-        if (!parsed.isOk()) {
-          self.postMessage({ id, ok: false, cmd, error: parsed.error });
-          break;
-        }
-        resources = parsed.value;
+        const parsedResources = resourceDatSvc.parse(bytes).match(
+          (value) => value,
+          (error) => {
+            self.postMessage({ id, ok: false, cmd, error });
+            return null;
+          },
+        );
+        if (!parsedResources) break;
+        resources = parsedResources;
         const { levels, sprites, objectTypesArr, roadInfoArr, objectGroups } = extractAll();
         // Reply immediately without sprite pre-decoding (sprites decode separately).
         self.postMessage({
@@ -313,13 +316,16 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'SERIALIZE': {
-        const serialized = resourceDatSvc.serialize(resources);
-        if (!serialized.isOk()) {
-          self.postMessage({ id, ok: false, cmd, error: serialized.error });
-          break;
-        }
-        const transferBuf = new ArrayBuffer(serialized.value.byteLength);
-        new Uint8Array(transferBuf).set(serialized.value);
+        const serializedBytes = resourceDatSvc.serialize(resources).match(
+          (value) => value,
+          (error) => {
+            self.postMessage({ id, ok: false, cmd, error });
+            return null;
+          },
+        );
+        if (!serializedBytes) break;
+        const transferBuf = new ArrayBuffer(serializedBytes.byteLength);
+        new Uint8Array(transferBuf).set(serializedBytes);
         self.postMessage({ id, ok: true, cmd, result: transferBuf }, [transferBuf]);
         break;
       }

@@ -34,14 +34,16 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
     [buffer],
     'Failed to parse resources',
   );
-  if (loadResult.isErr()) {
-    app.editorError.set(loadResult.error);
-    app.resourcesStatus.set('Failed to parse resources.');
-    app.workerBusy.set(false);
-    return;
-  }
-
-  const result = loadResult.value;
+  const result = loadResult.match(
+    (loaded) => loaded,
+    (error) => {
+      app.editorError.set(error);
+      app.resourcesStatus.set('Failed to parse resources.');
+      app.workerBusy.set(false);
+      return null;
+    },
+  );
+  if (!result) return;
   app.objectTypeDefinitionMap.clear();
   const objectTypes = result.objectTypesArr
     .map(([, def]) => def)
@@ -119,16 +121,20 @@ export async function decodeSpritePreviewsInBackground(
   type DecodeResult = {
     decodedSprites: { typeRes: number; pixels: ArrayBuffer; width: number; height: number }[];
   };
-  const result = await dispatchWorkerResult<DecodeResult>(
+  const decodeResult = await dispatchWorkerResult<DecodeResult>(
     app,
     'DECODE_SPRITE_PREVIEWS',
     { objectTypesArr },
     undefined,
     'Failed to decode sprite previews',
   );
-  if (result.isErr()) return;
+  const decodedSprites = decodeResult.match(
+    (decoded) => decoded.decodedSprites,
+    () => null,
+  );
+  if (!decodedSprites) return;
 
-  for (const { typeRes, pixels, width, height } of result.value.decodedSprites) {
+  for (const { typeRes, pixels, width, height } of decodedSprites) {
     const clamped = new Uint8ClampedArray(pixels);
     const canvas = renderSpritePixels(document, clamped, width, height);
     if (canvas) {
@@ -153,9 +159,13 @@ export async function decodeRoadTexturesInBackground(app: App) {
     ]),
     'Failed to decode road textures',
   );
-  if (texturesResult.isErr()) return;
+  const textureResults = texturesResult.match(
+    (textures) => textures,
+    () => null,
+  );
+  if (!textureResults) return;
 
-  const [result, allTilesResult] = texturesResult.value;
+  const [result, allTilesResult] = textureResults;
   app._roadTextureDataUrls.clear();
   const buildCanvas = (width: number, height: number, pixels: ArrayBuffer): HTMLCanvasElement | null => {
     const clamped = new Uint8ClampedArray(pixels);
@@ -201,20 +211,24 @@ export async function decodePackSpritesInBackground(app: App) {
       pixels: ArrayBuffer;
     }[];
   };
-  const result = await dispatchWorkerResult<AllSpritesResult>(
+  const decodeFramesResult = await dispatchWorkerResult<AllSpritesResult>(
     app,
     'DECODE_ALL_SPRITE_FRAMES',
     undefined,
     undefined,
     'Failed to decode sprite frames',
   );
-  if (result.isErr()) return;
+  const frames = decodeFramesResult.match(
+    (decoded) => decoded.frames,
+    () => null,
+  );
+  if (!frames) return;
 
   app.packSpriteCanvases.clear();
   app._packSpriteDataUrls.clear();
   app.packSpriteDecodedFrames.clear();
   const frameInfos: { id: number; bitDepth: 8 | 16; width: number; height: number }[] = [];
-  for (const { id, bitDepth, width, height, pixels } of result.value.frames) {
+  for (const { id, bitDepth, width, height, pixels } of frames) {
     const clamped = new Uint8ClampedArray(pixels);
     const canvas = renderSpritePixels(document, clamped, width, height);
     if (canvas) app.packSpriteCanvases.set(id, canvas);
@@ -254,10 +268,13 @@ export function getRoadInfoPreviewDataUrl(app: App, roadInfoId: number): string 
     DEFAULT_ROAD_THEME,
   );
   if (!canvas) return null;
-  const urlResult = encodeCanvasDataUrl(canvas);
-  if (urlResult.isErr()) return null;
-  app._roadInfoPreviewDataUrls.set(roadInfoId, urlResult.value);
-  return urlResult.value;
+  return encodeCanvasDataUrl(canvas).match(
+    (url) => {
+      app._roadInfoPreviewDataUrls.set(roadInfoId, url);
+      return url;
+    },
+    () => null,
+  );
 }
 
 export function lookupTileDimensions(app: App, texId: number): string {
