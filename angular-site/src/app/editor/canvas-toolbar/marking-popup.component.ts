@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
 import type { MarkingRoadSelection } from '../../road-marking-utils';
 
 export interface MarkingGenerateEvent {
@@ -6,21 +6,25 @@ export interface MarkingGenerateEvent {
   yStart: number;
   yEnd: number;
   inset: number;
+  yFrequency: number;
 }
 
 export interface MarkingCentreGenerateEvent {
   roadSelection: MarkingRoadSelection;
   yStart: number;
   yEnd: number;
-  dashFrequency: number;
+  dashLength: number;
+  gapLength: number;
 }
 
 /** Road-marking generation popup — encapsulates the side/dash form state. */
 @Component({
   selector: 'app-marking-popup',
   templateUrl: './marking-popup.component.html',
+  styleUrl: './marking-popup.component.scss',
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  encapsulation: ViewEncapsulation.None,
 })
 export class MarkingPopupComponent {
   @Input() roadMaxY = 0;
@@ -42,6 +46,7 @@ export class MarkingPopupComponent {
   sideYStart = 0;
   sideYEnd = 400;
   sideInset = 10;
+  sideYFrequency = 32;
 
   // Centre marks – road checkboxes
   centreCombined = true;
@@ -49,7 +54,8 @@ export class MarkingPopupComponent {
   centreRight = true;
   centreYStart = 0;
   centreYEnd = 400;
-  dashFrequency = 32;
+  centreDashLength = 16;
+  centreGapLength = 16;
 
   private _previewDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -80,9 +86,21 @@ export class MarkingPopupComponent {
 
   onPreview(): void {
     if (this.markingTab === 'side') {
-      this.previewSideMarks.emit({ roadSelection: this.sideRoadSelection, yStart: this.sideYStart, yEnd: this.sideYEnd, inset: this.sideInset });
+      this.previewSideMarks.emit({
+        roadSelection: this.sideRoadSelection,
+        yStart: this.sideYStart,
+        yEnd: this.sideYEnd,
+        inset: this.sideInset,
+        yFrequency: this.sideYFrequency,
+      });
     } else {
-      this.previewCentreMarks.emit({ roadSelection: this.centreRoadSelection, yStart: this.centreYStart, yEnd: this.centreYEnd, dashFrequency: this.dashFrequency });
+      this.previewCentreMarks.emit({
+        roadSelection: this.centreRoadSelection,
+        yStart: this.centreYStart,
+        yEnd: this.centreYEnd,
+        dashLength: this.centreDashLength,
+        gapLength: this.centreGapLength,
+      });
     }
   }
 
@@ -94,9 +112,21 @@ export class MarkingPopupComponent {
 
   onGenerate(): void {
     if (this.markingTab === 'side') {
-      this.generateSideMarks.emit({ roadSelection: this.sideRoadSelection, yStart: this.sideYStart, yEnd: this.sideYEnd, inset: this.sideInset });
+      this.generateSideMarks.emit({
+        roadSelection: this.sideRoadSelection,
+        yStart: this.sideYStart,
+        yEnd: this.sideYEnd,
+        inset: this.sideInset,
+        yFrequency: this.sideYFrequency,
+      });
     } else {
-      this.generateCentreMarks.emit({ roadSelection: this.centreRoadSelection, yStart: this.centreYStart, yEnd: this.centreYEnd, dashFrequency: this.dashFrequency });
+      this.generateCentreMarks.emit({
+        roadSelection: this.centreRoadSelection,
+        yStart: this.centreYStart,
+        yEnd: this.centreYEnd,
+        dashLength: this.centreDashLength,
+        gapLength: this.centreGapLength,
+      });
     }
     this.clearPreview.emit();
   }

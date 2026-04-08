@@ -40,6 +40,10 @@
         <mat-label>Inset</mat-label>
         <input matInput type="number" [(ngModel)]="sideInset" (ngModelChange)="schedulePreview()" />
       </mat-form-field>
+      <mat-form-field appearance="outline" class="popup-field">
+        <mat-label>Y frequency</mat-label>
+        <input matInput type="number" min="1" [(ngModel)]="sideYFrequency" (ngModelChange)="schedulePreview()" />
+      </mat-form-field>
     </div>
   } @else {
     <div class="popup-road-checkboxes">
@@ -63,8 +67,12 @@
         <input matInput type="number" [(ngModel)]="centreYEnd" (ngModelChange)="schedulePreview()" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="popup-field">
-        <mat-label>Dash frequency</mat-label>
-        <input matInput type="number" [(ngModel)]="dashFrequency" (ngModelChange)="schedulePreview()" />
+        <mat-label>Dash length</mat-label>
+        <input matInput type="number" min="1" [(ngModel)]="centreDashLength" (ngModelChange)="schedulePreview()" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="popup-field">
+        <mat-label>Gap length</mat-label>
+        <input matInput type="number" min="1" [(ngModel)]="centreGapLength" (ngModelChange)="schedulePreview()" />
       </mat-form-field>
     </div>
   }

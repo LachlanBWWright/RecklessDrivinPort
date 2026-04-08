@@ -86,10 +86,10 @@ export class EditorCanvasComponent {
   @Output() markCanvasMouseUp = new EventEmitter<MouseEvent>();
   @Output() panXChange = new EventEmitter<number>();
   @Output() panYChange = new EventEmitter<number>();
-  @Output() generateSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number }>();
-  @Output() generateCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashFrequency: number }>();
-  @Output() previewSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number }>();
-  @Output() previewCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashFrequency: number }>();
+  @Output() generateSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number; yFrequency: number }>();
+  @Output() generateCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashLength: number; gapLength: number }>();
+  @Output() previewSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number; yFrequency: number }>();
+  @Output() previewCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashLength: number; gapLength: number }>();
   @Output() clearMarkingPreview = new EventEmitter<void>();
 
   showMarkingPopup = false;

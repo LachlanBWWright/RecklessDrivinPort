@@ -5181,10 +5181,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     yStart: number,
     yEnd: number,
     inset: number,
+    yFrequency: number,
   ): void {
     const level = this.selectedLevel();
     if (!level) return;
-    const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset });
+    const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset, yFrequency });
     this._appendGeneratedMarks(generated, 'side road');
   }
 
@@ -5192,7 +5193,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     roadSelection: MarkingRoadSelection,
     yStart: number,
     yEnd: number,
-    dashFrequency: number,
+    dashLength: number,
+    gapLength: number,
   ): void {
     const level = this.selectedLevel();
     if (!level) return;
@@ -5200,7 +5202,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       roadSelection,
       yStart,
       yEnd,
-      dashFrequency,
+      dashLength,
+      gapLength,
     });
     this._appendGeneratedMarks(generated, 'centre dashed');
   }
@@ -5210,10 +5213,11 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     yStart: number,
     yEnd: number,
     inset: number,
+    yFrequency: number,
   ): void {
     const level = this.selectedLevel();
     if (!level) return;
-    const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset });
+    const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset, yFrequency });
     this.markingPreview.set(generated);
   }
 
@@ -5221,7 +5225,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     roadSelection: MarkingRoadSelection,
     yStart: number,
     yEnd: number,
-    dashFrequency: number,
+    dashLength: number,
+    gapLength: number,
   ): void {
     const level = this.selectedLevel();
     if (!level) return;
@@ -5229,7 +5234,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       roadSelection,
       yStart,
       yEnd,
-      dashFrequency,
+      dashLength,
+      gapLength,
     });
     this.markingPreview.set(generated);
   }
