@@ -1,10 +1,12 @@
 import type { DecodedSpriteFrame } from './level-editor.service';
 import { App } from './app';
+import { AppStateResources } from './app-state-resources';
+import { decodeRoadTexturesInBackground, failEditor } from './app-loaders';
 
 export async function loadResourceList(app: App): Promise<void> {
   try {
     const result: { entries: { type: string; id: number; size: number }[] } =
-      await app.dispatchWorker('LIST_RESOURCES');
+      await app.runtime.dispatchWorker('LIST_RESOURCES');
     app.allResourceEntries.set(result.entries);
   } catch (error) {
     console.warn('[App] loadResourceList failed:', error);
@@ -21,27 +23,27 @@ export async function selectResource(app: App, type: string, id: number): Promis
   app.selectedPackEntryId.set(null);
   app.selectedPackEntryBytes.set(null);
   app.resBrowserStatus.set('');
-  app.stopAudio();
+  app.media.stopAudio();
   app._lastAudioBuffer = null;
   app.audioCurrentTime.set(0);
   app.audioDuration.set(0);
   try {
     app.resBrowserBusy.set(true);
     if (type === 'Pack') {
-      const r: { entries: { id: number; size: number }[] | null } = await app.dispatchWorker(
+      const r: { entries: { id: number; size: number }[] | null } = await app.runtime.dispatchWorker(
         'LIST_PACK_ENTRIES',
         { packId: id },
       );
       app.selectedPackEntries.set(r.entries);
     } else if (type === 'STR#') {
       const [strR, rawR] = await Promise.all([
-        app.dispatchWorker<{ strings: string[] | null }>('GET_STR_LIST', { id }),
-        app.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id }),
+        app.runtime.dispatchWorker<{ strings: string[] | null }>('GET_STR_LIST', { id }),
+        app.runtime.dispatchWorker<{ bytes: ArrayBuffer | null }>('GET_RESOURCE_RAW', { type, id }),
       ]);
       app.selectedResStrings.set(strR.strings);
       if (rawR.bytes) app.selectedResBytes.set(new Uint8Array(rawR.bytes));
     } else if (type === 'TEXT' || type === 'STR ') {
-      const r: { bytes: ArrayBuffer | null } = await app.dispatchWorker<{ bytes: ArrayBuffer | null }>(
+      const r: { bytes: ArrayBuffer | null } = await app.runtime.dispatchWorker<{ bytes: ArrayBuffer | null }>(
         'GET_RESOURCE_RAW',
         {
         type,
@@ -61,7 +63,7 @@ export async function selectResource(app: App, type: string, id: number): Promis
         }
       }
     } else {
-      const r: { bytes: ArrayBuffer | null } = await app.dispatchWorker<{ bytes: ArrayBuffer | null }>(
+      const r: { bytes: ArrayBuffer | null } = await app.runtime.dispatchWorker<{ bytes: ArrayBuffer | null }>(
         'GET_RESOURCE_RAW',
         {
         type,
@@ -82,7 +84,7 @@ export async function selectPackEntry(app: App, packId: number, entryId: number)
   app.selectedPackEntryBytes.set(null);
   try {
     app.resBrowserBusy.set(true);
-    const r: { bytes: ArrayBuffer | null } = await app.dispatchWorker<{ bytes: ArrayBuffer | null }>(
+    const r: { bytes: ArrayBuffer | null } = await app.runtime.dispatchWorker<{ bytes: ArrayBuffer | null }>(
       'GET_PACK_ENTRY_RAW',
       {
       packId,
@@ -127,9 +129,9 @@ export function triggerUploadResource(app: App): void {
       app.resBrowserBusy.set(true);
       const bytes = new Uint8Array(await file.arrayBuffer());
       const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      await app.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
+      await app.runtime.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
       await loadResourceList(app);
-      const r: { bytes: ArrayBuffer | null } = await app.dispatchWorker('GET_RESOURCE_RAW', {
+      const r: { bytes: ArrayBuffer | null } = await app.runtime.dispatchWorker('GET_RESOURCE_RAW', {
         type,
         id,
       });
@@ -160,13 +162,13 @@ export function triggerUploadPackEntry(app: App): void {
       app.resBrowserBusy.set(true);
       const bytes = new Uint8Array(await file.arrayBuffer());
       const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      await app.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId, entryId, bytes: buf }, [buf]);
-      const listR: { entries: { id: number; size: number }[] | null } = await app.dispatchWorker(
+      await app.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId, entryId, bytes: buf }, [buf]);
+      const listR: { entries: { id: number; size: number }[] | null } = await app.runtime.dispatchWorker(
         'LIST_PACK_ENTRIES',
         { packId },
       );
       app.selectedPackEntries.set(listR.entries);
-      const r: { bytes: ArrayBuffer | null } = await app.dispatchWorker('GET_PACK_ENTRY_RAW', {
+      const r: { bytes: ArrayBuffer | null } = await app.runtime.dispatchWorker('GET_PACK_ENTRY_RAW', {
         packId,
         entryId,
       });
@@ -190,9 +192,9 @@ export async function saveStrList(app: App): Promise<void> {
   if (id === null || strings === null) return;
   try {
     app.resBrowserBusy.set(true);
-    await app.dispatchWorker('PUT_STR_LIST', { id, strings });
+    await app.runtime.dispatchWorker('PUT_STR_LIST', { id, strings });
     await loadResourceList(app);
-    const rawR: { bytes: ArrayBuffer | null } = await app.dispatchWorker('GET_RESOURCE_RAW', {
+    const rawR: { bytes: ArrayBuffer | null } = await app.runtime.dispatchWorker('GET_RESOURCE_RAW', {
       type: 'STR#',
       id,
     });
@@ -243,7 +245,7 @@ export async function saveResText(app: App): Promise<void> {
       for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 0xff;
     }
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    await app.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
+    await app.runtime.dispatchWorker('PUT_RESOURCE_RAW', { type, id, bytes: buf }, [buf]);
     app.selectedResBytes.set(bytes);
     await loadResourceList(app);
     app.snackBar.open(`✓ Saved ${type}#${id}`, 'OK', { duration: 3000 });
@@ -262,9 +264,9 @@ export async function savePackEntryFields(app: App): Promise<void> {
   app.resBrowserBusy.set(true);
   try {
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    await app.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId, entryId, bytes: buf }, [buf]);
+    await app.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId, entryId, bytes: buf }, [buf]);
     type ListPackResult = { entries: { id: number; size: number }[] | null };
-    const listR = await app.dispatchWorker<ListPackResult>('LIST_PACK_ENTRIES', { packId });
+    const listR = await app.runtime.dispatchWorker<ListPackResult>('LIST_PACK_ENTRIES', { packId });
     app.selectedPackEntries.set(listR.entries);
     app.snackBar.open(`✓ Saved Pack#${packId} entry #${entryId}`, 'OK', { duration: 3000 });
   } catch (error) {
@@ -277,8 +279,8 @@ export async function savePackEntryFields(app: App): Promise<void> {
 export async function applyTilePixels(app: App, texId: number, pixels: Uint8ClampedArray): Promise<void> {
   try {
     app.workerBusy.set(true);
-    await app.dispatchWorker<Record<string, never>>('APPLY_TILE16_PIXELS', { texId, pixels });
-    await app.decodeRoadTexturesInBackground();
+    await app.runtime.dispatchWorker<Record<string, never>>('APPLY_TILE16_PIXELS', { texId, pixels });
+    void decodeRoadTexturesInBackground(app);
     app.resourcesStatus.set(`Tile #${texId} replaced.`);
   } catch (error) {
     app.editorError.set(error instanceof Error ? error.message : 'Tile save failed');
@@ -414,12 +416,12 @@ export async function onTilePngUpload(app: App, event: Event, texId: number): Pr
     offscreen.height = entry.height;
     const ctx = offscreen.getContext('2d');
     if (!ctx) {
-      app.failEditor('Failed to get 2D context');
+      failEditor(app, 'Failed to get 2D context');
       return;
     }
     ctx.drawImage(img, 0, 0, entry.width, entry.height);
     const imageData = ctx.getImageData(0, 0, entry.width, entry.height);
-    await app._applyTilePixels(texId, new Uint8ClampedArray(imageData.data));
+    await applyTilePixels(app, texId, new Uint8ClampedArray(imageData.data));
   } catch (error) {
     app.editorError.set(error instanceof Error ? error.message : 'Tile PNG upload failed');
   }
@@ -427,7 +429,7 @@ export async function onTilePngUpload(app: App, event: Event, texId: number): Pr
 
 export async function onTileEditorSaved(app: App, event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
   app.spriteEditorOpen.set(false);
-  await app._applyTilePixels(event.frameId, event.pixels);
+  await applyTilePixels(app, event.frameId, event.pixels);
 }
 
 export async function addTileImage(app: App): Promise<void> {
@@ -454,7 +456,7 @@ export async function addTileImage(app: App): Promise<void> {
       offscreen.height = height;
       const ctx = offscreen.getContext('2d');
       if (!ctx) {
-        app.failEditor('Failed to get 2D context');
+        failEditor(app, 'Failed to get 2D context');
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
@@ -463,11 +465,11 @@ export async function addTileImage(app: App): Promise<void> {
       const existing = app.tileTileEntries().map((tile: { texId: number }) => tile.texId);
       const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 200;
       if (nextId > 9999) {
-        app.failEditor('Too many tile images (max ID 9999)');
+        failEditor(app, 'Too many tile images (max ID 9999)');
         return;
       }
-      await app.dispatchWorker('APPLY_TILE16_PIXELS', { texId: nextId, pixels });
-      await app.decodeRoadTexturesInBackground();
+      await app.runtime.dispatchWorker('APPLY_TILE16_PIXELS', { texId: nextId, pixels });
+      await decodeRoadTexturesInBackground(app);
       app.selectedTileId.set(nextId);
       app.resourcesStatus.set(`New tile #${nextId} created.`);
       app.snackBar.open(`✓ Tile #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
@@ -499,8 +501,8 @@ export async function deleteTileImage(app: App, texId: number): Promise<void> {
   const previousSelectedTileId = app.selectedTileId();
   try {
     app.workerBusy.set(true);
-    await app.dispatchWorker('REMOVE_TILE16_TEXTURE', { texId });
-    await app.decodeRoadTexturesInBackground();
+    await app.runtime.dispatchWorker('REMOVE_TILE16_TEXTURE', { texId });
+    await decodeRoadTexturesInBackground(app);
     if (previousSelectedTileId === texId) {
       app.selectedTileId.set(app.tileTileEntries()[0]?.texId ?? null);
     }
@@ -528,7 +530,7 @@ export async function onCustomResourcesFileSelected(app: App, event: Event): Pro
       app._pendingCustomResources = bytes;
       app.statusText.set('Custom resources.dat queued – waiting for WASM to initialize…');
     } else {
-      app._mountCustomResourcesFs(bytes);
+      app.runtime.mountCustomResourcesFs(bytes);
     }
   } catch (error) {
     console.error('[Angular] Failed to read custom resources.dat', error);
@@ -543,7 +545,7 @@ export function restartGameWithCustomResources(app: App): void {
 }
 
 export function clearCustomResources(app: App): void {
-  App._clearCustomResourcesDb().catch(() => {
+  AppStateResources._clearCustomResourcesDb().catch(() => {
     /* ignore */
   });
   app.customResourcesLoaded.set(false);

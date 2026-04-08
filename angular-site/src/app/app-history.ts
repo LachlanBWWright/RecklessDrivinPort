@@ -151,7 +151,7 @@ export function applyUndoSnapshot(app: App, snapshot: EditorUndoSnapshot): void 
       if (snapshot.editRoadInfoData) {
         app.roadInfoDataMap.set(snapshot.editRoadInfo, { ...snapshot.editRoadInfoData });
         app.refreshRoadInfoDerivedState();
-        void app.dispatchWorker('APPLY_ROAD_INFO', {
+        void app.runtime.dispatchWorker('APPLY_ROAD_INFO', {
           roadInfoId: snapshot.editRoadInfo,
           roadInfo: snapshot.editRoadInfoData,
         });
@@ -172,7 +172,7 @@ export function applyUndoSnapshot(app: App, snapshot: EditorUndoSnapshot): void 
       break;
     }
   }
-  app.scheduleCanvasRedraw();
+  app.runtime.scheduleCanvasRedraw();
   app._objectDragUndoCaptured = false;
   app._startMarkerDragUndoCaptured = false;
 }

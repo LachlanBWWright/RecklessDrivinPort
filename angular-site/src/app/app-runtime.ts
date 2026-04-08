@@ -1,5 +1,6 @@
 import { effect } from '@angular/core';
 import { App } from './app';
+import { AppStateResources } from './app-state-resources';
 import type { EditorSection } from './layout/site-toolbar/site-toolbar.component';
 import { MAX_TIME_VALUE } from './app-level';
 import { dist2d, distToSegment2d, MIN_START_MARKER_HIT_RADIUS, BASE_START_MARKER_HIT_RADIUS, insertBetweenClosestSegment } from './object-canvas';
@@ -50,7 +51,7 @@ export function setupAppLifecycle(app: App): void {
     app.editLevelEnd();
     app.selectedLevel();
     if (tab === 'editor' && section === 'objects') {
-      app.scheduleCanvasRedraw();
+      app.runtime.scheduleCanvasRedraw();
     }
   });
 
@@ -173,7 +174,7 @@ export function initializeKonvaOverlay(app: App): void {
       konvaContainer.style.height = `${h}px`;
     }
     app.konva.resize(w, h);
-    app.scheduleCanvasRedraw();
+    app.runtime.scheduleCanvasRedraw();
   });
   resizeObserver.observe(canvas);
 
@@ -342,7 +343,7 @@ export function initializeKonvaOverlay(app: App): void {
     if (app.markCreateMode() && app._pendingMarkPoints.length > 0) {
       const [wx, wy] = app.canvasToWorld(cssX, cssY);
       app._markCreateHoverPoint = { x: Math.round(wx), y: Math.round(wy) };
-      app.scheduleCanvasRedraw();
+      app.runtime.scheduleCanvasRedraw();
       return;
     }
     if (app.drawMode() === 'curve') {
@@ -406,7 +407,7 @@ export function initializeKonvaOverlay(app: App): void {
 
 export function destroyApp(app: App): void {
   try {
-    app.stopAudio();
+    app.media.stopAudio();
   } catch {
     /* ignore */
   }
@@ -435,9 +436,9 @@ export function scheduleCanvasRedraw(app: App): void {
 }
 
 export function onInit(app: App): void {
-  app.initPackWorker();
+  app.runtime.initPackWorker();
   if (typeof indexedDB !== 'undefined') {
-    App._loadCustomResourcesDb()
+        AppStateResources._loadCustomResourcesDb()
       .then((entry) => {
         if (entry) {
           app.customResourcesLoaded.set(true);
@@ -451,8 +452,8 @@ export function onInit(app: App): void {
 }
 
 export function onAfterViewInit(app: App): void {
-  app.setupEmscriptenModule();
-  app.loadWasmScript();
+  app.runtime.setupEmscriptenModule();
+  app.runtime.loadWasmScript();
 }
 
 export function formatTime(seconds: number): string {
@@ -469,7 +470,7 @@ export function getEditorSectionIndex(app: App): number {
 
 export function setEditorSectionIndex(app: App, idx: number): void {
   const section = app.SECTION_ORDER[idx];
-  if (section) app.setSection(section);
+  if (section) app.runtime.setSection(section);
 }
 
 export function toggleFullscreen(): void {
@@ -484,7 +485,7 @@ export function toggleFullscreen(): void {
 export function onVolumeChange(app: App, event: Event): void {
   const pct = Number.parseInt((event.target as HTMLInputElement).value, 10);
   app.masterVolume.set(pct);
-  app.applyVolumeToWasm(pct);
+  app.runtime.applyVolumeToWasm(pct);
 }
 
 export function beginStartMarkerDrag(app: App, focusTarget: EventTarget | null): void {

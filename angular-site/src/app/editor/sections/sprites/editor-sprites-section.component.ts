@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
+import { getSpriteFormatLabel } from '../../../sprite-editor';
 
 @Component({
   selector: 'app-editor-sprites-section',
@@ -24,9 +25,5 @@ export class EditorSpritesSectionComponent {
     return this.packSpriteFrames.find((f) => f.id === this.selectedPackSpriteId) ?? null;
   }
 
-  getSpriteFormatLabel(bitDepth: 8 | 16 | undefined): string {
-    if (bitDepth === 16) return 'RGB555';
-    if (bitDepth === 8) return '8-bit';
-    return '?';
-  }
+  readonly getSpriteFormatLabel = getSpriteFormatLabel;
 }

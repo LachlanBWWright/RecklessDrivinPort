@@ -1,5 +1,6 @@
 import { err, ok, type Result } from 'neverthrow';
 import { App } from './app';
+import { AppStateResources } from './app-state-resources';
 
 export function initPackWorker(app: App): void {
   if (typeof Worker === 'undefined') {
@@ -91,7 +92,7 @@ export function setupEmscriptenModule(app: App): void {
   }
 
   window.Module = {
-    locateFile: (path: string) => app.assetUrl(path),
+    locateFile: (path: string) => assetUrl(app, path),
     canvas,
     print: (t: string) => console.log('[WASM]', t),
     printErr: (t: string) => console.warn('[WASM ERR]', t),
@@ -113,10 +114,10 @@ export function setupEmscriptenModule(app: App): void {
       app.statusText.set('Running');
       app.overlayVisible.set(false);
       console.log('[Angular] WASM runtime initialized');
-      app.applyVolumeToWasm(app.masterVolume());
-      app.syncGameLoopWithActiveTab();
+      applyVolumeToWasm(app, app.masterVolume());
+      syncGameLoopWithActiveTab(app);
       if (app._pendingCustomResources) {
-        app._mountCustomResourcesFs(app._pendingCustomResources);
+        mountCustomResourcesFs(app, app._pendingCustomResources);
         app._pendingCustomResources = null;
       }
     },
@@ -125,7 +126,7 @@ export function setupEmscriptenModule(app: App): void {
         const mod = window.Module;
         if (!mod?.addRunDependency || typeof indexedDB === 'undefined') return;
         mod.addRunDependency('customResourcesDat');
-        App._loadCustomResourcesDb()
+        AppStateResources._loadCustomResourcesDb()
           .then((entry: { bytes: Uint8Array; name: string } | null) => {
             if (entry) {
               const FS = (window as unknown as Record<string, unknown>)['FS'] as
@@ -157,7 +158,7 @@ export function setupEmscriptenModule(app: App): void {
 
 export function loadWasmScript(app: App): void {
   app.wasmScript = document.createElement('script');
-  app.wasmScript.src = app.assetUrl('reckless_drivin.js');
+  app.wasmScript.src = assetUrl(app, 'reckless_drivin.js');
   app.wasmScript.async = true;
   app.wasmScript.onerror = () => {
     app.statusText.set('WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).');
@@ -171,7 +172,7 @@ export function assetUrl(app: App, path: string): string {
 }
 
 export async function readAssetBytes(app: App, path: string): Promise<Result<Uint8Array, string>> {
-  const response = await fetch(app.assetUrl(path));
+  const response = await fetch(assetUrl(app, path));
   if (!response.ok) {
     return err(
       `Could not fetch ${path} (HTTP ${response.status}). Run \`npm start\` again so dev assets are synced.`,
@@ -216,7 +217,7 @@ export async function onCustomResourcesFileSelected(app: App, event: Event): Pro
   if (!file) return;
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    app._mountCustomResourcesFs(bytes);
+    mountCustomResourcesFs(app, bytes);
   } catch (error) {
     app.editorError.set(error instanceof Error ? error.message : 'Failed to load file');
   }
@@ -234,7 +235,7 @@ export function restartGameWithCustomResources(app: App): void {
 export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {
   const name = app.customResourcesName() ?? 'resources.dat';
   if (typeof indexedDB !== 'undefined') {
-    App._saveCustomResourcesDb(bytes, name).catch((err: unknown) => {
+    AppStateResources._saveCustomResourcesDb(bytes, name).catch((err: unknown) => {
       console.warn('[Angular] Failed to save custom resources.dat to IndexedDB', err);
     });
   }
@@ -270,7 +271,7 @@ export function clearCustomResources(app: App): void {
   app.customResourcesLoaded.set(false);
   app.customResourcesName.set(null);
   if (typeof indexedDB !== 'undefined') {
-    App._clearCustomResourcesDb().catch((err: unknown) => {
+    AppStateResources._clearCustomResourcesDb().catch((err: unknown) => {
       console.warn('[Angular] Failed to clear custom resources.dat from IndexedDB', err);
     });
   }

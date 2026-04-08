@@ -5,8 +5,8 @@ import type { App } from './app';
 
 declare module './app' {
   interface App {
-    getRoadReferenceLevelNums(roadInfoId: number): number[];
-    getTileReferenceRoadInfoIds(texId: number): number[];
+    readonly getRoadReferenceLevelNums: (roadInfoId: number) => number[];
+    readonly getTileReferenceRoadInfoIds: (texId: number) => number[];
     syncSelectedRoadInfoSelection(preferredId?: number | null): void;
     refreshRoadInfoDerivedState(): void;
     queueRoadInfoSync(syncPromises: Promise<unknown>[]): void;
@@ -111,7 +111,7 @@ export function refreshRoadInfoDerivedState(app: App): void {
 }
 
 export async function applyRoadInfoDataToWorker(app: App, roadInfoId: number, roadInfo: RoadInfoData): Promise<void> {
-  await app.dispatchWorker('APPLY_ROAD_INFO', {
+  await app.runtime.dispatchWorker('APPLY_ROAD_INFO', {
     roadInfoId,
     roadInfo,
   });
@@ -174,7 +174,7 @@ export async function deleteRoadInfo(app: App, roadInfoId: number | null = app.s
 
   try {
     app.workerBusy.set(true);
-    await app.dispatchWorker('REMOVE_ROAD_INFO', { roadInfoId });
+    await app.runtime.dispatchWorker('REMOVE_ROAD_INFO', { roadInfoId });
     app.resourcesStatus.set(`Deleted road ${roadInfoId}.`);
     app.snackBar.open(`✓ Road ${roadInfoId} deleted`, 'OK', {
       duration: 3000,
@@ -197,7 +197,7 @@ export async function deleteRoadInfo(app: App, roadInfoId: number | null = app.s
 export function queueRoadInfoSync(app: App, syncPromises: Promise<unknown>[]): void {
   for (const [roadInfoId, roadInfo] of app.roadInfoDataMap.entries()) {
     syncPromises.push(
-      app.dispatchWorker('APPLY_ROAD_INFO', {
+      app.runtime.dispatchWorker('APPLY_ROAD_INFO', {
         roadInfoId,
         roadInfo,
       }),
@@ -208,14 +208,14 @@ export function queueRoadInfoSync(app: App, syncPromises: Promise<unknown>[]): v
 export function queuePackSync(app: App, syncPromises: Promise<unknown>[]): void {
   if (app.objectGroupsDirty()) {
     syncPromises.push(
-      app.dispatchWorker('APPLY_OBJECT_GROUPS', {
+      app.runtime.dispatchWorker('APPLY_OBJECT_GROUPS', {
         objectGroups: app.objectGroupDefinitions(),
       }),
     );
   }
   if (app.objectTypesDirty()) {
     syncPromises.push(
-      app.dispatchWorker('APPLY_OBJECT_TYPES', {
+      app.runtime.dispatchWorker('APPLY_OBJECT_TYPES', {
         objectTypes: app.objectTypeDefinitions(),
       }),
     );
@@ -272,7 +272,7 @@ export async function saveLevelProperties(app: App): Promise<void> {
     const syncPromises: Promise<unknown>[] = [];
     queueRoadInfoSync(app, syncPromises);
     await Promise.all(syncPromises);
-    const result: { levels: ParsedLevel[] } = await app.dispatchWorker('APPLY_PROPS', {
+    const result: { levels: ParsedLevel[] } = await app.runtime.dispatchWorker('APPLY_PROPS', {
       resourceId: id,
       props,
     });

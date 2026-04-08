@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
 import type { ParsedLevel } from '../../level-editor.service';
+import { levelDisplayNum } from '../../app-helpers';
 
 export type SiteTab = 'game' | 'editor';
 export type EditorSection = 'properties' | 'object-groups' | 'object-types' | 'objects' | 'sprites' | 'tiles' | 'audio' | 'screens';
@@ -37,7 +38,5 @@ export class SiteToolbarComponent {
     { id: 'screens', label: 'Screens', icon: 'tv' },
   ];
 
-  levelDisplayNum(resourceId: number): number {
-    return resourceId - 139;
-  }
+  readonly levelDisplayNum = levelDisplayNum;
 }

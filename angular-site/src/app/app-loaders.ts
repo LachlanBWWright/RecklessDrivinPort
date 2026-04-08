@@ -17,7 +17,7 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
       roadInfoArr: [number, RoadInfoData][];
       objectGroups: ObjectGroupDefinition[];
     };
-    const result: LoadResult = await app.dispatchWorker('LOAD', buffer, [buffer]);
+    const result: LoadResult = await app.runtime.dispatchWorker('LOAD', buffer, [buffer]);
 
     app.objectTypeDefinitionMap.clear();
     const objectTypes = result.objectTypesArr
@@ -75,12 +75,12 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
       void app.selectSprite(result.sprites[0].id);
     }
 
-    void app.decodeSpritePreviewsInBackground(result.objectTypesArr);
-    void app.decodeRoadTexturesInBackground();
-    void app.decodePackSpritesInBackground();
-    void app.loadResourceList();
-    void app.loadAudioEntries();
-    void app.loadIconEntries();
+    void decodeSpritePreviewsInBackground(app, result.objectTypesArr);
+    void decodeRoadTexturesInBackground(app);
+    void decodePackSpritesInBackground(app);
+    void app.media.loadResourceList();
+    void app.media.loadAudioEntries();
+    void app.media.loadIconEntries();
   } catch (error) {
     app.editorError.set(error instanceof Error ? error.message : 'Failed to parse resources');
     app.resourcesStatus.set('Failed to parse resources.');
@@ -102,7 +102,7 @@ export async function decodeSpritePreviewsInBackground(
     type DecodeResult = {
       decodedSprites: { typeRes: number; pixels: ArrayBuffer; width: number; height: number }[];
     };
-    const result: DecodeResult = await app.dispatchWorker('DECODE_SPRITE_PREVIEWS', {
+    const result: DecodeResult = await app.runtime.dispatchWorker('DECODE_SPRITE_PREVIEWS', {
       objectTypesArr,
     });
     for (const { typeRes, pixels, width, height } of result.decodedSprites) {
@@ -129,8 +129,8 @@ export async function decodeRoadTexturesInBackground(app: App): Promise<void> {
     };
 
     const [result, allTilesResult] = await Promise.all([
-      app.dispatchWorker('DECODE_ROAD_TEXTURES') as Promise<RoadTexResult>,
-      app.dispatchWorker('DECODE_ALL_ROAD_TEXTURES') as Promise<AllTilesResult>,
+      app.runtime.dispatchWorker('DECODE_ROAD_TEXTURES') as Promise<RoadTexResult>,
+      app.runtime.dispatchWorker('DECODE_ALL_ROAD_TEXTURES') as Promise<AllTilesResult>,
     ]);
 
     app._roadTextureDataUrls.clear();
@@ -165,7 +165,7 @@ export async function decodeRoadTexturesInBackground(app: App): Promise<void> {
     app.refreshRoadInfoDerivedState();
     app.roadTexturesVersion.update((v: number) => v + 1);
     app._roadOffscreenKey = '';
-    app.scheduleCanvasRedraw();
+    app.runtime.scheduleCanvasRedraw();
   } catch {
     /* non-fatal */
   }
@@ -182,7 +182,7 @@ export async function decodePackSpritesInBackground(app: App): Promise<void> {
         pixels: ArrayBuffer;
       }[];
     };
-    const result: AllSpritesResult = await app.dispatchWorker('DECODE_ALL_SPRITE_FRAMES');
+    const result: AllSpritesResult = await app.runtime.dispatchWorker('DECODE_ALL_SPRITE_FRAMES');
     app.packSpriteCanvases.clear();
     app._packSpriteDataUrls.clear();
     app.packSpriteDecodedFrames.clear();

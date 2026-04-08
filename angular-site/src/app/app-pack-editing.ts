@@ -1,5 +1,6 @@
 import type { ObjectGroupDefinition, ObjectGroupEntryData, ObjectTypeDefinition } from './level-editor.service';
 import type { App } from './app';
+import { decodeSpritePreviewsInBackground } from './app-loaders';
 
 export function cloneObjectGroupDefinitions(app: App, groups = app.objectGroupDefinitions()): ObjectGroupDefinition[] {
   return groups.map((group: ObjectGroupDefinition) => ({
@@ -105,7 +106,7 @@ export async function saveObjectGroups(app: App): Promise<void> {
       return;
     }
     app.workerBusy.set(true);
-    const result: { objectGroups: ObjectGroupDefinition[] } = await app.dispatchWorker('APPLY_OBJECT_GROUPS', {
+    const result: { objectGroups: ObjectGroupDefinition[] } = await app.runtime.dispatchWorker('APPLY_OBJECT_GROUPS', {
       objectGroups: groups,
     });
     app.objectGroupDefinitions.set(result.objectGroups);
@@ -290,7 +291,7 @@ export async function saveObjectTypes(app: App): Promise<void> {
   const saveRevision = app.objectTypesEditRevision;
   try {
     app.workerBusy.set(true);
-    const result: { objectTypesArr: [number, ObjectTypeDefinition][] } = await app.dispatchWorker('APPLY_OBJECT_TYPES', {
+    const result: { objectTypesArr: [number, ObjectTypeDefinition][] } = await app.runtime.dispatchWorker('APPLY_OBJECT_TYPES', {
       objectTypes,
     });
     const defs: ObjectTypeDefinition[] = result.objectTypesArr.map(([, def]: [number, ObjectTypeDefinition]) => def).filter(
@@ -307,7 +308,7 @@ export async function saveObjectTypes(app: App): Promise<void> {
       app.objectTypesDirty.set(true);
       app.scheduleObjectTypesAutoSave();
     }
-    void app.decodeSpritePreviewsInBackground(result.objectTypesArr);
+    void decodeSpritePreviewsInBackground(app, result.objectTypesArr);
     app.resourcesStatus.set(`Saved ${defs.length} object type(s).`);
     app.snackBar.open(`✓ Object types saved`, 'OK', {
       duration: 3000,

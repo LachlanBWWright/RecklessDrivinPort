@@ -253,7 +253,7 @@ export async function saveLevelObjects(app: App): Promise<void> {
   if (id === null) return;
   try {
     app.workerBusy.set(true);
-    const result: { levels: ParsedLevel[] } = await app.dispatchWorker('APPLY_OBJECTS', {
+    const result: { levels: ParsedLevel[] } = await app.runtime.dispatchWorker('APPLY_OBJECTS', {
       resourceId: id,
       objects: app.objects(),
     });
@@ -278,7 +278,7 @@ export async function saveTrack(app: App): Promise<void> {
   if (id === null) return;
   try {
     app.workerBusy.set(true);
-    const result: { levels: ParsedLevel[] } = await app.dispatchWorker('APPLY_TRACK', {
+    const result: { levels: ParsedLevel[] } = await app.runtime.dispatchWorker('APPLY_TRACK', {
       resourceId: id,
       trackUp: app.editTrackUp(),
       trackDown: app.editTrackDown(),

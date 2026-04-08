@@ -2,6 +2,8 @@ import { ok } from 'neverthrow';
 import { packHandleDecompress } from './lzrw.service';
 import { imageDataToIconHash, imageDataToIcl8, renderIconBytes, renderIcl8Bytes, renderIcs8Bytes, renderPictBytes } from './image-resource-codec';
 import { parseSndHeader, sndToWav, tryPlaySndResource, wavToSnd } from './snd-codec';
+import { ensureAudioCtx, startAudioBuffer } from './app-audio';
+import { failEditor } from './app-loaders';
 
 import type { App } from './app';
 
@@ -18,14 +20,14 @@ function triggerBytesDownload(bytes: Uint8Array, filename: string): void {
 export async function loadAudioEntries(host: App): Promise<void> {
   try {
     type EntriesResult = { entries: { id: number; size: number }[] | null };
-    const result: EntriesResult = await host.dispatchWorker<EntriesResult>('LIST_PACK_ENTRIES', {
+    const result: EntriesResult = await host.runtime.dispatchWorker<EntriesResult>('LIST_PACK_ENTRIES', {
       packId: 134,
     });
     const entries = result.entries ?? [];
     host.audioEntries.set(entries.map((e: { id: number; size: number }) => ({ id: e.id, sizeBytes: e.size })));
     if (entries.length > 0 && host.selectedAudioId() === null) {
       host.selectedAudioId.set(entries[0].id);
-      await host.loadSelectedAudioBytes(entries[0].id);
+      await loadSelectedAudioBytes(host, entries[0].id);
     }
     void loadAudioDurations(host, entries.map((e) => e.id));
   } catch {
@@ -38,7 +40,7 @@ async function loadAudioDurations(host: App, ids: number[]): Promise<void> {
   type AudioEntry = { id: number; sizeBytes: number; durationMs?: number };
   for (const id of ids) {
     try {
-      const result: RawResult = await host.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', {
+      const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', {
         packId: 134,
         entryId: id,
       });
@@ -57,17 +59,17 @@ async function loadAudioDurations(host: App, ids: number[]): Promise<void> {
 
 export async function selectAudioEntry(host: App, id: number): Promise<void> {
   host.selectedAudioId.set(id);
-  host.stopAudio();
+  host.media.stopAudio();
   host._lastAudioBuffer = null;
   host.audioCurrentTime.set(0);
   host.audioDuration.set(0);
-  await host.loadSelectedAudioBytes(id);
+  await loadSelectedAudioBytes(host, id);
 }
 
 export async function loadSelectedAudioBytes(host: App, id: number): Promise<void> {
   try {
     type RawResult = { bytes: ArrayBuffer | null };
-    const result: RawResult = await host.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', {
+    const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_PACK_ENTRY_RAW', {
       packId: 134,
       entryId: id,
     });
@@ -94,7 +96,7 @@ export function exportAudioWav(host: App): void {
 export async function playAudioEntry(host: App): Promise<void> {
   const bytes = host.selectedAudioBytes();
   if (!bytes) return;
-  const ctx = host._ensureAudioCtx();
+  const ctx = ensureAudioCtx(host);
   if (ctx.state === 'suspended') {
     try {
       await ctx.resume();
@@ -116,7 +118,7 @@ export async function playAudioEntry(host: App): Promise<void> {
         const ab = new Uint8Array(wavBytes).buffer;
         const audioBuf = await ctx.decodeAudioData(ab);
         host._lastAudioBuffer = audioBuf;
-        host._startAudioBuffer(audioBuf, 0);
+        startAudioBuffer(host, audioBuf, 0);
       } catch (err) {
         host._lastAudioBuffer = null;
         const played = tryPlaySndResource(bytes, ctx);
@@ -160,16 +162,16 @@ export async function onAudioWavUpload(host: App, event: Event): Promise<void> {
     const arrBuf = await file.arrayBuffer();
     const sndBytesResult = wavToSnd(new Uint8Array(arrBuf));
     if (!sndBytesResult.isOk()) {
-      host.failEditor(sndBytesResult.error);
+      failEditor(host, sndBytesResult.error);
       return;
     }
     const sndBytes = sndBytesResult.value;
-    await host.dispatchWorker('PUT_PACK_ENTRY_RAW', {
+    await host.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', {
       packId: 134,
       entryId: id,
       bytes: sndBytes.buffer,
     });
-    await host.loadSelectedAudioBytes(id);
+    await loadSelectedAudioBytes(host, id);
     host.resourcesStatus.set(`Sound #${id} replaced from WAV.`);
   } catch (err) {
     host.editorError.set(err instanceof Error ? err.message : 'WAV upload failed');
@@ -190,20 +192,20 @@ export async function addAudioEntry(host: App): Promise<void> {
       const arrBuf = await file.arrayBuffer();
       const sndBytesResult = wavToSnd(new Uint8Array(arrBuf));
       if (!sndBytesResult.isOk()) {
-        host.failEditor(sndBytesResult.error);
+        failEditor(host, sndBytesResult.error);
         return;
       }
       const sndBytes = sndBytesResult.value;
       const existing = host.audioEntries().map((e) => e.id);
       const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 128;
       if (nextId > 9999) {
-        host.failEditor('Too many sound entries (max ID 9999)');
+        failEditor(host, 'Too many sound entries (max ID 9999)');
         return;
       }
       const buf = sndBytes.buffer.slice(sndBytes.byteOffset, sndBytes.byteOffset + sndBytes.byteLength);
-      await host.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 134, entryId: nextId, bytes: buf }, [buf]);
-      await host.loadAudioEntries();
-      await host.selectAudioEntry(nextId);
+      await host.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 134, entryId: nextId, bytes: buf }, [buf]);
+      await loadAudioEntries(host);
+      await selectAudioEntry(host, nextId);
       host.resourcesStatus.set(`New sound #${nextId} created.`);
       host.snackBar.open(`✓ Sound #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (err) {
@@ -220,7 +222,7 @@ export async function addAudioEntry(host: App): Promise<void> {
 export async function loadIconEntries(host: App): Promise<void> {
   try {
     type ListResult = { entries: { type: string; id: number; size: number }[] };
-    const result: ListResult = await host.dispatchWorker<ListResult>('LIST_RESOURCES');
+    const result: ListResult = await host.runtime.dispatchWorker<ListResult>('LIST_RESOURCES');
     const SCREEN_TYPES = new Set(['ICN#', 'ics#', 'icl8', 'ics8', 'PICT', 'PPic']);
     const entries = result.entries
       .filter((e) => SCREEN_TYPES.has(e.type))
@@ -232,7 +234,7 @@ export async function loadIconEntries(host: App): Promise<void> {
       }));
     host.iconEntries.set(entries);
     if (entries.length > 0 && host.selectedIconId() === null) {
-      host.selectIconEntry(entries[0].type, entries[0].id);
+      void selectIconEntry(host, entries[0].type, entries[0].id);
     }
     void loadAllIconThumbnails(host);
   } catch {
@@ -247,7 +249,7 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
   if (type === 'PICT' || type === 'PPic') {
     try {
       type RawResult = { bytes: ArrayBuffer | null };
-      const result: RawResult = await host.dispatchWorker<RawResult>('GET_RESOURCE_RAW', {
+      const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', {
         type,
         id,
       });
@@ -270,7 +272,7 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
   }
   try {
     type RawResult = { bytes: ArrayBuffer | null };
-    const result: RawResult = await host.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
+    const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
     if (result.bytes) {
       const bytes = new Uint8Array(result.bytes);
       let canvas: HTMLCanvasElement | null = null;
@@ -316,7 +318,7 @@ export function exportIconRaw(host: App): void {
   void (async () => {
     try {
       type RawResult = { bytes: ArrayBuffer | null };
-      const result: RawResult = await host.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
+      const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
       if (result.bytes) {
         triggerBytesDownload(new Uint8Array(result.bytes), `${type.trim()}-${id}.bin`);
       }
@@ -353,7 +355,7 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
       offscreen.height = 32;
       const ctx = offscreen.getContext('2d');
       if (!ctx) {
-        host.failEditor('Failed to get 2D context');
+        failEditor(host, 'Failed to get 2D context');
         return;
       }
       ctx.drawImage(img, 0, 0, 32, 32);
@@ -364,7 +366,7 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
       offscreen.height = 16;
       const ctx = offscreen.getContext('2d');
       if (!ctx) {
-        host.failEditor('Failed to get 2D context');
+        failEditor(host, 'Failed to get 2D context');
         return;
       }
       ctx.drawImage(img, 0, 0, 16, 16);
@@ -375,18 +377,18 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
       offscreen.height = 32;
       const ctx = offscreen.getContext('2d');
       if (!ctx) {
-        host.failEditor('Failed to get 2D context');
+        failEditor(host, 'Failed to get 2D context');
         return;
       }
       ctx.drawImage(img, 0, 0, 32, 32);
       iconBytes = imageDataToIconHash(ctx.getImageData(0, 0, 32, 32).data);
     }
-    await host.dispatchWorker('PUT_RESOURCE_RAW', {
+    await host.runtime.dispatchWorker('PUT_RESOURCE_RAW', {
       type,
       id,
       bytes: iconBytes.buffer,
     });
-    await host.selectIconEntry(type, id);
+    await selectIconEntry(host, type, id);
     host.resourcesStatus.set(`${type} #${id} replaced.`);
   } catch (err) {
     host.editorError.set(err instanceof Error ? err.message : 'Image upload failed');
@@ -417,7 +419,7 @@ export async function addIconEntry(host: App): Promise<void> {
       offscreen.height = 32;
       const ctx = offscreen.getContext('2d');
       if (!ctx) {
-        host.failEditor('Failed to get 2D context');
+        failEditor(host, 'Failed to get 2D context');
         return;
       }
       ctx.drawImage(img, 0, 0, 32, 32);
@@ -427,13 +429,13 @@ export async function addIconEntry(host: App): Promise<void> {
         .map((e) => e.id);
       const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 200;
       if (nextId > 9999) {
-        host.failEditor('Too many icon entries');
+        failEditor(host, 'Too many icon entries');
         return;
       }
       const buf = iconBytes.buffer.slice(iconBytes.byteOffset, iconBytes.byteOffset + iconBytes.byteLength);
-      await host.dispatchWorker('PUT_RESOURCE_RAW', { type: 'ICN#', id: nextId, bytes: buf }, [buf]);
-      await host.loadIconEntries();
-      await host.selectIconEntry('ICN#', nextId);
+      await host.runtime.dispatchWorker('PUT_RESOURCE_RAW', { type: 'ICN#', id: nextId, bytes: buf }, [buf]);
+      await loadIconEntries(host);
+      await selectIconEntry(host, 'ICN#', nextId);
       host.resourcesStatus.set(`New ICN# #${nextId} created.`);
       host.snackBar.open(`✓ Icon #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
     } catch (err) {
@@ -479,7 +481,7 @@ export async function loadAllIconThumbnails(host: App): Promise<void> {
     if (host.iconCanvasMap.has(key)) continue;
     try {
       type RawResult = { bytes: ArrayBuffer | null };
-      const result: RawResult = await host.dispatchWorker<RawResult>('GET_RESOURCE_RAW', {
+      const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', {
         type: entry.type,
         id: entry.id,
       });

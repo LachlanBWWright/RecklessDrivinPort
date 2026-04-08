@@ -67,9 +67,9 @@ export function selectLevel(app: App, id: number, options?: { preserveView?: boo
   if (!preserveView) {
     resetViewToRoad(app, level);
   }
-  app.scheduleCanvasRedraw();
+  app.runtime.scheduleCanvasRedraw();
   if (typeof window !== 'undefined') {
-    window.requestAnimationFrame(() => app.scheduleCanvasRedraw());
+    window.requestAnimationFrame(() => app.runtime.scheduleCanvasRedraw());
   }
 }
 
@@ -181,7 +181,7 @@ export function onRoadInfoInput(app: App, field: Exclude<keyof RoadInfoData, 'id
   }
   app.roadInfoDataMap.set(currentId, next);
   if (assetFields.has(field)) {
-    void app.dispatchWorker('APPLY_ROAD_INFO', {
+    void app.runtime.dispatchWorker('APPLY_ROAD_INFO', {
       roadInfoId: currentId,
       roadInfo: next,
     });

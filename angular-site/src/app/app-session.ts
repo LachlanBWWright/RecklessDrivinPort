@@ -1,4 +1,6 @@
 import { App } from './app';
+import { AppStateResources } from './app-state-resources';
+import { failEditor, loadResourcesBytes } from './app-loaders';
 
 export function resetEditorData(app: App): void {
   app.hasEditorData.set(false);
@@ -64,7 +66,7 @@ export function resetEditorData(app: App): void {
   app.hoverTrackWaypoint.set(null);
   app.hoverTrackMidpoint.set(null);
   app.markingPreview.set([]);
-  app.stopAudio();
+  app.media.stopAudio();
   app._lastAudioBuffer = null;
   app.audioCurrentTime.set(0);
   app.audioDuration.set(0);
@@ -75,12 +77,12 @@ export async function loadDefaultResources(app: App): Promise<void> {
   try {
     app.editorError.set('');
     app.resourcesStatus.set('Loading default resources.dat…');
-    const bytesResult = await app.readAssetBytes('resources.dat');
+    const bytesResult = await app.runtime.readAssetBytes('resources.dat');
     if (!bytesResult.isOk()) {
-      app.failEditor(bytesResult.error, 'Failed to load resources.');
+      failEditor(app, bytesResult.error, 'Failed to load resources.');
       return;
     }
-    await app.loadResourcesBytes(bytesResult.value, 'default resources.dat');
+    await loadResourcesBytes(app, bytesResult.value, 'default resources.dat');
   } catch (error) {
     app.editorError.set(error instanceof Error ? error.message : 'Failed to load resources.dat');
     app.resourcesStatus.set('Failed to load resources.');
@@ -95,7 +97,7 @@ export async function onResourceFileSelected(app: App, event: Event): Promise<vo
   app.editorError.set('');
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    await app.loadResourcesBytes(bytes, file.name);
+    await loadResourcesBytes(app, bytes, file.name);
   } catch (error) {
     app.editorError.set(error instanceof Error ? error.message : 'Failed to load file');
     app.resourcesStatus.set('Failed to load uploaded file.');
@@ -104,7 +106,7 @@ export async function onResourceFileSelected(app: App, event: Event): Promise<vo
 }
 
 export function clearEditorResources(app: App): void {
-  app.resetEditorData();
+  resetEditorData(app);
   app.snackBar.open('Editor file cleared', 'OK', {
     duration: 2500,
     panelClass: 'snack-success',
@@ -119,7 +121,7 @@ export async function downloadEditedResources(app: App): Promise<void> {
     const syncPromises: Promise<unknown>[] = [];
     for (const level of app.parsedLevels()) {
       syncPromises.push(
-      app.dispatchWorker<void>('APPLY_ROAD_SEGS', {
+      app.runtime.dispatchWorker<void>('APPLY_ROAD_SEGS', {
           resourceId: level.resourceId,
           roadSegs: level.roadSegs,
         }),
@@ -127,18 +129,18 @@ export async function downloadEditedResources(app: App): Promise<void> {
     }
     const selId = app.selectedLevelId();
     if (selId !== null) {
-      syncPromises.push(app.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }));
+      syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }));
       syncPromises.push(
-        app.dispatchWorker<void>('APPLY_TRACK', {
+        app.runtime.dispatchWorker<void>('APPLY_TRACK', {
           resourceId: selId,
           trackUp: app.editTrackUp(),
           trackDown: app.editTrackDown(),
         }),
       );
-      syncPromises.push(app.dispatchWorker<void>('APPLY_OBJECTS', { resourceId: selId, objects: app.objects() }));
+      syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_OBJECTS', { resourceId: selId, objects: app.objects() }));
       if (app.propertiesDirty()) {
         syncPromises.push(
-          app.dispatchWorker<void>('APPLY_PROPS', {
+          app.runtime.dispatchWorker<void>('APPLY_PROPS', {
             resourceId: selId,
             props: {
               roadInfo: app.editRoadInfo(),
@@ -155,7 +157,7 @@ export async function downloadEditedResources(app: App): Promise<void> {
     app.queueRoadInfoSync(syncPromises);
     await Promise.all(syncPromises);
     app.resourcesStatus.set('Serializing resources…');
-    const buf = await app.dispatchWorker<ArrayBuffer>('SERIALIZE');
+    const buf = await app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE');
     const blob = new Blob([buf], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -187,7 +189,7 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
     const syncPromises: Promise<unknown>[] = [];
     for (const level of app.parsedLevels()) {
       syncPromises.push(
-      app.dispatchWorker<void>('APPLY_ROAD_SEGS', {
+      app.runtime.dispatchWorker<void>('APPLY_ROAD_SEGS', {
           resourceId: level.resourceId,
           roadSegs: level.roadSegs,
         }),
@@ -195,18 +197,18 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
     }
     const selId = app.selectedLevelId();
     if (selId !== null) {
-      syncPromises.push(app.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }));
+      syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }));
       syncPromises.push(
-        app.dispatchWorker<void>('APPLY_TRACK', {
+        app.runtime.dispatchWorker<void>('APPLY_TRACK', {
           resourceId: selId,
           trackUp: app.editTrackUp(),
           trackDown: app.editTrackDown(),
         }),
       );
-      syncPromises.push(app.dispatchWorker<void>('APPLY_OBJECTS', { resourceId: selId, objects: app.objects() }));
+      syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_OBJECTS', { resourceId: selId, objects: app.objects() }));
       if (app.propertiesDirty()) {
         syncPromises.push(
-          app.dispatchWorker<void>('APPLY_PROPS', {
+          app.runtime.dispatchWorker<void>('APPLY_PROPS', {
             resourceId: selId,
             props: {
               roadInfo: app.editRoadInfo(),
@@ -223,10 +225,10 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
     app.queueRoadInfoSync(syncPromises);
     await Promise.all(syncPromises);
     app.resourcesStatus.set('Serializing…');
-    const buf = await app.dispatchWorker<ArrayBuffer>('SERIALIZE');
+    const buf = await app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE');
     const bytes = new Uint8Array(buf);
     const name = app.customResourcesName() ?? 'resources.dat';
-    await App._saveCustomResourcesDb(bytes, name);
+    await AppStateResources._saveCustomResourcesDb(bytes, name);
     app.customResourcesName.set(name);
     app.customResourcesLoaded.set(true);
     app.resourcesStatus.set('Saved to game. Restart the game to apply changes.');
@@ -236,7 +238,7 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
         panelClass: 'snack-success',
       })
       .onAction()
-      .subscribe(() => app.restartGameWithCustomResources());
+      .subscribe(() => app.runtime.restartGameWithCustomResources());
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Failed to save resources';
     app.editorError.set(msg);

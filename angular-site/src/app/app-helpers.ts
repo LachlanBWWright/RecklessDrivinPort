@@ -36,6 +36,10 @@ export interface TrackOverlayPoint {
 
 export const ROAD_OVERHANG_PX = 700;
 
+export function levelDisplayNum(resourceId: number): number {
+  return resourceId - 139;
+}
+
 function sortNumbers(values: Iterable<number>): number[] {
   return Array.from(values).sort((a, b) => a - b);
 }

@@ -1,11 +1,13 @@
 import type { DecodedSpriteFrame } from './level-editor.service';
 import type { App } from './app';
+import { decodePackSpritesInBackground, failEditor } from './app-loaders';
+import { onTileEditorSaved } from './resource-browser';
 
 export async function selectSprite(app: App, spriteId: number): Promise<void> {
   app.selectedSpriteId.set(spriteId);
   app.currentSpriteBytes.set(null);
   try {
-    const result = await app.dispatchWorker<{ bytes: Uint8Array }>('GET_SPRITE_BYTES', { spriteId });
+    const result = await app.runtime.dispatchWorker<{ bytes: Uint8Array }>('GET_SPRITE_BYTES', { spriteId });
     app.currentSpriteBytes.set(result.bytes);
   } catch {
     // non-fatal: pixel canvas just stays empty
@@ -86,7 +88,7 @@ export async function onSpritePngUpload(app: App, event: Event, frameId: number)
 
   const frame: DecodedSpriteFrame | null = app.packSpriteDecodedFrames.get(frameId) ?? null;
   if (!frame) {
-    app.failEditor('Sprite frame not found');
+    failEditor(app, 'Sprite frame not found');
     return;
   }
 
@@ -105,14 +107,14 @@ export async function onSpritePngUpload(app: App, event: Event, frameId: number)
     canvas.height = frame.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      app.failEditor('Failed to get 2D context');
+      failEditor(app, 'Failed to get 2D context');
       return;
     }
     ctx.drawImage(img, 0, 0, frame.width, frame.height);
     const imageData = ctx.getImageData(0, 0, frame.width, frame.height);
 
     app.workerBusy.set(true);
-    const result = await app.dispatchWorker<{ levels: import('./level-editor.service').ParsedLevel[] }>(
+    const result = await app.runtime.dispatchWorker<{ levels: import('./level-editor.service').ParsedLevel[] }>(
       'APPLY_SPRITE_PACK_PIXELS',
       {
       frameId,
@@ -124,7 +126,7 @@ export async function onSpritePngUpload(app: App, event: Event, frameId: number)
       preserveCanvasView: true,
       refreshSelectedLevelState: false,
     });
-    app.decodePackSpritesInBackground();
+    void decodePackSpritesInBackground(app);
     app.resourcesStatus.set(`Sprite frame #${frameId} replaced from PNG.`);
   } catch (err) {
     app.editorError.set(err instanceof Error ? err.message : 'PNG upload failed');
@@ -153,7 +155,7 @@ export async function addSpriteFrame(app: App): Promise<void> {
       const width = Math.min(img.naturalWidth, 512);
       const height = Math.min(img.naturalHeight, 512);
       if (width <= 0 || height <= 0) {
-        app.failEditor('Invalid image dimensions');
+        failEditor(app, 'Invalid image dimensions');
         return;
       }
       const canvas = document.createElement('canvas');
@@ -161,7 +163,7 @@ export async function addSpriteFrame(app: App): Promise<void> {
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        app.failEditor('Failed to get 2D context');
+        failEditor(app, 'Failed to get 2D context');
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
@@ -198,12 +200,12 @@ export async function addSpriteFrame(app: App): Promise<void> {
       const existing = app.packSpriteFrames().map((frameInfo: { id: number }) => frameInfo.id);
       const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 128;
       if (nextId > 9999) {
-        app.failEditor('Too many sprite frames (max ID 9999)');
+        failEditor(app, 'Too many sprite frames (max ID 9999)');
         return;
       }
       const buf = data.buffer.slice(0);
-      await app.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 137, entryId: nextId, bytes: buf }, [buf]);
-      await app.decodePackSpritesInBackground();
+      await app.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 137, entryId: nextId, bytes: buf }, [buf]);
+      await decodePackSpritesInBackground(app);
       app.selectedPackSpriteId.set(nextId);
       app.resourcesStatus.set(`New sprite frame #${nextId} created.`);
       app.snackBar.open(`✓ Sprite #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
@@ -226,13 +228,13 @@ export async function onSpriteEditorSaved(
   const tileId = app._editingTileId;
   app._editingTileId = null;
   if (tileId !== null) {
-    await app.onTileEditorSaved(event);
+    await onTileEditorSaved(app, event);
     return;
   }
   try {
     app.workerBusy.set(true);
     const bitDepth = app.spriteEditorFrame()?.bitDepth ?? 16;
-    const result = await app.dispatchWorker<{ levels: import('./level-editor.service').ParsedLevel[] }>(
+    const result = await app.runtime.dispatchWorker<{ levels: import('./level-editor.service').ParsedLevel[] }>(
       'APPLY_SPRITE_PACK_PIXELS',
       {
       frameId: event.frameId,
@@ -244,7 +246,7 @@ export async function onSpriteEditorSaved(
       preserveCanvasView: true,
       refreshSelectedLevelState: false,
     });
-    app.decodePackSpritesInBackground();
+    void decodePackSpritesInBackground(app);
     app.resourcesStatus.set(`Sprite frame #${event.frameId} saved.`);
   } catch (err) {
     app.editorError.set(err instanceof Error ? err.message : 'Sprite save failed');

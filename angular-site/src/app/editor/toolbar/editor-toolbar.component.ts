@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
 import type { ParsedLevel } from '../../level-editor.service';
+import { levelDisplayNum } from '../../app-helpers';
 
 @Component({
   selector: 'app-editor-toolbar',
@@ -20,7 +21,5 @@ export class EditorToolbarComponent {
   @Output() saveEditedResourcesToGame = new EventEmitter<void>();
   @Output() selectLevel = new EventEmitter<number>();
 
-  levelDisplayNum(resourceId: number): number {
-    return resourceId - 139;
-  }
+  readonly levelDisplayNum = levelDisplayNum;
 }

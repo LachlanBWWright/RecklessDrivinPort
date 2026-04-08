@@ -29,7 +29,7 @@ export function confirmMarkCreateMode(app: App): void {
   app._pendingMarkPoints = [];
   app.pendingMarkPointCount.set(0);
   app._markCreateHoverPoint = null;
-  app.scheduleCanvasRedraw();
+  app.runtime.scheduleCanvasRedraw();
 }
 
 export function generateSideRoadMarks(
@@ -139,7 +139,7 @@ export function addMarkCreatePoint(app: App, x: number, y: number): void {
   app._pendingMarkPoints.push({ x, y });
   app.pendingMarkPointCount.set(app._pendingMarkPoints.length);
   app._markCreateHoverPoint = { x, y };
-  app.scheduleCanvasRedraw();
+  app.runtime.scheduleCanvasRedraw();
 }
 
 export function hasColocatedNubs(app: App): boolean {
@@ -263,7 +263,7 @@ export async function saveMarks(app: App): Promise<void> {
   if (id === null) return;
   try {
     app.workerBusy.set(true);
-    const result: { levels: import('./level-editor.service').ParsedLevel[] } = await app.dispatchWorker('APPLY_MARKS', {
+    const result: { levels: import('./level-editor.service').ParsedLevel[] } = await app.runtime.dispatchWorker('APPLY_MARKS', {
       resourceId: id,
       marks: app.marks(),
     });
@@ -377,6 +377,6 @@ export function applyBarrierDrawPath(app: App): void {
   app._lastBarriersSerialized = '';
   app._roadOffscreenKey = '';
   app.roadSegsVersion.update((v: number) => v + 1);
-  app.scheduleCanvasRedraw();
+  app.runtime.scheduleCanvasRedraw();
   app.snackBar.open(`✓ Barrier draw applied to ${side}.`, undefined, { duration: 1500 });
 }

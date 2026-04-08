@@ -22,14 +22,14 @@ describe('App', () => {
 
   it('should switch to editor tab', () => {
     const app = TestBed.createComponent(App).componentInstance;
-    app.setTab('editor');
+    app.runtime.setTab('editor');
     expect(app.activeTab()).toBe('editor');
   });
 
   it('should switch back to game tab', () => {
     const app = TestBed.createComponent(App).componentInstance;
-    app.setTab('editor');
-    app.setTab('game');
+    app.runtime.setTab('editor');
+    app.runtime.setTab('game');
     expect(app.activeTab()).toBe('game');
   });
 
@@ -45,11 +45,11 @@ describe('App', () => {
     } as unknown as NonNullable<typeof window.Module>;
 
     try {
-      app.setTab('editor');
+      app.runtime.setTab('editor');
       expect(pauseCount).toBe(1);
       expect(resumeCount).toBe(0);
 
-      app.setTab('game');
+      app.runtime.setTab('game');
       expect(resumeCount).toBe(1);
     } finally {
       window.Module = originalModule;
@@ -110,13 +110,13 @@ describe('App', () => {
 
   it('should switch editor sections', () => {
     const app = TestBed.createComponent(App).componentInstance;
-    app.setSection('objects');
+    app.runtime.setSection('objects');
     expect(app.editorSection()).toBe('objects');
-    app.setSection('object-types');
+    app.runtime.setSection('object-types');
     expect(app.editorSection()).toBe('object-types');
-    app.setSection('sprites');
+    app.runtime.setSection('sprites');
     expect(app.editorSection()).toBe('sprites');
-    app.setSection('properties');
+    app.runtime.setSection('properties');
     expect(app.editorSection()).toBe('properties');
   });
 
@@ -187,7 +187,7 @@ describe('App', () => {
     Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, configurable: true });
 
     try {
-      await app.downloadEditedResources();
+      await app.runtime.downloadEditedResources();
     } finally {
       (app as unknown as { dispatchWorker: unknown }).dispatchWorker = originalDispatchWorker;
       Object.defineProperty(URL, 'createObjectURL', { value: originalCreateObjectURL, configurable: true });
@@ -549,7 +549,7 @@ describe('App', () => {
 
     // restartGameWithCustomResources calls window.location.reload() after a setTimeout.
     // In jsdom that setTimeout is async; we only check that gameRestarting flips synchronously.
-    app.restartGameWithCustomResources();
+    app.runtime.restartGameWithCustomResources();
 
     expect(app.gameRestarting()).toBe(true);
   });
@@ -559,7 +559,7 @@ describe('App', () => {
     app.customResourcesLoaded.set(true);
     app.customResourcesName.set('my-resources.dat');
 
-    app.clearCustomResources();
+    app.runtime.clearCustomResources();
 
     expect(app.customResourcesLoaded()).toBe(false);
     expect(app.customResourcesName()).toBeNull();

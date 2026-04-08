@@ -36,7 +36,7 @@ export function createSourceFromBuffer(
       app.audioPlaying.set(false);
       app._audioSource = null;
       app._audioPauseOffset = 0;
-      app._updateAudioProgressRaf();
+      updateAudioProgressRaf(app);
     }
   };
   source.start(0, offsetSeconds);
@@ -59,7 +59,7 @@ export function startAudioBuffer(app: App, buffer: AudioBuffer, offset = 0): voi
   app.audioPlaying.set(true);
   app.audioDuration.set(buffer.duration);
   app.audioCurrentTime.set(offset);
-  app._updateAudioProgressRaf();
+  updateAudioProgressRaf(app);
 }
 
 export async function togglePlayPause(app: App): Promise<void> {
@@ -80,7 +80,7 @@ export async function togglePlayPause(app: App): Promise<void> {
     return;
   }
   if (app.audioPlaying()) {
-    app.stopAudio();
+    app.media.stopAudio();
     return;
   }
   try {
@@ -91,7 +91,7 @@ export async function togglePlayPause(app: App): Promise<void> {
         const ab = new Uint8Array(wavBytes).buffer;
         const audioBuf = await ctx.decodeAudioData(ab);
         app._lastAudioBuffer = audioBuf;
-        app._startAudioBuffer(audioBuf, app._audioPauseOffset);
+        startAudioBuffer(app, audioBuf, app._audioPauseOffset);
         return;
       } catch {
         app._lastAudioBuffer = null;
@@ -133,7 +133,7 @@ export function stopAudio(app: App): void {
   app.audioPlaying.set(false);
   app._audioPauseOffset = 0;
   app.audioCurrentTime.set(0);
-  app._updateAudioProgressRaf();
+  updateAudioProgressRaf(app);
 }
 
 export function seekAudio(app: App, seconds: number): void {
@@ -146,7 +146,7 @@ export function seekAudio(app: App, seconds: number): void {
       /* ignore */
     }
   }
-  app._startAudioBuffer(app._lastAudioBuffer, clamped);
+  startAudioBuffer(app, app._lastAudioBuffer, clamped);
 }
 
 export function updateAudioProgressRaf(app: App): void {
