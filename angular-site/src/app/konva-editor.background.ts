@@ -1,3 +1,4 @@
+import { err, ok, type Result } from 'neverthrow';
 import Konva from 'konva';
 
 export async function createOffscreenBitmap(
@@ -5,16 +6,16 @@ export async function createOffscreenBitmap(
   logicalW: number,
   logicalH: number,
   dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1)),
-): Promise<ImageBitmap> {
+): Promise<Result<ImageBitmap, string>> {
   const off = document.createElement('canvas');
   off.width = Math.max(1, Math.floor(logicalW * dpr));
   off.height = Math.max(1, Math.floor(logicalH * dpr));
   const ctx = off.getContext('2d');
-  if (!ctx) throw new Error('Unable to get 2D context for offscreen canvas');
+  if (!ctx) return err('Unable to get 2D context for offscreen canvas');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawFn(ctx, logicalW, logicalH);
   const bitmap = await createImageBitmap(off);
-  return bitmap;
+  return ok(bitmap);
 }
 
 export function applyBackgroundTransform(

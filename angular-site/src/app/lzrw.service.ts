@@ -16,6 +16,8 @@
  *   packHandleCompress(data)  – encode as FLAG_COPY (uncompressed) handle for round-trip writes
  */
 
+import { err, ok, type Result } from 'neverthrow';
+
 const HASH_TABLE_LEN = 4096;
 const DEPTH_BITS = 3;
 const DEPTH = 1 << DEPTH_BITS; // 8
@@ -152,14 +154,14 @@ export function lzrw3aDecompress(src: Uint8Array): Uint8Array {
  *
  * Handle format: [4-byte BE uint32 uncompressed_size] [FLAG_BYTE…payload]
  */
-export function packHandleDecompress(handle: Uint8Array): Uint8Array {
-  if (handle.length < 5) throw new Error('Pack handle too short');
+export function packHandleDecompress(handle: Uint8Array): Result<Uint8Array, string> {
+  if (handle.length < 5) return err('Pack handle too short');
 
   const view = new DataView(handle.buffer, handle.byteOffset, handle.byteLength);
   const uncompressedSize = view.getUint32(0, false); // big-endian
 
   if (uncompressedSize > 32 * 1024 * 1024) {
-    throw new Error(`Suspicious uncompressed size: ${uncompressedSize}`);
+    return err(`Suspicious uncompressed size: ${uncompressedSize}`);
   }
 
   const payload = handle.slice(4); // [FLAG_BYTE][…]
@@ -172,7 +174,7 @@ export function packHandleDecompress(handle: Uint8Array): Uint8Array {
     );
   }
 
-  return decompressed;
+  return ok(decompressed);
 }
 
 /**

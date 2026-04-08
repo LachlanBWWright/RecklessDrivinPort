@@ -717,7 +717,12 @@ export class KonvaEditorService implements OnDestroy {
     const t = profiler.start('konva.setOffscreenBackground');
     if (!this.stage || !this.bgImageNode || !this.bgLayer) { t.end(); return; }
     const dpr = desiredDpr ?? Math.max(1, Math.floor(window.devicePixelRatio || 1));
-    this.bgBitmap = await _createOffscreenBitmap(drawFn, this._logicalW, this._logicalH, dpr);
+    const bitmapResult = await _createOffscreenBitmap(drawFn, this._logicalW, this._logicalH, dpr);
+    if (!bitmapResult.isOk()) {
+      t.end();
+      return;
+    }
+    this.bgBitmap = bitmapResult.value;
     this.bgImageNode.image(this.bgBitmap);
     this.bgImageNode.width(this._logicalW);
     this.bgImageNode.height(this._logicalH);

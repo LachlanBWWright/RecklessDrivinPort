@@ -22,7 +22,10 @@ describe('lzrw3aDecompress', () => {
   it('round-trip via packHandleCompress/Decompress preserves data', () => {
     const original = new Uint8Array([10, 20, 30, 40, 50, 60, 70, 80]);
     const handle = packHandleCompress(original);
-    const decompressed = packHandleDecompress(handle);
+    const decompressedResult = packHandleDecompress(handle);
+    expect(decompressedResult.isOk()).toBe(true);
+    if (decompressedResult.isErr()) return;
+    const decompressed = decompressedResult.value;
     expect(Array.from(decompressed)).toEqual(Array.from(original));
   });
 
@@ -35,7 +38,7 @@ describe('lzrw3aDecompress', () => {
   });
 
   it('packHandleDecompress throws on handle too short', () => {
-    expect(() => packHandleDecompress(new Uint8Array(3))).toThrow();
+    expect(packHandleDecompress(new Uint8Array(3)).isErr()).toBe(true);
   });
 
   it('packHandleCompress produces compressed (non-FLAG_COPY) marker', () => {
@@ -57,13 +60,17 @@ describe('lzrw3aDecompress', () => {
     for (let i = 0; i < 256; i++) original[i] = i & 0xff;
     const handle = packHandleCompress(original);
     const result = packHandleDecompress(handle);
-    expect(Array.from(result)).toEqual(Array.from(original));
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(Array.from(result.value)).toEqual(Array.from(original));
   });
 
   it('round-trip with all-zero data', () => {
     const original = new Uint8Array(100);
     const result = packHandleDecompress(packHandleCompress(original));
-    expect(result.every((b) => b === 0)).toBe(true);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value.every((b) => b === 0)).toBe(true);
   });
 
   it('compresses repetitive data smaller than FLAG_COPY', () => {
@@ -77,7 +84,9 @@ describe('lzrw3aDecompress', () => {
     expect(handle.length).toBeLessThan(copySize);
     // Must round-trip correctly
     const result = packHandleDecompress(handle);
-    expect(Array.from(result)).toEqual(Array.from(original));
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(Array.from(result.value)).toEqual(Array.from(original));
   });
 
   it('round-trip with large random-ish data', () => {
@@ -86,6 +95,8 @@ describe('lzrw3aDecompress', () => {
     for (let i = 0; i < 1024; i++) original[i] = (i * 7 + (i >> 3)) & 0xFF;
     const handle = packHandleCompress(original);
     const result = packHandleDecompress(handle);
-    expect(Array.from(result)).toEqual(Array.from(original));
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(Array.from(result.value)).toEqual(Array.from(original));
   });
 });

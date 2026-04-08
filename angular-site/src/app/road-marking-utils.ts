@@ -115,19 +115,6 @@ function collectLineGroups(
   return groups;
 }
 
-function lineGroupToSegments(points: readonly LinePoint[]): MarkSeg[] {
-  const segments: MarkSeg[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    segments.push({
-      x1: Math.round(points[i].x),
-      y1: Math.round(points[i].y),
-      x2: Math.round(points[i + 1].x),
-      y2: Math.round(points[i + 1].y),
-    });
-  }
-  return segments;
-}
-
 function pointAtDistance(points: readonly LinePoint[], distance: number): LinePoint {
   if (distance <= 0) return points[0];
   let remaining = distance;
