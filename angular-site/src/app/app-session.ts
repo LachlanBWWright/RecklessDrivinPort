@@ -75,20 +75,15 @@ export function resetEditorData(app: App): void {
 }
 
 export async function loadDefaultResources(app: App): Promise<void> {
-  try {
-    app.editorError.set('');
-    app.resourcesStatus.set('Loading default resources.dat…');
-    const bytesResult = await app.runtime.readAssetBytes('resources.dat');
-    if (!bytesResult.isOk()) {
-      failEditor(app, bytesResult.error, 'Failed to load resources.');
-      return;
-    }
-    await loadResourcesBytes(app, bytesResult.value, 'default resources.dat');
-  } catch (error) {
-    app.editorError.set(error instanceof Error ? error.message : 'Failed to load resources.dat');
-    app.resourcesStatus.set('Failed to load resources.');
-    app.workerBusy.set(false);
-  }
+  app.editorError.set('');
+  app.resourcesStatus.set('Loading default resources.dat…');
+  const bytesResult = await app.runtime.readAssetBytes('resources.dat');
+  await bytesResult.match(
+    (bytes) => loadResourcesBytes(app, bytes, 'default resources.dat'),
+    (error) => {
+      failEditor(app, error, 'Failed to load resources.');
+    },
+  );
 }
 
 export async function onResourceFileSelected(app: App, event: Event): Promise<void> {
@@ -96,14 +91,16 @@ export async function onResourceFileSelected(app: App, event: Event): Promise<vo
   const file = input?.files?.[0];
   if (!file) return;
   app.editorError.set('');
-  try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    await loadResourcesBytes(app, bytes, file.name);
-  } catch (error) {
-    app.editorError.set(error instanceof Error ? error.message : 'Failed to load file');
-    app.resourcesStatus.set('Failed to load uploaded file.');
-    app.workerBusy.set(false);
-  }
+  await resultFromPromise(file.arrayBuffer(), 'Failed to read file')
+    .andThen((buf) => resultFromPromise(loadResourcesBytes(app, new Uint8Array(buf), file.name), 'Failed to parse file'))
+    .match(
+      () => {},
+      (error) => {
+        app.editorError.set(error);
+        app.resourcesStatus.set('Failed to load uploaded file.');
+        app.workerBusy.set(false);
+      },
+    );
 }
 
 export function clearEditorResources(app: App): void {

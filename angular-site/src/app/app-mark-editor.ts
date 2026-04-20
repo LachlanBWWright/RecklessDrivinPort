@@ -1,6 +1,7 @@
 import { clampBarrierPoint, generateCentreDashMarkings, generateSideMarkings, sampleQuadraticBezier, type MarkingRoadSelection } from './road-marking-utils';
 import type { MarkSeg, RoadSeg } from './level-editor.service';
 import type { App } from './app';
+import { resultFromPromise } from './result-helpers';
 
 export function addMark(app: App): void {
   app._pushUndo('marks');
@@ -261,24 +262,21 @@ export function onMarkFieldInput(app: App, markIdx: number, field: 'x1' | 'y1' |
 export async function saveMarks(app: App): Promise<void> {
   const id = app.selectedLevelId();
   if (id === null) return;
-  try {
-    app.workerBusy.set(true);
-    const result: { levels: import('./level-editor.service').ParsedLevel[] } = await app.runtime.dispatchWorker('APPLY_MARKS', {
-      resourceId: id,
-      marks: app.marks(),
-    });
-    app.applyLevelsResult(result.levels, {
-      preserveCanvasView: true,
-      refreshSelectedLevelState: false,
-    });
-    const msg = `Saved ${app.marks().length} mark segments for level ${id - 139}.`;
-    app.resourcesStatus.set(msg);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Save failed';
-    app.editorError.set(msg);
-  } finally {
-    app.workerBusy.set(false);
-  }
+  app.workerBusy.set(true);
+  type MarkResult = { levels: import('./level-editor.service').ParsedLevel[] };
+  await resultFromPromise(
+    app.runtime.dispatchWorker<MarkResult>('APPLY_MARKS', { resourceId: id, marks: app.marks() }),
+    'Save failed',
+  ).match(
+    (result) => {
+      app.applyLevelsResult(result.levels, { preserveCanvasView: true, refreshSelectedLevelState: false });
+      app.resourcesStatus.set(`Saved ${app.marks().length} mark segments for level ${id - 139}.`);
+    },
+    (msg) => {
+      app.editorError.set(msg);
+    },
+  );
+  app.workerBusy.set(false);
 }
 
 export function scheduleMarkAutoSave(app: App): void {
