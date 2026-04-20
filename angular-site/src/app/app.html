@@ -208,6 +208,8 @@
             (hideAll)="hideAllObjectTypes()"
             (removeSelected)="removeSelectedObject()"
             (deselect)="selectedObjIndex.set(null)"
+            (markSelected)="selectedMarkIndex.set($event)"
+            (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
           ></app-editor-objects-section>
         }
 
