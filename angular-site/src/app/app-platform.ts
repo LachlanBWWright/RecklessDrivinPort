@@ -78,16 +78,14 @@ export function setupEmscriptenModule(app: App): void {
   } as typeof XMLHttpRequest.prototype.open;
 
   if (typeof window.crossOriginIsolated !== 'undefined' && !window.crossOriginIsolated) {
-    app.statusText.set(
-      'Cross-origin isolation unavailable – the WASM game requires SharedArrayBuffer. ' +
-        'The server must send Cross-Origin-Opener-Policy: same-origin and ' +
+    // Log a developer hint to the console only – do not pollute the game status
+    // text with a technical server-config message that end users cannot act on.
+    console.warn(
+      '[RecklessDrivin] Cross-origin isolation unavailable – WASM with SharedArrayBuffer ' +
+        'will fail. The server must send Cross-Origin-Opener-Policy: same-origin and ' +
         'Cross-Origin-Embedder-Policy: require-corp headers. ' +
-        'Run `npm start` from the angular-site directory (the built-in dev server already ' +
-        'sets these headers). The level editor will still work without the game.',
-    );
-    console.error(
-      '[Angular] window.crossOriginIsolated is false – WASM with SharedArrayBuffer will fail. ' +
-        'Use `npm start` (ng serve) which sets COOP/COEP headers automatically.',
+        'Run `npm start` (ng serve) to enable these headers automatically. ' +
+        'The level editor will still work without the game.',
     );
   }
 
