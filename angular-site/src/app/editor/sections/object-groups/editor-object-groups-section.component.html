@@ -127,25 +127,25 @@
                     <div class="object-group-entry__bottom">
                       <mat-form-field appearance="outline" class="object-group-number-field">
                         <mat-label>minOffs</mat-label>
-                        <input matInput type="number" [value]="entry.minOffs"
+                        <input matInput type="number" [appValue]="entry.minOffs"
                           [disabled]="workerBusy"
                           (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'minOffs', event: $event })" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-number-field">
                         <mat-label>maxOffs</mat-label>
-                        <input matInput type="number" [value]="entry.maxOffs"
+                        <input matInput type="number" [appValue]="entry.maxOffs"
                           [disabled]="workerBusy"
                           (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'maxOffs', event: $event })" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-number-field">
                         <mat-label>probility</mat-label>
-                        <input matInput type="number" [value]="entry.probility"
+                        <input matInput type="number" [appValue]="entry.probility"
                           [disabled]="workerBusy"
                           (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'probility', event: $event })" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-dir-field">
                         <mat-label>Direction</mat-label>
-                        <input matInput type="number" step="0.01" [value]="entry.dir"
+                        <input matInput type="number" step="0.01" [appValue]="entry.dir"
                           [disabled]="workerBusy"
                           (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'dir', event: $event })" />
                         <span matSuffix class="dir-arrow-suffix">

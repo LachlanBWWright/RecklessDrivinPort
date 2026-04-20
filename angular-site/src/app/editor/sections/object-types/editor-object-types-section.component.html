@@ -132,7 +132,7 @@
                 <div class="object-type-field-grid object-type-field-grid--dense">
                   <mat-form-field appearance="outline">
                     <mat-label>Frame Count</mat-label>
-                    <input matInput type="number" [value]="type.numFrames"
+                    <input matInput type="number" [appValue]="type.numFrames"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'numFrames', $event)" />
                     <mat-hint>Raw `numFrames` encoding from the game</mat-hint>
@@ -140,91 +140,91 @@
 
                   <mat-form-field appearance="outline">
                     <mat-label>Frame Duration</mat-label>
-                    <input matInput type="number" step="0.01" [value]="type.frameDuration"
+                    <input matInput type="number" step="0.01" [appValue]="type.frameDuration"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'frameDuration', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Mass</mat-label>
-                    <input matInput type="number" step="0.1" [value]="type.mass"
+                    <input matInput type="number" step="0.1" [appValue]="type.mass"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'mass', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Engine Force</mat-label>
-                    <input matInput type="number" step="0.1" [value]="type.maxEngineForce"
+                    <input matInput type="number" step="0.1" [appValue]="type.maxEngineForce"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'maxEngineForce', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Reverse Force</mat-label>
-                    <input matInput type="number" step="0.1" [value]="type.maxNegEngineForce"
+                    <input matInput type="number" step="0.1" [appValue]="type.maxNegEngineForce"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'maxNegEngineForce', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Friction</mat-label>
-                    <input matInput type="number" step="0.01" [value]="type.friction"
+                    <input matInput type="number" step="0.01" [appValue]="type.friction"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'friction', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Steering</mat-label>
-                    <input matInput type="number" step="0.01" [value]="type.steering"
+                    <input matInput type="number" step="0.01" [appValue]="type.steering"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'steering', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Wheel Width</mat-label>
-                    <input matInput type="number" step="0.01" [value]="type.wheelWidth"
+                    <input matInput type="number" step="0.01" [appValue]="type.wheelWidth"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'wheelWidth', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Wheel Length</mat-label>
-                    <input matInput type="number" step="0.01" [value]="type.wheelLength"
+                    <input matInput type="number" step="0.01" [appValue]="type.wheelLength"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'wheelLength', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Collision Width</mat-label>
-                    <input matInput type="number" step="0.01" [value]="type.width"
+                    <input matInput type="number" step="0.01" [appValue]="type.width"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'width', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Collision Length</mat-label>
-                    <input matInput type="number" step="0.01" [value]="type.length"
+                    <input matInput type="number" step="0.01" [appValue]="type.length"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'length', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Score</mat-label>
-                    <input matInput type="number" [value]="type.score"
+                    <input matInput type="number" [appValue]="type.score"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'score', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Max Damage</mat-label>
-                    <input matInput type="number" step="0.1" [value]="type.maxDamage"
+                    <input matInput type="number" step="0.1" [appValue]="type.maxDamage"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'maxDamage', $event)" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Weapon Info</mat-label>
-                    <input matInput type="number" [value]="type.weaponInfo"
+                    <input matInput type="number" [appValue]="type.weaponInfo"
                       [disabled]="workerBusy"
                       (input)="onFieldInput(type.typeRes, 'weaponInfo', $event)" />
                   </mat-form-field>

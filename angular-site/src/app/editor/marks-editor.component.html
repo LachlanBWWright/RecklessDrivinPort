@@ -11,22 +11,22 @@
     <div class="mark-fields-row">
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P1 X</mat-label>
-        <input matInput type="number" [value]="mark.x1"
+        <input matInput type="number" [appValue]="mark.x1"
           (input)="onFieldInput(selectedMarkIndex, 'x1', $event)" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P1 Y</mat-label>
-        <input matInput type="number" [value]="mark.y1"
+        <input matInput type="number" [appValue]="mark.y1"
           (input)="onFieldInput(selectedMarkIndex, 'y1', $event)" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P2 X</mat-label>
-        <input matInput type="number" [value]="mark.x2"
+        <input matInput type="number" [appValue]="mark.x2"
           (input)="onFieldInput(selectedMarkIndex, 'x2', $event)" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P2 Y</mat-label>
-        <input matInput type="number" [value]="mark.y2"
+        <input matInput type="number" [appValue]="mark.y2"
           (input)="onFieldInput(selectedMarkIndex, 'y2', $event)" />
       </mat-form-field>
     </div>
