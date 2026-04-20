@@ -2,6 +2,7 @@ import type { LevelProperties, RoadInfoData, ParsedLevel } from './level-editor.
 import { buildRoadTileGroups, getRoadReferenceLevelNums, getTileReferenceRoadInfoIds } from './app-helpers';
 import { ROAD_THEMES } from './object-canvas';
 import type { App } from './app';
+import { resultFromPromise } from './result-helpers';
 
 declare module './app' {
   interface App {
@@ -125,33 +126,34 @@ export async function createRoadInfo(app: App): Promise<void> {
 
   const previousMap = new Map(app.roadInfoDataMap);
   const previousSelectedRoadId = app.selectedRoadInfoId();
-  const previousEditRoadInfoData = app.editRoadInfoData();
-  const previousEditRoadInfo = previousEditRoadInfoData ? { ...previousEditRoadInfoData } : null;
+  const _editData = app.editRoadInfoData();
+  const previousEditRoadInfo = _editData ? { ..._editData } : null;
 
   app.roadInfoDataMap.set(newRoadInfoId, newRoadInfo);
   refreshRoadInfoDerivedState(app);
   setSelectedRoadInfo(app, newRoadInfoId);
 
-  try {
-    app.workerBusy.set(true);
-    await applyRoadInfoDataToWorker(app, newRoadInfoId, newRoadInfo);
-    app.resourcesStatus.set(`Created road ${newRoadInfoId}.`);
-    app.snackBar.open(`✓ Road ${newRoadInfoId} created`, 'OK', {
-      duration: 3000,
-      panelClass: 'snack-success',
-    });
-  } catch (error) {
-    app.roadInfoDataMap.clear();
-    for (const [id, roadInfo] of previousMap.entries()) app.roadInfoDataMap.set(id, roadInfo);
-    refreshRoadInfoDerivedState(app);
-    setSelectedRoadInfo(app, previousSelectedRoadId);
-    app.editRoadInfoData.set(previousEditRoadInfo);
-    const msg = error instanceof Error ? error.message : 'Failed to create road';
-    app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
-  } finally {
-    app.workerBusy.set(false);
-  }
+  app.workerBusy.set(true);
+  const result = await resultFromPromise(
+    applyRoadInfoDataToWorker(app, newRoadInfoId, newRoadInfo),
+    'Failed to create road',
+  );
+  result.match(
+    () => {
+      app.resourcesStatus.set(`Created road ${newRoadInfoId}.`);
+      app.snackBar.open(`✓ Road ${newRoadInfoId} created`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+    },
+    (msg) => {
+      app.roadInfoDataMap.clear();
+      for (const [id, roadInfo] of previousMap.entries()) app.roadInfoDataMap.set(id, roadInfo);
+      refreshRoadInfoDerivedState(app);
+      setSelectedRoadInfo(app, previousSelectedRoadId);
+      app.editRoadInfoData.set(previousEditRoadInfo);
+      app.editorError.set(msg);
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    },
+  );
+  app.workerBusy.set(false);
 }
 
 export async function deleteRoadInfo(app: App, roadInfoId: number | null = app.selectedRoadInfoId()): Promise<void> {
@@ -166,32 +168,33 @@ export async function deleteRoadInfo(app: App, roadInfoId: number | null = app.s
 
   const previousMap = new Map(app.roadInfoDataMap);
   const previousSelectedRoadId = app.selectedRoadInfoId();
-  const previousEditRoadInfoData = app.editRoadInfoData();
-  const previousEditRoadInfo = previousEditRoadInfoData ? { ...previousEditRoadInfoData } : null;
+  const _editData = app.editRoadInfoData();
+  const previousEditRoadInfo = _editData ? { ..._editData } : null;
   app.roadInfoDataMap.delete(roadInfoId);
   refreshRoadInfoDerivedState(app);
   syncSelectedRoadInfoSelection(app, previousSelectedRoadId === roadInfoId ? app.editRoadInfo() : previousSelectedRoadId);
 
-  try {
-    app.workerBusy.set(true);
-    await app.runtime.dispatchWorker('REMOVE_ROAD_INFO', { roadInfoId });
-    app.resourcesStatus.set(`Deleted road ${roadInfoId}.`);
-    app.snackBar.open(`✓ Road ${roadInfoId} deleted`, 'OK', {
-      duration: 3000,
-      panelClass: 'snack-success',
-    });
-  } catch (error) {
-    app.roadInfoDataMap.clear();
-    for (const [id, roadInfo] of previousMap.entries()) app.roadInfoDataMap.set(id, roadInfo);
-    refreshRoadInfoDerivedState(app);
-    setSelectedRoadInfo(app, previousSelectedRoadId);
-    app.editRoadInfoData.set(previousEditRoadInfo);
-    const msg = error instanceof Error ? error.message : 'Failed to delete road';
-    app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
-  } finally {
-    app.workerBusy.set(false);
-  }
+  app.workerBusy.set(true);
+  const result = await resultFromPromise(
+    app.runtime.dispatchWorker('REMOVE_ROAD_INFO', { roadInfoId }),
+    'Failed to delete road',
+  );
+  result.match(
+    () => {
+      app.resourcesStatus.set(`Deleted road ${roadInfoId}.`);
+      app.snackBar.open(`✓ Road ${roadInfoId} deleted`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+    },
+    (msg) => {
+      app.roadInfoDataMap.clear();
+      for (const [id, roadInfo] of previousMap.entries()) app.roadInfoDataMap.set(id, roadInfo);
+      refreshRoadInfoDerivedState(app);
+      setSelectedRoadInfo(app, previousSelectedRoadId);
+      app.editRoadInfoData.set(previousEditRoadInfo);
+      app.editorError.set(msg);
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    },
+  );
+  app.workerBusy.set(false);
 }
 
 export function queueRoadInfoSync(app: App, syncPromises: Promise<unknown>[]): void {

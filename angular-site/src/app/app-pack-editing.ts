@@ -1,6 +1,7 @@
 import type { ObjectGroupDefinition, ObjectGroupEntryData, ObjectTypeDefinition } from './level-editor.service';
 import type { App } from './app';
 import { decodeSpritePreviewsInBackground } from './app-loaders';
+import { resultFromPromise } from './result-helpers';
 
 export function cloneObjectGroupDefinitions(app: App, groups = app.objectGroupDefinitions()): ObjectGroupDefinition[] {
   return groups.map((group: ObjectGroupDefinition) => ({
@@ -100,37 +101,36 @@ export async function saveObjectGroups(app: App): Promise<void> {
   const groups = app.objectGroupDefinitions();
   if (!app.objectGroupsDirty()) return;
   const saveRevision = app.objectGroupsEditRevision;
-  try {
-    if (app.workerBusy()) {
-      app.scheduleObjectGroupsAutoSave();
-      return;
-    }
-    app.workerBusy.set(true);
-    const result: { objectGroups: ObjectGroupDefinition[] } = await app.runtime.dispatchWorker('APPLY_OBJECT_GROUPS', {
-      objectGroups: groups,
-    });
-    app.objectGroupDefinitions.set(result.objectGroups);
-    if (!result.objectGroups.some((group: ObjectGroupDefinition) => group.id === app.selectedObjectGroupId())) {
-      app.selectedObjectGroupId.set(result.objectGroups[0]?.id ?? null);
-    }
-    if (app.objectGroupsEditRevision === saveRevision) {
-      app.objectGroupsDirty.set(false);
-      app.resourcesStatus.set(`Saved ${result.objectGroups.length} object group(s).`);
-      app.snackBar.open(`✓ Object groups saved`, 'OK', {
-        duration: 3000,
-        panelClass: 'snack-success',
-      });
-    } else {
-      app.markObjectGroupsDirty();
-      app.scheduleObjectGroupsAutoSave();
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Object group save failed';
-    app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
-  } finally {
-    app.workerBusy.set(false);
+  if (app.workerBusy()) {
+    app.scheduleObjectGroupsAutoSave();
+    return;
   }
+  app.workerBusy.set(true);
+  const result = await resultFromPromise(
+    app.runtime.dispatchWorker<{ objectGroups: ObjectGroupDefinition[] }>('APPLY_OBJECT_GROUPS', { objectGroups: groups }),
+    'Object group save failed',
+  );
+  result.match(
+    (data) => {
+      app.objectGroupDefinitions.set(data.objectGroups);
+      if (!data.objectGroups.some((group: ObjectGroupDefinition) => group.id === app.selectedObjectGroupId())) {
+        app.selectedObjectGroupId.set(data.objectGroups[0]?.id ?? null);
+      }
+      if (app.objectGroupsEditRevision === saveRevision) {
+        app.objectGroupsDirty.set(false);
+        app.resourcesStatus.set(`Saved ${data.objectGroups.length} object group(s).`);
+        app.snackBar.open(`✓ Object groups saved`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      } else {
+        app.markObjectGroupsDirty();
+        app.scheduleObjectGroupsAutoSave();
+      }
+    },
+    (msg) => {
+      app.editorError.set(msg);
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    },
+  );
+  app.workerBusy.set(false);
 }
 
 export function cloneObjectTypeDefinitions(app: App, defs = app.objectTypeDefinitions()): ObjectTypeDefinition[] {
@@ -289,36 +289,35 @@ export async function saveObjectTypes(app: App): Promise<void> {
   }
   const objectTypes = app.objectTypeDefinitions();
   const saveRevision = app.objectTypesEditRevision;
-  try {
-    app.workerBusy.set(true);
-    const result: { objectTypesArr: [number, ObjectTypeDefinition][] } = await app.runtime.dispatchWorker('APPLY_OBJECT_TYPES', {
-      objectTypes,
-    });
-    const defs: ObjectTypeDefinition[] = result.objectTypesArr.map(([, def]: [number, ObjectTypeDefinition]) => def).filter(
-      (def: ObjectTypeDefinition | null): def is ObjectTypeDefinition => !!def,
-    );
-    app.objectTypeDefinitions.set(defs);
-    syncObjectTypeLookup(app, defs);
-    if (!defs.some((def) => def.typeRes === app.selectedObjectTypeId())) {
-      app.selectedObjectTypeId.set(defs[0]?.typeRes ?? null);
-    }
-    if (app.objectTypesEditRevision === saveRevision) {
-      app.objectTypesDirty.set(false);
-    } else {
-      app.objectTypesDirty.set(true);
-      app.scheduleObjectTypesAutoSave();
-    }
-    void decodeSpritePreviewsInBackground(app, result.objectTypesArr);
-    app.resourcesStatus.set(`Saved ${defs.length} object type(s).`);
-    app.snackBar.open(`✓ Object types saved`, 'OK', {
-      duration: 3000,
-      panelClass: 'snack-success',
-    });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Object type save failed';
-    app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
-  } finally {
-    app.workerBusy.set(false);
-  }
+  app.workerBusy.set(true);
+  const result = await resultFromPromise(
+    app.runtime.dispatchWorker<{ objectTypesArr: [number, ObjectTypeDefinition][] }>('APPLY_OBJECT_TYPES', { objectTypes }),
+    'Object type save failed',
+  );
+  result.match(
+    (data) => {
+      const defs: ObjectTypeDefinition[] = data.objectTypesArr
+        .map(([, def]: [number, ObjectTypeDefinition]) => def)
+        .filter((def: ObjectTypeDefinition | null): def is ObjectTypeDefinition => !!def);
+      app.objectTypeDefinitions.set(defs);
+      syncObjectTypeLookup(app, defs);
+      if (!defs.some((def) => def.typeRes === app.selectedObjectTypeId())) {
+        app.selectedObjectTypeId.set(defs[0]?.typeRes ?? null);
+      }
+      if (app.objectTypesEditRevision === saveRevision) {
+        app.objectTypesDirty.set(false);
+      } else {
+        app.objectTypesDirty.set(true);
+        app.scheduleObjectTypesAutoSave();
+      }
+      void decodeSpritePreviewsInBackground(app, data.objectTypesArr);
+      app.resourcesStatus.set(`Saved ${defs.length} object type(s).`);
+      app.snackBar.open(`✓ Object types saved`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+    },
+    (msg) => {
+      app.editorError.set(msg);
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    },
+  );
+  app.workerBusy.set(false);
 }
