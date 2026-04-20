@@ -21,6 +21,7 @@ import {
   onPropertiesTabInput,
   onRoadInfoChange,
   onRoadInfoInput,
+  onRoadTexturePick,
   onTimeLimitChange,
   resetViewToRoad,
   selectLevel,
@@ -328,6 +329,10 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, event: Event): void {
     onRoadInfoInput(this, field, event);
+  }
+
+  onRoadTexturePick(field: import('./app-level').RoadTextureField, value: number): void {
+    onRoadTexturePick(this, field, value);
   }
 
   onTimeLimitChange(value: number): void {
@@ -707,11 +712,6 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   removeSelectedMark(): void {
     removeSelectedMark(this);
-  }
-
-  _appendGeneratedMarks(generated: { x1: number; y1: number; x2: number; y2: number }[], label: string): void {
-    void generated;
-    void label;
   }
 
   _addMarkCreatePoint(x: number, y: number): void {

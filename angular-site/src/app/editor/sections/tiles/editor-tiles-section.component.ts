@@ -27,6 +27,7 @@ export class EditorTilesSectionComponent implements OnChanges {
   @Output() createRoadInfo = new EventEmitter<void>();
   @Output() deleteRoadInfo = new EventEmitter<number>();
   @Output() roadInfoInput = new EventEmitter<{ field: Exclude<keyof RoadInfoData, 'id'>; event: Event }>();
+  @Output() roadTextureChange = new EventEmitter<{ field: TextureField; value: number }>();
   @Output() selectedTileIdChange = new EventEmitter<number | null>();
   @Output() deleteTileImage = new EventEmitter<number>();
   @Output() openTileEditor = new EventEmitter<number>();
@@ -108,9 +109,6 @@ export class EditorTilesSectionComponent implements OnChanges {
   }
 
   setRoadValue(field: TextureField, value: number): void {
-    this.roadInfoInput.emit({
-      field,
-      event: { target: { value: String(value) } } as unknown as Event,
-    });
+    this.roadTextureChange.emit({ field, value });
   }
 }

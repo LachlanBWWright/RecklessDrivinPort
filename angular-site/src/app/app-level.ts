@@ -4,6 +4,9 @@ import { cloneRoadInfoData, saveLevelProperties, setLevelRoadInfo, setSelectedRo
 
 export const MAX_TIME_VALUE = 65535;
 
+/** Texture fields stored in road info data that correspond to asset references. */
+export type RoadTextureField = 'backgroundTex' | 'foregroundTex' | 'roadLeftBorder' | 'roadRightBorder' | 'marks' | 'tracks' | 'skidSound';
+
 declare module './app' {
   interface App {
     selectLevel(id: number, options?: { preserveView?: boolean }): void;
@@ -12,6 +15,7 @@ declare module './app' {
     onRoadInfoChange(roadInfo: number): void;
     selectRoadInfo(roadInfo: number): void;
     onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, event: Event): void;
+    onRoadTexturePick(field: RoadTextureField, value: number): void;
     onTimeLimitChange(value: number): void;
     onPropertiesTabInput(e: { field: keyof LevelProperties; event: Event }): void;
     onObjGroupInput(index: number, field: 'resID' | 'numObjs', event: Event): void;
@@ -195,6 +199,28 @@ export function onTimeLimitChange(app: App, value: number): void {
   if (Number.isNaN(nextValue)) return;
   app._pushUndo('props');
   app.editTime.set(Math.max(0, Math.min(MAX_TIME_VALUE, Math.round(nextValue))));
+  app.markPropertiesDirty();
+}
+
+/**
+ * Handles a texture/asset field change coming from a `mat-select` (which
+ * provides the new value directly as a number rather than through an Event).
+ * Avoids the need to construct a synthetic Event object.
+ */
+export function onRoadTexturePick(app: App, field: RoadTextureField, value: number): void {
+  const currentId = app.selectedRoadInfoId();
+  const current = currentId !== null ? cloneRoadInfoData(app, app.roadInfoDataMap.get(currentId)) : null;
+  if (currentId === null || current === null) return;
+  app._pushUndo('props');
+  const next = { ...current, [field]: value };
+  app.editRoadInfoData.set(next);
+  app.selectedRoadInfoData.set({ ...next });
+  app.roadInfoDataMap.set(currentId, next);
+  void app.runtime.dispatchWorker('APPLY_ROAD_INFO', {
+    roadInfoId: currentId,
+    roadInfo: next,
+  });
+  app.refreshRoadInfoDerivedState();
   app.markPropertiesDirty();
 }
 

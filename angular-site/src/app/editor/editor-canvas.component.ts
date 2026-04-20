@@ -75,15 +75,10 @@ export class EditorCanvasComponent {
   @Output() toggleMarks = new EventEmitter<void>();
   @Output() barrierDrawSideChange = new EventEmitter<'v0' | 'v1' | 'i' | 'v2' | 'v3'>();
   @Output() drawModeChange = new EventEmitter<DrawMode>();
-  @Output() markSelected = new EventEmitter<number>();
   @Output() addMark = new EventEmitter<void>();
   @Output() removeMark = new EventEmitter<void>();
   @Output() startMarkCreate = new EventEmitter<void>();
   @Output() confirmMarkCreate = new EventEmitter<void>();
-  @Output() markFieldInput = new EventEmitter<{idx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event}>();
-  @Output() markCanvasMouseDown = new EventEmitter<MouseEvent>();
-  @Output() markCanvasMouseMove = new EventEmitter<MouseEvent>();
-  @Output() markCanvasMouseUp = new EventEmitter<MouseEvent>();
   @Output() panXChange = new EventEmitter<number>();
   @Output() panYChange = new EventEmitter<number>();
   @Output() generateSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number; yFrequency: number }>();
