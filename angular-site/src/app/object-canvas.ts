@@ -341,7 +341,7 @@ export function onCanvasMouseDown(app: App, event: MouseEvent): void {
     return;
   }
 
-  const [wx, wy] = canvasToWorld(app, event.offsetX, event.offsetY);
+  const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
   const objs = app.objects();
   const hitRadius = Math.max(MIN_HIT_RADIUS, BASE_HIT_RADIUS / app.canvasZoom());
 
@@ -427,7 +427,7 @@ export function onCanvasMouseMove(app: App, event: MouseEvent): void {
 
   const twp = app.dragTrackWaypoint();
   if (twp) {
-    const [wx, wy] = canvasToWorld(app, event.offsetX, event.offsetY);
+    const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
     const rx = Math.round(wx);
     const ry = Math.round(wy);
     app._pendingWaypointDragPos = { x: rx, y: ry };
@@ -440,7 +440,7 @@ export function onCanvasMouseMove(app: App, event: MouseEvent): void {
       app._pushUndo('props');
       app._startMarkerDragUndoCaptured = true;
     }
-    const [wx] = canvasToWorld(app, event.offsetX, event.offsetY);
+    const [wx] = app.canvasToWorld(event.offsetX, event.offsetY);
     app.editXStartPos.set(Math.round(wx));
     app.markPropertiesDirty();
     return;
@@ -453,7 +453,7 @@ export function onCanvasMouseMove(app: App, event: MouseEvent): void {
       const evY = event.offsetY;
       window.requestAnimationFrame(() => {
         app._hoverRafPending = false;
-        const [wx, wy] = canvasToWorld(app, evX, evY);
+        const [wx, wy] = app.canvasToWorld(evX, evY);
         const trackHitR = Math.max(12, 10 / app.canvasZoom());
         let found: TrackWaypointRef | null = null;
         for (let i = 0; i < app.editTrackUp().length && !found; i++) {
@@ -497,7 +497,7 @@ export function onCanvasMouseMove(app: App, event: MouseEvent): void {
 
   const dragIdx = app.dragObjIndex();
   if (dragIdx === null) return;
-  const [wx, wy] = canvasToWorld(app, event.offsetX, event.offsetY);
+  const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
   if (!app._objectDragUndoCaptured) {
     app._pushUndo('objects');
     app._objectDragUndoCaptured = true;
@@ -551,7 +551,7 @@ export function onCanvasMouseUp(app: App): void {
 
 export function onCanvasDoubleClick(app: App, event: MouseEvent): void {
   if (app.markCreateMode() || app.drawMode() !== 'none') return;
-  const [wx, wy] = canvasToWorld(app, event.offsetX, event.offsetY);
+  const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
   const objs = [...app.objects()];
   app._pushUndo('objects');
   objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: 128 });
@@ -561,7 +561,7 @@ export function onCanvasDoubleClick(app: App, event: MouseEvent): void {
 
 export function onCanvasContextMenu(app: App, event: MouseEvent): void {
   if (!app.showTrackOverlay()) return;
-  const [wx, wy] = canvasToWorld(app, event.offsetX, event.offsetY);
+  const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
   const trackUp = app.editTrackUp();
   const trackDown = app.editTrackDown();
   const trackHitR = Math.max(20, 14 / app.canvasZoom());

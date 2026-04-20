@@ -31,6 +31,17 @@ function getInputValue(event: Event): string | null {
   ) {
     return target.value;
   }
+  // Duck-type fallback for synthetic/test events whose target is not an HTML
+  // form element instance (e.g. cross-frame targets or objects created in unit
+  // tests).  Only accept a plain string `value` property.
+  if (
+    target !== null &&
+    typeof target === 'object' &&
+    'value' in target &&
+    typeof (target as Record<string, unknown>)['value'] === 'string'
+  ) {
+    return (target as { value: string }).value;
+  }
   return null;
 }
 

@@ -63,7 +63,7 @@ export class InputValueDirective implements OnChanges {
     Object.defineProperty(this._el.nativeElement, 'value', {
       configurable: true,
       enumerable: true,
-      get() { return origGet.call(this); },
+      get() { return origGet.call(this) as string; },
       set(v: string) { if (!dir._focused) origSet.call(this, v); },
     });
   }

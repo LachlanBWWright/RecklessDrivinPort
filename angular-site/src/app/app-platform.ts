@@ -223,11 +223,10 @@ export async function onCustomResourcesFileSelected(app: App, event: Event): Pro
 
 export function restartGameWithCustomResources(app: App): void {
   app.gameRestarting.set(true);
-  try {
-    window.location.reload();
-  } finally {
-    app.gameRestarting.set(false);
-  }
+  // window.location.reload() will destroy the page; if it doesn't execute
+  // (e.g. blocked by the browser or in a test environment) the restarting
+  // flag intentionally remains set so the UI stays in the loading state.
+  window.location.reload();
 }
 
 export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {
