@@ -58,7 +58,7 @@ describe('App', () => {
 
   it('should hide game panel when on editor tab', async () => {
     const fixture = TestBed.createComponent(App);
-    fixture.componentInstance.setTab('editor');
+    fixture.componentInstance.runtime.setTab('editor');
     fixture.detectChanges();
     await fixture.whenStable();
     const gamePanel = (fixture.nativeElement as HTMLElement).querySelector('#panel-game');
@@ -75,7 +75,7 @@ describe('App', () => {
 
   it('should show editor section when on editor tab', async () => {
     const fixture = TestBed.createComponent(App);
-    fixture.componentInstance.setTab('editor');
+    fixture.componentInstance.runtime.setTab('editor');
     fixture.detectChanges();
     await fixture.whenStable();
     expect((fixture.nativeElement as HTMLElement).querySelector('#panel-editor')).toBeTruthy();
@@ -90,7 +90,7 @@ describe('App', () => {
 
   it('should NOT show hero card when on editor tab', async () => {
     const fixture = TestBed.createComponent(App);
-    fixture.componentInstance.setTab('editor');
+    fixture.componentInstance.runtime.setTab('editor');
     fixture.detectChanges();
     await fixture.whenStable();
     expect((fixture.nativeElement as HTMLElement).querySelector('.hero-card')).toBeNull();
@@ -169,17 +169,17 @@ describe('App', () => {
     app.objectTypesDirty.set(true);
 
     const dispatchCalls: string[] = [];
-    const originalDispatchWorker = (app as unknown as { dispatchWorker: unknown }).dispatchWorker;
-    (app as unknown as { dispatchWorker: unknown }).dispatchWorker = async (cmd: string) => {
+    const originalDispatchWorker = app.runtime.dispatchWorker;
+    app.runtime.dispatchWorker = ((cmd: string) => {
       dispatchCalls.push(cmd);
       if (cmd === 'APPLY_OBJECT_TYPES') {
-        return { objectTypesArr: [[200, app.objectTypeDefinitions()[0]]] } as unknown;
+        return Promise.resolve({ objectTypesArr: [[200, app.objectTypeDefinitions()[0]]] });
       }
       if (cmd === 'SERIALIZE') {
-        return new ArrayBuffer(8) as unknown;
+        return Promise.resolve(new ArrayBuffer(8));
       }
-      return {} as unknown;
-    };
+      return Promise.resolve({});
+    }) as typeof app.runtime.dispatchWorker;
 
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -189,7 +189,7 @@ describe('App', () => {
     try {
       await app.runtime.downloadEditedResources();
     } finally {
-      (app as unknown as { dispatchWorker: unknown }).dispatchWorker = originalDispatchWorker;
+      app.runtime.dispatchWorker = originalDispatchWorker;
       Object.defineProperty(URL, 'createObjectURL', { value: originalCreateObjectURL, configurable: true });
       Object.defineProperty(URL, 'revokeObjectURL', { value: originalRevokeObjectURL, configurable: true });
     }
@@ -220,7 +220,7 @@ describe('App', () => {
 
     app.onCanvasMouseDown(mouseEvent(0, 0));
     app.onCanvasMouseMove(mouseEvent(0, 0));
-    app.onCanvasMouseUp(mouseEvent(0, 0));
+    app.onCanvasMouseUp();
 
     expect(app.objects()[0]).toEqual({ x: 150, y: 240, dir: 0, typeRes: 128 });
 
@@ -253,7 +253,7 @@ describe('App', () => {
 
     app.onCanvasMouseDown(mouseEvent(0, 0));
     app.onCanvasMouseMove(mouseEvent(0, 0));
-    app.onCanvasMouseUp(mouseEvent(0, 0));
+    app.onCanvasMouseUp();
 
     expect(app.editXStartPos()).toBe(150);
     expect(app.propertiesDirty()).toBe(true);
@@ -287,7 +287,7 @@ describe('App', () => {
 
     app.onCanvasMouseDown(mouseEvent(0, 0));
     app.onCanvasMouseMove(mouseEvent(0, 0));
-    app.onCanvasMouseUp(mouseEvent(0, 0));
+    app.onCanvasMouseUp();
 
     expect(app.editLevelEnd()).toBe(650);
     expect(app.propertiesDirty()).toBe(true);
@@ -416,7 +416,7 @@ describe('App', () => {
 
   it('should show load/upload controls in the editor when no level pack is loaded', async () => {
     const fixture = TestBed.createComponent(App);
-    fixture.componentInstance.setTab('editor');
+    fixture.componentInstance.runtime.setTab('editor');
     fixture.detectChanges();
     await fixture.whenStable();
 
@@ -431,7 +431,7 @@ describe('App', () => {
 
   it('should show clear/download controls and a level dropdown when the editor has data', async () => {
     const fixture = TestBed.createComponent(App);
-    fixture.componentInstance.setTab('editor');
+    fixture.componentInstance.runtime.setTab('editor');
     fixture.componentInstance.hasEditorData.set(true);
     fixture.componentInstance.parsedLevels.set([
       {

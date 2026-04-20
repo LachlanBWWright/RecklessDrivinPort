@@ -1,6 +1,7 @@
 import { App } from './app';
 import { AppStateResources } from './app-state-resources';
 import { failEditor, loadResourcesBytes } from './app-loaders';
+import { resultFromPromise } from './result-helpers';
 
 export function resetEditorData(app: App): void {
   app.hasEditorData.set(false);
@@ -113,137 +114,123 @@ export function clearEditorResources(app: App): void {
   });
 }
 
+/**
+ * Flushes all in-memory edits (objects, tracks, marks, road segs, properties,
+ * object groups, road info) to the pack worker so a subsequent SERIALIZE call
+ * will include them.
+ */
+async function flushPendingEdits(app: App): Promise<void> {
+  const syncPromises: Promise<unknown>[] = [];
+  for (const level of app.parsedLevels()) {
+    syncPromises.push(
+      app.runtime.dispatchWorker<void>('APPLY_ROAD_SEGS', {
+        resourceId: level.resourceId,
+        roadSegs: level.roadSegs,
+      }),
+    );
+  }
+  const selId = app.selectedLevelId();
+  if (selId !== null) {
+    syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }));
+    syncPromises.push(
+      app.runtime.dispatchWorker<void>('APPLY_TRACK', {
+        resourceId: selId,
+        trackUp: app.editTrackUp(),
+        trackDown: app.editTrackDown(),
+      }),
+    );
+    syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_OBJECTS', { resourceId: selId, objects: app.objects() }));
+    if (app.propertiesDirty()) {
+      syncPromises.push(
+        app.runtime.dispatchWorker<void>('APPLY_PROPS', {
+          resourceId: selId,
+          props: {
+            roadInfo: app.editRoadInfo(),
+            time: app.editTime(),
+            xStartPos: app.editXStartPos(),
+            levelEnd: app.editLevelEnd(),
+            objectGroups: app.editObjectGroups(),
+          },
+        }),
+      );
+    }
+  }
+  app.queuePackSync(syncPromises);
+  app.queueRoadInfoSync(syncPromises);
+  await Promise.all(syncPromises);
+}
+
 export async function downloadEditedResources(app: App): Promise<void> {
   if (!app.hasEditorData()) return;
-  try {
-    app.workerBusy.set(true);
-    app.resourcesStatus.set('Saving pending edits before download…');
-    const syncPromises: Promise<unknown>[] = [];
-    for (const level of app.parsedLevels()) {
-      syncPromises.push(
-      app.runtime.dispatchWorker<void>('APPLY_ROAD_SEGS', {
-          resourceId: level.resourceId,
-          roadSegs: level.roadSegs,
-        }),
+  app.workerBusy.set(true);
+  app.resourcesStatus.set('Saving pending edits before download…');
+
+  await resultFromPromise(flushPendingEdits(app), 'Failed to flush pending edits')
+    .andThen(() => {
+      app.resourcesStatus.set('Serializing resources…');
+      return resultFromPromise(
+        app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE'),
+        'Failed to serialize resources',
       );
-    }
-    const selId = app.selectedLevelId();
-    if (selId !== null) {
-      syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }));
-      syncPromises.push(
-        app.runtime.dispatchWorker<void>('APPLY_TRACK', {
-          resourceId: selId,
-          trackUp: app.editTrackUp(),
-          trackDown: app.editTrackDown(),
-        }),
-      );
-      syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_OBJECTS', { resourceId: selId, objects: app.objects() }));
-      if (app.propertiesDirty()) {
-        syncPromises.push(
-          app.runtime.dispatchWorker<void>('APPLY_PROPS', {
-            resourceId: selId,
-            props: {
-              roadInfo: app.editRoadInfo(),
-              time: app.editTime(),
-              xStartPos: app.editXStartPos(),
-              levelEnd: app.editLevelEnd(),
-              objectGroups: app.editObjectGroups(),
-            },
-          }),
-        );
-      }
-    }
-    app.queuePackSync(syncPromises);
-    app.queueRoadInfoSync(syncPromises);
-    await Promise.all(syncPromises);
-    app.resourcesStatus.set('Serializing resources…');
-    const buf = await app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE');
-    const blob = new Blob([buf], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'resources.dat';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    app.resourcesStatus.set('Downloaded updated resources.dat.');
-    app.snackBar.open('✓ Downloaded resources.dat', 'OK', {
-      duration: 3000,
-      panelClass: 'snack-success',
-    });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Failed to serialize resources';
-    app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
-  } finally {
-    app.workerBusy.set(false);
-  }
+    })
+    .match(
+      (buf) => {
+        const blob = new Blob([buf], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'resources.dat';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        app.resourcesStatus.set('Downloaded updated resources.dat.');
+        app.snackBar.open('✓ Downloaded resources.dat', 'OK', { duration: 3000, panelClass: 'snack-success' });
+      },
+      (msg) => {
+        app.editorError.set(msg);
+        app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      },
+    );
+
+  app.workerBusy.set(false);
 }
 
 export async function saveEditedResourcesToGame(app: App): Promise<void> {
   if (!app.hasEditorData()) return;
-  try {
-    app.workerBusy.set(true);
-    app.resourcesStatus.set('Flushing pending edits…');
-    const syncPromises: Promise<unknown>[] = [];
-    for (const level of app.parsedLevels()) {
-      syncPromises.push(
-      app.runtime.dispatchWorker<void>('APPLY_ROAD_SEGS', {
-          resourceId: level.resourceId,
-          roadSegs: level.roadSegs,
-        }),
+  app.workerBusy.set(true);
+  app.resourcesStatus.set('Flushing pending edits…');
+
+  await resultFromPromise(flushPendingEdits(app), 'Failed to flush pending edits')
+    .andThen(() => {
+      app.resourcesStatus.set('Serializing…');
+      return resultFromPromise(
+        app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE'),
+        'Failed to save resources',
       );
-    }
-    const selId = app.selectedLevelId();
-    if (selId !== null) {
-      syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }));
-      syncPromises.push(
-        app.runtime.dispatchWorker<void>('APPLY_TRACK', {
-          resourceId: selId,
-          trackUp: app.editTrackUp(),
-          trackDown: app.editTrackDown(),
-        }),
-      );
-      syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_OBJECTS', { resourceId: selId, objects: app.objects() }));
-      if (app.propertiesDirty()) {
-        syncPromises.push(
-          app.runtime.dispatchWorker<void>('APPLY_PROPS', {
-            resourceId: selId,
-            props: {
-              roadInfo: app.editRoadInfo(),
-              time: app.editTime(),
-              xStartPos: app.editXStartPos(),
-              levelEnd: app.editLevelEnd(),
-              objectGroups: app.editObjectGroups(),
-            },
-          }),
-        );
-      }
-    }
-    app.queuePackSync(syncPromises);
-    app.queueRoadInfoSync(syncPromises);
-    await Promise.all(syncPromises);
-    app.resourcesStatus.set('Serializing…');
-    const buf = await app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE');
-    const bytes = new Uint8Array(buf);
-    const name = app.customResourcesName() ?? 'resources.dat';
-    await AppStateResources._saveCustomResourcesDb(bytes, name);
-    app.customResourcesName.set(name);
-    app.customResourcesLoaded.set(true);
-    app.resourcesStatus.set('Saved to game. Restart the game to apply changes.');
-    app.snackBar
-      .open('✓ Saved to game – click Restart Game to apply', 'Restart', {
-        duration: 8000,
-        panelClass: 'snack-success',
-      })
-      .onAction()
-      .subscribe(() => app.runtime.restartGameWithCustomResources());
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Failed to save resources';
-    app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
-  } finally {
-    app.workerBusy.set(false);
-  }
+    })
+    .andThen((buf) => {
+      const name = app.customResourcesName() ?? 'resources.dat';
+      return resultFromPromise(
+        AppStateResources._saveCustomResourcesDb(new Uint8Array(buf), name),
+        'Failed to persist resources to game storage',
+      ).map(() => name);
+    })
+    .match(
+      (name) => {
+        app.customResourcesName.set(name);
+        app.customResourcesLoaded.set(true);
+        app.resourcesStatus.set('Saved to game. Restart the game to apply changes.');
+        app.snackBar
+          .open('✓ Saved to game – click Restart Game to apply', 'Restart', { duration: 8000, panelClass: 'snack-success' })
+          .onAction()
+          .subscribe(() => app.runtime.restartGameWithCustomResources());
+      },
+      (msg) => {
+        app.editorError.set(msg);
+        app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      },
+    );
+
+  app.workerBusy.set(false);
 }
