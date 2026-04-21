@@ -5,8 +5,6 @@ import type { App } from './app';
 import type { TrackWaypointRef, TrackMidpointRef } from './level-editor.service';
 import {
   dist2d,
-  distToSegment2d,
-  insertBetweenClosestSegment,
   selectObject,
   getObjectCanvas,
   getKonvaContainer,
@@ -14,10 +12,10 @@ import {
   BASE_HIT_RADIUS,
   MIN_START_MARKER_HIT_RADIUS,
   BASE_START_MARKER_HIT_RADIUS,
-  worldToCanvas,
   canvasToWorld,
   getCanvasScale,
 } from './object-canvas';
+import { tryDeleteHoveredWaypoint, insertTrackPointNearestSegment } from './object-canvas-track-editor';
 
 export function onCanvasMouseDown(app: App, event: MouseEvent): void {
   event.preventDefault();
@@ -263,56 +261,6 @@ export function onCanvasContextMenu(app: App, event: MouseEvent): void {
   if (!app.selectedLevel()) return;
   insertTrackPointNearestSegment(app, wx, wy);
 }
-
-function tryDeleteHoveredWaypoint(app: App, wx: number, wy: number): boolean {
-  const trackHitR = Math.max(20, 14 / app.canvasZoom());
-  const trackUp = app.editTrackUp();
-  const trackDown = app.editTrackDown();
-  for (let i = 0; i < trackUp.length; i++) {
-    if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
-      app._pushUndo('tracks');
-      app.editTrackUp.set(trackUp.filter((_, j) => j !== i));
-      app._roadOffscreenKey = '';
-      return true;
-    }
-  }
-  for (let i = 0; i < trackDown.length; i++) {
-    if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
-      app._pushUndo('tracks');
-      app.editTrackDown.set(trackDown.filter((_, j) => j !== i));
-      app._roadOffscreenKey = '';
-      return true;
-    }
-  }
-  return false;
-}
-
-function insertTrackPointNearestSegment(app: App, wx: number, wy: number): void {
-  const trackUp = app.editTrackUp();
-  const trackDown = app.editTrackDown();
-  let nearestUp = Infinity;
-  for (let i = 0; i < trackUp.length - 1; i++) {
-    const d = distToSegment2d(wx, wy, trackUp[i].x, trackUp[i].y, trackUp[i + 1].x, trackUp[i + 1].y);
-    if (d < nearestUp) nearestUp = d;
-  }
-  if (trackUp.length === 1) nearestUp = dist2d(trackUp[0].x, trackUp[0].y, wx, wy);
-
-  let nearestDown = Infinity;
-  for (let i = 0; i < trackDown.length - 1; i++) {
-    const d = distToSegment2d(wx, wy, trackDown[i].x, trackDown[i].y, trackDown[i + 1].x, trackDown[i + 1].y);
-    if (d < nearestDown) nearestDown = d;
-  }
-  if (trackDown.length === 1) nearestDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
-
-  app._pushUndo('tracks');
-  if (nearestUp <= nearestDown || trackDown.length === 0) {
-    app.editTrackUp.set(insertBetweenClosestSegment(trackUp, wx, wy));
-  } else {
-    app.editTrackDown.set(insertBetweenClosestSegment(trackDown, wx, wy));
-  }
-  app._roadOffscreenKey = '';
-}
-
 export function onCanvasKeyDown(app: App, event: KeyboardEvent): void {
   if (event.key === ' ') {
     app.spaceDown.set(true);
@@ -352,10 +300,14 @@ export function onCanvasKeyDown(app: App, event: KeyboardEvent): void {
     return;
   }
   const panStep = 50 / app.canvasZoom();
-  if (event.key === 'ArrowUp')    { event.preventDefault(); app.canvasPanY.update((y: number) => y + panStep); }
-  if (event.key === 'ArrowDown')  { event.preventDefault(); app.canvasPanY.update((y: number) => y - panStep); }
-  if (event.key === 'ArrowLeft')  { event.preventDefault(); app.canvasPanX.update((x: number) => x - panStep); }
-  if (event.key === 'ArrowRight') { event.preventDefault(); app.canvasPanX.update((x: number) => x + panStep); }
+  const panMap: Record<string, () => void> = {
+    ArrowUp:    () => app.canvasPanY.update((y) => y + panStep),
+    ArrowDown:  () => app.canvasPanY.update((y) => y - panStep),
+    ArrowLeft:  () => app.canvasPanX.update((x) => x - panStep),
+    ArrowRight: () => app.canvasPanX.update((x) => x + panStep),
+  };
+  const panFn = panMap[event.key];
+  if (panFn) { event.preventDefault(); panFn(); }
 }
 
 export function onCanvasKeyUp(app: App, event: KeyboardEvent): void {
@@ -390,5 +342,3 @@ export function onCanvasWheel(app: App, event: WheelEvent): void {
   app.canvasPanX.set(wx - (lx - width / 2) / nextZoom);
   app.canvasPanY.set(wy + (ly - height / 2) / nextZoom);
 }
-
-export { worldToCanvas, canvasToWorld };

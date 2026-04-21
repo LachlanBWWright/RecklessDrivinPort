@@ -20,6 +20,7 @@ import {
   computeFramedWorldRect,
 } from './app-helpers';
 import { worldDirToCanvasForwardVector, worldDirToCanvasRotationRad } from './object-direction-utils';
+import { drawStartMarkerOnCanvas, drawFinishLineOnCanvas, drawOriginDotOnCanvas, drawGridLines, drawOriginAxes } from './object-canvas-markers';
 
 export function resetView(app: App): void {
   const level = app.selectedLevel();
@@ -85,7 +86,7 @@ export function redrawObjectCanvas(app: App): void {
   ctx.fillStyle = theme.bg;
   ctx.fillRect(0, 0, width, height);
 
-  drawGrid(app, ctx, width, height, zoom, panX, panY);
+  drawGridLines(app, ctx, width, height, zoom, panX, panY);
 
   if (level && app.showRoad()) {
     drawObjectRoadPreviewCached(
@@ -137,92 +138,42 @@ export function redrawObjectCanvas(app: App): void {
   drawMarkingPreview(app, ctx);
   drawBarriers(app, ctx, level, zoom, panX, panY);
   drawObjects(app, ctx, objs, selIdx, visibleTypes, width, height, zoom);
-  drawOriginDot(ctx, app);
-  drawStartMarker(app, ctx, level, width, height, zoom);
-  drawFinishLine(app, ctx, level, width, height, zoom);
+  drawOriginDotOnCanvas(ctx, app);
+  drawStartMarkerOnCanvas(app, ctx, level, width, height, zoom);
+  drawFinishLineOnCanvas(app, ctx, level, width, height, zoom);
+  syncKonva(app);
+}
+
+function syncKonva(app: App): void {
+  const zoom = app.canvasZoom();
+  const panX = app.canvasPanX();
+  const panY = app.canvasPanY();
+  const objs = app.objects();
+  const selIdx = app.selectedObjIndex();
+  const visibleTypes = app.visibleTypeFilter();
+  const level = app.selectedLevel();
 
   app.initKonvaIfNeeded();
   app.konva.setTransform(zoom, panX, panY);
   app.konva.setObjects(
-    app.showObjects() ? objs : [],
-    selIdx,
-    visibleTypes,
-    OBJ_PALETTE,
-    (typeRes: number) => app.getObjectSpritePreview(typeRes),
-    zoom,
-    panX,
-    panY,
+    app.showObjects() ? objs : [], selIdx, visibleTypes, OBJ_PALETTE,
+    (typeRes: number) => app.getObjectSpritePreview(typeRes), zoom, panX, panY,
   );
   if (level && app.showTrackOverlay()) {
-    const up = app.showTrackUp() ? app.editTrackUp() : [];
-    const down = app.showTrackDown() ? app.editTrackDown() : [];
-    app.konva.setTrackWaypoints(up, down, zoom, panX, panY);
+    app.konva.setTrackWaypoints(
+      app.showTrackUp() ? app.editTrackUp() : [],
+      app.showTrackDown() ? app.editTrackDown() : [],
+      zoom, panX, panY,
+    );
   } else {
     app.konva.clearTrackWaypoints();
   }
-  if (level && app.showMarks()) {
-    app.konva.setMarks(app.marks(), app.selectedMarkIndex(), zoom, panX, panY);
-  } else {
-    app.konva.clearMarks();
-  }
-  if (level) {
-    app.konva.setFinishLine(app.editLevelEnd(), zoom, panX, panY);
-  } else {
-    app.konva.clearFinishLine();
-  }
+  if (level && app.showMarks()) app.konva.setMarks(app.marks(), app.selectedMarkIndex(), zoom, panX, panY);
+  else app.konva.clearMarks();
+  if (level) app.konva.setFinishLine(app.editLevelEnd(), zoom, panX, panY);
+  else app.konva.clearFinishLine();
   app.konva.flush();
 }
-
-function drawGrid(
-  app: App,
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  zoom: number,
-  panX: number,
-  panY: number,
-): void {
-  if (!app.showGrid()) return;
-  const gridStep = 100;
-  const gridStepPx = gridStep * zoom;
-  if (gridStepPx <= 8) return;
-  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-  ctx.lineWidth = 1;
-  const startWorldX = panX - width / (2 * zoom);
-  const startWorldY = panY - height / (2 * zoom);
-  const endWorldX = panX + width / (2 * zoom);
-  const endWorldY = panY + height / (2 * zoom);
-  ctx.beginPath();
-  for (let gx = Math.floor(startWorldX / gridStep) * gridStep; gx <= endWorldX; gx += gridStep) {
-    const [cx] = worldToCanvas(app, gx, 0);
-    ctx.moveTo(cx, 0);
-    ctx.lineTo(cx, height);
-  }
-  for (let gy = Math.floor(startWorldY / gridStep) * gridStep; gy <= endWorldY; gy += gridStep) {
-    const [, cy] = worldToCanvas(app, 0, gy);
-    ctx.moveTo(0, cy);
-    ctx.lineTo(width, cy);
-  }
-  ctx.stroke();
-}
-
-function drawOriginAxes(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  app: App,
-): void {
-  const [ox, oy] = worldToCanvas(app, 0, 0);
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(ox, 0); ctx.lineTo(ox, height);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(0, oy); ctx.lineTo(width, oy);
-  ctx.stroke();
-}
-
 function drawMarkingPreview(app: App, ctx: CanvasRenderingContext2D): void {
   const preview = app.markingPreview();
   if (preview.length === 0) return;
@@ -354,73 +305,3 @@ function drawObjects(
   }
 }
 
-function drawOriginDot(ctx: CanvasRenderingContext2D, app: App): void {
-  const [originX, originY] = worldToCanvas(app, 0, 0);
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.beginPath();
-  ctx.arc(originX, originY, 3, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawStartMarker(
-  app: App,
-  ctx: CanvasRenderingContext2D,
-  level: ReturnType<App['selectedLevel']>,
-  width: number,
-  height: number,
-  zoom: number,
-): void {
-  if (!level) return;
-  const startX = app.editXStartPos();
-  const [startCanvasX, startCanvasY] = worldToCanvas(app, startX, 0);
-  if (startCanvasX < -20 || startCanvasX > width + 20 || startCanvasY < -20 || startCanvasY > height + 20) return;
-  const zf = Math.min(zoom, 2);
-  const poleHeight = 20 * zf;
-  const flagTip = 10 * zf;
-  const flagMid = 14 * zf;
-  const flagBottom = 8 * zf;
-  const color = app._draggingStartMarker ? '#ffffff' : '#00e5ff';
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(startCanvasX, startCanvasY);
-  ctx.lineTo(startCanvasX, startCanvasY - poleHeight);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(startCanvasX, startCanvasY - poleHeight);
-  ctx.lineTo(startCanvasX + flagTip, startCanvasY - flagMid);
-  ctx.lineTo(startCanvasX, startCanvasY - flagBottom);
-  ctx.closePath();
-  ctx.fill();
-  if (zoom > 0.4) {
-    ctx.font = `${Math.max(9, 10 * zoom)}px monospace`;
-    ctx.fillText(`START X=${startX}`, startCanvasX + 6, startCanvasY - poleHeight - 2);
-  }
-}
-
-function drawFinishLine(
-  app: App,
-  ctx: CanvasRenderingContext2D,
-  level: ReturnType<App['selectedLevel']>,
-  width: number,
-  height: number,
-  zoom: number,
-): void {
-  const liveFinishY = app.editLevelEnd();
-  if (!level || liveFinishY < 0) return;
-  const [, finishCanvasY] = worldToCanvas(app, 0, liveFinishY);
-  if (finishCanvasY < -2 || finishCanvasY > height + 2) return;
-  const color = app._draggingFinishLine ? '#ffffff' : '#f9a825';
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([10, 6]);
-  ctx.beginPath();
-  ctx.moveTo(0, finishCanvasY);
-  ctx.lineTo(width, finishCanvasY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = color;
-  ctx.font = `${Math.max(9, 11 * zoom)}px monospace`;
-  ctx.fillText(`FINISH Y=${liveFinishY}`, 6, finishCanvasY - 4);
-}
