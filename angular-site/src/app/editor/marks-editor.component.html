@@ -1,0 +1,54 @@
+<!-- Marks (checkpoint) editor — expansion panel -->
+<mat-expansion-panel class="marks-panel" [expanded]="false">
+  <mat-expansion-panel-header>
+    <mat-panel-title>
+      <mat-icon>edit_location</mat-icon>&nbsp;Checkpoint / Mark Segments
+    </mat-panel-title>
+    <mat-panel-description><span class="badge">{{ marks.length }}</span></mat-panel-description>
+  </mat-expansion-panel-header>
+
+  @if (selectedMark; as mark) {
+    <form class="mark-fields-row" [formGroup]="markForm">
+      <mat-form-field appearance="outline" class="mark-field">
+        <mat-label>P1 X</mat-label>
+        <input matInput type="number" formControlName="x1" inputmode="numeric" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="mark-field">
+        <mat-label>P1 Y</mat-label>
+        <input matInput type="number" formControlName="y1" inputmode="numeric" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="mark-field">
+        <mat-label>P2 X</mat-label>
+        <input matInput type="number" formControlName="x2" inputmode="numeric" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="mark-field">
+        <mat-label>P2 Y</mat-label>
+        <input matInput type="number" formControlName="y2" inputmode="numeric" />
+      </mat-form-field>
+    </form>
+  }
+
+  <div class="marks-table-container">
+    <!-- Plain HTML table — no mat-table overhead -->
+    <table class="marks-table">
+      <thead>
+        <tr><th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr>
+      </thead>
+      <tbody>
+        @for (mark of marks; track $index) {
+          <tr [class.selected-row]="selectedMarkIndex === $index"
+              (click)="markSelected.emit($index)" style="cursor:pointer">
+            <td>{{ $index }}</td>
+            <td>{{ mark.x1 }}</td>
+            <td>{{ mark.y1 }}</td>
+            <td>{{ mark.x2 }}</td>
+            <td>{{ mark.y2 }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (marks.length === 0) {
+      <p class="marks-empty">No mark segments. Use the toolbar <strong>add_location</strong> button to create one.</p>
+    }
+  </div>
+</mat-expansion-panel>

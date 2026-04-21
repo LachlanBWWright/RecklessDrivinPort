@@ -926,7 +926,7 @@ void Blit2Screen(void) {
         /* Convert 8-bit indexed → 32-bit ARGB */
         SDL_BlitSurface(s_surface, NULL, s_rgb_surface, NULL);
     } else {
-        /* ---- 16-bit XRGB1555 hi-color path ---- */
+        /* ---- 16-bit RGB555 hi-color path ---- */
         if (SDL_LockSurface(s_rgb_surface) == 0) {
             for (y = 0; y < gYSize; y++) {
                 Uint32 *dst = (Uint32 *)((UInt8 *)s_rgb_surface->pixels
@@ -934,9 +934,9 @@ void Blit2Screen(void) {
                 const UInt16 *src = (const UInt16 *)(s_back_buffer + y * gRowBytes);
                 int x;
                 for (x = 0; x < gXSize; x++) {
-                    /* Mac stored XRGB1555 big-endian; swap to native LE before extracting RGB */
-                    UInt16 p = be16_swap(src[x]);
-                    /* XRGB1555: bits 14-10=R, 9-5=G, 4-0=B */
+                    /* Back buffer stores native RGB555 values. */
+                    UInt16 p = src[x];
+                    /* RGB555: bits 14-10=R, 9-5=G, 4-0=B */
                     Uint8 r = (Uint8)(((p >> 10) & 0x1F) << 3);
                     Uint8 g = (Uint8)(((p >>  5) & 0x1F) << 3);
                     Uint8 b = (Uint8)(( p        & 0x1F) << 3);

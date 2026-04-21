@@ -13,13 +13,15 @@ export interface SideMarkGenerationOptions {
   yStart: number;
   yEnd: number;
   inset: number;
+  yFrequency: number;
 }
 
 export interface CentreDashGenerationOptions {
   roadSelection: MarkingRoadSelection;
   yStart: number;
   yEnd: number;
-  dashFrequency: number;
+  dashLength: number;
+  gapLength: number;
 }
 
 interface LinePoint {
@@ -113,19 +115,6 @@ function collectLineGroups(
   return groups;
 }
 
-function lineGroupToSegments(points: readonly LinePoint[]): MarkSeg[] {
-  const segments: MarkSeg[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    segments.push({
-      x1: Math.round(points[i].x),
-      y1: Math.round(points[i].y),
-      x2: Math.round(points[i + 1].x),
-      y2: Math.round(points[i + 1].y),
-    });
-  }
-  return segments;
-}
-
 function pointAtDistance(points: readonly LinePoint[], distance: number): LinePoint {
   if (distance <= 0) return points[0];
   let remaining = distance;
@@ -146,9 +135,10 @@ function pointAtDistance(points: readonly LinePoint[], distance: number): LinePo
   return points[points.length - 1];
 }
 
-function dashedSegmentsFromGroup(points: readonly LinePoint[], dashFrequency: number): MarkSeg[] {
-  const cycle = Math.max(4, dashFrequency);
-  const dashLength = Math.max(2, cycle / 2);
+function dashedSegmentsFromGroup(points: readonly LinePoint[], dashLength: number, gapLength: number): MarkSeg[] {
+  const safeDashLength = Math.max(1, dashLength);
+  const safeGapLength = Math.max(1, gapLength);
+  const cycle = safeDashLength + safeGapLength;
   let totalLen = 0;
   for (let i = 0; i < points.length - 1; i++) {
     totalLen += Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
@@ -157,7 +147,7 @@ function dashedSegmentsFromGroup(points: readonly LinePoint[], dashFrequency: nu
   const segments: MarkSeg[] = [];
   for (let offset = 0; offset < totalLen; offset += cycle) {
     const from = pointAtDistance(points, offset);
-    const to = pointAtDistance(points, Math.min(totalLen, offset + dashLength));
+    const to = pointAtDistance(points, Math.min(totalLen, offset + safeDashLength));
     segments.push({
       x1: Math.round(from.x),
       y1: Math.round(from.y),
@@ -185,6 +175,9 @@ export function generateSideMarkings(
   options: SideMarkGenerationOptions,
 ): MarkSeg[] {
   const inset = Math.max(0, options.inset);
+  const cycle = Math.max(2, options.yFrequency);
+  const dashLength = Math.max(1, Math.round(cycle / 2));
+  const gapLength = Math.max(1, cycle - dashLength);
   const groups: LinePoint[][] = [];
 
   const addGroup = (getPoint: (seg: RoadSeg, y: number) => LinePoint | null) => {
@@ -223,14 +216,15 @@ export function generateSideMarkings(
     return { x: innerRight, y };
   });
 
-  return groups.flatMap(lineGroupToSegments);
+  return groups.flatMap((group) => dashedSegmentsFromGroup(group, dashLength, gapLength));
 }
 
 export function generateCentreDashMarkings(
   roadSegs: readonly RoadSeg[],
   options: CentreDashGenerationOptions,
 ): MarkSeg[] {
-  const dashFrequency = Math.max(4, options.dashFrequency);
+  const dashLength = Math.max(1, options.dashLength);
+  const gapLength = Math.max(1, options.gapLength);
   const groups: LinePoint[][] = [];
 
   const addGroup = (getPoint: (seg: RoadSeg, y: number) => LinePoint | null) => {
@@ -255,5 +249,5 @@ export function generateCentreDashMarkings(
     return { x: (seg.v2 + seg.v3) / 2, y };
   });
 
-  return groups.flatMap((group) => dashedSegmentsFromGroup(group, dashFrequency));
+  return groups.flatMap((group) => dashedSegmentsFromGroup(group, dashLength, gapLength));
 }

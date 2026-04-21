@@ -1,0 +1,411 @@
+ :host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- Canvas toolbar ---- */
+.canvas-toolbar {
+  background: #1e1e1e;
+  border-bottom: 1px solid #383838;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hint-text {
+  font-size: 0.73rem;
+  color: #8a8a8a;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+
+  .hint-icon { font-size: 14px !important; height: 14px !important; width: 14px !important; color: #555; }
+
+  kbd {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 0 4px;
+    font-family: monospace;
+    font-size: 0.7rem;
+    color: #ccc;
+  }
+}
+
+.canvas-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+
+  button[mat-stroked-button] {
+    height: 28px !important;
+    font-size: 0.76rem !important;
+    padding: 0 8px !important;
+    min-width: unset !important;
+    color: #ccc !important;
+    border-color: #444 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px;
+    line-height: 28px !important;
+
+    mat-icon {
+      font-size: 15px !important;
+      height: 15px !important;
+      width: 15px !important;
+      line-height: 15px !important;
+      vertical-align: middle !important;
+    }
+    &.btn-active { color: #e53935 !important; border-color: #e53935 !important; }
+    &:hover:not([disabled]) { border-color: #42a5f5 !important; color: #42a5f5 !important; }
+  }
+
+  button[mat-icon-button] {
+    width: 28px !important;
+    height: 28px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    // Fix icon baseline alignment — use a wrapper flex to center icon
+    ::ng-deep .mat-mdc-button-touch-target { display: none; }
+    ::ng-deep .mat-mdc-button-persistent-ripple { border-radius: 50%; }
+    mat-icon, ::ng-deep mat-icon {
+      font-size: 18px !important;
+      height: 18px !important;
+      width: 18px !important;
+      line-height: 18px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    &:hover mat-icon, &:hover ::ng-deep mat-icon { color: #42a5f5; }
+    // btn-active: highlight the button background, don't override icon colors
+    // Icons without `.has-custom-color` class get the default red active color.
+    &.btn-active {
+      background: rgba(229, 57, 53, 0.12) !important;
+      mat-icon:not(.has-custom-color), ::ng-deep mat-icon:not(.has-custom-color) {
+        color: #e53935 !important;
+      }
+    }
+    &[disabled] { opacity: 0.35; }
+  }
+
+  button[mat-stroked-button].canvas-add-object-button {
+    height: 40px !important;
+    line-height: 40px !important;
+    padding: 0 12px !important;
+    align-self: center;
+
+    mat-icon {
+      font-size: 18px !important;
+      height: 18px !important;
+      width: 18px !important;
+      line-height: 18px !important;
+    }
+  }
+}
+
+.canvas-property-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow: visible;
+  padding: 6px 0;
+  box-sizing: border-box;
+}
+
+.canvas-inline-field {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  margin-bottom: 0;
+
+  ::ng-deep .mat-mdc-text-field-wrapper {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-infix {
+    min-height: 34px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  .mat-mdc-select-trigger {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+}
+
+.canvas-inline-field--road {
+  min-width: 140px;
+  max-width: 220px;
+}
+
+.canvas-inline-field--time {
+  min-width: 100px;
+  max-width: 120px;
+}
+
+.road-info-trigger,
+.road-info-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.road-info-option-label {
+  white-space: nowrap;
+}
+
+/* Keep road info option thumbnails compact so the select panel height stays under control. */
+  .road-info-thumb,
+  .road-info-thumb--fallback {
+    width: 32px;
+    height: 16px;
+    max-height: 12px;
+    max-width: 28px;
+  border-radius: 4px;
+  border: 1px solid #4a4a4a;
+  flex: 0 0 auto;
+  object-fit: cover;
+  background: linear-gradient(135deg, #555, #2c2c2c);
+}
+
+.road-info-thumb--fallback.water {
+  background: linear-gradient(135deg, #0a7a1e, #354ab5);
+}
+
+.canvas-inline-field--time ::ng-deep .mat-mdc-input-element {
+  text-align: right;
+}
+
+.toolbar-divider {
+  height: 20px !important;
+  border-right-color: #444 !important;
+  margin: 0 2px !important;
+}
+
+/* ---- Object canvas column ---- */
+.object-canvas-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto; /* fill the flex parent (app-editor-canvas element) */
+  min-width: 0;
+  min-height: 0; /* allow shrinking */
+  overflow: hidden;
+}
+
+.canvas-subtitle {
+  font-size: 0.73rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #666;
+  padding: 4px 12px;
+  background: #222;
+  border-bottom: 1px solid #333;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .canvas-subtitle-icon { font-size: 13px !important; height: 13px !important; width: 13px !important; }
+}
+
+/* ---- Canvas with scrollbars layout ---- */
+.canvas-with-scrollbars {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 14px;
+  grid-template-rows: minmax(0, 1fr) 14px;
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.object-canvas {
+  grid-column: 1;
+  grid-row: 1;
+  display: block;
+  width: 100%;
+  height: 100%; /* fill the grid cell height */
+  min-width: 0;
+  min-height: 0;
+  background: #1a2a1a;
+}
+
+.canvas-scrollbar {
+  appearance: none;
+  background: #1e1e1e;
+  border: none;
+
+  &:focus { outline: none; }
+}
+
+.canvas-scrollbar--vert {
+  grid-column: 2;
+  grid-row: 1;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 14px;
+  align-self: stretch;
+  background: #1a1a1a;
+  border-left: 1px solid #333;
+
+  &::-webkit-slider-runnable-track { background: transparent; }
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 10px;
+    height: 40px;
+    background: #333;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 1px solid #444;
+    &:hover { background: #42a5f5; }
+  }
+  &::-moz-range-thumb {
+    width: 10px;
+    height: 32px;
+    background: #333;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+  }
+}
+
+.canvas-scrollbar--horiz {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+  height: 14px;
+  background: #1a1a1a;
+  border-top: 1px solid #333;
+
+  &::-webkit-slider-runnable-track { background: transparent; }
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 40px;
+    height: 10px;
+    background: #333;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 1px solid #444;
+    &:hover { background: #42a5f5; }
+  }
+  &::-moz-range-thumb {
+    width: 32px;
+    height: 10px;
+    background: #333;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+  }
+}
+
+/* ---- Canvas status bar ---- */
+.canvas-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px;
+  background: #151515;
+  border-top: 1px solid #2a2a2a;
+  font-size: 0.72rem;
+  color: #666;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+
+  .zoom-info { color: #aaa; font-weight: 600; }
+  .pan-info { color: #777; font-family: monospace; }
+  .status-divider { height: 14px !important; border-right-color: #333 !important; }
+  .legend-item { font-size: 0.7rem; }
+}
+
+/* ---- Road stats panel ---- */
+.road-stats-panel {
+  background: #1e1e1e !important;
+  border: 1px solid #2e2e2e !important;
+  border-radius: 0 !important;
+  border-top: none !important;
+
+  ::ng-deep .mat-expansion-panel-header {
+    background: #1a1a1a !important;
+    height: 40px !important;
+    font-size: 0.82rem;
+  }
+  ::ng-deep .mat-panel-title { display: flex; align-items: center; gap: 4px; color: #888; font-size: 0.82rem; }
+  ::ng-deep .mat-expansion-panel-body { padding: 12px; }
+}
+
+/* ---- Road stats ---- */
+.road-stats-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---- Stat cards ---- */
+.stat-card {
+  background: #1a1a1a;
+  border: 1px solid #2e2e2e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  min-width: 80px;
+  text-align: center;
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #f0f0f0;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 0.72rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 4px;
+  }
+}
+
+/* ---- Canvas popup overlay ---- */
+.canvas-popup {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 28px; /* leave room for the vertical scrollbar */
+  z-index: 50;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+  pointer-events: all;
+}
+
+app-marking-popup,
+app-canvas-info-popup {
+  display: block;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  pointer-events: none;
+}

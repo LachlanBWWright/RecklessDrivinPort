@@ -8,7 +8,7 @@ import {
   serializeLevelRoadSegs,
   serializeMarkSegs,
 } from './level-editor.service';
-import { encodePackHandle } from './pack-parser.service';
+import { encodePackHandle, parsePackHandle } from './pack-parser.service';
 
 function makeLevelEntry(overrides: Partial<{
   roadInfo: number;
@@ -234,10 +234,27 @@ describe('LevelEditorService', () => {
     const defs = svc.extractObjectTypeDefinitions(resources);
     expect(defs.get(150)).toEqual({
       typeRes: 150,
+      mass: 0,
+      maxEngineForce: 0,
+      maxNegEngineForce: 0,
+      friction: 0,
+      flags: 0,
+      deathObj: 0,
       frame: 321,
       numFrames: 4,
+      frameDuration: 0,
+      wheelWidth: 0,
+      wheelLength: 0,
+      steering: 0,
       width: 36,
       length: 52,
+      score: 0,
+      flags2: 0,
+      creationSound: 0,
+      otherSound: 0,
+      maxDamage: 0,
+      weaponObj: 0,
+      weaponInfo: 0,
     });
   });
 
@@ -265,6 +282,45 @@ describe('LevelEditorService', () => {
     expect(decoded?.bitDepth).toBe(16);
     expect(decoded?.pixels[3]).toBe(0);
     expect(decoded?.pixels[4]).toBeGreaterThan(decoded?.pixels[6] ?? 0);
+  });
+
+  it('applySpritePackPixels updates 8-bit frames in Pack #129', () => {
+    const sprite = new Uint8Array(8 + 4);
+    const view = new DataView(sprite.buffer);
+    view.setUint16(0, 2, false); // width
+    view.setUint16(2, 2, false); // height
+    sprite[4] = 1; // stride 2
+    sprite[8] = 0; // transparent mask
+    sprite[9] = 10;
+    sprite[10] = 11;
+    sprite[11] = 12;
+
+    const resources = [{
+      type: 'Pack',
+      id: 129,
+      data: encodePackHandle([{ id: 7, data: sprite }], 129),
+    }];
+
+    const pixels = new Uint8ClampedArray([
+      255, 0, 0, 0,
+      0, 255, 0, 255,
+      0, 0, 255, 255,
+      0, 0, 0, 255,
+    ]);
+
+    const updated = svc.applySpritePackPixels(resources, 7, 8, pixels);
+    const pack = updated[0];
+    expect(pack.type).toBe('Pack');
+    expect(pack.id).toBe(129);
+
+    const parsed = parsePackHandle(pack.data, 129);
+    const entry = parsed.find((e) => e.id === 7);
+    expect(entry).toBeDefined();
+    if (!entry) return;
+    expect(entry.data[8]).toBe(0); // mask preserved
+    expect(entry.data[9]).not.toBe(10);
+    expect(entry.data[10]).not.toBe(11);
+    expect(entry.data[11]).not.toBe(12);
   });
 });
 
@@ -399,5 +455,79 @@ describe('serializeLevelRoadSegs round-trip', () => {
     expect(parsed.value.trackUp.length).toBe(1);
     expect(parsed.value.roadSegs.length).toBe(1);
     expect(parsed.value.roadSegs[0].v0).toBe(100);
+  });
+});
+
+import { rgb565ToRgba, rgbaToRgb555 } from './level-editor.service';
+
+describe('rgb565ToRgba', () => {
+  it('converts pure red (0xF800) to [255, 0, 0, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0xF800);
+    expect(r).toBe(255);
+    expect(g).toBe(0);
+    expect(b).toBe(0);
+    expect(a).toBe(255);
+  });
+
+  it('converts pure green (0x07E0) to [0, 255, 0, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0x07E0);
+    expect(r).toBe(0);
+    expect(g).toBe(255);
+    expect(b).toBe(0);
+    expect(a).toBe(255);
+  });
+
+  it('converts pure blue (0x001F) to [0, 0, 255, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0x001F);
+    expect(r).toBe(0);
+    expect(g).toBe(0);
+    expect(b).toBe(255);
+    expect(a).toBe(255);
+  });
+
+  it('converts black (0x0000) to [0, 0, 0, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0x0000);
+    expect(r).toBe(0);
+    expect(g).toBe(0);
+    expect(b).toBe(0);
+    expect(a).toBe(255);
+  });
+
+  it('converts white (0xFFFF) to [255, 255, 255, 255]', () => {
+    const [r, g, b, a] = rgb565ToRgba(0xFFFF);
+    expect(r).toBe(255);
+    expect(g).toBe(255);
+    expect(b).toBe(255);
+    expect(a).toBe(255);
+  });
+});
+
+describe('rgbaToRgb555', () => {
+  it('converts pure red (255, 0, 0) to 0x7C00', () => {
+    expect(rgbaToRgb555(255, 0, 0)).toBe(0x7C00);
+  });
+
+  it('converts pure green (0, 255, 0) to 0x03E0', () => {
+    expect(rgbaToRgb555(0, 255, 0)).toBe(0x03E0);
+  });
+
+  it('converts pure blue (0, 0, 255) to 0x001F', () => {
+    expect(rgbaToRgb555(0, 0, 255)).toBe(0x001F);
+  });
+
+  it('converts black (0, 0, 0) to 0x0000', () => {
+    expect(rgbaToRgb555(0, 0, 0)).toBe(0x0000);
+  });
+
+  it('converts white (255, 255, 255) to 0x7FFF', () => {
+    expect(rgbaToRgb555(255, 255, 255)).toBe(0x7FFF);
+  });
+
+  it('r5g5b5 channels are all 5-bit (0-31)', () => {
+    for (let i = 0; i < 256; i += 16) {
+      const val = rgbaToRgb555(i, i, i);
+      expect(val).toBeGreaterThanOrEqual(0);
+      expect(val).toBeLessThanOrEqual(0x7FFF);
+    }
   });
 });

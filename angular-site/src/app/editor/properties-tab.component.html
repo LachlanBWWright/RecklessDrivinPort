@@ -1,0 +1,268 @@
+@if (selectedLevel) {
+  <mat-card class="tab-panel-card">
+    <mat-card-content class="props-card-content">
+      <h4 class="section-subtitle">Road Info <span class="badge">Road {{ editRoadInfo }}</span></h4>
+      <p class="muted hint-text">
+        Select the shared road record used by this level here. Texture assignments are edited in the Tiles tab.
+      </p>
+
+      <mat-form-field appearance="outline" class="texture-select-field road-select-field">
+        <mat-label>Shared road</mat-label>
+        <mat-select
+          [value]="editRoadInfo"
+          [disabled]="workerBusy || !roadInfoOptions.length"
+          (selectionChange)="roadInfoChange.emit($event.value)"
+          aria-label="Shared road selector"
+        >
+          <mat-select-trigger>
+            @if (getRoadInfoOption(editRoadInfo); as selectedRoadInfo) {
+              <span class="texture-option texture-option--trigger">
+                @if (selectedRoadInfo.previewUrl) {
+                  <img class="texture-thumb" [src]="selectedRoadInfo.previewUrl" [alt]="'Road info ' + selectedRoadInfo.id" />
+                } @else {
+                  <span class="texture-thumb texture-thumb--fallback" [class.water]="selectedRoadInfo.water"></span>
+                }
+                <span class="texture-option-label">{{ selectedRoadInfo.label }}</span>
+              </span>
+            } @else {
+              <span class="texture-option texture-option--trigger">
+                <span class="texture-thumb texture-thumb--fallback"></span>
+                <span class="texture-option-label">Road {{ editRoadInfo }}</span>
+              </span>
+            }
+          </mat-select-trigger>
+          @for (option of roadInfoOptions; track option.id) {
+            <mat-option [value]="option.id">
+              <span class="texture-option">
+                @if (option.previewUrl) {
+                  <img class="texture-thumb" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
+                } @else {
+                  <span class="texture-thumb texture-thumb--fallback" [class.water]="option.water"></span>
+                }
+                <span class="texture-option-label">{{ option.label }}</span>
+              </span>
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (roadInfoData) {
+        <form class="road-info-section" [formGroup]="roadInfoForm">
+          <table class="data-table plain-table road-info-table">
+            <tbody>
+              <tr><th colspan="2">Physics</th></tr>
+              <tr>
+                <td>friction</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="friction" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>airResistance</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="airResistance" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>backResistance</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="backResistance" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>tolerance</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" formControlName="tolerance" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>deathOffs</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" formControlName="deathOffs" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>water</td>
+                <td><input class="road-info-checkbox" type="checkbox" formControlName="water" /></td>
+              </tr>
+
+              <tr><th colspan="2">Handling</th></tr>
+              <tr>
+                <td>xDrift</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="xDrift" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>yDrift</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="yDrift" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>xFrontDrift</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="xFrontDrift" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>yFrontDrift</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="yFrontDrift" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>trackSlide</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="trackSlide" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>dustSlide</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="dustSlide" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>dustColor</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" formControlName="dustColor" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>filler</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" formControlName="filler" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>filler2</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" formControlName="filler2" />
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>slideFriction</td>
+                <td>
+                  <mat-form-field appearance="outline" class="road-info-field">
+                    <input matInput type="number" step="any" formControlName="slideFriction" />
+                  </mat-form-field>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </form>
+      }
+
+      <hr />
+      <p class="muted hint-text">
+        Level property groups and object counts are still edited below.
+      </p>
+
+      <h4 class="section-subtitle">Object Groups</h4>
+      @for (objGroup of editObjectGroups; track $index) {
+        <div class="object-group-row">
+          <div class="object-group-row__header">
+            <span class="object-group-slot-label">Slot {{ $index }}</span>
+          </div>
+
+          <mat-form-field appearance="outline" class="object-group-select-field">
+            <mat-label>Group type</mat-label>
+            <mat-select
+              [value]="objGroup.resID"
+              [disabled]="workerBusy"
+              (selectionChange)="setObjectGroupValue($index, $event.value)"
+            >
+              <mat-select-trigger>
+                <span class="object-group-option object-group-option--trigger">
+                  <span class="object-group-option__label">{{ getObjectGroupLabel(objGroup.resID) }}</span>
+                  <span class="object-group-sprites" aria-hidden="true">
+                    @for (typeRes of getObjectGroupSprites(objGroup.resID); track $index) {
+                      @if (getSpriteUrl(typeRes); as url) {
+                        <img class="object-group-sprite" [src]="url" [alt]="" />
+                      } @else {
+                        <span class="object-group-sprite object-group-sprite--fallback"></span>
+                      }
+                    }
+                  </span>
+                </span>
+              </mat-select-trigger>
+              <mat-option [value]="0">
+                <span class="object-group-option">
+                  <span class="object-group-option__label">0 · empty slot</span>
+                </span>
+              </mat-option>
+              @for (group of objectGroupDefinitions; track group.id) {
+                @if (group.id !== 0) {
+                  <mat-option [value]="group.id">
+                    <span class="object-group-option">
+                      <span class="object-group-option__label">#{{ group.id }}</span>
+                      <span class="object-group-sprites" aria-hidden="true">
+                        @for (entry of group.entries; track $index) {
+                          @if (getSpriteUrl(entry.typeRes); as url) {
+                            <img class="object-group-sprite" [src]="url" [alt]="" />
+                          } @else {
+                            <span class="object-group-sprite object-group-sprite--fallback"></span>
+                          }
+                        }
+                      </span>
+                    </span>
+                  </mat-option>
+                }
+              }
+              @if (objGroup.resID !== 0 && !hasObjectGroupDefinition(objGroup.resID)) {
+                <mat-option [value]="objGroup.resID">
+                  <span class="object-group-option">
+                    <span class="object-group-option__label">#{{ objGroup.resID }} (custom)</span>
+                    <span class="object-group-sprites" aria-hidden="true">
+                      @for (typeRes of getObjectGroupSprites(objGroup.resID); track $index) {
+                        @if (getSpriteUrl(typeRes); as url) {
+                          <img class="object-group-sprite" [src]="url" [alt]="" />
+                        } @else {
+                          <span class="object-group-sprite object-group-sprite--fallback"></span>
+                        }
+                      }
+                    </span>
+                  </span>
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="object-group-count-field">
+            <mat-label>numObjs</mat-label>
+            <input matInput type="number" [formControl]="objectGroupNumObjsForm.controls[$index]" />
+          </mat-form-field>
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+}

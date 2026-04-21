@@ -15,117 +15,29 @@
  *   replace ResourceDatEntry.data with new handle bytes
  */
 
+
 import { ok, err, type Result } from 'neverthrow';
 import type { ResourceDatEntry } from './resource-dat.service';
 import { parsePackHandle, encodePackHandle } from './pack-parser.service';
+import type {
+  ObjectGroupRef, ObjectGroupDefinition, ObjectGroupEntryData,
+  TrackSeg, ObjectPos, RoadSeg, MarkSeg,
+  LevelProperties, ParsedLevel, EditableLevel, EditableSpriteAsset,
+  ObjectTypeDefinition, DecodedSpriteFrame,
+  RoadInfoData, DecodedRoadTexture,
+} from './level-editor.types';
 
-// ------------------------------------------------------------------
-// Exported data models
-// ------------------------------------------------------------------
+// Re-export all data-model types so that existing importers that reference
+// './level-editor.service' continue to work after the types were extracted.
+export type {
+  ObjectGroupRef, ObjectGroupEntryData, ObjectGroupDefinition,
+  TrackSeg, ObjectPos, RoadSeg, MarkSeg,
+  TrackWaypointRef, TrackMidpointRef,
+  LevelProperties, ParsedLevel, EditableLevel, EditableSpriteAsset,
+  ObjectTypeDefinition, DecodedSpriteFrame,
+  RoadInfoData, RoadInfoOption, TextureTileEntry, RoadTileGroup, DecodedRoadTexture,
+} from './level-editor.types';
 
-export interface ObjectGroupRef {
-  resID: number;    // SInt16
-  numObjs: number;  // SInt16
-}
-
-export interface TrackSeg {
-  flags: number;  // UInt16
-  x: number;      // SInt16
-  y: number;      // SInt32
-  velo: number;   // float (big-endian)
-}
-
-export interface ObjectPos {
-  x: number;        // SInt32
-  y: number;        // SInt32
-  dir: number;      // float
-  typeRes: number;  // SInt16
-}
-
-export interface RoadSeg {
-  v0: number;  // SInt16
-  v1: number;  // SInt16
-  v2: number;  // SInt16
-  v3: number;  // SInt16
-}
-
-export interface MarkSeg {
-  x1: number;  // SInt32
-  y1: number;  // SInt32
-  x2: number;  // SInt32
-  y2: number;  // SInt32
-}
-
-/** Identifies a single draggable or hovered track waypoint. */
-export interface TrackWaypointRef {
-  track: 'up' | 'down';
-  segIdx: number;
-}
-
-/**
- * Identifies the midpoint of a segment between two consecutive track waypoints.
- * `segIdx` is the index of the first of the two waypoints (so the midpoint is
- * between waypoints[segIdx] and waypoints[segIdx+1]).
- */
-export interface TrackMidpointRef {
-  track: 'up' | 'down';
-  /** Index of the first waypoint of the segment (midpoint is between [segIdx] and [segIdx+1]). */
-  segIdx: number;
-}
-
-export interface LevelProperties {
-  roadInfo: number;   // SInt16 – index into kPackRoad
-  time: number;       // UInt16 – level time limit
-  xStartPos: number;  // SInt16 – player start X position
-  levelEnd: number;   // UInt16 – Y position of finish line
-  objectGroups: ObjectGroupRef[];  // 10 slots
-}
-
-/** Full in-memory representation of a decoded level. */
-export interface ParsedLevel {
-  resourceId: number;
-  properties: LevelProperties;
-  objectGroups: ObjectGroupRef[];  // 10 entries
-  trackUp: TrackSeg[];
-  trackDown: TrackSeg[];
-  objects: ObjectPos[];
-  roadSegs: RoadSeg[];
-  roadSegCount: number;
-  marks: MarkSeg[];
-  rawEntry1: Uint8Array;
-  rawEntry2: Uint8Array;
-  encrypted: boolean;
-}
-
-/** Legacy tile overlay kept for backward compatibility. */
-export interface EditableLevel {
-  resourceId: number;
-  width: number;
-  height: number;
-  tiles: number[];
-}
-
-export interface EditableSpriteAsset {
-  id: number;
-  type: string;
-  size: number;
-}
-
-export interface ObjectTypeDefinition {
-  typeRes: number;
-  frame: number;
-  numFrames: number;
-  width: number;
-  length: number;
-}
-
-export interface DecodedSpriteFrame {
-  frameId: number;
-  width: number;
-  height: number;
-  pixels: Uint8ClampedArray;
-  bitDepth: 8 | 16;
-}
 
 // ------------------------------------------------------------------
 // Constants
@@ -149,6 +61,30 @@ const SPRITE_HEADER_SIZE = 8;
 const ROAD_PACK_ID = 135;
 /** Pack ID for kPackTx16 (16-bit RGB555 textures, resource ID 136). */
 const TX16_PACK_ID = 136;
+/** Pack ID for kPackOgrp (object group definitions, resource ID 130). */
+const OBJECT_GROUP_PACK_ID = 130;
+
+const OT_OFFSET_MASS = 0;
+const OT_OFFSET_MAX_ENGINE_FORCE = 4;
+const OT_OFFSET_MAX_NEG_ENGINE_FORCE = 8;
+const OT_OFFSET_FRICTION = 12;
+const OT_OFFSET_FLAGS = 16;
+const OT_OFFSET_DEATH_OBJ = 18;
+const OT_OFFSET_FRAME = 20;
+const OT_OFFSET_NUM_FRAMES = 22;
+const OT_OFFSET_FRAME_DURATION = 24;
+const OT_OFFSET_WHEEL_WIDTH = 28;
+const OT_OFFSET_WHEEL_LENGTH = 32;
+const OT_OFFSET_STEERING = 36;
+const OT_OFFSET_WIDTH = 40;
+const OT_OFFSET_LENGTH = 44;
+const OT_OFFSET_SCORE = 48;
+const OT_OFFSET_FLAGS2 = 50;
+const OT_OFFSET_CREATION_SOUND = 52;
+const OT_OFFSET_OTHER_SOUND = 54;
+const OT_OFFSET_MAX_DAMAGE = 56;
+const OT_OFFSET_WEAPON_OBJ = 60;
+const OT_OFFSET_WEAPON_INFO = 62;
 
 /**
  * tRoadInfo struct – layout (all big-endian, no padding on PPC):
@@ -162,16 +98,44 @@ const TX16_PACK_ID = 136;
  *   SInt16 foregroundTex @20   ← road-surface texture ID in kPackTx16
  *   SInt16 roadLeftBorder  @22 ← left border (kerb) texture ID
  *   SInt16 roadRightBorder @24 ← right border (kerb) texture ID
- *   … (remaining fields not needed for rendering)
+ *   SInt16 tracks        @26
+ *   SInt16 skidSound     @28
+ *   SInt16 filler        @30
+ *   float xDrift         @32
+ *   float yDrift         @36
+ *   float xFrontDrift    @40
+ *   float yFrontDrift    @44
+ *   float trackSlide     @48
+ *   float dustSlide      @52
+ *   UInt8  dustColor     @56
  *   UInt8  water         @57
+ *   UInt16 filler2       @58
+ *   float slideFriction  @60
  */
+const ROAD_INFO_SIZE       = 64;
+const RI_OFFSET_FRICTION   = 0;
+const RI_OFFSET_AIR_RESIST = 4;
+const RI_OFFSET_BACK_RES   = 8;
+const RI_OFFSET_TOLERANCE  = 12;
+const RI_OFFSET_MARKS      = 14;
+const RI_OFFSET_DEATH_OFFS = 16;
 const RI_OFFSET_BG_TEX     = 18;
 const RI_OFFSET_FG_TEX     = 20;
 const RI_OFFSET_LEFT_BORD  = 22;
 const RI_OFFSET_RIGHT_BORD = 24;
+const RI_OFFSET_TRACKS     = 26;
+const RI_OFFSET_SKID_SND   = 28;
+const RI_OFFSET_FILLER     = 30;
+const RI_OFFSET_X_DRIFT    = 32;
+const RI_OFFSET_Y_DRIFT    = 36;
+const RI_OFFSET_X_FRONT    = 40;
+const RI_OFFSET_Y_FRONT    = 44;
+const RI_OFFSET_TRACK_SLIDE = 48;
+const RI_OFFSET_DUST_SLIDE = 52;
+const RI_OFFSET_DUST_COLOR = 56;
 const RI_OFFSET_WATER      = 57;
-/** sizeof(tRoadInfo) – reserved for future reference. */
-// const ROAD_INFO_SIZE = 64;
+const RI_OFFSET_FILLER2    = 58;
+const RI_OFFSET_SLIDE_FRICTION = 60;
 
 /** Texture dimensions (pixels) for tiles in kPackTx16. */
 // const BIG_TEX_SIZE = 128;   // background + road surface textures: 128×128 px
@@ -181,31 +145,6 @@ const BORDER_TEX_H   = 128;  // kerb border textures: 128 px tall
 // ------------------------------------------------------------------
 // Road texture data types (exported so worker can transfer them)
 // ------------------------------------------------------------------
-
-/** Decoded info for a single tRoadInfo entry in kPackRoad. */
-export interface RoadInfoData {
-  /** tRoadInfo entry ID (= roadInfo field in level data, e.g. 128–136). */
-  id: number;
-  /** Texture ID in kPackTx16 for the off-road / background fill. */
-  backgroundTex: number;
-  /** Texture ID in kPackTx16 for the driveable road surface. */
-  foregroundTex: number;
-  /** Texture ID in kPackTx16 for the left (inside) kerb border. */
-  roadLeftBorder: number;
-  /** Texture ID in kPackTx16 for the right (outside) kerb border. */
-  roadRightBorder: number;
-  /** True for water levels (level 5 / roadInfo 133). */
-  water: boolean;
-}
-
-/** Decoded 16-bit RGB555 texture ready for ImageData. */
-export interface DecodedRoadTexture {
-  texId: number;
-  width: number;
-  height: number;
-  /** Raw RGBA8888 pixel data (width × height × 4 bytes). */
-  pixels: ArrayBuffer;
-}
 
 // ------------------------------------------------------------------
 // Helpers
@@ -234,9 +173,8 @@ function rgb555ToRgba(value: number): [number, number, number, number] {
 }
 
 /** Convert a packed big-endian RGB565 pixel into 8-bit RGBA for canvas previews.
- *  Kept for future use (RGB565 texture format support). */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function rgb565ToRgba(value: number): [number, number, number, number] {
+ *  Used for RGB565 texture format support. */
+export function rgb565ToRgba(value: number): [number, number, number, number] {
   const r = ((value >> 11) & 0x1f) * RGB5_SCALE;
   const g = ((value >> 5) & 0x3f) * RGB6_SCALE;
   const b = (value & 0x1f) * RGB5_SCALE;
@@ -308,6 +246,43 @@ function indexed8ToRgba(value: number): [number, number, number, number] {
   if (!entry) return [0, 0, 0, 255];
   return [entry[0], entry[1], entry[2], 255];
 }
+
+/** Convert RGBA8888 to the nearest Mac 8-bit palette index. */
+function rgbaToMacPaletteIndex(r: number, g: number, b: number): number {
+  if (!rgbaToMacPaletteIndexCache) {
+    const cache = new Map<number, number>();
+    for (let rq = 0; rq < 32; rq++) {
+      for (let gq = 0; gq < 32; gq++) {
+        for (let bq = 0; bq < 32; bq++) {
+          const key = (rq << 10) | (gq << 5) | bq;
+          const rr = rq * 8;
+          const gg = gq * 8;
+          const bb = bq * 8;
+          let bestIdx = 0;
+          let bestDist = Infinity;
+          for (let i = 0; i < MAC_SYSTEM_PALETTE.length; i++) {
+            const [pr, pg, pb] = MAC_SYSTEM_PALETTE[i] ?? [0, 0, 0];
+            const dr = rr - pr;
+            const dg = gg - pg;
+            const db = bb - pb;
+            const dist = dr * dr + dg * dg + db * db;
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestIdx = i;
+            }
+          }
+          cache.set(key, bestIdx);
+        }
+      }
+    }
+    rgbaToMacPaletteIndexCache = cache;
+  }
+
+  const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+  return rgbaToMacPaletteIndexCache.get(key) ?? 0;
+}
+
+let rgbaToMacPaletteIndexCache: Map<number, number> | null = null;
 
 // ------------------------------------------------------------------
 // Level entry parser
@@ -442,6 +417,131 @@ export function serializeLevelProperties(rawEntry1: Uint8Array, props: LevelProp
   return out;
 }
 
+export function serializeRoadInfoData(roadInfo: RoadInfoData): Uint8Array {
+  const out = new Uint8Array(ROAD_INFO_SIZE);
+  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  view.setFloat32(RI_OFFSET_FRICTION, roadInfo.friction, false);
+  view.setFloat32(RI_OFFSET_AIR_RESIST, roadInfo.airResistance, false);
+  view.setFloat32(RI_OFFSET_BACK_RES, roadInfo.backResistance, false);
+  view.setUint16(RI_OFFSET_TOLERANCE, roadInfo.tolerance, false);
+  view.setInt16(RI_OFFSET_MARKS, roadInfo.marks, false);
+  view.setInt16(RI_OFFSET_DEATH_OFFS, roadInfo.deathOffs, false);
+  view.setInt16(RI_OFFSET_BG_TEX, roadInfo.backgroundTex, false);
+  view.setInt16(RI_OFFSET_FG_TEX, roadInfo.foregroundTex, false);
+  view.setInt16(RI_OFFSET_LEFT_BORD, roadInfo.roadLeftBorder, false);
+  view.setInt16(RI_OFFSET_RIGHT_BORD, roadInfo.roadRightBorder, false);
+  view.setInt16(RI_OFFSET_TRACKS, roadInfo.tracks, false);
+  view.setInt16(RI_OFFSET_SKID_SND, roadInfo.skidSound, false);
+  view.setInt16(RI_OFFSET_FILLER, roadInfo.filler, false);
+  view.setFloat32(RI_OFFSET_X_DRIFT, roadInfo.xDrift, false);
+  view.setFloat32(RI_OFFSET_Y_DRIFT, roadInfo.yDrift, false);
+  view.setFloat32(RI_OFFSET_X_FRONT, roadInfo.xFrontDrift, false);
+  view.setFloat32(RI_OFFSET_Y_FRONT, roadInfo.yFrontDrift, false);
+  view.setFloat32(RI_OFFSET_TRACK_SLIDE, roadInfo.trackSlide, false);
+  view.setFloat32(RI_OFFSET_DUST_SLIDE, roadInfo.dustSlide, false);
+  view.setUint8(RI_OFFSET_DUST_COLOR, roadInfo.dustColor);
+  view.setUint8(RI_OFFSET_WATER, roadInfo.water ? 1 : 0);
+  view.setUint16(RI_OFFSET_FILLER2, roadInfo.filler2, false);
+  view.setFloat32(RI_OFFSET_SLIDE_FRICTION, roadInfo.slideFriction, false);
+  return out;
+}
+
+function parseObjectTypeDefinition(data: Uint8Array): ObjectTypeDefinition | null {
+  if (data.length < OBJECT_TYPE_SIZE) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  return {
+    typeRes: 0,
+    mass: view.getFloat32(OT_OFFSET_MASS, false),
+    maxEngineForce: view.getFloat32(OT_OFFSET_MAX_ENGINE_FORCE, false),
+    maxNegEngineForce: view.getFloat32(OT_OFFSET_MAX_NEG_ENGINE_FORCE, false),
+    friction: view.getFloat32(OT_OFFSET_FRICTION, false),
+    flags: view.getUint16(OT_OFFSET_FLAGS, false),
+    deathObj: view.getInt16(OT_OFFSET_DEATH_OBJ, false),
+    frame: view.getInt16(OT_OFFSET_FRAME, false),
+    numFrames: view.getUint16(OT_OFFSET_NUM_FRAMES, false),
+    frameDuration: view.getFloat32(OT_OFFSET_FRAME_DURATION, false),
+    wheelWidth: view.getFloat32(OT_OFFSET_WHEEL_WIDTH, false),
+    wheelLength: view.getFloat32(OT_OFFSET_WHEEL_LENGTH, false),
+    steering: view.getFloat32(OT_OFFSET_STEERING, false),
+    width: view.getFloat32(OT_OFFSET_WIDTH, false),
+    length: view.getFloat32(OT_OFFSET_LENGTH, false),
+    score: view.getUint16(OT_OFFSET_SCORE, false),
+    flags2: view.getUint16(OT_OFFSET_FLAGS2, false),
+    creationSound: view.getInt16(OT_OFFSET_CREATION_SOUND, false),
+    otherSound: view.getInt16(OT_OFFSET_OTHER_SOUND, false),
+    maxDamage: view.getFloat32(OT_OFFSET_MAX_DAMAGE, false),
+    weaponObj: view.getInt16(OT_OFFSET_WEAPON_OBJ, false),
+    weaponInfo: view.getInt16(OT_OFFSET_WEAPON_INFO, false),
+  };
+}
+
+function serializeObjectTypeDefinition(def: ObjectTypeDefinition, baseData?: Uint8Array): Uint8Array {
+  const out = baseData && baseData.length >= OBJECT_TYPE_SIZE
+    ? baseData.slice(0, OBJECT_TYPE_SIZE)
+    : new Uint8Array(OBJECT_TYPE_SIZE);
+  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  view.setFloat32(OT_OFFSET_MASS, def.mass, false);
+  view.setFloat32(OT_OFFSET_MAX_ENGINE_FORCE, def.maxEngineForce, false);
+  view.setFloat32(OT_OFFSET_MAX_NEG_ENGINE_FORCE, def.maxNegEngineForce, false);
+  view.setFloat32(OT_OFFSET_FRICTION, def.friction, false);
+  view.setUint16(OT_OFFSET_FLAGS, def.flags, false);
+  view.setInt16(OT_OFFSET_DEATH_OBJ, def.deathObj, false);
+  view.setInt16(OT_OFFSET_FRAME, def.frame, false);
+  view.setUint16(OT_OFFSET_NUM_FRAMES, def.numFrames, false);
+  view.setFloat32(OT_OFFSET_FRAME_DURATION, def.frameDuration, false);
+  view.setFloat32(OT_OFFSET_WHEEL_WIDTH, def.wheelWidth, false);
+  view.setFloat32(OT_OFFSET_WHEEL_LENGTH, def.wheelLength, false);
+  view.setFloat32(OT_OFFSET_STEERING, def.steering, false);
+  view.setFloat32(OT_OFFSET_WIDTH, def.width, false);
+  view.setFloat32(OT_OFFSET_LENGTH, def.length, false);
+  view.setUint16(OT_OFFSET_SCORE, def.score, false);
+  view.setUint16(OT_OFFSET_FLAGS2, def.flags2, false);
+  view.setInt16(OT_OFFSET_CREATION_SOUND, def.creationSound, false);
+  view.setInt16(OT_OFFSET_OTHER_SOUND, def.otherSound, false);
+  view.setFloat32(OT_OFFSET_MAX_DAMAGE, def.maxDamage, false);
+  view.setInt16(OT_OFFSET_WEAPON_OBJ, def.weaponObj, false);
+  view.setInt16(OT_OFFSET_WEAPON_INFO, def.weaponInfo, false);
+  return out;
+}
+
+function parseObjectGroupDefinition(data: Uint8Array): ObjectGroupDefinition | null {
+  if (data.length < 4) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const numEntries = view.getUint32(0, false);
+  if (numEntries > 1000) return null;
+
+  const entries: ObjectGroupEntryData[] = [];
+  let pos = 4;
+  for (let i = 0; i < numEntries && pos + 12 <= data.length; i++) {
+    entries.push({
+      typeRes: view.getInt16(pos, false),
+      minOffs: view.getInt16(pos + 2, false),
+      maxOffs: view.getInt16(pos + 4, false),
+      probility: view.getInt16(pos + 6, false),
+      dir: view.getFloat32(pos + 8, false),
+    });
+    pos += 12;
+  }
+
+  return { id: 0, entries };
+}
+
+function serializeObjectGroupDefinition(group: ObjectGroupDefinition): Uint8Array {
+  const buf = new Uint8Array(4 + group.entries.length * 12);
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  view.setUint32(0, group.entries.length, false);
+  for (let i = 0; i < group.entries.length; i++) {
+    const pos = 4 + i * 12;
+    const entry = group.entries[i];
+    view.setInt16(pos, entry.typeRes, false);
+    view.setInt16(pos + 2, entry.minOffs, false);
+    view.setInt16(pos + 4, entry.maxOffs, false);
+    view.setInt16(pos + 6, entry.probility, false);
+    view.setFloat32(pos + 8, entry.dir, false);
+  }
+  return buf;
+}
+
 export function serializeLevelTrack(
   rawEntry1: Uint8Array,
   trackUp: { x: number; y: number; flags: number; velo: number }[],
@@ -485,6 +585,42 @@ export function serializeLevelTrack(
   result.set(downBuf, before.length + upBuf.length);
   result.set(after,   before.length + upBuf.length + downBuf.length);
   return result;
+}
+
+export function extractObjectGroupDefinitions(resources: ResourceDatEntry[]): ObjectGroupDefinition[] {
+  const pack = resources.find((e) => e.type === 'Pack' && e.id === OBJECT_GROUP_PACK_ID);
+  if (!pack) return [];
+  try {
+    const entries = parsePackHandle(pack.data, pack.id);
+    return entries
+      .map((entry) => {
+        const parsed = parseObjectGroupDefinition(entry.data);
+        return parsed ? { id: entry.id, entries: parsed.entries } : null;
+      })
+      .filter((entry): entry is ObjectGroupDefinition => entry !== null)
+      .sort((a, b) => a.id - b.id);
+  } catch (err) {
+    console.warn('[LevelEditor] failed to parse object groups:', err);
+    return [];
+  }
+}
+
+export function applyObjectGroupDefinitions(
+  resources: ResourceDatEntry[],
+  groups: ObjectGroupDefinition[],
+): ResourceDatEntry[] {
+  return resources.map((res) => {
+    if (res.type !== 'Pack' || res.id !== OBJECT_GROUP_PACK_ID) return res;
+    try {
+      const newEntries = [...groups]
+        .sort((a, b) => a.id - b.id)
+        .map((group) => ({ id: group.id, data: serializeObjectGroupDefinition(group) }));
+      return { ...res, data: encodePackHandle(newEntries, OBJECT_GROUP_PACK_ID) };
+    } catch (err) {
+      console.warn('[LevelEditor] applyObjectGroupDefinitions error:', err);
+      return res;
+    }
+  });
 }
 
 export function serializeLevelObjects(rawEntry1: Uint8Array, objects: ObjectPos[]): Uint8Array {
@@ -571,12 +707,14 @@ export class LevelEditorService {
         const e2 = packEntries.find((e) => e.id === 2);
         if (!e1) continue;
 
-        const parseResult = parseLevelEntry(e1.data);
-        if (parseResult.isErr()) {
-          console.warn(`[LevelEditor] parse error for Pack #${entry.id}:`, parseResult.error);
-          continue;
-        }
-        const partial = parseResult.value;
+        const partial = parseLevelEntry(e1.data).match(
+          (value) => value,
+          (error) => {
+            console.warn(`[LevelEditor] parse error for Pack #${entry.id}:`, error);
+            return null;
+          },
+        );
+        if (!partial) continue;
         const marks   = e2 ? parseMarkSegs(e2.data) : [];
 
         levels.push({
@@ -609,6 +747,48 @@ export class LevelEditorService {
         return { ...res, data: encodePackHandle(newEntries, resourceId) };
       } catch (err) {
         console.error(`[LevelEditor] applyLevelProperties error id=${resourceId}:`, err);
+        return res;
+      }
+    });
+  }
+
+  applyRoadInfoData(
+    resources: ResourceDatEntry[],
+    roadInfoId: number,
+    roadInfo: RoadInfoData,
+  ): ResourceDatEntry[] {
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== ROAD_PACK_ID) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, res.id);
+        const newData = serializeRoadInfoData(roadInfo);
+        const newEntries = packEntries.some((entry) => entry.id === roadInfoId)
+          ? packEntries.map((entry) => (entry.id === roadInfoId ? { ...entry, data: newData } : entry))
+          : [...packEntries, { id: roadInfoId, data: newData }];
+        newEntries.sort((a, b) => a.id - b.id);
+        return { ...res, data: encodePackHandle(newEntries, ROAD_PACK_ID) };
+      } catch (err) {
+        console.error(`[LevelEditor] applyRoadInfoData error id=${roadInfoId}:`, err);
+        return res;
+      }
+    });
+  }
+
+  removeRoadInfoData(
+    resources: ResourceDatEntry[],
+    roadInfoId: number,
+  ): ResourceDatEntry[] {
+    return resources.map((res) => {
+      if (res.type !== 'Pack' || res.id !== ROAD_PACK_ID) return res;
+      try {
+        const packEntries = parsePackHandle(res.data, res.id);
+        if (!packEntries.some((entry) => entry.id === roadInfoId)) return res;
+        const newEntries = packEntries
+          .filter((entry) => entry.id !== roadInfoId)
+          .sort((a, b) => a.id - b.id);
+        return { ...res, data: encodePackHandle(newEntries, ROAD_PACK_ID) };
+      } catch (err) {
+        console.error(`[LevelEditor] removeRoadInfoData error id=${roadInfoId}:`, err);
         return res;
       }
     });
@@ -770,15 +950,9 @@ export class LevelEditorService {
     try {
       const entries = parsePackHandle(pack.data, pack.id);
       for (const entry of entries) {
-        if (entry.data.length < OBJECT_TYPE_SIZE) continue;
-        const view = new DataView(entry.data.buffer, entry.data.byteOffset, entry.data.byteLength);
-        defs.set(entry.id, {
-          typeRes: entry.id,
-          frame: view.getInt16(20, false),
-          numFrames: view.getUint16(22, false),
-          width: view.getFloat32(40, false),
-          length: view.getFloat32(44, false),
-        });
+        const def = parseObjectTypeDefinition(entry.data);
+        if (!def) continue;
+        defs.set(entry.id, { ...def, typeRes: entry.id });
       }
     } catch (err) {
       console.warn('[LevelEditor] failed to parse object types:', err);
@@ -857,15 +1031,16 @@ export class LevelEditorService {
   }
 
   /**
-   * Write edited RGBA8888 pixels back into the sprite pack (Pack 137, 16-bit RGB555).
-   * Only writes to 16-bit sprite pack entries; 8-bit PPic PPic entries are not modified.
+   * Write edited RGBA8888 pixels back into the sprite pack.
+   * Pack 137 uses 16-bit RGB555 pixels; Pack 129 uses 8-bit indexed pixels.
    */
-  applySpritePack16Pixels(
+  applySpritePackPixels(
     resources: ResourceDatEntry[],
     frameId: number,
+    bitDepth: 8 | 16,
     pixels: Uint8ClampedArray,
   ): ResourceDatEntry[] {
-    const packId = SPRITE_PACK_16_ID;
+    const packId = bitDepth === 16 ? SPRITE_PACK_16_ID : SPRITE_PACK_8_ID;
     return resources.map((res) => {
       if (res.type !== 'Pack' || res.id !== packId) return res;
       try {
@@ -878,32 +1053,49 @@ export class LevelEditorService {
         const log2xSize = entry.data[4];
         const stride = 1 << log2xSize;
         if (width <= 0 || height <= 0 || stride <= 0) return res;
-        // Write edited pixels back (convert RGBA8888 → RGB555 BE)
         const newData = entry.data.slice();
         const newView = new DataView(newData.buffer, newData.byteOffset, newData.byteLength);
-        const maskValue = view.getUint16(SPRITE_HEADER_SIZE, false); // transparent colour unchanged
+        const maskValue = bitDepth === 16
+          ? view.getUint16(SPRITE_HEADER_SIZE, false)
+          : newData[SPRITE_HEADER_SIZE]; // transparent colour unchanged
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
             const srcI = (y * width + x) * 4;
-            const dstOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
-            if (dstOffset + 2 > newData.length) continue;
             const a = pixels[srcI + 3];
             if (a === 0) {
               // transparent – restore mask value
-              newView.setUint16(dstOffset, maskValue, false);
+              if (bitDepth === 16) {
+                const dstOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
+                if (dstOffset + 2 > newData.length) continue;
+                newView.setUint16(dstOffset, maskValue, false);
+              } else {
+                const dstOffset = SPRITE_HEADER_SIZE + y * stride + x;
+                if (dstOffset >= newData.length) continue;
+                newData[dstOffset] = maskValue;
+              }
             } else {
-              const rgb = rgbaToRgb555(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
-              // Flip the LSB to create a visually similar but distinct RGB555 value so it won't
-              // be misidentified as the transparent mask colour by the game renderer.
-              const safe = rgb === maskValue ? (rgb ^ 1) : rgb;
-              newView.setUint16(dstOffset, safe, false);
+              if (bitDepth === 16) {
+                const rgb = rgbaToRgb555(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
+                // Flip the LSB to create a visually similar but distinct RGB555 value so it won't
+                // be misidentified as the transparent mask colour by the game renderer.
+                const safe = rgb === maskValue ? (rgb ^ 1) : rgb;
+                const dstOffset = SPRITE_HEADER_SIZE + (y * stride + x) * 2;
+                if (dstOffset + 2 > newData.length) continue;
+                newView.setUint16(dstOffset, safe, false);
+              } else {
+                const idx = rgbaToMacPaletteIndex(pixels[srcI], pixels[srcI + 1], pixels[srcI + 2]);
+                const safe = idx === maskValue ? ((idx + 1) & 0xff) : idx;
+                const dstOffset = SPRITE_HEADER_SIZE + y * stride + x;
+                if (dstOffset >= newData.length) continue;
+                newData[dstOffset] = safe;
+              }
             }
           }
         }
         const newEntries = packEntries.map((e) => e.id === frameId ? { ...e, data: newData } : e);
         return { ...res, data: encodePackHandle(newEntries, packId) };
       } catch (err) {
-        console.warn('[LevelEditor] applySpritePack16Pixels error:', err);
+        console.warn('[LevelEditor] applySpritePackPixels error:', err);
         return res;
       }
     });
@@ -1029,15 +1221,33 @@ export class LevelEditorService {
     try {
       const entries = parsePackHandle(pack.data, pack.id);
       for (const entry of entries) {
-        if (entry.data.length < RI_OFFSET_WATER + 1) continue;
+        if (entry.data.length < ROAD_INFO_SIZE) continue;
         const view = new DataView(entry.data.buffer, entry.data.byteOffset, entry.data.byteLength);
         result.set(entry.id, {
           id: entry.id,
+          friction: view.getFloat32(RI_OFFSET_FRICTION, false),
+          airResistance: view.getFloat32(RI_OFFSET_AIR_RESIST, false),
+          backResistance: view.getFloat32(RI_OFFSET_BACK_RES, false),
+          tolerance: view.getUint16(RI_OFFSET_TOLERANCE, false),
+          marks: view.getInt16(RI_OFFSET_MARKS, false),
+          deathOffs: view.getInt16(RI_OFFSET_DEATH_OFFS, false),
           backgroundTex:  view.getInt16(RI_OFFSET_BG_TEX,    false),
           foregroundTex:  view.getInt16(RI_OFFSET_FG_TEX,    false),
           roadLeftBorder: view.getInt16(RI_OFFSET_LEFT_BORD, false),
           roadRightBorder: view.getInt16(RI_OFFSET_RIGHT_BORD, false),
+          tracks: view.getInt16(RI_OFFSET_TRACKS, false),
+          skidSound: view.getInt16(RI_OFFSET_SKID_SND, false),
+          filler: view.getInt16(RI_OFFSET_FILLER, false),
+          xDrift: view.getFloat32(RI_OFFSET_X_DRIFT, false),
+          yDrift: view.getFloat32(RI_OFFSET_Y_DRIFT, false),
+          xFrontDrift: view.getFloat32(RI_OFFSET_X_FRONT, false),
+          yFrontDrift: view.getFloat32(RI_OFFSET_Y_FRONT, false),
+          trackSlide: view.getFloat32(RI_OFFSET_TRACK_SLIDE, false),
+          dustSlide: view.getFloat32(RI_OFFSET_DUST_SLIDE, false),
+          dustColor: view.getUint8(RI_OFFSET_DUST_COLOR),
           water: entry.data[RI_OFFSET_WATER] !== 0,
+          filler2: view.getUint16(RI_OFFSET_FILLER2, false),
+          slideFriction: view.getFloat32(RI_OFFSET_SLIDE_FRICTION, false),
         });
       }
     } catch (err) {
@@ -1109,6 +1319,11 @@ export class LevelEditorService {
     });
   }
 
+  /** Remove a single tile entry from kPackTx16 (Pack ID 136). */
+  removeTile16Texture(resources: ResourceDatEntry[], texId: number): ResourceDatEntry[] {
+    return removePackEntryRaw(resources, TX16_PACK_ID, texId);
+  }
+
   /**
    * Decode all textures needed for road rendering from kPackTx16 (Pack ID 136).
    * Returns decoded RGBA8888 textures keyed by texture ID.
@@ -1158,6 +1373,29 @@ export class LevelEditorService {
     }
     return result;
   }
+}
+
+export function applyObjectTypeDefinitions(
+  resources: ResourceDatEntry[],
+  objectTypes: ObjectTypeDefinition[],
+): ResourceDatEntry[] {
+  return resources.map((res) => {
+    if (res.type !== 'Pack' || res.id !== OBJECT_TYPES_PACK_ID) return res;
+    try {
+      const packEntries = parsePackHandle(res.data, res.id);
+      const existingById = new Map(packEntries.map((entry) => [entry.id, entry.data] as const));
+      const newEntries = [...objectTypes]
+        .sort((a, b) => a.typeRes - b.typeRes)
+        .map((def) => ({
+          id: def.typeRes,
+          data: serializeObjectTypeDefinition(def, existingById.get(def.typeRes)),
+        }));
+      return { ...res, data: encodePackHandle(newEntries, OBJECT_TYPES_PACK_ID) };
+    } catch (err) {
+      console.error('[LevelEditor] applyObjectTypeDefinitions error:', err);
+      return res;
+    }
+  });
 }
 
 // ------------------------------------------------------------------
@@ -1301,6 +1539,30 @@ export function putPackEntryRaw(
     const newEntries = entries.some((e) => e.id === entryId)
       ? entries.map((e) => (e.id === entryId ? { ...e, data: data.slice() } : e))
       : [...entries, { id: entryId, data: data.slice() }];
+    const newPackData = encodePackHandle(newEntries, packId);
+    return resources.map((e) =>
+      e.type === 'Pack' && e.id === packId ? { ...e, data: newPackData } : e,
+    );
+  } catch {
+    return resources;
+  }
+}
+
+/**
+ * Remove a single entry from a Pack resource.
+ * Returns the original resources array unchanged if the pack or entry is missing.
+ */
+export function removePackEntryRaw(
+  resources: ResourceDatEntry[],
+  packId: number,
+  entryId: number,
+): ResourceDatEntry[] {
+  const pack = resources.find((e) => e.type === 'Pack' && e.id === packId);
+  if (!pack) return resources;
+  try {
+    const entries = parsePackHandle(pack.data, packId);
+    if (!entries.some((e) => e.id === entryId)) return resources;
+    const newEntries = entries.filter((e) => e.id !== entryId);
     const newPackData = encodePackHandle(newEntries, packId);
     return resources.map((e) =>
       e.type === 'Pack' && e.id === packId ? { ...e, data: newPackData } : e,

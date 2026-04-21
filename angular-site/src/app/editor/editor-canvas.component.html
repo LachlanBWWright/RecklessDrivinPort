@@ -1,0 +1,209 @@
+<!-- Canvas toolbar -->
+<div class="canvas-toolbar">
+  <div class="canvas-controls">
+    <!-- Undo / Redo -->
+    <button mat-icon-button (click)="undo.emit()" [disabled]="!canUndo" matTooltip="Undo (Ctrl+Z)">
+      <mat-icon>undo</mat-icon>
+    </button>
+    <button mat-icon-button (click)="redo.emit()" [disabled]="!canRedo" matTooltip="Redo (Ctrl+Y)">
+      <mat-icon>redo</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Object actions -->
+    <button mat-stroked-button class="canvas-add-object-button" (click)="addObject.emit()" matTooltip="Add new object">
+      <mat-icon>add</mat-icon> Object
+    </button>
+    <button mat-icon-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+    <button mat-icon-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected (Del)">
+      <mat-icon>delete</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- View controls -->
+    <button mat-icon-button (click)="frameAll.emit()" matTooltip="Frame all objects">
+      <mat-icon>fit_screen</mat-icon>
+    </button>
+    <button mat-icon-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
+      <mat-icon>center_focus_strong</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Marks toggle + mark management (visible when marks enabled) -->
+    <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
+      <mat-icon>edit_location</mat-icon>
+    </button>
+    @if (showMarks) {
+      <button mat-icon-button (click)="addMark.emit()" [disabled]="workerBusy" matTooltip="Add mark">
+        <mat-icon>add_location</mat-icon>
+      </button>
+      <button mat-icon-button [class.btn-active]="markCreateMode"
+        (click)="markCreateMode ? confirmMarkCreate.emit() : startMarkCreate.emit()"
+        [disabled]="workerBusy"
+        [matTooltip]="markCreateMode ? 'Confirm create (' + pendingMarkPointCount + ' pts)' : 'Create mark by click'">
+        <mat-icon>{{ markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon>
+      </button>
+      <button mat-icon-button (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
+        <mat-icon>remove_circle_outline</mat-icon>
+      </button>
+      <button mat-icon-button [class.btn-active]="showMarkingPopup"
+        (click)="toggleMarkingPopup()"
+        [matTooltip]="showMarkingPopup ? 'Close marking generator' : 'Generate road markings'">
+        <mat-icon>auto_awesome</mat-icon>
+      </button>
+    }
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Draw mode selector: 'none' = select/pan; other values enable barrier drawing -->
+    <mat-button-toggle-group [value]="drawMode" (change)="drawModeChange.emit($event.value)"
+                             matTooltip="Select draw mode">
+      <mat-button-toggle value="none" matTooltip="Select / pan (no drawing)">
+        <mat-icon>pan_tool</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="freehand" matTooltip="Freehand barrier draw">
+        <mat-icon>gesture</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="straight" matTooltip="Straight-line barrier draw">
+        <mat-icon>show_chart</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="curve" matTooltip="Bezier-style barrier draw: click start, end, then bend">
+        <mat-icon>timeline</mat-icon>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <form class="canvas-property-controls" [formGroup]="canvasForm">
+      <mat-form-field appearance="outline" class="canvas-inline-field canvas-inline-field--road">
+        <mat-label>Road Info</mat-label>
+        <mat-select
+          formControlName="roadInfo"
+          aria-label="Road info selector"
+        >
+          <mat-select-trigger>
+            @if (getRoadInfoOption(canvasForm.controls.roadInfo.value ?? editRoadInfo); as selectedRoadInfo) {
+              <span class="road-info-trigger">
+                @if (selectedRoadInfo.previewUrl) {
+                  <img class="road-info-thumb" [src]="selectedRoadInfo.previewUrl" [alt]="'Road info ' + selectedRoadInfo.id" />
+                } @else {
+                  <span class="road-info-thumb road-info-thumb--fallback" [class.water]="selectedRoadInfo.water"></span>
+                }
+                <span>{{ selectedRoadInfo.label }}</span>
+              </span>
+            } @else {
+              <span class="road-info-trigger">
+                <span class="road-info-thumb road-info-thumb--fallback"></span>
+                <span>Road {{ canvasForm.controls.roadInfo.value ?? editRoadInfo }}</span>
+              </span>
+            }
+          </mat-select-trigger>
+          @for (option of roadInfoOptions; track option.id) {
+            <mat-option [value]="option.id">
+              <span class="road-info-option">
+                @if (option.previewUrl) {
+                  <img class="road-info-thumb" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
+                } @else {
+                  <span class="road-info-thumb road-info-thumb--fallback" [class.water]="option.water"></span>
+                }
+                <span class="road-info-option-label">{{ option.label }}</span>
+              </span>
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="canvas-inline-field canvas-inline-field--time">
+        <mat-label>Time Limit</mat-label>
+        <input
+          matInput
+          type="text"
+          formControlName="editTimeText"
+          inputmode="numeric"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Time limit in seconds"
+          (focus)="onTimeLimitFocus()"
+          (blur)="onTimeLimitBlur()"
+          (keydown)="$event.stopPropagation()"
+          (keydown.enter)="commitTimeLimit(); $event.preventDefault()"
+        />
+      </mat-form-field>
+    </form>
+    @if (drawMode !== 'none') {
+      <mat-button-toggle-group [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
+                               matTooltip="Select which barrier side to draw">
+        <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
+        <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
+        <mat-button-toggle value="i" matTooltip="Merge inner barriers: snap both v1 and v2 to the same drawn x">I</mat-button-toggle>
+        <mat-button-toggle value="v2" matTooltip="Right inner barrier (v2)">Ri</mat-button-toggle>
+        <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
+      </mat-button-toggle-group>
+    }
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Zoom controls -->
+    <button mat-icon-button (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
+    <button mat-icon-button (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
+    <button mat-icon-button (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
+    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <!-- Info button -->
+    <button mat-icon-button [class.btn-active]="showInfoPopup" (click)="showInfoPopup = !showInfoPopup" matTooltip="Editor help &amp; info">
+      <mat-icon>info</mat-icon>
+    </button>
+  </div>
+</div>
+
+<div class="object-canvas-col">
+  <div class="canvas-with-scrollbars" style="position:relative">
+    <canvas id="object-canvas" class="object-canvas" width="900" height="700"
+      tabindex="0"
+      (mousedown)="canvasMouseDown.emit($event)"
+      (mousemove)="canvasMouseMove.emit($event)"
+      (mouseup)="canvasMouseUp.emit($event)"
+      (dblclick)="canvasDblClick.emit($event)"
+      (keydown)="canvasKeyDown.emit($event)"
+      (keyup)="canvasKeyUp.emit($event)"
+      (wheel)="canvasWheel.emit($event)"
+      (contextmenu)="canvasContextMenu.emit($event); $event.preventDefault()"
+      [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'default'))"
+    ></canvas>
+    <!-- Vertical scrollbar: direct mapping - value=min(=0) → see start(Y=0), value=max → see end -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
+      aria-label="Vertical scroll position"
+      [min]="0" [max]="scrollYMax" [step]="10"
+      [formControl]="canvasForm.controls.panY"
+    />
+    <!-- Horizontal scrollbar -->
+    <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
+      [min]="scrollXMin" [max]="scrollXMax" [step]="5"
+      [formControl]="canvasForm.controls.panX"
+    />
+
+    <!-- Marking generation popup overlay -->
+    @if (showMarkingPopup) {
+      <app-marking-popup
+        [roadMaxY]="roadMaxY"
+        [workerBusy]="workerBusy"
+        (close)="toggleMarkingPopup()"
+        (generateSideMarks)="generateSideMarks.emit($event)"
+        (generateCentreMarks)="generateCentreMarks.emit($event)"
+        (previewSideMarks)="previewSideMarks.emit($event)"
+        (previewCentreMarks)="previewCentreMarks.emit($event)"
+        (clearPreview)="clearMarkingPreview.emit()"
+      ></app-marking-popup>
+    }
+
+    <!-- Info popup overlay -->
+    @if (showInfoPopup) {
+      <app-canvas-info-popup
+        [levelNum]="levelNum"
+        [objectCount]="objectCount"
+        (close)="showInfoPopup = false"
+      ></app-canvas-info-popup>
+    }
+  </div>
+  <div class="canvas-status-bar">
+    <span class="zoom-info">{{ (zoom * 100).toFixed(0) }}%</span>
+    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
+    <span class="pan-info">({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})</span>
+    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
+    <span class="legend-item" style="color:#42a5f5">&#9632; Up</span>
+    <span class="legend-item" style="color:#ef5350">&#9632; Down</span>
+    <span class="legend-item" style="color:#00e5ff">&#9650; Start X</span>
+  </div>
+</div>

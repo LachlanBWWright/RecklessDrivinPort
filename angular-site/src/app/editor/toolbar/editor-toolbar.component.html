@@ -1,0 +1,47 @@
+<mat-card class="editor-toolbar-card">
+  <mat-card-content>
+    <div class="editor-toolbar-row">
+      <div class="toolbar-actions">
+        <button mat-stroked-button (click)="loadDefaultResources.emit()" [disabled]="workerBusy">
+          <mat-icon>cloud_download</mat-icon> Load Default
+        </button>
+        <input #fileInput type="file" accept=".dat" (change)="resourceFileSelected.emit($event)" [disabled]="workerBusy" style="display:none" />
+        <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy">
+          <mat-icon>folder_open</mat-icon> Upload resources.dat
+        </button>
+        <button mat-raised-button color="primary" (click)="downloadEditedResources.emit()" [disabled]="!hasEditorData || workerBusy">
+          <mat-icon>download</mat-icon> Download Edited
+        </button>
+        <button mat-raised-button color="accent" (click)="saveEditedResourcesToGame.emit()" [disabled]="!hasEditorData || workerBusy"
+          matTooltip="Save all edits (including sprites) to the game and prepare for restart">
+          <mat-icon>save</mat-icon> Save to Game
+        </button>
+
+        <div class="level-btns-inline">
+          <span class="level-label">Level</span>
+          @for (level of parsedLevels; track level.resourceId) {
+            <button mat-mini-fab
+              [color]="selectedLevelId === level.resourceId ? 'primary' : undefined"
+              class="level-btn"
+              [class.level-btn--active]="selectedLevelId === level.resourceId"
+              (click)="selectLevel.emit(level.resourceId)"
+              [matTooltip]="'Level ' + levelDisplayNum(level.resourceId)">
+              {{ levelDisplayNum(level.resourceId) }}
+            </button>
+          }
+        </div>
+      </div>
+      <div class="toolbar-status">
+        @if (workerBusy) {
+          <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
+          <span class="muted">Processing…</span>
+        }
+        @if (editorError) {
+          <span class="editor-error">
+            <mat-icon>warning</mat-icon> {{ editorError }}
+          </span>
+        }
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>

@@ -25,6 +25,13 @@
 #include "objects.h"
 #include "byteswap_packs.h"
 
+#define kEndShapeToken   0
+#define kLineStartToken  1
+#define kDrawPixelsToken 2
+#define kSkipPixelsToken 3
+#define TOKEN_TYPE(p)  ((p)[0])
+#define TOKEN_DATA(p)  (((SInt32)(p)[1] << 16) | ((SInt32)(p)[2] << 8) | (p)[3])
+
 /* ---- low-level helpers -------------------------------------------------- */
 
 static inline void swap_f32(float *p) {
@@ -37,6 +44,13 @@ static inline void swap_u32(UInt32 *p) { *p = be32_swap(*p); }
 static inline void swap_s32(SInt32 *p) { *p = (SInt32)be32_swap((uint32_t)*p); }
 static inline void swap_u16(UInt16 *p) { *p = be16_swap(*p); }
 static inline void swap_s16(SInt16 *p) { *p = (SInt16)be16_swap((uint16_t)*p); }
+
+static void swap_u16_buf(UInt16 *p, int count) {
+    while (count-- > 0) {
+        swap_u16(p);
+        p++;
+    }
+}
 
 /* ---- struct-level swappers ---------------------------------------------- */
 
@@ -264,6 +278,62 @@ void PortByteSwapSpriteHandle(Handle h) {
         UInt16 *ySize = xSize + 1;
         swap_u16(xSize);
         swap_u16(ySize);
-        /* The pixel data that follows is raw bytes - no swap needed */
+        /* 16-bit sprite packs store raw big-endian RGB555 pixels after the header. */
+        {
+            UInt8 *base = (UInt8 *)(*h);
+            UInt32 size = GetHandleSize(h);
+            if (size > 8) {
+                UInt16 *pixels = (UInt16 *)(base + 8);
+                int count = (int)((size - 8) / 2);
+                swap_u16_buf(pixels, count);
+            }
+        }
+    }
+}
+
+void PortByteSwapPackTx16(void) {
+    int i, n = pack_count(kPackTx16);
+    for (i = 1; i <= n; i++) {
+        int size = 0;
+        UInt16 *data = (UInt16 *)GetPackEntryByPos(kPackTx16, i, &size);
+        if (!data || size < 2) continue;
+        swap_u16_buf(data, size / 2);
+    }
+}
+
+static void swap_rle16_entry(UInt8 *entry, int size) {
+    UInt8 *pos = entry + 8; /* skip Rect header */
+    UInt8 *end = entry + size;
+    while (pos + 4 <= end) {
+        SInt32 tokenData = TOKEN_DATA(pos);
+        switch (TOKEN_TYPE(pos)) {
+            case kDrawPixelsToken: {
+                int tokenSize = tokenData * 2;
+                UInt16 *src = (UInt16 *)(pos + 4);
+                int count = tokenData;
+                if (pos + 4 + tokenSize > end) return;
+                swap_u16_buf(src, count);
+                pos += 4 + tokenSize + (tokenSize & 3 ? (4 - (tokenSize & 3)) : 0);
+                break;
+            }
+            case kSkipPixelsToken:
+            case kLineStartToken:
+                pos += 4;
+                break;
+            case kEndShapeToken:
+                return;
+            default:
+                return;
+        }
+    }
+}
+
+void PortByteSwapPackRLE16(int packNum) {
+    int i, n = pack_count(packNum);
+    for (i = 1; i <= n; i++) {
+        int size = 0;
+        UInt8 *entry = (UInt8 *)GetPackEntryByPos(packNum, i, &size);
+        if (!entry || size <= 8) continue;
+        swap_rle16_entry(entry, size);
     }
 }

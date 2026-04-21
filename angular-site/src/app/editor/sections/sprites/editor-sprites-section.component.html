@@ -1,0 +1,103 @@
+<mat-card class="tab-panel-card">
+  <mat-card-header>
+    <mat-card-title>Sprite Viewer &amp; PPic Asset Editor</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    @if (packSpriteFrames.length > 0) {
+      <div class="sprite-sidebar-layout">
+        <aside class="sprite-sidebar">
+          <div class="sprite-sidebar-header">
+            <div>
+              <div class="sprite-sidebar-title">Sprites</div>
+              <div class="sprite-sidebar-subtitle">{{ packSpriteFrames.length }} frames</div>
+            </div>
+            <button
+              mat-icon-button
+              color="primary"
+              [disabled]="workerBusy"
+              matTooltip="Upload a PNG to add a new 16-bit sprite frame"
+              (click)="addSpriteFrame.emit()">
+              <mat-icon>add</mat-icon>
+            </button>
+          </div>
+
+          <div class="sprite-list">
+            @for (frame of packSpriteFrames; track frame.id) {
+              <button
+                type="button"
+                class="sprite-list-item"
+                [class.sprite-list-item--active]="selectedPackSpriteId === frame.id"
+                (click)="selectedPackSpriteIdChange.emit(frame.id)">
+                <span class="sprite-list-item__thumb">
+                  @if (getPackSpriteDataUrl(frame.id); as url) {
+                    <img [src]="url" class="sprite-list-item__img" alt="" />
+                  } @else {
+                    <span class="sprite-list-item__img sprite-list-item__img--fallback">#{{ frame.id }}</span>
+                  }
+                </span>
+                <span class="sprite-list-item__main">
+                  <span class="sprite-list-item__title">Frame #{{ frame.id }}</span>
+                  <span class="sprite-list-item__meta">{{ frame.bitDepth }}-bit · {{ frame.width }}×{{ frame.height }} px</span>
+                </span>
+                <mat-icon class="sprite-list-item__chevron">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        </aside>
+
+        @if (selectedPackSpriteId !== null) {
+          <div class="sprite-detail">
+            @if (getPackSpriteDataUrl(selectedPackSpriteId); as url) {
+              <img [src]="url" class="pack-sprite-large" alt="sprite preview" />
+            } @else {
+              <div class="pack-sprite-large pack-sprite-large--placeholder">
+                <mat-icon>image</mat-icon>
+                <span>Preview loading...</span>
+              </div>
+            }
+            @if (selectedPackSpriteFrame; as selectedFrame) {
+              <mat-card class="sprite-meta-card">
+                <mat-card-content>
+                  <p class="sprite-meta">
+                    <strong>Frame</strong> #{{ selectedPackSpriteId }}<br>
+                    <strong>Depth</strong> {{ selectedFrame.bitDepth }}-bit
+                    ({{ getSpriteFormatLabel(selectedFrame.bitDepth) }})<br>
+                    <strong>Size</strong> {{ selectedFrame.width }}×{{ selectedFrame.height }} px
+                  </p>
+                </mat-card-content>
+              </mat-card>
+              <div class="sprite-actions">
+                @if (selectedFrame.bitDepth === 16) {
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    (click)="openSpriteEditor.emit(selectedPackSpriteId!)"
+                    [disabled]="workerBusy">
+                    <mat-icon>brush</mat-icon> Edit Pixels
+                  </button>
+                  <input #spritePngInput type="file" accept="image/png,image/*" style="display:none"
+                    (change)="spritePngUpload.emit({ event: $event, spriteId: selectedPackSpriteId! })" />
+                  <button
+                    mat-stroked-button
+                    (click)="spritePngInput.click()"
+                    [disabled]="workerBusy"
+                    matTooltip="Upload a PNG to replace this sprite (scaled to match dimensions)">
+                    <mat-icon>upload</mat-icon> Upload PNG
+                  </button>
+                }
+                <button mat-stroked-button (click)="exportSpritePng.emit()">
+                  <mat-icon>download</mat-icon> Export PNG
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="no-data-content">
+        <mat-icon class="no-data-icon">image_not_supported</mat-icon>
+        <p>Game sprite frames from Pack 129/137 will appear here once decoded. Load a resources.dat to begin.</p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

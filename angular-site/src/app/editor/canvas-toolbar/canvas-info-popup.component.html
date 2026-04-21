@@ -1,0 +1,15 @@
+<div class="canvas-popup info-popup">
+  <div class="popup-header">
+    <span class="popup-title">Level {{ levelNum }} &mdash; {{ objectCount }} objects</span>
+    <button mat-icon-button class="popup-close-btn" (click)="close.emit()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+  <div class="info-popup-body">
+    <p><strong>Objects:</strong> Drag to move &middot; Dbl-click canvas to add &middot; <kbd>Del</kbd> removes &middot; <kbd>Ctrl+D</kbd> dupes</p>
+    <p><strong>Marks:</strong> Toggle <mat-icon class="inline-icon">edit_location</mat-icon> to show mark tools &middot; Drag yellow nubs to reposition &middot; <kbd>N</kbd> joins/splits nubs &middot; Use toolbar buttons to add/remove &middot; Use <mat-icon class="inline-icon">auto_awesome</mat-icon> to generate</p>
+    <p><strong>Barriers:</strong> Select draw mode (<mat-icon class="inline-icon">gesture</mat-icon> freehand, <mat-icon class="inline-icon">show_chart</mat-icon> straight, <mat-icon class="inline-icon">timeline</mat-icon> curve) &middot; Select L/Li/I/Ri/R &middot; <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd></p>
+    <p><strong>Draw mode <mat-icon class="inline-icon">pan_tool</mat-icon> None:</strong> select/drag objects &amp; marks without triggering barrier draws</p>
+    <p><strong>Navigation:</strong> <kbd>Space</kbd>+drag pans &middot; Scroll/zoom wheel &middot; <kbd>+</kbd>/<kbd>-</kbd> zoom &middot; Arrow keys pan</p>
+  </div>
+</div>

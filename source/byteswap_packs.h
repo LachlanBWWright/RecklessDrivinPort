@@ -19,4 +19,10 @@ void PortByteSwapLevelPack(int packNum);
  * Call for each sprite Handle immediately after PtrToHand in LoadSprites. */
 void PortByteSwapSpriteHandle(Handle h);
 
+/* Swap the raw 16-bit texture entries in kPackTx16. */
+void PortByteSwapPackTx16(void);
+
+/* Swap the 16-bit RLE entries in kPacksR16 / kPackcR16. */
+void PortByteSwapPackRLE16(int packNum);
+
 #endif /* __BYTESWAP_PACKS_H */

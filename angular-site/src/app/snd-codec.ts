@@ -1,3 +1,5 @@
+import { err, ok, type Result } from 'neverthrow';
+
 /**
  * Mac OS 'snd ' resource codec helpers.
  *
@@ -78,14 +80,14 @@ export function decodeIMA4Packet(packet: Uint8Array, pktOff: number, out: Float3
     // Process high nibble then low nibble (Apple IMA4 byte order)
     for (let shift = 4; shift >= 0; shift -= 4) {
       const nibble = (byte >> shift) & 0x0F;
-      const step = IMA4_STEP_TABLE[index]!;
+      const step = IMA4_STEP_TABLE[index] ?? 0;
       let diff = (step >> 3);
       if (nibble & 1) diff += (step >> 2);
       if (nibble & 2) diff += (step >> 1);
       if (nibble & 4) diff += step;
       if (nibble & 8) diff = -diff;
       predictor = Math.max(-32768, Math.min(32767, predictor + diff));
-      index = Math.max(0, Math.min(88, index + IMA4_INDEX_TABLE[nibble]!));
+      index = Math.max(0, Math.min(88, index + (IMA4_INDEX_TABLE[nibble] ?? 0)));
       out[pos++] = predictor / 32768.0;
     }
   }
@@ -198,4 +200,195 @@ export function buildWav(pcm: Uint8Array, sampleRate: number, numChannels: numbe
   dv.setUint32(40, dataSize, true);
   out.set(pcm, 44);
   return out;
+}
+
+/** Convert a Mac OS 'snd ' resource to PCM WAV. */
+export function sndToWav(bytes: Uint8Array): Uint8Array {
+  const info = parseSndHeader(bytes);
+  if (!info) {
+    return buildWav(bytes, 22050, 1, 8);
+  }
+  if (info.encode === 0xfe) {
+    const dataStart = info.pcmOffset;
+    const pktsAvail = Math.floor((bytes.length - dataStart) / 34);
+    if (pktsAvail > 0) {
+      const f32 = decodeIMA4(bytes.subarray(dataStart), pktsAvail);
+      const pcm16 = new Int16Array(f32.length);
+      for (let s = 0; s < f32.length; s += 1) {
+        pcm16[s] = Math.max(-32768, Math.min(32767, Math.round(f32[s] * 32768)));
+      }
+      return buildWav(
+        new Uint8Array(pcm16.buffer),
+        Math.round(info.sampleRate),
+        info.numChannels,
+        16,
+      );
+    }
+    return buildWav(bytes, Math.round(info.sampleRate), 1, 8);
+  }
+  const pcmStart = Math.min(info.pcmOffset, bytes.length);
+  const pcmData = bytes.slice(pcmStart);
+  return buildWav(pcmData, Math.round(info.sampleRate), info.numChannels, info.sampleSize);
+}
+
+/** Convert a WAV file to a minimal Mac OS 'snd ' Format 1 resource. */
+export function wavToSnd(wav: Uint8Array): Result<Uint8Array, string> {
+  if (wav.length < 44) return err('WAV file too short');
+  const wavView = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  const sampleRate = wavView.getUint32(24, true);
+  const numChannels = wavView.getUint16(22, true);
+  const bitsPerSample = wavView.getUint16(34, true);
+  let dataOff = 12;
+  let dataLen = 0;
+  while (dataOff + 8 <= wav.length) {
+    const chunkId = String.fromCharCode(
+      wav[dataOff],
+      wav[dataOff + 1],
+      wav[dataOff + 2],
+      wav[dataOff + 3],
+    );
+    const chunkLen = wavView.getUint32(dataOff + 4, true);
+    if (chunkId === 'data') {
+      dataOff += 8;
+      dataLen = chunkLen;
+      break;
+    }
+    dataOff += 8 + chunkLen;
+  }
+  if (dataLen === 0) return err('No data chunk in WAV');
+  let pcm = wav.slice(dataOff, dataOff + dataLen);
+  if (bitsPerSample === 16) {
+    const pcmView = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
+    const pcm8 = new Uint8Array(pcm.length / 2);
+    for (let i = 0; i < pcm8.length; i += 1) {
+      pcm8[i] = ((pcmView.getInt16(i * 2, true) >> 8) + 128) & 0xff;
+    }
+    pcm = pcm8;
+  }
+  if (numChannels === 2) {
+    const mono = new Uint8Array(pcm.length / 2);
+    for (let i = 0; i < mono.length; i += 1) {
+      mono[i] = ((pcm[i * 2] + pcm[i * 2 + 1]) / 2) | 0;
+    }
+    pcm = mono;
+  }
+  const headerOff = 20;
+  const out = new Uint8Array(headerOff + 22 + pcm.length);
+  const dv = new DataView(out.buffer);
+  dv.setUint16(0, 1, false);
+  dv.setUint16(2, 1, false);
+  dv.setUint16(4, 5, false);
+  dv.setUint32(6, 0x80, false);
+  dv.setUint16(10, 1, false);
+  dv.setUint16(12, 0x8051, false);
+  dv.setUint16(14, 0, false);
+  dv.setUint32(16, headerOff, false);
+  dv.setUint32(headerOff + 0, 0, false);
+  dv.setUint32(headerOff + 4, pcm.length, false);
+  dv.setUint32(headerOff + 8, sampleRate * 65536, false);
+  dv.setUint32(headerOff + 12, 0, false);
+  dv.setUint32(headerOff + 16, 0, false);
+  dv.setUint8(headerOff + 20, 0);
+  dv.setUint8(headerOff + 21, 60);
+  out.set(pcm, headerOff + 22);
+  return ok(out);
+}
+
+/**
+ * Attempt to play a Mac OS 'snd ' resource using the Web Audio API.
+ * Returns true if playback started, false if format is unsupported.
+ */
+export function tryPlaySndResource(bytes: Uint8Array, audioCtx: AudioContext): boolean {
+  if (bytes.length < 6) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const format = view.getUint16(0, false);
+  let cmdOffset = 0;
+
+  if (format === 1) {
+    const numSynths = view.getUint16(2, false);
+    cmdOffset = 4 + numSynths * 6;
+  } else if (format === 2) {
+    cmdOffset = 4;
+  } else {
+    return false;
+  }
+
+  if (cmdOffset + 2 > bytes.length) return false;
+  const numCmds = view.getUint16(cmdOffset, false);
+  cmdOffset += 2;
+
+  for (let i = 0; i < numCmds; i += 1) {
+    if (cmdOffset + 8 > bytes.length) break;
+    const cmd = view.getUint16(cmdOffset, false) & 0x7fff;
+    const param2 = view.getUint32(cmdOffset + 4, false);
+    cmdOffset += 8;
+
+    if (cmd === 80 || cmd === 81) {
+      const headerOff = param2;
+      if (headerOff + 22 > bytes.length) break;
+      const numFrames = view.getUint32(headerOff + 4, false);
+      const sampleRateFixed = view.getUint32(headerOff + 8, false);
+      const sampleRate = Math.max(sampleRateFixed / 65536, 100);
+      const encode = view.getUint8(headerOff + 20);
+
+      if (encode === 0x00) {
+        const dataStart = headerOff + 22;
+        const sampleCount = Math.min(numFrames, bytes.length - dataStart);
+        if (sampleCount <= 0 || sampleCount > 10_000_000) break;
+        const audioBuffer = audioCtx.createBuffer(1, sampleCount, sampleRate);
+        const ch = audioBuffer.getChannelData(0);
+        for (let s = 0; s < sampleCount; s += 1) ch[s] = (bytes[dataStart + s] - 128) / 128;
+        const src = audioCtx.createBufferSource();
+        src.buffer = audioBuffer;
+        src.connect(audioCtx.destination);
+        src.start();
+        return true;
+      }
+
+      if (encode === 0xfe) {
+        if (headerOff + 66 > bytes.length) break;
+        const fmtBytes = bytes.slice(headerOff + 40, headerOff + 44);
+        const comprFmt = String.fromCharCode(...fmtBytes);
+        if (comprFmt !== 'ima4') break;
+
+        const dataStart = headerOff + 66;
+        const numPackets = numFrames;
+        const totalSamples = numPackets * 64;
+        if (totalSamples <= 0 || totalSamples > 10_000_000) break;
+        const available = Math.floor((bytes.length - dataStart) / 34);
+        const pktsToUse = Math.min(numPackets, available);
+        if (pktsToUse <= 0) break;
+
+        const f32 = decodeIMA4(bytes.subarray(dataStart), pktsToUse);
+        const audioBuffer = audioCtx.createBuffer(1, f32.length, sampleRate);
+        audioBuffer.getChannelData(0).set(f32);
+        const src = audioCtx.createBufferSource();
+        src.buffer = audioBuffer;
+        src.connect(audioCtx.destination);
+        src.start();
+        return true;
+      }
+
+      if (encode === 0xff) {
+        const dataStart = headerOff + 64;
+        if (dataStart + 2 > bytes.length) break;
+        const sampleCount = Math.min(numFrames, Math.floor((bytes.length - dataStart) / 2));
+        if (sampleCount <= 0 || sampleCount > 10_000_000) break;
+        const audioBuffer = audioCtx.createBuffer(1, sampleCount, sampleRate);
+        const ch = audioBuffer.getChannelData(0);
+        for (let s = 0; s < sampleCount; s += 1) {
+          const sample = view.getInt16(dataStart + s * 2, false);
+          ch[s] = sample / 32768.0;
+        }
+        const src = audioCtx.createBufferSource();
+        src.buffer = audioBuffer;
+        src.connect(audioCtx.destination);
+        src.start();
+        return true;
+      }
+
+      break;
+    }
+  }
+  return false;
 }

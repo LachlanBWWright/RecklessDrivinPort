@@ -1,0 +1,15 @@
+<app-properties-tab
+  [selectedLevel]="selectedLevel"
+  [levelNum]="levelNum"
+  [editRoadInfo]="editRoadInfo"
+  [roadInfoOptions]="roadInfoOptions"
+  [roadInfoData]="roadInfoData"
+  [editObjectGroups]="editObjectGroups"
+  [objectGroupDefinitions]="objectGroupDefinitions"
+  [getSpriteUrl]="getSpriteUrl"
+  [propertiesDirty]="propertiesDirty"
+  [workerBusy]="workerBusy"
+  (roadInfoChange)="roadInfoChange.emit($event)"
+  (roadInfoInput)="roadInfoInput.emit($event)"
+  (objGroupInput)="objGroupInput.emit($event)"
+></app-properties-tab>

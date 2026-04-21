@@ -1,0 +1,106 @@
+<mat-card class="tab-panel-card">
+  <mat-card-header>
+    <mat-card-title>Screens &amp; HUD Icons Editor</mat-card-title>
+    <mat-card-subtitle>Icon and screen image resources - ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    @if (iconEntries.length > 0) {
+      <div class="screens-sidebar-layout">
+        <aside class="screens-sidebar">
+          <div class="screens-sidebar-header">
+            <div>
+              <div class="screens-sidebar-title">Screens</div>
+              <div class="screens-sidebar-subtitle">{{ iconEntries.length }} resources</div>
+            </div>
+            <button
+              mat-icon-button
+              color="primary"
+              [disabled]="workerBusy"
+              matTooltip="Upload a PNG to add a new 32×32 icon (ICN#)"
+              (click)="addIconEntry.emit()">
+              <mat-icon>add</mat-icon>
+            </button>
+          </div>
+
+          <div class="screens-list">
+            @for (icon of iconEntries; track trackIconEntry($index, icon)) {
+              <button
+                type="button"
+                class="screens-list-item"
+                [class.screens-list-item--active]="selectedIconId === icon.id && selectedIconType === icon.type"
+                (click)="selectIconEntry.emit({ type: icon.type, id: icon.id })">
+                <span class="screens-list-item__thumb">
+                  @if (getIconThumbDataUrl(icon.type, icon.id); as thumbUrl) {
+                    <img [src]="thumbUrl" class="screens-list-item__img" alt="" />
+                  } @else {
+                    <mat-icon class="screens-list-item__icon">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
+                  }
+                </span>
+                <span class="screens-list-item__main">
+                  <span class="screens-list-item__title">{{ icon.label }}</span>
+                  <span class="screens-list-item__meta">{{ icon.type }}</span>
+                </span>
+                <span class="res-size-badge">{{ icon.type }}</span>
+                <mat-icon class="screens-list-item__chevron">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        </aside>
+
+        @if (selectedIconId !== null) {
+          <div class="icon-detail">
+            <h4 class="audio-detail-title">{{ selectedIconLabel }}</h4>
+            @if (iconPreviewDataUrl; as url) {
+              <img [src]="url" class="icon-large-preview"
+                [style.imageRendering]="'pixelated'" alt="icon preview">
+            } @else {
+              <div class="icon-placeholder">
+                <mat-spinner diameter="32"></mat-spinner>
+              </div>
+            }
+            @if (selectedIconType !== 'PICT' && selectedIconType !== 'PPic') {
+              <div class="sprite-actions">
+                <button mat-stroked-button (click)="exportIconPng.emit()">
+                  <mat-icon>download</mat-icon> Export PNG
+                </button>
+                <input #iconPngInput type="file" accept="image/png,image/*" style="display:none"
+                  (change)="iconPngUpload.emit($event)" />
+                <button mat-stroked-button (click)="iconPngInput.click()" [disabled]="workerBusy"
+                  [matTooltip]="selectedIconType === 'icl8' ? 'Upload PNG (32×32), converted to 8-bit Mac palette'
+                    : selectedIconType === 'ics8' ? 'Upload PNG (16×16), converted to 8-bit Mac palette'
+                    : selectedIconType === 'ics#' ? 'Upload PNG (16×16), converted to 1-bit'
+                    : 'Upload PNG (32×32), converted to 1-bit'">
+                  <mat-icon>upload</mat-icon> Replace PNG
+                </button>
+              </div>
+              <p class="muted" style="margin-top:12px;font-size:0.85em">
+                @if (selectedIconType === 'ICN#' || selectedIconType === 'ics#') {
+                  ICN# / ics# resources are 32×32 1-bit black-and-white bitmaps.
+                } @else if (selectedIconType === 'icl8') {
+                  icl8 resources are 32×32 8-bit colour-palette icons (Mac system palette).
+                } @else if (selectedIconType === 'ics8') {
+                  ics8 resources are 16×16 8-bit colour-palette icons (Mac system palette).
+                }
+              </p>
+            } @else {
+              <div class="sprite-actions">
+                <button mat-stroked-button (click)="exportIconRaw.emit()">
+                  <mat-icon>download</mat-icon> Export Raw
+                </button>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="res-placeholder">
+            <p class="muted">Select an entry from the list.</p>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="no-data-content">
+        <mat-icon class="no-data-icon">image_not_supported</mat-icon>
+        <p>Screen and icon resources will appear here once a resources.dat is loaded.</p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

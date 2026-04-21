@@ -2,7 +2,7 @@ import { NgModule, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -31,12 +31,25 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 import { App } from './app';
-import { EditorCanvasComponent } from './editor-canvas.component';
-import { MarksEditorComponent } from './marks-editor.component';
-import { ObjectInspectorComponent } from './object-inspector.component';
-import { ObjectListComponent } from './object-list.component';
-import { PropertiesTabComponent } from './properties-tab.component';
-import { SpriteEditorComponent } from './sprite-editor.component';
+import { SiteToolbarComponent } from './layout/site-toolbar/site-toolbar.component';
+import { GamePanelComponent } from './game/game-panel/game-panel.component';
+import { EditorToolbarComponent } from './editor/toolbar/editor-toolbar.component';
+import { EditorPropertiesSectionComponent } from './editor/sections/properties/editor-properties-section.component';
+import { EditorObjectGroupsSectionComponent } from './editor/sections/object-groups/editor-object-groups-section.component';
+import { EditorObjectTypesSectionComponent } from './editor/sections/object-types/editor-object-types-section.component';
+import { EditorObjectsSectionComponent } from './editor/sections/objects/editor-objects-section.component';
+import { EditorSpritesSectionComponent } from './editor/sections/sprites/editor-sprites-section.component';
+import { EditorTilesSectionComponent } from './editor/sections/tiles/editor-tiles-section.component';
+import { EditorAudioSectionComponent } from './editor/sections/audio/editor-audio-section.component';
+import { EditorScreensSectionComponent } from './editor/sections/screens/editor-screens-section.component';
+import { EditorCanvasComponent } from './editor/editor-canvas.component';
+import { MarksEditorComponent } from './editor/marks-editor.component';
+import { ObjectInspectorComponent } from './editor/object-inspector.component';
+import { ObjectListComponent } from './editor/object-list.component';
+import { PropertiesTabComponent } from './editor/properties-tab.component';
+import { SpriteEditorComponent } from './editor/sprite-editor.component';
+import { MarkingPopupComponent } from './editor/canvas-toolbar/marking-popup.component';
+import { CanvasInfoPopupComponent } from './editor/canvas-toolbar/canvas-info-popup.component';
 
 const MATERIAL_MODULES = [
   MatButtonModule, MatIconModule, MatTooltipModule, MatInputModule,
@@ -49,12 +62,32 @@ const MATERIAL_MODULES = [
 ];
 
 @NgModule({
-  declarations: [App, EditorCanvasComponent, MarksEditorComponent, ObjectInspectorComponent, ObjectListComponent, PropertiesTabComponent, SpriteEditorComponent],
+  declarations: [
+    App,
+    SiteToolbarComponent,
+    GamePanelComponent,
+    EditorToolbarComponent,
+    EditorPropertiesSectionComponent,
+    EditorObjectGroupsSectionComponent,
+    EditorObjectTypesSectionComponent,
+    EditorObjectsSectionComponent,
+    EditorSpritesSectionComponent,
+    EditorTilesSectionComponent,
+    EditorAudioSectionComponent,
+    EditorScreensSectionComponent,
+    EditorCanvasComponent,
+    MarksEditorComponent,
+    ObjectInspectorComponent,
+    ObjectListComponent,
+    PropertiesTabComponent,
+    SpriteEditorComponent,
+    MarkingPopupComponent,
+    CanvasInfoPopupComponent,
+  ],
   imports: [
     BrowserModule,
     CommonModule,
     BrowserAnimationsModule,
-    FormsModule,
     ReactiveFormsModule,
     ...MATERIAL_MODULES,
   ],

@@ -12,6 +12,11 @@
 #include "particlefx.h"
 #include "packs.h"
 
+void DrawRoadZoomed16(float,float,float);
+void DrawMarksZoomed16(float,float,float);
+void DrawTracksZoomed16(float,float,float);
+int DrawPanel(void);
+
 #define kXCameraScreenPos 0.5
 #define kYCameraScreenPos 6.70833333333E-01
 
@@ -268,9 +273,18 @@ void RenderFrameZoomed()
 	float xDrawStart=gCameraObj->pos.x-gXSize*kXCameraScreenPos*zoom;
 	float yDrawStart=gCameraObj->pos.y+gYSize*kYCameraScreenPos*zoom;
 	int preSpecBlit=gScreenBlitSpecial;
-	DrawRoadZoomed(xDrawStart,yDrawStart,zoom);
-	DrawMarksZoomed(xDrawStart,yDrawStart,zoom);
-	DrawTracksZoomed(xDrawStart,yDrawStart,zoom);
+	if(gPrefs.hiColor)
+	{
+		DrawRoadZoomed16(xDrawStart,yDrawStart,zoom);
+		DrawMarksZoomed16(xDrawStart,yDrawStart,zoom);
+		DrawTracksZoomed16(xDrawStart,yDrawStart,zoom);
+	}
+	else
+	{
+		DrawRoadZoomed(xDrawStart,yDrawStart,zoom);
+		DrawMarksZoomed(xDrawStart,yDrawStart,zoom);
+		DrawTracksZoomed(xDrawStart,yDrawStart,zoom);
+	}
 	DrawSpritesZoomed(xDrawStart,yDrawStart,zoom);
 	DrawTextFXZoomed(xDrawStart,yDrawStart,zoom);
 /*	DrawParticleFX(xDrawStart,yDrawStart,0);
@@ -281,4 +295,3 @@ void RenderFrameZoomed()
 	else
 		Blit2Screen();
 }
-
