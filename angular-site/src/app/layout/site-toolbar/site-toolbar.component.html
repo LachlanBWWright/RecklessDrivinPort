@@ -25,6 +25,18 @@
         }
       </div>
 
+      <div class="toolbar-status" [class.toolbar-status--error]="!!editorError">
+        @if (workerBusy) {
+          <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
+          <span class="muted">Processing…</span>
+        }
+        @if (editorError) {
+          <span class="editor-error">
+            <mat-icon>warning</mat-icon> {{ editorError }}
+          </span>
+        }
+      </div>
+
       @if (hasEditorData) {
         <mat-form-field appearance="outline" class="level-select-field">
           <mat-select
@@ -47,18 +59,6 @@
           </mat-select>
         </mat-form-field>
       }
-
-      <div class="toolbar-status" [class.toolbar-status--error]="!!editorError">
-        @if (workerBusy) {
-          <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
-          <span class="muted">Processing…</span>
-        }
-        @if (editorError) {
-          <span class="editor-error">
-            <mat-icon>warning</mat-icon> {{ editorError }}
-          </span>
-        }
-      </div>
 
       <nav class="nav-tabs nav-tabs--editor" role="tablist" aria-label="Level editor sections">
         @for (section of editorSections; track section.id) {

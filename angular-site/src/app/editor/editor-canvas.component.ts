@@ -131,16 +131,22 @@ export class EditorCanvasComponent implements OnChanges {
     if (changes['panX']) {
       this.canvasForm.controls.panX.setValue(this.panX, { emitEvent: false });
     }
-    if (changes['workerBusy']) {
-      const disabled = this.workerBusy;
+    if (changes['workerBusy'] || changes['roadInfoOptions']) {
       const controls = this.canvasForm.controls;
-      if (disabled) {
+      const roadInfoDisabled = this.workerBusy || this.roadInfoOptions.length === 0;
+      if (roadInfoDisabled) {
         controls.roadInfo.disable({ emitEvent: false });
+      } else {
+        controls.roadInfo.enable({ emitEvent: false });
+      }
+    }
+    if (changes['workerBusy']) {
+      const controls = this.canvasForm.controls;
+      if (this.workerBusy) {
         controls.editTimeText.disable({ emitEvent: false });
         controls.panY.disable({ emitEvent: false });
         controls.panX.disable({ emitEvent: false });
       } else {
-        controls.roadInfo.enable({ emitEvent: false });
         controls.editTimeText.enable({ emitEvent: false });
         controls.panY.enable({ emitEvent: false });
         controls.panX.enable({ emitEvent: false });

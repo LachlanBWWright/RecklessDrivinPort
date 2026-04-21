@@ -78,7 +78,7 @@ export class PropertiesTabComponent implements OnChanges {
     slideFriction: new FormControl<number | null>(null),
   });
 
-  readonly objectGroupNumObjsForm = new FormArray<FormControl<number | null>>([]);
+  readonly objectGroupNumObjsForm = new FormArray<FormControl<number>>([]);
   private syncingObjectGroupNumObjsForm = false;
 
   constructor() {
@@ -96,6 +96,13 @@ export class PropertiesTabComponent implements OnChanges {
     }
     if (changes['editObjectGroups']) {
       this.syncObjectGroupNumObjsForm();
+    }
+    if (changes['workerBusy']) {
+      if (this.workerBusy) {
+        this.objectGroupNumObjsForm.disable({ emitEvent: false });
+      } else {
+        this.objectGroupNumObjsForm.enable({ emitEvent: false });
+      }
     }
   }
 

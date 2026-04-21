@@ -138,7 +138,7 @@
                 <td>backgroundTex</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select formControlName="backgroundTex" [disabled]="workerBusy">
+                    <mat-select formControlName="backgroundTex">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('backgroundTex')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -176,7 +176,7 @@
                 <td>foregroundTex</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select formControlName="foregroundTex" [disabled]="workerBusy">
+                    <mat-select formControlName="foregroundTex">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('foregroundTex')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -214,7 +214,7 @@
                 <td>roadLeftBorder</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select formControlName="roadLeftBorder" [disabled]="workerBusy">
+                    <mat-select formControlName="roadLeftBorder">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('roadLeftBorder')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -252,7 +252,7 @@
                 <td>roadRightBorder</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select formControlName="roadRightBorder" [disabled]="workerBusy">
+                    <mat-select formControlName="roadRightBorder">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('roadRightBorder')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -290,7 +290,7 @@
                 <td>marks</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select formControlName="marks" [disabled]="workerBusy">
+                    <mat-select formControlName="marks">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('marks')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -328,7 +328,7 @@
                 <td>tracks</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select formControlName="tracks" [disabled]="workerBusy">
+                    <mat-select formControlName="tracks">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('tracks')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -366,7 +366,7 @@
                 <td>skidSound</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select formControlName="skidSound" [disabled]="workerBusy">
+                    <mat-select formControlName="skidSound">
                       <mat-select-trigger>
                         <span class="texture-option texture-option--trigger">
                           <span class="texture-thumb texture-thumb--fallback texture-thumb--audio"></span>

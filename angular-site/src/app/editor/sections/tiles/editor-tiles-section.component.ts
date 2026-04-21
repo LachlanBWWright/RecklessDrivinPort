@@ -65,6 +65,13 @@ export class EditorTilesSectionComponent implements OnChanges {
     if ('selectedRoadInfoData' in changes) {
       this.syncRoadTextureForm();
     }
+    if ('workerBusy' in changes) {
+      if (this.workerBusy) {
+        this.roadTextureForm.disable({ emitEvent: false });
+      } else {
+        this.roadTextureForm.enable({ emitEvent: false });
+      }
+    }
   }
 
   get totalTileCount(): number {
