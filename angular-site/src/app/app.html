@@ -74,8 +74,8 @@
             [propertiesDirty]="propertiesDirty()"
             [workerBusy]="workerBusy()"
             (roadInfoChange)="onRoadInfoChange($event)"
-            (roadInfoInput)="onRoadInfoInput($event.field, $event.event)"
-            (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.event)"
+            (roadInfoInput)="onRoadInfoInput($event.field, $event.value)"
+            (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.value)"
           ></app-editor-properties-section>
         }
 
@@ -93,7 +93,7 @@
             (deleteGroup)="deleteObjectGroup($event)"
             (addEntry)="addObjectGroupEntry($event)"
             (deleteEntry)="deleteObjectGroupEntry($event.groupId, $event.entryIndex)"
-            (entryInput)="onObjectGroupEntryInput($event.groupId, $event.entryIndex, $event.field, $event.event)"
+            (entryInput)="onObjectGroupEntryInput($event.groupId, $event.entryIndex, $event.field, $event.value)"
             (saveObjectGroups)="saveObjectGroups()"
           ></app-editor-object-groups-section>
         }
@@ -110,7 +110,7 @@
             (selectedObjectTypeIdChange)="selectObjectType($event)"
             (addType)="addObjectType()"
             (deleteType)="deleteObjectType($event)"
-            (fieldInput)="onObjectTypeFieldInput($event.typeRes, $event.field, $event.event)"
+            (fieldInput)="onObjectTypeFieldInput($event.typeRes, $event.field, $event.value)"
             (referenceChange)="onObjectTypeReferenceChange($event.typeRes, $event.field, $event.value)"
             (flagToggle)="onObjectTypeFlagToggle($event.typeRes, $event.field, $event.bit, $event.checked)"
             (frameChange)="onObjectTypeFrameChange($event.typeRes, $event.frame)"
@@ -210,7 +210,7 @@
             (removeSelected)="removeSelectedObject()"
             (deselect)="selectedObjIndex.set(null)"
             (markSelected)="selectedMarkIndex.set($event)"
-            (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.event)"
+            (markFieldInput)="onMarkFieldInput($event.idx, $event.field, $event.value)"
           ></app-editor-objects-section>
         }
 
@@ -244,7 +244,6 @@
             (selectedRoadInfoIdChange)="selectRoadInfo($event)"
             (createRoadInfo)="createRoadInfo()"
             (deleteRoadInfo)="deleteRoadInfo($event)"
-            (roadInfoInput)="onRoadInfoInput($event.field, $event.event)"
             (roadTextureChange)="onRoadTexturePick($event.field, $event.value)"
             (selectedTileIdChange)="selectedTileId.set($event)"
             (deleteTileImage)="media.deleteTileImage($event)"

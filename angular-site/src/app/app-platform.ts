@@ -2,6 +2,19 @@ import { err, ok, type Result } from 'neverthrow';
 import { App } from './app';
 import { AppStateResources } from './app-state-resources';
 
+type EventListenerLike = EventListenerOrEventListenerObject;
+
+interface EmscriptenModuleLike {
+  canvas?: HTMLCanvasElement;
+  pauseMainLoop?: () => void;
+  resumeMainLoop?: () => void;
+  _set_wasm_master_volume?: (vol: number) => void;
+}
+
+let keyboardGateInstalled = false;
+let xhrOpenPatched = false;
+let activeTabGetter: (() => 'game' | 'editor') | null = null;
+
 export function initPackWorker(app: App): void {
   if (typeof Worker === 'undefined') {
     console.warn('[App] Web Worker not available; pack operations will not work.');
@@ -59,23 +72,9 @@ export function setupEmscriptenModule(app: App): void {
   const canvasEl = document.getElementById('canvas');
   if (!(canvasEl instanceof HTMLCanvasElement)) return;
   const canvas = canvasEl;
-  const origOpen = XMLHttpRequest.prototype.open;
-  const self = app;
-  XMLHttpRequest.prototype.open = function (
-    this: XMLHttpRequest,
-    method: string,
-    url: string,
-    asyncFlag: boolean = true,
-    user?: string,
-    password?: string,
-  ): void {
-    if (url && url.indexOf('.data') !== -1) {
-      this.addEventListener('progress', (e: ProgressEvent) => {
-        if (e.lengthComputable) self.progressPct.set(Math.round((e.loaded / e.total) * 100));
-      });
-    }
-    origOpen.call(this, method, url, asyncFlag, user, password);
-  } as typeof XMLHttpRequest.prototype.open;
+  activeTabGetter = () => app.activeTab();
+  installKeyboardGate(canvas);
+  patchXmlHttpRequestProgress(app);
 
   if (typeof window.crossOriginIsolated !== 'undefined' && !window.crossOriginIsolated) {
     // Log a developer hint to the console only – do not pollute the game status
@@ -154,7 +153,70 @@ export function setupEmscriptenModule(app: App): void {
   };
 }
 
+function patchXmlHttpRequestProgress(app: App): void {
+  if (xhrOpenPatched) return;
+  const origOpen = XMLHttpRequest.prototype.open;
+  const self = app;
+  XMLHttpRequest.prototype.open = function (
+    this: XMLHttpRequest,
+    method: string,
+    url: string,
+    asyncFlag: boolean = true,
+    user?: string,
+    password?: string,
+  ): void {
+    if (url && url.indexOf('.data') !== -1) {
+      this.addEventListener('progress', (e: ProgressEvent) => {
+        if (e.lengthComputable) self.progressPct.set(Math.round((e.loaded / e.total) * 100));
+      });
+    }
+    origOpen.call(this, method, url, asyncFlag, user, password);
+  } as typeof XMLHttpRequest.prototype.open;
+  xhrOpenPatched = true;
+}
+
+function installKeyboardGate(canvas: HTMLCanvasElement): void {
+  if (keyboardGateInstalled || typeof EventTarget === 'undefined') return;
+  const origAddEventListener = EventTarget.prototype.addEventListener;
+
+  EventTarget.prototype.addEventListener = function (
+    this: EventTarget,
+    type: string,
+    listener: EventListenerLike | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void {
+    const isKeyEvent = type === 'keydown' || type === 'keyup' || type === 'keypress';
+    const targetIsGameSurface = this === document || this === window || this === canvas;
+    if (isKeyEvent && targetIsGameSurface) {
+      if (listener === null) {
+        origAddEventListener.call(this, type, listener, options);
+        return;
+      }
+      if (typeof listener === 'function') {
+        const wrapped: EventListener = function (this: EventTarget, event: Event): unknown {
+          if (activeTabGetter?.() !== 'game') return undefined;
+          return listener.call(this, event);
+        };
+        origAddEventListener.call(this, type, wrapped, options);
+        return;
+      }
+      const wrappedListener: EventListenerObject = {
+        handleEvent(event: Event): void {
+          if (activeTabGetter?.() !== 'game') return;
+          listener.handleEvent(event);
+        },
+      };
+      origAddEventListener.call(this, type, wrappedListener, options);
+      return;
+    }
+    origAddEventListener.call(this, type, listener, options);
+  } as typeof EventTarget.prototype.addEventListener;
+
+  keyboardGateInstalled = true;
+}
+
 export function loadWasmScript(app: App): void {
+  if (app.wasmScript) return;
   app.wasmScript = document.createElement('script');
   app.wasmScript.src = assetUrl(app, 'reckless_drivin.js');
   app.wasmScript.async = true;
@@ -199,11 +261,12 @@ export function applyVolumeToWasm(app: App, pct: number): void {
 }
 
 export function syncGameLoopWithActiveTab(app: App): void {
-  const mod = window.Module;
+  const mod = window.Module as EmscriptenModuleLike | undefined;
   if (!mod) return;
   try {
     if (app.activeTab() === 'editor') mod.pauseMainLoop?.();
     else mod.resumeMainLoop?.();
+    if (app.activeTab() === 'editor') mod.canvas?.blur();
   } catch {
     /* ignore */
   }

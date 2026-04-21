@@ -69,17 +69,16 @@
       </mat-button-toggle>
     </mat-button-toggle-group>
     <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
-    <div class="canvas-property-controls">
+    <form class="canvas-property-controls" [formGroup]="canvasForm">
       <mat-form-field appearance="outline" class="canvas-inline-field canvas-inline-field--road">
         <mat-label>Road Info</mat-label>
         <mat-select
-          [value]="editRoadInfo"
-          (valueChange)="roadInfoChange.emit($event)"
+          formControlName="roadInfo"
           [disabled]="workerBusy || !roadInfoOptions.length"
           aria-label="Road info selector"
         >
           <mat-select-trigger>
-            @if (getRoadInfoOption(editRoadInfo); as selectedRoadInfo) {
+            @if (getRoadInfoOption(canvasForm.controls.roadInfo.value ?? editRoadInfo); as selectedRoadInfo) {
               <span class="road-info-trigger">
                 @if (selectedRoadInfo.previewUrl) {
                   <img class="road-info-thumb" [src]="selectedRoadInfo.previewUrl" [alt]="'Road info ' + selectedRoadInfo.id" />
@@ -91,7 +90,7 @@
             } @else {
               <span class="road-info-trigger">
                 <span class="road-info-thumb road-info-thumb--fallback"></span>
-                <span>Road {{ editRoadInfo }}</span>
+                <span>Road {{ canvasForm.controls.roadInfo.value ?? editRoadInfo }}</span>
               </span>
             }
           </mat-select-trigger>
@@ -115,14 +114,18 @@
         <input
           matInput
           type="text"
+          formControlName="editTimeText"
           inputmode="numeric"
-          [appValue]="editTime"
-          [disabled]="workerBusy"
-          (input)="onTimeLimitInput($event)"
+          autocomplete="off"
+          spellcheck="false"
           aria-label="Time limit in seconds"
+          (focus)="onTimeLimitFocus()"
+          (blur)="onTimeLimitBlur()"
+          (keydown)="$event.stopPropagation()"
+          (keydown.enter)="commitTimeLimit(); $event.preventDefault()"
         />
       </mat-form-field>
-    </div>
+    </form>
     @if (drawMode !== 'none') {
       <mat-button-toggle-group [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
                                matTooltip="Select which barrier side to draw">
@@ -164,14 +167,12 @@
     <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
       aria-label="Vertical scroll position"
       [min]="0" [max]="scrollYMax" [step]="10"
-      [value]="panY"
-      (input)="onVertScrollInput($event)"
+      [formControl]="canvasForm.controls.panY"
     />
     <!-- Horizontal scrollbar -->
     <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
       [min]="scrollXMin" [max]="scrollXMax" [step]="5"
-      [value]="panX"
-      (input)="onHorizScrollInput($event)"
+      [formControl]="canvasForm.controls.panX"
     />
 
     <!-- Marking generation popup overlay -->

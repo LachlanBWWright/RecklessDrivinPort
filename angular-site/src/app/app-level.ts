@@ -14,11 +14,11 @@ declare module './app' {
     onPropsInput(field: keyof LevelProperties, event: Event): void;
     onRoadInfoChange(roadInfo: number): void;
     selectRoadInfo(roadInfo: number): void;
-    onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, event: Event): void;
+    onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, value: number | boolean): void;
     onRoadTexturePick(field: RoadTextureField, value: number): void;
     onTimeLimitChange(value: number): void;
     onPropertiesTabInput(e: { field: keyof LevelProperties; event: Event }): void;
-    onObjGroupInput(index: number, field: 'resID' | 'numObjs', event: Event): void;
+    onObjGroupInput(index: number, field: 'resID' | 'numObjs', value: number): void;
   }
 }
 
@@ -43,10 +43,6 @@ function getInputValue(event: Event): string | null {
     return (target as { value: string }).value;
   }
   return null;
-}
-
-function getInputChecked(event: Event): boolean {
-  return event.target instanceof HTMLInputElement ? event.target.checked : false;
 }
 
 export function selectLevel(app: App, id: number, options?: { preserveView?: boolean }): void {
@@ -146,7 +142,11 @@ export function selectRoadInfo(app: App, roadInfo: number): void {
   setSelectedRoadInfo(app, nextRoadInfo);
 }
 
-export function onRoadInfoInput(app: App, field: Exclude<keyof RoadInfoData, 'id'>, event: Event): void {
+export function onRoadInfoInput(
+  app: App,
+  field: Exclude<keyof RoadInfoData, 'id'>,
+  value: number | boolean,
+): void {
   const assetFields = new Set<Exclude<keyof RoadInfoData, 'id'>>([
     'backgroundTex',
     'foregroundTex',
@@ -160,8 +160,6 @@ export function onRoadInfoInput(app: App, field: Exclude<keyof RoadInfoData, 'id
   const currentId = assetFields.has(field) ? app.selectedRoadInfoId() : app.editRoadInfo();
   const current = currentId !== null ? cloneRoadInfoData(app, app.roadInfoDataMap.get(currentId)) : null;
   if (currentId === null || current === null) return;
-  const value = getInputValue(event);
-  if (field !== 'water' && value === '') return;
   const next = { ...current };
   app._pushUndo('props');
   switch (field) {
@@ -175,18 +173,14 @@ export function onRoadInfoInput(app: App, field: Exclude<keyof RoadInfoData, 'id
     case 'trackSlide':
     case 'dustSlide':
     case 'slideFriction': {
-      const parsed = Number.parseFloat(value ?? '');
-      if (Number.isNaN(parsed)) return;
-      next[field] = parsed;
+      next[field] = Number(value);
       break;
     }
     case 'water':
-      next.water = getInputChecked(event);
+      next.water = Boolean(value);
       break;
     default: {
-      const parsed = Number.parseInt(value ?? '', 10);
-      if (Number.isNaN(parsed)) return;
-      next[field] = parsed;
+      next[field] = Number(value);
       break;
     }
   }
@@ -239,13 +233,10 @@ export function onPropertiesTabInput(app: App, e: { field: keyof LevelProperties
   onPropsInput(app, e.field, e.event);
 }
 
-export function onObjGroupInput(app: App, index: number, field: 'resID' | 'numObjs', event: Event): void {
-  const value = getInputValue(event);
-  const val = Number.parseInt(value ?? '', 10);
-  if (Number.isNaN(val)) return;
+export function onObjGroupInput(app: App, index: number, field: 'resID' | 'numObjs', value: number): void {
   const groups = [...app.editObjectGroups()];
   if (index < 0 || index >= groups.length) return;
-  groups[index] = { ...groups[index], [field]: val };
+  groups[index] = { ...groups[index], [field]: value };
   app.editObjectGroups.set(groups);
   app.markPropertiesDirty();
 }

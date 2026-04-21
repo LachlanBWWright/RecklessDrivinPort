@@ -8,28 +8,24 @@
   </mat-expansion-panel-header>
 
   @if (selectedMark; as mark) {
-    <div class="mark-fields-row">
+    <form class="mark-fields-row" [formGroup]="markForm">
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P1 X</mat-label>
-        <input matInput type="text" inputmode="numeric" [appValue]="mark.x1"
-          (input)="onFieldInput(selectedMarkIndex, 'x1', $event)" />
+        <input matInput type="number" formControlName="x1" inputmode="numeric" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P1 Y</mat-label>
-        <input matInput type="text" inputmode="numeric" [appValue]="mark.y1"
-          (input)="onFieldInput(selectedMarkIndex, 'y1', $event)" />
+        <input matInput type="number" formControlName="y1" inputmode="numeric" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P2 X</mat-label>
-        <input matInput type="text" inputmode="numeric" [appValue]="mark.x2"
-          (input)="onFieldInput(selectedMarkIndex, 'x2', $event)" />
+        <input matInput type="number" formControlName="x2" inputmode="numeric" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="mark-field">
         <mat-label>P2 Y</mat-label>
-        <input matInput type="text" inputmode="numeric" [appValue]="mark.y2"
-          (input)="onFieldInput(selectedMarkIndex, 'y2', $event)" />
+        <input matInput type="number" formControlName="y2" inputmode="numeric" />
       </mat-form-field>
-    </div>
+    </form>
   }
 
   <div class="marks-table-container">
@@ -56,4 +52,3 @@
     }
   </div>
 </mat-expansion-panel>
-

@@ -73,7 +73,6 @@ import {
   onCanvasMouseUp,
   onCanvasWheel,
   onObjDirDegInput,
-  onObjFieldInput,
   onObjTypeResChange,
   redrawObjectCanvas,
   removeSelectedObject,
@@ -327,8 +326,8 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     return deleteRoadInfo(this, roadInfoId);
   }
 
-  onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, event: Event): void {
-    onRoadInfoInput(this, field, event);
+  onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, value: number | boolean): void {
+    onRoadInfoInput(this, field, value);
   }
 
   onRoadTexturePick(field: import('./app-level').RoadTextureField, value: number): void {
@@ -343,8 +342,8 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     onPropertiesTabInput(this, e);
   }
 
-  onObjGroupInput(index: number, field: 'resID' | 'numObjs', event: Event): void {
-    onObjGroupInput(this, index, field, event);
+  onObjGroupInput(index: number, field: 'resID' | 'numObjs', value: number): void {
+    onObjGroupInput(this, index, field, value);
   }
 
   _captureUndoSnapshot(kind: EditorUndoKind): EditorUndoSnapshot {
@@ -453,9 +452,9 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     groupId: number,
     entryIndex: number,
     field: keyof ObjectGroupEntryData,
-    event: Event,
+    value: number,
   ): void {
-    onObjectGroupEntryInput(this, groupId, entryIndex, field, event);
+    onObjectGroupEntryInput(this, groupId, entryIndex, field, value);
   }
 
   saveObjectGroups(): Promise<void> {
@@ -505,9 +504,12 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   onObjectTypeFieldInput(
     typeRes: number,
     field: Exclude<keyof ObjectTypeDefinition, 'typeRes'>,
-    event: Event,
+    value: number,
   ): void {
-    onObjectTypeFieldInput(this, typeRes, field, event);
+    if (field === 'numFrames') {
+      console.log('[Frame Count] app.onObjectTypeFieldInput', { typeRes, field, value });
+    }
+    onObjectTypeFieldInput(this, typeRes, field, value);
   }
 
   onObjectTypeReferenceChange(
@@ -539,11 +541,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     selectObject(this, index, centerCanvas);
   }
 
-  onObjFieldInput(field: 'x' | 'y' | 'dir' | 'typeRes', event: Event): void {
-    onObjFieldInput(this, field, event);
-  }
-
-  onObjDirDegInput(value: string | Event): void {
+  onObjDirDegInput(value: string): void {
     onObjDirDegInput(this, value);
   }
 
@@ -730,8 +728,8 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     joinAdjacentMarkNubs(this);
   }
 
-  onMarkFieldInput(markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event): void {
-    onMarkFieldInput(this, markIdx, field, event);
+  onMarkFieldInput(markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', value: number): void {
+    onMarkFieldInput(this, markIdx, field, value);
   }
 
   saveMarks(): Promise<void> {

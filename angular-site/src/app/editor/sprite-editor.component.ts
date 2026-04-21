@@ -10,6 +10,7 @@ import {
   AfterViewInit,
   ChangeDetectionStrategy,
 } from '@angular/core';
+import { FormControl } from '@angular/forms';
 import type { DecodedSpriteFrame } from '../level-editor.service';
 
 export type SpriteEditorTool = 'pencil' | 'fill' | 'eyedropper' | 'eraser';
@@ -34,7 +35,7 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   @ViewChild('overlayEl') overlayElRef?: ElementRef<HTMLDivElement>;
 
   tool: SpriteEditorTool = 'pencil';
-  brushSize = 1;
+  readonly brushSize = new FormControl(1, { nonNullable: true });
   /** Current drawing colour as [r,g,b,a] */
   color: [number, number, number, number] = [255, 255, 255, 255];
   zoom = 8;
@@ -290,18 +291,20 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   }
 
   private drawPixel(cx: number, cy: number): void {
-    const half = Math.floor(this.brushSize / 2);
-    for (let dy = -half; dy < this.brushSize - half; dy++) {
-      for (let dx = -half; dx < this.brushSize - half; dx++) {
+    const size = this.brushSize.value;
+    const half = Math.floor(size / 2);
+    for (let dy = -half; dy < size - half; dy++) {
+      for (let dx = -half; dx < size - half; dx++) {
         this.setPixel(cx + dx, cy + dy, this.color[0], this.color[1], this.color[2], this.color[3]);
       }
     }
   }
 
   private erasePixel(cx: number, cy: number): void {
-    const half = Math.floor(this.brushSize / 2);
-    for (let dy = -half; dy < this.brushSize - half; dy++) {
-      for (let dx = -half; dx < this.brushSize - half; dx++) {
+    const size = this.brushSize.value;
+    const half = Math.floor(size / 2);
+    for (let dy = -half; dy < size - half; dy++) {
+      for (let dx = -half; dx < size - half; dx++) {
         this.setPixel(cx + dx, cy + dy, 0, 0, 0, 0);
       }
     }

@@ -80,19 +80,14 @@ export function onObjectGroupEntryInput(
   groupId: number,
   entryIndex: number,
   field: keyof ObjectGroupEntryData,
-  event: Event,
+  value: number,
 ): void {
-  const target = event.target as EventTarget & { value?: string };
-  const rawValue = target?.value ?? '';
-  if (rawValue === '') return;
-  const parsed = field === 'dir' ? Number.parseFloat(rawValue) : Number.parseInt(rawValue, 10);
-  if (Number.isNaN(parsed)) return;
   const groups = cloneObjectGroupDefinitions(app);
   const group = groups.find((item: ObjectGroupDefinition) => item.id === groupId);
   if (!group) return;
   const entry = group.entries[entryIndex];
   if (!entry) return;
-  group.entries[entryIndex] = { ...entry, [field]: parsed };
+  group.entries[entryIndex] = { ...entry, [field]: value };
   app.objectGroupDefinitions.set(groups);
   app.markObjectGroupsDirty();
 }
@@ -227,23 +222,15 @@ export function onObjectTypeFieldInput(
   app: App,
   typeRes: number,
   field: Exclude<keyof ObjectTypeDefinition, 'typeRes'>,
-  event: Event,
+  value: number,
 ): void {
-  const target = event.target as EventTarget & { value?: string };
-  const rawValue = target?.value ?? '';
-  if (rawValue === '') return;
-  const parsed = [
-    'mass', 'maxEngineForce', 'maxNegEngineForce', 'friction',
-    'frameDuration', 'wheelWidth', 'wheelLength', 'steering',
-    'width', 'length', 'maxDamage',
-  ].includes(field)
-    ? Number.parseFloat(rawValue)
-    : Number.parseInt(rawValue, 10);
-  if (Number.isNaN(parsed)) return;
+  if (field === 'numFrames') {
+    console.log('[Frame Count] app-pack-editing.onObjectTypeFieldInput', { typeRes, field, value });
+  }
   const defs = cloneObjectTypeDefinitions(app);
   const def = defs.find((item: ObjectTypeDefinition) => item.typeRes === typeRes);
   if (!def) return;
-  def[field] = parsed;
+  def[field] = value;
   markObjectTypesDirty(app, defs);
 }
 

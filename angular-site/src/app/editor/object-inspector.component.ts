@@ -1,4 +1,6 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, OnChanges, SimpleChanges } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { FormControl, FormGroup } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-object-inspector',
@@ -19,7 +21,6 @@ export class ObjectInspectorComponent implements OnChanges {
   @Input() visibleTypeFilter: Set<number> = new Set();
   @Input() workerBusy = false;
   @Input() typeDimLabel = '';
-  dirDegText = '0';
   /** True while the direction input element has focus – prevents ngOnChanges resetting typed text. */
   dirDegFocused = false;
 
@@ -31,6 +32,11 @@ export class ObjectInspectorComponent implements OnChanges {
   @Output() removeSelected = new EventEmitter<void>();
   @Output() deselect = new EventEmitter<void>();
 
+  readonly inspectorForm = new FormGroup({
+    dirDegText: new FormControl('0', { nonNullable: true }),
+    typeRes: new FormControl<number | null>(null),
+  });
+
   /** CSS rotation for the direction arrow (degrees, clockwise from up). */
   get dirArrowRotation(): string {
     const deg = Number.isFinite(this.editDirDeg) ? this.editDirDeg : 0;
@@ -38,10 +44,8 @@ export class ObjectInspectorComponent implements OnChanges {
     return `rotate(${deg}deg)`;
   }
 
-  onDirDegTextInput(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    if (!target) return;
-    this.dirDegText = target.value;
+  get dirDegText(): string {
+    return this.inspectorForm.controls.dirDegText.value;
   }
 
   /** Commit the current direction text to the parent model. */
@@ -49,12 +53,33 @@ export class ObjectInspectorComponent implements OnChanges {
     this.dirDegInput.emit(this.dirDegText);
   }
 
+  constructor() {
+    this.inspectorForm.controls.typeRes.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      if (value !== null) {
+        this.typeResChange.emit(value);
+      }
+    });
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     // Only update the text input when the user is NOT actively editing it.
     // Without this guard, every Angular change-detection cycle (triggered by
     // canvas redraws etc.) would reset the typed value mid-edit.
     if (changes['editDirDeg'] && !this.dirDegFocused) {
-      this.dirDegText = Number.isFinite(this.editDirDeg) ? this.editDirDeg.toString() : '0';
+      this.inspectorForm.controls.dirDegText.setValue(
+        Number.isFinite(this.editDirDeg) ? this.editDirDeg.toString() : '0',
+        { emitEvent: false },
+      );
+    }
+    if (changes['editTypeRes']) {
+      this.inspectorForm.controls.typeRes.setValue(this.editTypeRes, { emitEvent: false });
+    }
+    if (changes['workerBusy']) {
+      if (this.workerBusy) {
+        this.inspectorForm.disable({ emitEvent: false });
+      } else {
+        this.inspectorForm.enable({ emitEvent: false });
+      }
     }
   }
 }

@@ -2,7 +2,7 @@ import { NgModule, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -50,7 +50,6 @@ import { PropertiesTabComponent } from './editor/properties-tab.component';
 import { SpriteEditorComponent } from './editor/sprite-editor.component';
 import { MarkingPopupComponent } from './editor/canvas-toolbar/marking-popup.component';
 import { CanvasInfoPopupComponent } from './editor/canvas-toolbar/canvas-info-popup.component';
-import { InputValueDirective } from './shared/input-value.directive';
 
 const MATERIAL_MODULES = [
   MatButtonModule, MatIconModule, MatTooltipModule, MatInputModule,
@@ -84,13 +83,11 @@ const MATERIAL_MODULES = [
     SpriteEditorComponent,
     MarkingPopupComponent,
     CanvasInfoPopupComponent,
-    InputValueDirective,
   ],
   imports: [
     BrowserModule,
     CommonModule,
     BrowserAnimationsModule,
-    FormsModule,
     ReactiveFormsModule,
     ...MATERIAL_MODULES,
   ],

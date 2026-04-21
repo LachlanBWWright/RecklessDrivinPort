@@ -35,12 +35,11 @@
     <mat-divider class="inspector-divider"></mat-divider>
 
 
-    <div class="inspector-fields">
+    <form class="inspector-fields" [formGroup]="inspectorForm">
       <mat-form-field appearance="outline" class="inspector-field">
         <mat-label>Direction (°)</mat-label>
         <input matInput type="text" inputmode="decimal"
-          [value]="dirDegText"
-          (input)="onDirDegTextInput($event)"
+          formControlName="dirDegText"
           (focus)="dirDegFocused = true"
           (keydown.enter)="commitDirDegText(); $event.preventDefault()"
           (blur)="dirDegFocused = false; commitDirDegText()" />
@@ -52,18 +51,17 @@
       <mat-form-field appearance="outline" class="inspector-field">
         <mat-label>Type ID</mat-label>
         <mat-select
-          [value]="editTypeRes"
-          panelClass="type-id-select-panel"
-          (selectionChange)="typeResChange.emit($event.value)">
+          formControlName="typeRes"
+          panelClass="type-id-select-panel">
           <mat-select-trigger>
             <span class="inspector-type-option inspector-type-option--trigger">
-              <span>{{ editTypeRes }}</span>
+              <span>{{ inspectorForm.controls.typeRes.value ?? editTypeRes }}</span>
               <span class="inspector-type-thumb-wrap">
-                @if (getSpriteUrl(editTypeRes); as url) {
+                @if (getSpriteUrl(inspectorForm.controls.typeRes.value ?? editTypeRes); as url) {
                   <img [src]="url" class="inspector-type-thumb" alt="" />
                 } @else {
                   <span class="inspector-type-thumb inspector-type-thumb--fallback"
-                    [style.background]="getFallbackColor(editTypeRes)"></span>
+                    [style.background]="getFallbackColor(inspectorForm.controls.typeRes.value ?? editTypeRes)"></span>
                 }
               </span>
             </span>
@@ -83,16 +81,16 @@
               </span>
             </mat-option>
           }
-          @if (!availableTypeIds.includes(editTypeRes)) {
-            <mat-option [value]="editTypeRes">
+          @if (!availableTypeIds.includes(inspectorForm.controls.typeRes.value ?? editTypeRes)) {
+            <mat-option [value]="inspectorForm.controls.typeRes.value ?? editTypeRes">
               <span class="inspector-type-option inspector-type-option--menu">
-                <span>{{ editTypeRes }} (custom)</span>
+                <span>{{ inspectorForm.controls.typeRes.value ?? editTypeRes }} (custom)</span>
                 <span class="inspector-type-thumb-wrap">
-                  @if (getSpriteUrl(editTypeRes); as url) {
+                  @if (getSpriteUrl(inspectorForm.controls.typeRes.value ?? editTypeRes); as url) {
                     <img [src]="url" class="inspector-type-thumb" alt="" />
                   } @else {
                     <span class="inspector-type-thumb inspector-type-thumb--fallback"
-                      [style.background]="getFallbackColor(editTypeRes)"></span>
+                      [style.background]="getFallbackColor(inspectorForm.controls.typeRes.value ?? editTypeRes)"></span>
                   }
                 </span>
               </span>
@@ -101,7 +99,7 @@
         </mat-select>
         <mat-hint>128 = player car</mat-hint>
       </mat-form-field>
-    </div>
+    </form>
 
     <!-- Actions moved to top; keep the auto-apply note here -->
     <div class="inspector-actions">

@@ -1,4 +1,6 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { FormControl } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ObjectPos } from '../level-editor.service';
 
 @Component({
@@ -8,7 +10,7 @@ import type { ObjectPos } from '../level-editor.service';
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ObjectListComponent {
+export class ObjectListComponent implements OnChanges {
   @Input() objects: ObjectPos[] = [];
   @Input() filteredIndices: number[] = [];
   @Input() selectedIndex: number | null = null;
@@ -19,11 +21,17 @@ export class ObjectListComponent {
   @Output() objectSelected = new EventEmitter<number>();
   @Output() searchTermChange = new EventEmitter<string>();
 
-  /** Typed handler for the search input event – avoids $any() in the template. */
-  onSearchInput(event: Event): void {
-    const input = event.target;
-    if (input instanceof HTMLInputElement) {
-      this.searchTermChange.emit(input.value);
+  readonly searchControl = new FormControl('', { nonNullable: true });
+
+  constructor() {
+    this.searchControl.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      this.searchTermChange.emit(value ?? '');
+    });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['searchTerm']) {
+      this.searchControl.setValue(this.searchTerm, { emitEvent: false });
     }
   }
 }

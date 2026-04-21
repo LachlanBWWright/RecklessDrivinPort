@@ -104,24 +104,22 @@
               </mat-card>
             </div>
 
-            <div class="object-type-field-stack">
+            <div class="object-type-field-stack" [formGroup]="typeForm">
               <div class="object-type-field-section">
                 <div class="object-type-section-title">Sprite frame</div>
                 <mat-form-field appearance="outline" class="object-type-sprite-frame-field">
                   <mat-label>Sprite Frame</mat-label>
                   <mat-select
                     panelClass="object-type-frame-select-panel"
-                    [value]="type.frame"
-                    [disabled]="workerBusy"
-                    (selectionChange)="onFrameChange(type.typeRes, $event.value)">
+                    formControlName="frame">
                     <mat-select-trigger>
-                      {{ getFrameLabel(type.frame) }}
+                      {{ getFrameLabel(typeForm.controls.frame.value ?? type.frame) }}
                     </mat-select-trigger>
                     @for (frame of spriteFrames; track trackFrame($index, frame)) {
                       <mat-option [value]="frame.id">{{ getFrameLabel(frame.id) }}</mat-option>
                     }
-                    @if (hasCustomFrame(type.frame)) {
-                      <mat-option [value]="type.frame">#{{ type.frame }} (custom)</mat-option>
+                    @if (hasCustomFrame(typeForm.controls.frame.value ?? type.frame)) {
+                      <mat-option [value]="typeForm.controls.frame.value ?? type.frame">#{{ typeForm.controls.frame.value ?? type.frame }} (custom)</mat-option>
                     }
                   </mat-select>
                 </mat-form-field>
@@ -132,101 +130,78 @@
                 <div class="object-type-field-grid object-type-field-grid--dense">
                   <mat-form-field appearance="outline">
                     <mat-label>Frame Count</mat-label>
-                    <input matInput type="text" inputmode="numeric" [appValue]="type.numFrames"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'numFrames', $event)" />
+                    <input
+                      matInput
+                      type="number"
+                      inputmode="numeric"
+                      formControlName="numFrames"
+                    />
                     <mat-hint>Raw `numFrames` encoding from the game</mat-hint>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Frame Duration</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.frameDuration"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'frameDuration', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="frameDuration" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Mass</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.mass"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'mass', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="mass" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Engine Force</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.maxEngineForce"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'maxEngineForce', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="maxEngineForce" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Reverse Force</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.maxNegEngineForce"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'maxNegEngineForce', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="maxNegEngineForce" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Friction</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.friction"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'friction', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="friction" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Steering</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.steering"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'steering', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="steering" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Wheel Width</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.wheelWidth"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'wheelWidth', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="wheelWidth" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Wheel Length</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.wheelLength"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'wheelLength', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="wheelLength" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Collision Width</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.width"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'width', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="width" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Collision Length</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.length"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'length', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="length" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Score</mat-label>
-                    <input matInput type="text" inputmode="numeric" [appValue]="type.score"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'score', $event)" />
+                    <input matInput type="number" inputmode="numeric" formControlName="score" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Max Damage</mat-label>
-                    <input matInput type="text" inputmode="decimal" [appValue]="type.maxDamage"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'maxDamage', $event)" />
+                    <input matInput type="number" inputmode="decimal" formControlName="maxDamage" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Weapon Info</mat-label>
-                    <input matInput type="text" inputmode="numeric" [appValue]="type.weaponInfo"
-                      [disabled]="workerBusy"
-                      (input)="onFieldInput(type.typeRes, 'weaponInfo', $event)" />
+                    <input matInput type="number" inputmode="numeric" formControlName="weaponInfo" />
                   </mat-form-field>
                 </div>
               </div>
@@ -236,66 +211,62 @@
                 <div class="object-type-field-grid object-type-field-grid--dense">
                   <mat-form-field appearance="outline">
                     <mat-label>Death Object</mat-label>
-                    <mat-select [value]="type.deathObj" [disabled]="workerBusy"
-                      (selectionChange)="onReferenceChange(type.typeRes, 'deathObj', $event.value)">
-                      <mat-select-trigger>{{ getObjectTypeLabel(type.deathObj) }}</mat-select-trigger>
+                    <mat-select formControlName="deathObj">
+                      <mat-select-trigger>{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }}</mat-select-trigger>
                       <mat-option [value]="-1">None</mat-option>
                       @for (refType of objectTypes; track trackType($index, refType)) {
                         <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
                       }
-                      @if (type.deathObj !== -1 && hasCustomObjectType(type.deathObj)) {
-                        <mat-option [value]="type.deathObj">{{ getObjectTypeLabel(type.deathObj) }} (custom)</mat-option>
+                      @if ((typeForm.controls.deathObj.value ?? type.deathObj) !== -1 && hasCustomObjectType(typeForm.controls.deathObj.value ?? type.deathObj)) {
+                        <mat-option [value]="typeForm.controls.deathObj.value ?? type.deathObj">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }} (custom)</mat-option>
                       }
                     </mat-select>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Creation Sound</mat-label>
-                    <mat-select [value]="type.creationSound" [disabled]="workerBusy"
-                      (selectionChange)="onReferenceChange(type.typeRes, 'creationSound', $event.value)">
-                      <mat-select-trigger>{{ getSoundLabel(type.creationSound) }}</mat-select-trigger>
+                    <mat-select formControlName="creationSound">
+                      <mat-select-trigger>{{ getSoundLabel(typeForm.controls.creationSound.value ?? type.creationSound) }}</mat-select-trigger>
                       <mat-option [value]="0">None</mat-option>
                       @for (sound of audioEntries; track sound.id) {
                         @if (sound.id !== 0) {
                         <mat-option [value]="sound.id">{{ getSoundLabel(sound.id) }}</mat-option>
                         }
                       }
-                      @if (type.creationSound !== 0 && hasCustomSound(type.creationSound)) {
-                        <mat-option [value]="type.creationSound">{{ getSoundLabel(type.creationSound) }} (custom)</mat-option>
+                      @if ((typeForm.controls.creationSound.value ?? type.creationSound) !== 0 && hasCustomSound(typeForm.controls.creationSound.value ?? type.creationSound)) {
+                        <mat-option [value]="typeForm.controls.creationSound.value ?? type.creationSound">{{ getSoundLabel(typeForm.controls.creationSound.value ?? type.creationSound) }} (custom)</mat-option>
                       }
                     </mat-select>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Other Sound</mat-label>
-                    <mat-select [value]="type.otherSound" [disabled]="workerBusy"
-                      (selectionChange)="onReferenceChange(type.typeRes, 'otherSound', $event.value)">
-                      <mat-select-trigger>{{ getSoundLabel(type.otherSound) }}</mat-select-trigger>
+                    <mat-select formControlName="otherSound">
+                      <mat-select-trigger>{{ getSoundLabel(typeForm.controls.otherSound.value ?? type.otherSound) }}</mat-select-trigger>
                       <mat-option [value]="0">None</mat-option>
                       @for (sound of audioEntries; track sound.id) {
                         @if (sound.id !== 0) {
                         <mat-option [value]="sound.id">{{ getSoundLabel(sound.id) }}</mat-option>
                         }
                       }
-                      @if (type.otherSound !== 0 && hasCustomSound(type.otherSound)) {
-                        <mat-option [value]="type.otherSound">{{ getSoundLabel(type.otherSound) }} (custom)</mat-option>
+                      @if ((typeForm.controls.otherSound.value ?? type.otherSound) !== 0 && hasCustomSound(typeForm.controls.otherSound.value ?? type.otherSound)) {
+                        <mat-option [value]="typeForm.controls.otherSound.value ?? type.otherSound">{{ getSoundLabel(typeForm.controls.otherSound.value ?? type.otherSound) }} (custom)</mat-option>
                       }
                     </mat-select>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Weapon Object</mat-label>
-                    <mat-select [value]="type.weaponObj" [disabled]="workerBusy"
-                      (selectionChange)="onReferenceChange(type.typeRes, 'weaponObj', $event.value)">
-                      <mat-select-trigger>{{ type.weaponObj === 0 ? 'None' : getObjectTypeLabel(type.weaponObj) }}</mat-select-trigger>
+                    <mat-select formControlName="weaponObj">
+                      <mat-select-trigger>{{ (typeForm.controls.weaponObj.value ?? type.weaponObj) === 0 ? 'None' : getObjectTypeLabel(typeForm.controls.weaponObj.value ?? type.weaponObj) }}</mat-select-trigger>
                       <mat-option [value]="0">None</mat-option>
                       @for (refType of objectTypes; track trackType($index, refType)) {
                         @if (refType.typeRes !== 0) {
                           <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
                         }
                       }
-                      @if (type.weaponObj !== 0 && hasCustomObjectType(type.weaponObj)) {
-                        <mat-option [value]="type.weaponObj">{{ getObjectTypeLabel(type.weaponObj) }} (custom)</mat-option>
+                      @if ((typeForm.controls.weaponObj.value ?? type.weaponObj) !== 0 && hasCustomObjectType(typeForm.controls.weaponObj.value ?? type.weaponObj)) {
+                        <mat-option [value]="typeForm.controls.weaponObj.value ?? type.weaponObj">{{ getObjectTypeLabel(typeForm.controls.weaponObj.value ?? type.weaponObj) }} (custom)</mat-option>
                       }
                     </mat-select>
                   </mat-form-field>
@@ -308,12 +279,11 @@
                   <div class="object-type-flag-group">
                     <div class="object-type-flag-group-title">flags</div>
                     <div class="object-type-flag-grid">
-                      @for (flag of flagOptions.flags; track flag.bit) {
+                      @for (flag of flagOptions.flags; track flag.bit; let i = $index) {
                         <mat-checkbox
-                          [checked]="hasFlag(type.flags, flag.bit)"
-                          [disabled]="workerBusy"
+                          [formControl]="flagForms.flags.controls[i]"
                           [matTooltip]="flag.hint"
-                          (change)="onFlagToggle(type.typeRes, 'flags', flag.bit, $event.checked)">
+                        >
                           {{ flag.label }}
                         </mat-checkbox>
                       }
@@ -323,12 +293,11 @@
                   <div class="object-type-flag-group">
                     <div class="object-type-flag-group-title">flags2</div>
                     <div class="object-type-flag-grid">
-                      @for (flag of flagOptions.flags2; track flag.bit) {
+                      @for (flag of flagOptions.flags2; track flag.bit; let i = $index) {
                         <mat-checkbox
-                          [checked]="hasFlag(type.flags2, flag.bit)"
-                          [disabled]="workerBusy"
+                          [formControl]="flagForms.flags2.controls[i]"
                           [matTooltip]="flag.hint"
-                          (change)="onFlagToggle(type.typeRes, 'flags2', flag.bit, $event.checked)">
+                        >
                           {{ flag.label }}
                         </mat-checkbox>
                       }

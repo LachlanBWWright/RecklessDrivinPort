@@ -1,4 +1,6 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
+import { FormControl, FormGroup } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { MarkingRoadSelection } from '../../road-marking-utils';
 
 export interface MarkingGenerateEvent {
@@ -39,25 +41,36 @@ export class MarkingPopupComponent {
 
   markingTab: 'side' | 'dash' = 'side';
 
-  // Side marks – road checkboxes
-  sideCombined = true;
-  sideLeft = true;
-  sideRight = true;
-  sideYStart = 0;
-  sideYEnd = 400;
-  sideInset = 10;
-  sideYFrequency = 32;
+  readonly sideForm = new FormGroup({
+    combined: new FormControl(true, { nonNullable: true }),
+    left: new FormControl(true, { nonNullable: true }),
+    right: new FormControl(true, { nonNullable: true }),
+    yStart: new FormControl(0, { nonNullable: true }),
+    yEnd: new FormControl(400, { nonNullable: true }),
+    inset: new FormControl(10, { nonNullable: true }),
+    yFrequency: new FormControl(32, { nonNullable: true }),
+  });
 
-  // Centre marks – road checkboxes
-  centreCombined = true;
-  centreLeft = true;
-  centreRight = true;
-  centreYStart = 0;
-  centreYEnd = 400;
-  centreDashLength = 16;
-  centreGapLength = 16;
+  readonly centreForm = new FormGroup({
+    combined: new FormControl(true, { nonNullable: true }),
+    left: new FormControl(true, { nonNullable: true }),
+    right: new FormControl(true, { nonNullable: true }),
+    yStart: new FormControl(0, { nonNullable: true }),
+    yEnd: new FormControl(400, { nonNullable: true }),
+    dashLength: new FormControl(16, { nonNullable: true }),
+    gapLength: new FormControl(16, { nonNullable: true }),
+  });
 
   private _previewDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    this.sideForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.schedulePreview();
+    });
+    this.centreForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.schedulePreview();
+    });
+  }
 
   private checkboxesToSelection(combined: boolean, left: boolean, right: boolean): MarkingRoadSelection {
     if (combined && (left || right)) return 'both';
@@ -68,12 +81,19 @@ export class MarkingPopupComponent {
     return 'both';
   }
 
+  private toNumber(value: number | null): number {
+    const next = Number(value);
+    return Number.isFinite(next) ? next : 0;
+  }
+
   get sideRoadSelection(): MarkingRoadSelection {
-    return this.checkboxesToSelection(this.sideCombined, this.sideLeft, this.sideRight);
+    const { combined, left, right } = this.sideForm.getRawValue();
+    return this.checkboxesToSelection(combined, left, right);
   }
 
   get centreRoadSelection(): MarkingRoadSelection {
-    return this.checkboxesToSelection(this.centreCombined, this.centreLeft, this.centreRight);
+    const { combined, left, right } = this.centreForm.getRawValue();
+    return this.checkboxesToSelection(combined, left, right);
   }
 
   schedulePreview(delayMs = 300): void {
@@ -86,20 +106,22 @@ export class MarkingPopupComponent {
 
   onPreview(): void {
     if (this.markingTab === 'side') {
+      const { combined, left, right } = this.sideForm.getRawValue();
       this.previewSideMarks.emit({
-        roadSelection: this.sideRoadSelection,
-        yStart: this.sideYStart,
-        yEnd: this.sideYEnd,
-        inset: this.sideInset,
-        yFrequency: this.sideYFrequency,
+        roadSelection: this.checkboxesToSelection(combined, left, right),
+        yStart: this.toNumber(this.sideForm.controls.yStart.value),
+        yEnd: this.toNumber(this.sideForm.controls.yEnd.value),
+        inset: this.toNumber(this.sideForm.controls.inset.value),
+        yFrequency: Math.max(1, this.toNumber(this.sideForm.controls.yFrequency.value)),
       });
     } else {
+      const { combined, left, right } = this.centreForm.getRawValue();
       this.previewCentreMarks.emit({
-        roadSelection: this.centreRoadSelection,
-        yStart: this.centreYStart,
-        yEnd: this.centreYEnd,
-        dashLength: this.centreDashLength,
-        gapLength: this.centreGapLength,
+        roadSelection: this.checkboxesToSelection(combined, left, right),
+        yStart: this.toNumber(this.centreForm.controls.yStart.value),
+        yEnd: this.toNumber(this.centreForm.controls.yEnd.value),
+        dashLength: Math.max(1, this.toNumber(this.centreForm.controls.dashLength.value)),
+        gapLength: Math.max(1, this.toNumber(this.centreForm.controls.gapLength.value)),
       });
     }
   }
@@ -112,20 +134,22 @@ export class MarkingPopupComponent {
 
   onGenerate(): void {
     if (this.markingTab === 'side') {
+      const { combined, left, right } = this.sideForm.getRawValue();
       this.generateSideMarks.emit({
-        roadSelection: this.sideRoadSelection,
-        yStart: this.sideYStart,
-        yEnd: this.sideYEnd,
-        inset: this.sideInset,
-        yFrequency: this.sideYFrequency,
+        roadSelection: this.checkboxesToSelection(combined, left, right),
+        yStart: this.toNumber(this.sideForm.controls.yStart.value),
+        yEnd: this.toNumber(this.sideForm.controls.yEnd.value),
+        inset: this.toNumber(this.sideForm.controls.inset.value),
+        yFrequency: Math.max(1, this.toNumber(this.sideForm.controls.yFrequency.value)),
       });
     } else {
+      const { combined, left, right } = this.centreForm.getRawValue();
       this.generateCentreMarks.emit({
-        roadSelection: this.centreRoadSelection,
-        yStart: this.centreYStart,
-        yEnd: this.centreYEnd,
-        dashLength: this.centreDashLength,
-        gapLength: this.centreGapLength,
+        roadSelection: this.checkboxesToSelection(combined, left, right),
+        yStart: this.toNumber(this.centreForm.controls.yStart.value),
+        yEnd: this.toNumber(this.centreForm.controls.yEnd.value),
+        dashLength: Math.max(1, this.toNumber(this.centreForm.controls.dashLength.value)),
+        gapLength: Math.max(1, this.toNumber(this.centreForm.controls.gapLength.value)),
       });
     }
     this.clearPreview.emit();

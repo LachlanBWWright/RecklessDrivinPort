@@ -248,9 +248,8 @@ export function joinAdjacentMarkNubs(app: App): void {
   app.scheduleMarkAutoSave();
 }
 
-export function onMarkFieldInput(app: App, markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', event: Event): void {
-  const target = event.target as EventTarget & { value?: string };
-  const val = Number.parseInt(target?.value ?? '', 10);
+export function onMarkFieldInput(app: App, markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', value: number): void {
+  const val = Number(value);
   if (Number.isNaN(val)) return;
   app._pushUndo('marks');
   const ms = [...app.marks()];

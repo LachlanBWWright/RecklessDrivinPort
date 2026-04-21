@@ -128,31 +128,8 @@ export function selectObject(app: App, index: number, centerCanvas = false): voi
   }
 }
 
-export function onObjFieldInput(
-  app: App,
-  field: 'x' | 'y' | 'dir' | 'typeRes',
-  event: Event,
-): void {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
-  const value = parseFloat(target.value);
-  if (Number.isNaN(value)) return;
-  if (field === 'x') {
-    app.editObjX.set(Math.round(value));
-  } else if (field === 'y') {
-    app.editObjY.set(Math.round(value));
-  } else if (field === 'dir') {
-    const wrapped = Math.atan2(Math.sin(value), Math.cos(value));
-    app.editObjDir.set(wrapped);
-  } else {
-    app.editObjTypeRes.set(Math.round(value));
-  }
-  applyObjEdit(app);
-}
-
-export function onObjDirDegInput(app: App, value: string | Event): void {
-  const text = typeof value === 'string' ? value : value.target instanceof HTMLInputElement ? value.target.value : '';
-  const deg = parseFloat(text);
+export function onObjDirDegInput(app: App, value: string): void {
+  const deg = parseFloat(value);
   if (Number.isNaN(deg)) return;
   const rad = (deg * Math.PI) / 180;
   app.editObjDir.set(Math.atan2(Math.sin(rad), Math.cos(rad)));

@@ -1,4 +1,6 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { FormControl, FormGroup } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ObjectPos, MarkSeg, RoadInfoOption, TrackWaypointRef } from '../level-editor.service';
 import type { MarkingRoadSelection } from '../road-marking-utils';
 
@@ -11,7 +13,7 @@ export type DrawMode = 'none' | 'freehand' | 'straight' | 'curve';
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class EditorCanvasComponent {
+export class EditorCanvasComponent implements OnChanges {
   @Input() objects: ObjectPos[] = [];
   @Input() selectedObjIndex: number | null = null;
   @Input() marks: MarkSeg[] = [];
@@ -89,36 +91,90 @@ export class EditorCanvasComponent {
 
   showMarkingPopup = false;
   showInfoPopup = false;
+  timeLimitFocused = false;
+
+  readonly canvasForm = new FormGroup({
+    roadInfo: new FormControl<number | null>(null),
+    editTimeText: new FormControl('', { nonNullable: true }),
+    panY: new FormControl<number | null>(null),
+    panX: new FormControl<number | null>(null),
+  });
+
+  constructor() {
+    this.canvasForm.controls.roadInfo.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      if (value !== null) {
+        this.roadInfoChange.emit(value);
+      }
+    });
+    this.canvasForm.controls.panY.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      if (value !== null) {
+        this.panYChange.emit(value);
+      }
+    });
+    this.canvasForm.controls.panX.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      if (value !== null) {
+        this.panXChange.emit(value);
+      }
+    });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['editRoadInfo']) {
+      this.canvasForm.controls.roadInfo.setValue(this.editRoadInfo, { emitEvent: false });
+    }
+    if (changes['editTime'] && !this.timeLimitFocused) {
+      this.canvasForm.controls.editTimeText.setValue(String(this.editTime), { emitEvent: false });
+    }
+    if (changes['panY']) {
+      this.canvasForm.controls.panY.setValue(this.panY, { emitEvent: false });
+    }
+    if (changes['panX']) {
+      this.canvasForm.controls.panX.setValue(this.panX, { emitEvent: false });
+    }
+    if (changes['workerBusy']) {
+      const disabled = this.workerBusy;
+      const controls = this.canvasForm.controls;
+      if (disabled) {
+        controls.roadInfo.disable({ emitEvent: false });
+        controls.editTimeText.disable({ emitEvent: false });
+        controls.panY.disable({ emitEvent: false });
+        controls.panX.disable({ emitEvent: false });
+      } else {
+        controls.roadInfo.enable({ emitEvent: false });
+        controls.editTimeText.enable({ emitEvent: false });
+        controls.panY.enable({ emitEvent: false });
+        controls.panX.enable({ emitEvent: false });
+      }
+    }
+  }
+
+  commitTimeLimit(): void {
+    const raw = this.canvasForm.controls.editTimeText.value.trim();
+    const nextValue = Number.parseInt(raw, 10);
+    if (Number.isNaN(nextValue)) {
+      this.canvasForm.controls.editTimeText.setValue(String(this.editTime), { emitEvent: false });
+      return;
+    }
+    this.timeChange.emit(Math.max(0, Math.min(65535, Math.round(nextValue))));
+  }
+
+  onTimeLimitFocus(): void {
+    this.timeLimitFocused = true;
+  }
+
+  onTimeLimitBlur(): void {
+    this.timeLimitFocused = false;
+    this.commitTimeLimit();
+  }
 
   getRoadInfoOption(roadInfoId: number): RoadInfoOption | undefined {
     return this.roadInfoOptions.find((option) => option.id === roadInfoId);
-  }
-
-  onTimeLimitInput(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    const nextValue = Number.parseInt(target?.value ?? '', 10);
-    if (Number.isNaN(nextValue)) return;
-    this.timeChange.emit(nextValue);
   }
 
   toggleMarkingPopup(): void {
     this.showMarkingPopup = !this.showMarkingPopup;
     if (!this.showMarkingPopup) {
       this.clearMarkingPreview.emit();
-    }
-  }
-
-  /** Typed handler for the vertical range-input scrollbar. */
-  onVertScrollInput(event: Event): void {
-    if (event.target instanceof HTMLInputElement) {
-      this.panYChange.emit(Number(event.target.value));
-    }
-  }
-
-  /** Typed handler for the horizontal range-input scrollbar. */
-  onHorizScrollInput(event: Event): void {
-    if (event.target instanceof HTMLInputElement) {
-      this.panXChange.emit(Number(event.target.value));
     }
   }
 }

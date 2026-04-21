@@ -61,8 +61,8 @@
           <!-- Brush size -->
           <div class="se-section-title">Brush size</div>
           <div class="se-slider-row">
-            <input class="se-range-input" type="range" min="1" max="12" step="1" [(ngModel)]="brushSize" />
-            <span class="se-slider-value">{{ brushSize }} px</span>
+            <input class="se-range-input" type="range" min="1" max="12" step="1" [formControl]="brushSize" />
+            <span class="se-slider-value">{{ brushSize.value }} px</span>
           </div>
 
           <!-- Current colour -->

@@ -1,4 +1,6 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { FormControl } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { SndInfo } from '../../../snd-codec';
 import { formatTime } from '../../../app-runtime';
 
@@ -9,7 +11,7 @@ import { formatTime } from '../../../app-runtime';
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class EditorAudioSectionComponent {
+export class EditorAudioSectionComponent implements OnChanges {
   @Input() audioEntries: { id: number; sizeBytes: number; durationMs?: number }[] = [];
   @Input() selectedAudioId: number | null = null;
   @Input() selectedAudioBytes: Uint8Array | null = null;
@@ -31,4 +33,37 @@ export class EditorAudioSectionComponent {
   @Output() addAudioEntry = new EventEmitter<void>();
 
   readonly formatTime = formatTime;
+  readonly audioVolumeControl = new FormControl<number | null>(null);
+  readonly audioSeekControl = new FormControl<number | null>(null);
+
+  constructor() {
+    this.audioVolumeControl.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      const next = Number(value);
+      if (!Number.isNaN(next)) {
+        this.setAudioPlayerVolume.emit(next);
+      }
+    });
+    this.audioSeekControl.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      const next = Number(value);
+      if (!Number.isNaN(next)) {
+        this.seekAudio.emit(next);
+      }
+    });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['audioPlayerVolume']) {
+      this.audioVolumeControl.setValue(this.audioPlayerVolume, { emitEvent: false });
+    }
+    if (changes['audioCurrentTime']) {
+      this.audioSeekControl.setValue(this.audioCurrentTime, { emitEvent: false });
+    }
+    if (changes['audioControllable']) {
+      if (this.audioControllable) {
+        this.audioSeekControl.enable({ emitEvent: false });
+      } else {
+        this.audioSeekControl.disable({ emitEvent: false });
+      }
+    }
+  }
 }

@@ -67,8 +67,7 @@
               <div class="audio-volume-row">
                 <mat-icon class="audio-volume-icon">volume_up</mat-icon>
                 <mat-slider min="0" max="100" step="1" discrete class="audio-volume-slider">
-                  <input matSliderThumb [value]="audioPlayerVolume"
-                    (valueChange)="setAudioPlayerVolume.emit($event)" />
+                  <input matSliderThumb [formControl]="audioVolumeControl" />
                 </mat-slider>
                 <span class="audio-volume-value">{{ audioPlayerVolume }}%</span>
               </div>
@@ -87,9 +86,7 @@
                     min="0"
                     [max]="audioDuration"
                     step="0.01"
-                    [value]="audioCurrentTime"
-                    (input)="seekAudio.emit($any($event.target).valueAsNumber)"
-                    [disabled]="!audioControllable"
+                    [formControl]="audioSeekControl"
                     class="audio-progress-slider" />
                   <span class="audio-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span>
                 </div>

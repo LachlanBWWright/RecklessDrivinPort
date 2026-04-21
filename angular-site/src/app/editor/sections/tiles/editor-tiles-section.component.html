@@ -130,14 +130,15 @@
             Texture references are stored with the shared road record. Physics fields remain on the Properties tab.
           </p>
 
-          <table class="data-table plain-table road-info-table">
-            <tbody>
+          <form [formGroup]="roadTextureForm">
+            <table class="data-table plain-table road-info-table">
+              <tbody>
               <tr><th colspan="2">Road Assets</th></tr>
               <tr>
                 <td>backgroundTex</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select [value]="getRoadValue('backgroundTex')" [disabled]="workerBusy" (selectionChange)="setRoadValue('backgroundTex', $event.value)">
+                    <mat-select formControlName="backgroundTex" [disabled]="workerBusy">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('backgroundTex')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -175,7 +176,7 @@
                 <td>foregroundTex</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select [value]="getRoadValue('foregroundTex')" [disabled]="workerBusy" (selectionChange)="setRoadValue('foregroundTex', $event.value)">
+                    <mat-select formControlName="foregroundTex" [disabled]="workerBusy">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('foregroundTex')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -213,7 +214,7 @@
                 <td>roadLeftBorder</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select [value]="getRoadValue('roadLeftBorder')" [disabled]="workerBusy" (selectionChange)="setRoadValue('roadLeftBorder', $event.value)">
+                    <mat-select formControlName="roadLeftBorder" [disabled]="workerBusy">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('roadLeftBorder')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -251,7 +252,7 @@
                 <td>roadRightBorder</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select [value]="getRoadValue('roadRightBorder')" [disabled]="workerBusy" (selectionChange)="setRoadValue('roadRightBorder', $event.value)">
+                    <mat-select formControlName="roadRightBorder" [disabled]="workerBusy">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('roadRightBorder')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -289,7 +290,7 @@
                 <td>marks</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select [value]="getRoadValue('marks')" [disabled]="workerBusy" (selectionChange)="setRoadValue('marks', $event.value)">
+                    <mat-select formControlName="marks" [disabled]="workerBusy">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('marks')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -327,7 +328,7 @@
                 <td>tracks</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select [value]="getRoadValue('tracks')" [disabled]="workerBusy" (selectionChange)="setRoadValue('tracks', $event.value)">
+                    <mat-select formControlName="tracks" [disabled]="workerBusy">
                       <mat-select-trigger>
                         @if (getTextureEntry(getRoadValue('tracks')); as selectedTexture) {
                           <span class="texture-option texture-option--trigger">
@@ -365,7 +366,7 @@
                 <td>skidSound</td>
                 <td>
                   <mat-form-field appearance="outline" class="texture-select-field">
-                    <mat-select [value]="getRoadValue('skidSound')" [disabled]="workerBusy" (selectionChange)="setRoadValue('skidSound', $event.value)">
+                    <mat-select formControlName="skidSound" [disabled]="workerBusy">
                       <mat-select-trigger>
                         <span class="texture-option texture-option--trigger">
                           <span class="texture-thumb texture-thumb--fallback texture-thumb--audio"></span>
@@ -392,8 +393,9 @@
                   </mat-form-field>
                 </td>
               </tr>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </form>
         } @else {
           <div class="no-data-content">
             <mat-icon class="no-data-icon">route</mat-icon>

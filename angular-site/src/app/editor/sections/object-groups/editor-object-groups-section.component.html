@@ -56,28 +56,26 @@
 
             @if (group.entries.length > 0) {
               <div class="object-group-entry-list">
-                @for (entry of group.entries; track trackEntry($index)) {
-                  <div class="object-group-entry">
+                @for (entryForm of entryForms.controls; track trackEntry($index)) {
+                  <div class="object-group-entry" [formGroup]="entryForm">
                     <div class="object-group-entry__top">
                       <div class="object-group-entry__index">#{{ $index }}</div>
                       <mat-form-field appearance="outline" class="object-group-type-field">
                         <mat-select
                           panelClass="object-group-type-select-panel"
-                          [value]="entry.typeRes"
-                          [disabled]="workerBusy"
-                          (selectionChange)="onTypeResChange(group.id, $index, $event.value)">
+                          formControlName="typeRes">
                           <mat-select-trigger>
                             <span class="object-group-type-option object-group-type-option--trigger">
                               <span class="object-group-type-option__thumb">
-                                @if (getSpriteUrl(entry.typeRes); as url) {
+                                @if (getSpriteUrl(entryForm.controls.typeRes.value ?? 0); as url) {
                                   <img [src]="url" class="object-group-type-option__img" [style.imageRendering]="'pixelated'" alt="" />
                                 } @else {
                                   <span class="object-group-type-option__img object-group-type-option__img--fallback">#</span>
                                 }
                               </span>
                               <span class="object-group-type-option__main">
-                                <span class="object-group-type-option__label">{{ getTypeLabel(entry.typeRes) }}</span>
-                                <span class="object-group-type-option__meta">{{ getDirLabel(entry.dir) }}</span>
+                                <span class="object-group-type-option__label">{{ getTypeLabel(entryForm.controls.typeRes.value ?? 0) }}</span>
+                                <span class="object-group-type-option__meta">{{ getDirLabel(entryForm.controls.dir.value ?? 0) }}</span>
                               </span>
                             </span>
                           </mat-select-trigger>
@@ -93,24 +91,24 @@
                                 </span>
                                 <span class="object-group-type-option__main">
                                   <span class="object-group-type-option__label">{{ getTypeLabel(typeRes) }}</span>
-                                  <span class="object-group-type-option__meta">{{ getDirLabel(entry.dir) }}</span>
+                                  <span class="object-group-type-option__meta">{{ getDirLabel(entryForm.controls.dir.value ?? 0) }}</span>
                                 </span>
                               </span>
                             </mat-option>
                           }
-                          @if (hasCustomType(entry.typeRes)) {
-                            <mat-option [value]="entry.typeRes">
+                          @if (hasCustomType(entryForm.controls.typeRes.value ?? 0)) {
+                            <mat-option [value]="entryForm.controls.typeRes.value">
                               <span class="object-group-type-option">
                                 <span class="object-group-type-option__thumb">
-                                  @if (getSpriteUrl(entry.typeRes); as url) {
+                                  @if (getSpriteUrl(entryForm.controls.typeRes.value ?? 0); as url) {
                                     <img [src]="url" class="object-group-type-option__img" [style.imageRendering]="'pixelated'" alt="" />
                                   } @else {
                                     <span class="object-group-type-option__img object-group-type-option__img--fallback">#</span>
                                   }
                                 </span>
                                 <span class="object-group-type-option__main">
-                                  <span class="object-group-type-option__label">#{{ entry.typeRes }} (custom)</span>
-                                  <span class="object-group-type-option__meta">{{ getDirLabel(entry.dir) }}</span>
+                                  <span class="object-group-type-option__label">#{{ entryForm.controls.typeRes.value }} (custom)</span>
+                                  <span class="object-group-type-option__meta">{{ getDirLabel(entryForm.controls.dir.value ?? 0) }}</span>
                                 </span>
                               </span>
                             </mat-option>
@@ -127,32 +125,24 @@
                     <div class="object-group-entry__bottom">
                       <mat-form-field appearance="outline" class="object-group-number-field">
                         <mat-label>minOffs</mat-label>
-                        <input matInput type="text" inputmode="numeric" [appValue]="entry.minOffs"
-                          [disabled]="workerBusy"
-                          (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'minOffs', event: $event })" />
+                        <input matInput type="number" inputmode="numeric" formControlName="minOffs" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-number-field">
                         <mat-label>maxOffs</mat-label>
-                        <input matInput type="text" inputmode="numeric" [appValue]="entry.maxOffs"
-                          [disabled]="workerBusy"
-                          (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'maxOffs', event: $event })" />
+                        <input matInput type="number" inputmode="numeric" formControlName="maxOffs" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-number-field">
                         <mat-label>probility</mat-label>
-                        <input matInput type="text" inputmode="numeric" [appValue]="entry.probility"
-                          [disabled]="workerBusy"
-                          (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'probility', event: $event })" />
+                        <input matInput type="number" inputmode="numeric" formControlName="probility" />
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="object-group-dir-field">
                         <mat-label>Direction</mat-label>
-                        <input matInput type="text" inputmode="decimal" [appValue]="entry.dir"
-                          [disabled]="workerBusy"
-                          (input)="entryInput.emit({ groupId: group.id, entryIndex: $index, field: 'dir', event: $event })" />
+                        <input matInput type="number" inputmode="decimal" formControlName="dir" />
                         <span matSuffix class="dir-arrow-suffix">
-                          @if (isAutoDir(entry.dir)) {
+                          @if (isAutoDir(entryForm.controls.dir.value ?? 0)) {
                             <span class="dir-auto-badge" matTooltip="Auto / track-aligned">AUTO</span>
                           } @else {
-                            <mat-icon class="dir-arrow-icon" [style.transform]="getDirArrowRotation(entry.dir)">north</mat-icon>
+                            <mat-icon class="dir-arrow-icon" [style.transform]="getDirArrowRotation(entryForm.controls.dir.value ?? 0)">north</mat-icon>
                           }
                         </span>
                       </mat-form-field>

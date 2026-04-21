@@ -1,4 +1,6 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, OnChanges, SimpleChanges } from '@angular/core';
+import { FormControl, FormGroup } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { RoadInfoData, RoadInfoOption, RoadTileGroup, TextureTileEntry } from '../../../level-editor.service';
 
 type TextureField = 'backgroundTex' | 'foregroundTex' | 'roadLeftBorder' | 'roadRightBorder' | 'marks' | 'tracks' | 'skidSound';
@@ -26,7 +28,6 @@ export class EditorTilesSectionComponent implements OnChanges {
   @Output() selectedRoadInfoIdChange = new EventEmitter<number>();
   @Output() createRoadInfo = new EventEmitter<void>();
   @Output() deleteRoadInfo = new EventEmitter<number>();
-  @Output() roadInfoInput = new EventEmitter<{ field: Exclude<keyof RoadInfoData, 'id'>; event: Event }>();
   @Output() roadTextureChange = new EventEmitter<{ field: TextureField; value: number }>();
   @Output() selectedTileIdChange = new EventEmitter<number | null>();
   @Output() deleteTileImage = new EventEmitter<number>();
@@ -38,12 +39,31 @@ export class EditorTilesSectionComponent implements OnChanges {
   /** Cached dimensions label for the currently selected tile. */
   selectedTileDimensions = '?';
 
+  readonly roadTextureForm = new FormGroup({
+    backgroundTex: new FormControl<number | null>(null),
+    foregroundTex: new FormControl<number | null>(null),
+    roadLeftBorder: new FormControl<number | null>(null),
+    roadRightBorder: new FormControl<number | null>(null),
+    marks: new FormControl<number | null>(null),
+    tracks: new FormControl<number | null>(null),
+    skidSound: new FormControl<number | null>(null),
+  });
+
+  constructor() {
+    this.roadTextureForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.emitRoadTextureChanges();
+    });
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if ('selectedTileId' in changes || 'tileTileEntries' in changes) {
       const entry = this.selectedTileId !== null
         ? this.tileTileEntries.find((t) => t.texId === this.selectedTileId)
         : undefined;
       this.selectedTileDimensions = entry ? `${entry.width}×${entry.height}` : '?';
+    }
+    if ('selectedRoadInfoData' in changes) {
+      this.syncRoadTextureForm();
     }
   }
 
@@ -105,10 +125,45 @@ export class EditorTilesSectionComponent implements OnChanges {
   }
 
   getRoadValue(field: TextureField): number {
-    return this.selectedRoadInfoData?.[field] ?? 0;
+    return Number(this.roadTextureForm.controls[field].value ?? 0);
   }
 
-  setRoadValue(field: TextureField, value: number): void {
-    this.roadTextureChange.emit({ field, value });
+  private syncRoadTextureForm(): void {
+    if (!this.selectedRoadInfoData) {
+      return;
+    }
+    this.roadTextureForm.patchValue(
+      {
+        backgroundTex: this.selectedRoadInfoData.backgroundTex,
+        foregroundTex: this.selectedRoadInfoData.foregroundTex,
+        roadLeftBorder: this.selectedRoadInfoData.roadLeftBorder,
+        roadRightBorder: this.selectedRoadInfoData.roadRightBorder,
+        marks: this.selectedRoadInfoData.marks,
+        tracks: this.selectedRoadInfoData.tracks,
+        skidSound: this.selectedRoadInfoData.skidSound,
+      },
+      { emitEvent: false },
+    );
+  }
+
+  private emitRoadTextureChanges(): void {
+    if (!this.selectedRoadInfoData) return;
+    const next = this.roadTextureForm.getRawValue();
+    const fields: TextureField[] = [
+      'backgroundTex',
+      'foregroundTex',
+      'roadLeftBorder',
+      'roadRightBorder',
+      'marks',
+      'tracks',
+      'skidSound',
+    ];
+    for (const field of fields) {
+      const value = next[field];
+      if (value === null) continue;
+      if (value !== this.selectedRoadInfoData[field]) {
+        this.roadTextureChange.emit({ field, value });
+      }
+    }
   }
 }

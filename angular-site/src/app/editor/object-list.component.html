@@ -9,8 +9,7 @@
     <mat-icon matPrefix>search</mat-icon>
     <input matInput type="search"
       placeholder="Filter by #index or Ttype…"
-      [value]="searchTerm"
-      (input)="onSearchInput($event)" />
+      [formControl]="searchControl" />
     @if (searchTerm) {
       <button matSuffix mat-icon-button aria-label="Clear" (click)="searchTermChange.emit('')">
         <mat-icon>close</mat-icon>
@@ -55,4 +54,3 @@
     }
   </div>
 </div>
-

@@ -415,6 +415,7 @@ export function destroyApp(app: App): void {
   if (app.wasmScript?.parentNode) {
     (app.wasmScript.parentNode as HTMLElement).removeChild(app.wasmScript);
   }
+  app.wasmScript = null;
   app.packWorker?.terminate();
   app.packWorker = null;
   app.konva.destroy();

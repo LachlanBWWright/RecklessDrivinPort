@@ -26,6 +26,6 @@ export class EditorPropertiesSectionComponent {
   @Input() workerBusy = false;
 
   @Output() roadInfoChange = new EventEmitter<number>();
-  @Output() roadInfoInput = new EventEmitter<{ field: Exclude<keyof RoadInfoData, 'id'>; event: Event }>();
-  @Output() objGroupInput = new EventEmitter<{ index: number; field: 'resID' | 'numObjs'; event: Event }>();
+  @Output() roadInfoInput = new EventEmitter<{ field: Exclude<keyof RoadInfoData, 'id'>; value: number | boolean }>();
+  @Output() objGroupInput = new EventEmitter<{ index: number; field: 'resID' | 'numObjs'; value: number }>();
 }
