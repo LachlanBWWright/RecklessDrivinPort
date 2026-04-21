@@ -114,9 +114,8 @@
         <mat-label>Time Limit</mat-label>
         <input
           matInput
-          type="number"
-          min="0"
-          max="65535"
+          type="text"
+          inputmode="numeric"
           [appValue]="editTime"
           [disabled]="workerBusy"
           (input)="onTimeLimitInput($event)"

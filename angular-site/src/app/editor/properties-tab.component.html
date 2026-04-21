@@ -55,7 +55,7 @@
                 <td>friction</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.friction" (input)="roadInfoInput.emit({ field: 'friction', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.friction" (input)="roadInfoInput.emit({ field: 'friction', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -63,7 +63,7 @@
                 <td>airResistance</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.airResistance" (input)="roadInfoInput.emit({ field: 'airResistance', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.airResistance" (input)="roadInfoInput.emit({ field: 'airResistance', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -71,7 +71,7 @@
                 <td>backResistance</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.backResistance" (input)="roadInfoInput.emit({ field: 'backResistance', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.backResistance" (input)="roadInfoInput.emit({ field: 'backResistance', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -79,7 +79,7 @@
                 <td>tolerance</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" [appValue]="roadInfoData.tolerance" (input)="roadInfoInput.emit({ field: 'tolerance', event: $event })" />
+                    <input matInput type="text" inputmode="numeric" [appValue]="roadInfoData.tolerance" (input)="roadInfoInput.emit({ field: 'tolerance', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -87,7 +87,7 @@
                 <td>deathOffs</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" [appValue]="roadInfoData.deathOffs" (input)="roadInfoInput.emit({ field: 'deathOffs', event: $event })" />
+                    <input matInput type="text" inputmode="numeric" [appValue]="roadInfoData.deathOffs" (input)="roadInfoInput.emit({ field: 'deathOffs', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -101,7 +101,7 @@
                 <td>xDrift</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.xDrift" (input)="roadInfoInput.emit({ field: 'xDrift', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.xDrift" (input)="roadInfoInput.emit({ field: 'xDrift', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -109,7 +109,7 @@
                 <td>yDrift</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.yDrift" (input)="roadInfoInput.emit({ field: 'yDrift', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.yDrift" (input)="roadInfoInput.emit({ field: 'yDrift', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -117,7 +117,7 @@
                 <td>xFrontDrift</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.xFrontDrift" (input)="roadInfoInput.emit({ field: 'xFrontDrift', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.xFrontDrift" (input)="roadInfoInput.emit({ field: 'xFrontDrift', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -125,7 +125,7 @@
                 <td>yFrontDrift</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.yFrontDrift" (input)="roadInfoInput.emit({ field: 'yFrontDrift', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.yFrontDrift" (input)="roadInfoInput.emit({ field: 'yFrontDrift', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -133,7 +133,7 @@
                 <td>trackSlide</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.trackSlide" (input)="roadInfoInput.emit({ field: 'trackSlide', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.trackSlide" (input)="roadInfoInput.emit({ field: 'trackSlide', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -141,7 +141,7 @@
                 <td>dustSlide</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.dustSlide" (input)="roadInfoInput.emit({ field: 'dustSlide', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.dustSlide" (input)="roadInfoInput.emit({ field: 'dustSlide', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -149,7 +149,7 @@
                 <td>dustColor</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" min="0" max="255" [appValue]="roadInfoData.dustColor" (input)="roadInfoInput.emit({ field: 'dustColor', event: $event })" />
+                    <input matInput type="text" inputmode="numeric" [appValue]="roadInfoData.dustColor" (input)="roadInfoInput.emit({ field: 'dustColor', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -157,7 +157,7 @@
                 <td>filler</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" [appValue]="roadInfoData.filler" (input)="roadInfoInput.emit({ field: 'filler', event: $event })" />
+                    <input matInput type="text" inputmode="numeric" [appValue]="roadInfoData.filler" (input)="roadInfoInput.emit({ field: 'filler', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -165,7 +165,7 @@
                 <td>filler2</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" [appValue]="roadInfoData.filler2" (input)="roadInfoInput.emit({ field: 'filler2', event: $event })" />
+                    <input matInput type="text" inputmode="numeric" [appValue]="roadInfoData.filler2" (input)="roadInfoInput.emit({ field: 'filler2', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -173,7 +173,7 @@
                 <td>slideFriction</td>
                 <td>
                   <mat-form-field appearance="outline" class="road-info-field">
-                    <input matInput type="number" step="0.01" [appValue]="roadInfoData.slideFriction" (input)="roadInfoInput.emit({ field: 'slideFriction', event: $event })" />
+                    <input matInput type="text" inputmode="decimal" [appValue]="roadInfoData.slideFriction" (input)="roadInfoInput.emit({ field: 'slideFriction', event: $event })" />
                   </mat-form-field>
                 </td>
               </tr>
@@ -261,7 +261,8 @@
             <mat-label>numObjs</mat-label>
             <input
               matInput
-              type="number"
+              type="text"
+              inputmode="numeric"
               [appValue]="objGroup.numObjs"
               [disabled]="workerBusy"
               (input)="objGroupInput.emit({ index: $index, field: 'numObjs', event: $event })"
