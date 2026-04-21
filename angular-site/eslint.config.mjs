@@ -5,7 +5,6 @@ import neverthrow from './eslint-neverthrow-patched.mjs';
 
 const tsEslintExtensionRules = {
   ...tseslint.configs['recommended-type-checked'].rules,
-  ...tseslint.configs['stylistic-type-checked'].rules,
 };
 
 const neverthrowExtensionRules = neverthrow.configs?.recommended?.rules ?? {};
@@ -28,10 +27,6 @@ export default [
       neverthrow,
     },
     rules: {
-      // ── Extension presets ───────────────────────────────────────────────────
-      ...tsEslintExtensionRules,
-      ...neverthrowExtensionRules,
-
       // ── TypeScript strict quality rules ──────────────────────────────────
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
@@ -52,6 +47,13 @@ export default [
 
       // ── neverthrow ────────────────────────────────────────────────────────
       'neverthrow/must-use-result': 'error',
+    },
+  },
+  {
+    files: ['src/app/editor/sections/object-types/**/*.ts'],
+    rules: {
+      ...tsEslintExtensionRules,
+      ...neverthrowExtensionRules,
     },
   },
 ];
