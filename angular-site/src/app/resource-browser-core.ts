@@ -41,6 +41,10 @@ const finishBusy = (app: App) => {
   app.resBrowserBusy.set(false);
 };
 
+// Exported aliases used by resource-browser-uploads.ts
+export { dispatchResult as _dispatchResult, loadRawResource as _loadRawResource, finishBusy as _finishBusy };
+export { triggerUploadResource, triggerUploadPackEntry } from './resource-browser-uploads';
+
 export async function loadResourceList(app: App) {
   const listResult = await dispatchResult<{ entries: { type: string; id: number; size: number }[] }>(
     app,
@@ -157,135 +161,6 @@ export function downloadSelectedPackEntry(app: App) {
   triggerBytesDownload(bytes, `Pack_${id}_entry_${entryId}.bin`);
 }
 
-export function triggerUploadResource(app: App) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.bin,*/*';
-  input.onchange = async () => {
-    const file = input.files?.[0];
-    const type = app.selectedResType();
-    const id = app.selectedResId();
-    if (!file || !type || id === null) return;
-
-    app.resBrowserBusy.set(true);
-
-    const fileBytesResult = await resultFromPromise(file.arrayBuffer(), `Upload failed for ${type}#${id}`);
-    const bytes = fileBytesResult.match(
-      (buffer) => new Uint8Array(buffer),
-      (error) => {
-        app.snackBar.open(`✗ ${error}`, 'Dismiss', { duration: 5000 });
-        return null;
-      },
-    );
-    if (!bytes) {
-      finishBusy(app);
-      return;
-    }
-
-    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    const saveResult = await dispatchResult(
-      app,
-      'PUT_RESOURCE_RAW',
-      { type, id, bytes: buf },
-      [buf],
-      `Upload failed for ${type}#${id}`,
-    );
-    const saveError = saveResult.match(
-      () => null,
-      (error) => error,
-    );
-    if (saveError) {
-      app.snackBar.open(`✗ ${saveError}`, 'Dismiss', { duration: 5000 });
-      finishBusy(app);
-      return;
-    }
-
-    await loadResourceList(app);
-    const updatedBytes = await loadRawResource(app, type, id);
-    if (updatedBytes) app.selectedResBytes.set(updatedBytes);
-    app.snackBar.open(`✓ Replaced ${type}#${id} (${bytes.length} bytes)`, 'OK', { duration: 3000 });
-    finishBusy(app);
-  };
-  input.click();
-}
-
-export function triggerUploadPackEntry(app: App) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.bin,*/*';
-  input.onchange = async () => {
-    const file = input.files?.[0];
-    const packId = app.selectedResId();
-    const entryId = app.selectedPackEntryId();
-    if (!file || packId === null || entryId === null) return;
-
-    app.resBrowserBusy.set(true);
-
-    const fileBytesResult = await resultFromPromise(file.arrayBuffer(), `Upload failed for Pack#${packId} entry #${entryId}`);
-    const bytes = fileBytesResult.match(
-      (buffer) => new Uint8Array(buffer),
-      (error) => {
-        app.snackBar.open(`✗ ${error}`, 'Dismiss', { duration: 5000 });
-        return null;
-      },
-    );
-    if (!bytes) {
-      finishBusy(app);
-      return;
-    }
-
-    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    const saveResult = await dispatchResult(
-      app,
-      'PUT_PACK_ENTRY_RAW',
-      { packId, entryId, bytes: buf },
-      [buf],
-      `Upload failed for Pack#${packId} entry #${entryId}`,
-    );
-    const saveError = saveResult.match(
-      () => null,
-      (error) => error,
-    );
-    if (saveError) {
-      app.snackBar.open(`✗ ${saveError}`, 'Dismiss', { duration: 5000 });
-      finishBusy(app);
-      return;
-    }
-
-    const listResult = await dispatchResult<{ entries: { id: number; size: number }[] | null }>(
-      app,
-      'LIST_PACK_ENTRIES',
-      { packId },
-      undefined,
-      `Failed to refresh Pack#${packId} entry list`,
-    );
-    listResult.match(
-      ({ entries }) => app.selectedPackEntries.set(entries),
-      () => undefined,
-    );
-
-    const entryBytesResult = await dispatchResult<{ bytes: ArrayBuffer | null }>(
-      app,
-      'GET_PACK_ENTRY_RAW',
-      { packId, entryId },
-      undefined,
-      `Failed to refresh Pack#${packId} entry #${entryId}`,
-    );
-    entryBytesResult.match(
-      ({ bytes: updatedBytes }) => {
-        if (updatedBytes) app.selectedPackEntryBytes.set(new Uint8Array(updatedBytes));
-      },
-      () => undefined,
-    );
-
-    await loadResourceList(app);
-    app.snackBar.open(`✓ Replaced Pack#${packId} entry #${entryId} (${bytes.length} bytes)`, 'OK', {
-      duration: 3000,
-    });
-    finishBusy(app);
-  };
-  input.click();
-}
 
 export async function saveStrList(app: App) {
   const id = app.selectedResId();
