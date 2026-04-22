@@ -31,7 +31,7 @@ export function createRuntimeActions(app: App): {
   onVolumeSliderChange(pct: number): void;
   applyVolume(): void;
   loadDefaultResources(): Promise<void>;
-  onResourceFileSelected(event: Event): Promise<void>;
+  onResourceFileSelected(file: File | null): Promise<void>;
   clearEditorResources(): void;
   downloadEditedResources(): Promise<void>;
   saveEditedResourcesToGame(): Promise<void>;

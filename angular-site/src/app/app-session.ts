@@ -86,9 +86,7 @@ export async function loadDefaultResources(app: App): Promise<void> {
   );
 }
 
-export async function onResourceFileSelected(app: App, event: Event): Promise<void> {
-  const input = event.target as EventTarget & { files?: FileList };
-  const file = input?.files?.[0];
+export async function onResourceFileSelected(app: App, file: File | null): Promise<void> {
   if (!file) return;
   app.editorError.set('');
   await resultFromPromise(file.arrayBuffer(), 'Failed to read file')

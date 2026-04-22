@@ -11,7 +11,7 @@
           <button mat-stroked-button (click)="loadDefaultResources.emit()" [disabled]="workerBusy">
             <mat-icon>cloud_download</mat-icon> <span class="nav-tab-label">Load Default</span>
           </button>
-          <input #fileInput type="file" accept=".dat" (change)="resourceFileSelected.emit($event)" [disabled]="workerBusy" style="display:none" />
+          <input #fileInput type="file" accept=".dat" (change)="onFileChange($event)" [disabled]="workerBusy" style="display:none" />
           <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy">
             <mat-icon>folder_open</mat-icon> <span class="nav-tab-label">Upload resources.dat</span>
           </button>
