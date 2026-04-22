@@ -19,7 +19,7 @@ import {
 } from './resource-fields';
 import type { EditorUndoSnapshot } from './app-history';
 import { AppStateBase } from './app-state-base';
-import {
+export {
   saveCustomResourcesDb,
   loadCustomResourcesDb,
   clearCustomResourcesDb,
@@ -185,99 +185,6 @@ export class AppStateResources extends AppStateBase {
   customResourcesName = signal<string | null>(null);
   /** True while the game is being restarted. */
   gameRestarting = signal(false);
-
-  // ── IndexedDB persistence for custom resources.dat ─────────────────────────
-  // The game is compiled with Emscripten ASYNCIFY, which makes calling callMain()
-  // a second time unsafe (the ASYNCIFY state machine is not designed to be re-entered).
-  // We therefore restart by reloading the page, persisting the custom bytes in IndexedDB
-  // so the preRun hook can inject them into MEMFS before the game's main() runs.
-  private static readonly _IDB_NAME = 'reckless-drivin';
-  private static readonly _IDB_STORE = 'custom-resources';
-  private static readonly _IDB_KEY = 'resources-dat';
-
-  static _openCustomResourcesDb(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(AppStateResources._IDB_NAME, 1);
-      req.onupgradeneeded = () => {
-        if (!req.result.objectStoreNames.contains(AppStateResources._IDB_STORE)) {
-          req.result.createObjectStore(AppStateResources._IDB_STORE);
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  static async _saveCustomResourcesDb(bytes: Uint8Array, name: string): Promise<void> {
-    const db = await AppStateResources._openCustomResourcesDb();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(AppStateResources._IDB_STORE, 'readwrite');
-      tx.objectStore(AppStateResources._IDB_STORE).put({ bytes, name }, AppStateResources._IDB_KEY);
-      tx.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-      tx.onerror = () => {
-        db.close();
-        reject(tx.error);
-      };
-    });
-  }
-
-  static async _loadCustomResourcesDb(): Promise<{ bytes: Uint8Array; name: string } | null> {
-    return new Promise((resolve) => {
-      const req = indexedDB.open(AppStateResources._IDB_NAME, 1);
-      req.onupgradeneeded = () => {
-        if (!req.result.objectStoreNames.contains(AppStateResources._IDB_STORE)) {
-          req.result.createObjectStore(AppStateResources._IDB_STORE);
-        }
-      };
-      req.onsuccess = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(AppStateResources._IDB_STORE)) {
-          db.close();
-          resolve(null);
-          return;
-        }
-        const tx = db.transaction(AppStateResources._IDB_STORE, 'readonly');
-        const getReq = tx.objectStore(AppStateResources._IDB_STORE).get(AppStateResources._IDB_KEY);
-        getReq.onsuccess = () => {
-          db.close();
-          resolve((getReq.result as { bytes: Uint8Array; name: string }) ?? null);
-        };
-        getReq.onerror = () => {
-          db.close();
-          resolve(null);
-        };
-      };
-      req.onerror = () => resolve(null);
-    });
-  }
-
-  static async _clearCustomResourcesDb(): Promise<void> {
-    return new Promise((resolve) => {
-      const req = indexedDB.open(AppStateResources._IDB_NAME, 1);
-      req.onsuccess = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(AppStateResources._IDB_STORE)) {
-          db.close();
-          resolve();
-          return;
-        }
-        const tx = db.transaction(AppStateResources._IDB_STORE, 'readwrite');
-        tx.objectStore(AppStateResources._IDB_STORE).delete(AppStateResources._IDB_KEY);
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          db.close();
-          resolve();
-        };
-      };
-      req.onerror = () => resolve();
-    });
-  }
 
   objectTypeDefinitionMap = new Map<number, ObjectTypeDefinition>();
   objectSpritePreviews = new Map<number, HTMLCanvasElement>();

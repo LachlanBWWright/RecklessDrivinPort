@@ -1,6 +1,6 @@
 import { err, ok, type Result } from 'neverthrow';
 import { App } from './app';
-import { AppStateResources } from './app-state-resources';
+import { saveCustomResourcesDb, loadCustomResourcesDb, clearCustomResourcesDb } from './app-state-resources';
 
 type EventListenerLike = EventListenerOrEventListenerObject;
 
@@ -123,7 +123,7 @@ export function setupEmscriptenModule(app: App): void {
         const mod = window.Module;
         if (!mod?.addRunDependency || typeof indexedDB === 'undefined') return;
         mod.addRunDependency('customResourcesDat');
-        AppStateResources._loadCustomResourcesDb()
+        loadCustomResourcesDb()
           .then((entry: { bytes: Uint8Array; name: string } | null) => {
             if (entry) {
               const FS = (window as unknown as Record<string, unknown>)['FS'] as
@@ -295,7 +295,7 @@ export function restartGameWithCustomResources(app: App): void {
 export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {
   const name = app.customResourcesName() ?? 'resources.dat';
   if (typeof indexedDB !== 'undefined') {
-    AppStateResources._saveCustomResourcesDb(bytes, name).catch((err: unknown) => {
+    saveCustomResourcesDb(bytes, name).catch((err: unknown) => {
       console.warn('[Angular] Failed to save custom resources.dat to IndexedDB', err);
     });
   }
@@ -331,7 +331,7 @@ export function clearCustomResources(app: App): void {
   app.customResourcesLoaded.set(false);
   app.customResourcesName.set(null);
   if (typeof indexedDB !== 'undefined') {
-    AppStateResources._clearCustomResourcesDb().catch((err: unknown) => {
+    clearCustomResourcesDb().catch((err: unknown) => {
       console.warn('[Angular] Failed to clear custom resources.dat from IndexedDB', err);
     });
   }

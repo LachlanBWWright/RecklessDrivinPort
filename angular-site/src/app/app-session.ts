@@ -1,5 +1,5 @@
 import { App } from './app';
-import { AppStateResources } from './app-state-resources';
+import { saveCustomResourcesDb } from './app-state-resources';
 import { failEditor, loadResourcesBytes } from './app-loaders';
 import { resultFromPromise } from './result-helpers';
 
@@ -209,7 +209,7 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
     .andThen((buf) => {
       const name = app.customResourcesName() ?? 'resources.dat';
       return resultFromPromise(
-        AppStateResources._saveCustomResourcesDb(new Uint8Array(buf), name),
+        saveCustomResourcesDb(new Uint8Array(buf), name),
         'Failed to persist resources to game storage',
       ).map(() => name);
     })

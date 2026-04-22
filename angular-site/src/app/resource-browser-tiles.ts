@@ -1,4 +1,4 @@
-import { AppStateResources } from './app-state-resources';
+import { clearCustomResourcesDb } from './app-state-resources';
 import { decodeRoadTexturesInBackground, failEditor } from './app-loaders';
 import { resultFromPromise, resultFromThrowable } from './result-helpers';
 
@@ -261,7 +261,7 @@ export function restartGameWithCustomResources(app: App) {
 }
 
 export function clearCustomResources(app: App) {
-  AppStateResources._clearCustomResourcesDb()
+  clearCustomResourcesDb()
     .then(() => undefined)
     .catch(() => undefined);
   app.customResourcesLoaded.set(false);

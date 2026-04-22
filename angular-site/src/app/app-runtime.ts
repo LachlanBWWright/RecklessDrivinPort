@@ -1,6 +1,6 @@
 import { effect } from '@angular/core';
 import { App } from './app';
-import { AppStateResources } from './app-state-resources';
+import { loadCustomResourcesDb } from './app-state-resources';
 import type { EditorSection } from './layout/site-toolbar/site-toolbar.component';
 import { resultFromThrowable } from './result-helpers';
 import { registerKonvaEventHandlers } from './app-runtime-konva-events';
@@ -215,7 +215,7 @@ export function scheduleCanvasRedraw(app: App): void {
 export function onInit(app: App): void {
   app.runtime.initPackWorker();
   if (typeof indexedDB !== 'undefined') {
-        AppStateResources._loadCustomResourcesDb()
+        loadCustomResourcesDb()
       .then((entry) => {
         if (entry) {
           app.customResourcesLoaded.set(true);
