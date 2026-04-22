@@ -40,13 +40,19 @@
  */
 
 import { ResourceDatService } from './resource-dat.service';
-import { LevelEditorService } from './level-editor.service';
 import {
   getRawResource, putRawResource, listResources,
   parseStrList, encodeStrList,
   listPackEntries, getPackEntryRaw, putPackEntryRaw,
   extractObjectGroupDefinitions, applyObjectGroupDefinitions,
   applyObjectTypeDefinitions,
+  extractParsedLevels, extractSpriteAssets,
+  extractObjectTypeDefinitions, extractRoadInfos, extractRoadTextures,
+  extractAllRoadTextures, decodeAllSpriteFrames, batchDecodeSpriteFrames,
+  applyLevelProperties, applyLevelObjects, applyLevelTrack, applyLevelMarks, applyLevelRoadSegs,
+  applyRoadInfoData, removeRoadInfoData,
+  applySpriteByte, getSpriteBytes, applySpritePackPixels,
+  applyTile16Pixels, TX16_PACK_ID, removePackEntryRaw,
 } from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
 import type {
@@ -58,10 +64,11 @@ import type {
   DecodedRoadTexture,
   RoadInfoData,
   ObjectGroupDefinition,
+  ParsedLevel,
+  EditableSpriteAsset,
 } from './level-editor.service';
 
 const resourceDatSvc = new ResourceDatService();
-const levelEditorSvc = new LevelEditorService();
 
 /** Mutable resources owned by this worker. */
 let resources: ResourceDatEntry[] = [];
@@ -71,17 +78,17 @@ let resources: ResourceDatEntry[] = [];
  * gets fresh, consistent state.
  */
 function extractAll(): {
-  levels: ReturnType<typeof levelEditorSvc.extractParsedLevels>;
-  sprites: ReturnType<typeof levelEditorSvc.extractSpriteAssets>;
+  levels: ParsedLevel[];
+  sprites: EditableSpriteAsset[];
   objectTypesArr: [number, ObjectTypeDefinition][];
   roadInfoArr: [number, RoadInfoData][];
   objectGroups: ObjectGroupDefinition[];
 } {
-  const objectTypesMap = levelEditorSvc.extractObjectTypeDefinitions(resources);
-  const roadInfoMap = levelEditorSvc.extractRoadInfos(resources);
+  const objectTypesMap = extractObjectTypeDefinitions(resources);
+  const roadInfoMap = extractRoadInfos(resources);
   return {
-    levels: levelEditorSvc.extractParsedLevels(resources),
-    sprites: levelEditorSvc.extractSpriteAssets(resources),
+    levels: extractParsedLevels(resources),
+    sprites: extractSpriteAssets(resources),
     objectTypesArr: [...objectTypesMap.entries()],
     roadInfoArr: [...roadInfoMap.entries()],
     objectGroups: extractObjectGroupDefinitions(resources),
@@ -105,7 +112,7 @@ function decodeAllSpritePreviews(
 
   if (frameIds.length === 0) return result;
 
-  const frameMap = levelEditorSvc.batchDecodeSpriteFrames(resources, frameIds);
+  const frameMap = batchDecodeSpriteFrames(resources, frameIds);
 
   for (const [typeRes, objType] of objectTypesArr) {
     if (!objType) continue;
@@ -155,7 +162,7 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'DECODE_ROAD_TEXTURES': {
         // Parse kPackRoad to get texture IDs used by each roadInfo.
-        const roadInfoMap = levelEditorSvc.extractRoadInfos(resources);
+        const roadInfoMap = extractRoadInfos(resources);
         // Collect unique texture IDs needed across all roadInfo entries.
         const neededTexIds = new Set<number>();
         for (const ri of roadInfoMap.values()) {
@@ -164,7 +171,7 @@ self.addEventListener('message', (event: MessageEvent) => {
           neededTexIds.add(ri.roadLeftBorder);
           neededTexIds.add(ri.roadRightBorder);
         }
-        const textures: DecodedRoadTexture[] = levelEditorSvc.extractRoadTextures(
+        const textures: DecodedRoadTexture[] = extractRoadTextures(
           resources,
           [...neededTexIds],
         );
@@ -178,7 +185,7 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'DECODE_ALL_SPRITE_FRAMES': {
-        const frames = levelEditorSvc.decodeAllSpriteFrames(resources);
+        const frames = decodeAllSpriteFrames(resources);
         const framePixelBuffers: ArrayBuffer[] = frames.map((f) => f.pixels);
         self.postMessage({ id, ok: true, cmd, result: { frames } }, framePixelBuffers);
         break;
@@ -186,7 +193,7 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'DECODE_ALL_ROAD_TEXTURES': {
         // Decode every tile in kPackTx16 (not just those referenced by road infos).
-        const textures = levelEditorSvc.extractAllRoadTextures(resources);
+        const textures = extractAllRoadTextures(resources);
         const transferables3: ArrayBuffer[] = textures.map((t) => t.pixels);
         self.postMessage(
           { id, ok: true, cmd, result: { textures } },
@@ -197,21 +204,21 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'APPLY_TILE16_PIXELS': {
         const { texId, pixels } = payload as { texId: number; pixels: Uint8ClampedArray };
-        resources = levelEditorSvc.applyTile16Pixels(resources, texId, pixels);
+        resources = applyTile16Pixels(resources, texId, pixels);
         self.postMessage({ id, ok: true, cmd, result: {} });
         break;
       }
 
       case 'REMOVE_TILE16_TEXTURE': {
         const { texId } = payload as { texId: number };
-        resources = levelEditorSvc.removeTile16Texture(resources, texId);
+        resources = removePackEntryRaw(resources, TX16_PACK_ID, texId);
         self.postMessage({ id, ok: true, cmd, result: {} });
         break;
       }
 
       case 'APPLY_PROPS': {
         const { resourceId, props } = payload as { resourceId: number; props: LevelProperties };
-        resources = levelEditorSvc.applyLevelProperties(resources, resourceId, props);
+        resources = applyLevelProperties(resources, resourceId, props);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
         break;
@@ -219,7 +226,7 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'APPLY_ROAD_INFO': {
         const { roadInfoId, roadInfo } = payload as { roadInfoId: number; roadInfo: RoadInfoData };
-        resources = levelEditorSvc.applyRoadInfoData(resources, roadInfoId, roadInfo);
+        resources = applyRoadInfoData(resources, roadInfoId, roadInfo);
         const { roadInfoArr } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { roadInfoArr } });
         break;
@@ -227,7 +234,7 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'REMOVE_ROAD_INFO': {
         const { roadInfoId } = payload as { roadInfoId: number };
-        resources = levelEditorSvc.removeRoadInfoData(resources, roadInfoId);
+        resources = removeRoadInfoData(resources, roadInfoId);
         const { roadInfoArr } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { roadInfoArr } });
         break;
@@ -235,7 +242,7 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'APPLY_OBJECTS': {
         const { resourceId, objects } = payload as { resourceId: number; objects: ObjectPos[] };
-        resources = levelEditorSvc.applyLevelObjects(resources, resourceId, objects);
+        resources = applyLevelObjects(resources, resourceId, objects);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
         break;
@@ -255,7 +262,7 @@ self.addEventListener('message', (event: MessageEvent) => {
           trackUp: { x: number; y: number; flags: number; velo: number }[];
           trackDown: { x: number; y: number; flags: number; velo: number }[];
         };
-        resources = levelEditorSvc.applyLevelTrack(resources, resourceId, trackUp, trackDown);
+        resources = applyLevelTrack(resources, resourceId, trackUp, trackDown);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
         break;
@@ -263,7 +270,7 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'APPLY_MARKS': {
         const { resourceId, marks } = payload as { resourceId: number; marks: MarkSeg[] };
-        resources = levelEditorSvc.applyLevelMarks(resources, resourceId, marks);
+        resources = applyLevelMarks(resources, resourceId, marks);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
         break;
@@ -271,7 +278,7 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'APPLY_ROAD_SEGS': {
         const { resourceId, roadSegs } = payload as { resourceId: number; roadSegs: RoadSeg[] };
-        resources = levelEditorSvc.applyLevelRoadSegs(resources, resourceId, roadSegs);
+        resources = applyLevelRoadSegs(resources, resourceId, roadSegs);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
         break;
@@ -279,8 +286,8 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'APPLY_SPRITE_BYTE': {
         const { spriteId, offset, value } = payload as { spriteId: number; offset: number; value: number };
-        resources = levelEditorSvc.applySpriteByte(resources, spriteId, offset, value);
-        const raw = levelEditorSvc.getSpriteBytes(resources, spriteId);
+        resources = applySpriteByte(resources, spriteId, offset, value);
+        const raw = getSpriteBytes(resources, spriteId);
         const bytes = raw ? raw.slice() : null;
         self.postMessage({ id, ok: true, cmd, result: { bytes } });
         break;
@@ -292,7 +299,7 @@ self.addEventListener('message', (event: MessageEvent) => {
           bitDepth,
           pixels,
         } = payload as { frameId: number; bitDepth: 8 | 16; pixels: Uint8ClampedArray };
-        resources = levelEditorSvc.applySpritePackPixels(resources, frameId, bitDepth, pixels);
+        resources = applySpritePackPixels(resources, frameId, bitDepth, pixels);
         // Return updated levels so canvas previews refresh
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
@@ -309,7 +316,7 @@ self.addEventListener('message', (event: MessageEvent) => {
 
       case 'GET_SPRITE_BYTES': {
         const { spriteId } = payload as { spriteId: number };
-        const raw = levelEditorSvc.getSpriteBytes(resources, spriteId);
+        const raw = getSpriteBytes(resources, spriteId);
         const bytes = raw ? raw.slice() : null;
         self.postMessage({ id, ok: true, cmd, result: { bytes } });
         break;
