@@ -4,21 +4,6 @@ import { ROAD_THEMES } from './object-canvas';
 import type { App } from './app';
 import { resultFromPromise } from './result-helpers';
 
-declare module './app' {
-  interface App {
-    readonly getRoadReferenceLevelNums: (roadInfoId: number) => number[];
-    readonly getTileReferenceRoadInfoIds: (texId: number) => number[];
-    syncSelectedRoadInfoSelection(preferredId?: number | null): void;
-    refreshRoadInfoDerivedState(): void;
-    queueRoadInfoSync(syncPromises: Promise<unknown>[]): void;
-    queuePackSync(syncPromises: Promise<unknown>[]): void;
-    markPropertiesDirty(): void;
-    scheduleObjectGroupsAutoSave(): void;
-    markObjectGroupsDirty(): void;
-    saveLevelProperties(): Promise<void>;
-  }
-}
-
 export function cloneRoadInfoData(app: App, roadInfo: RoadInfoData | null | undefined): RoadInfoData | null {
   return roadInfo ? { ...roadInfo } : null;
 }

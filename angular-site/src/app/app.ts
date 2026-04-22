@@ -297,49 +297,33 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     return this.objectSpritePreviews.get(typeRes) ?? null;
   }
 
-  selectLevel(id: number, options?: { preserveView?: boolean }): void {
-    selectLevel(this, id, options);
-  }
+  readonly selectLevel = (id: number, options?: { preserveView?: boolean }): void => selectLevel(this, id, options);
 
-  resetViewToRoad(level: ParsedLevel): void {
-    resetViewToRoad(this, level);
-  }
+  readonly resetViewToRoad = (level: ParsedLevel): void => resetViewToRoad(this, level);
 
   onPropsInput(field: keyof import('./level-editor.service').LevelProperties, value: number): void {
     onPropsInput(this, field, value);
   }
 
-  onRoadInfoChange(roadInfo: number): void {
-    onRoadInfoChange(this, roadInfo);
-  }
+  readonly onRoadInfoChange = (roadInfo: number): void => onRoadInfoChange(this, roadInfo);
 
-  selectRoadInfo(roadInfo: number): void {
-    selectRoadInfo(this, roadInfo);
-  }
+  readonly selectRoadInfo = (roadInfo: number): void => selectRoadInfo(this, roadInfo);
 
-  createRoadInfo(): Promise<void> {
-    return createRoadInfo(this);
-  }
+  readonly createRoadInfo = (): Promise<void> => createRoadInfo(this);
 
   deleteRoadInfo(roadInfoId: number | null = this.selectedRoadInfoId()): Promise<void> {
     return deleteRoadInfo(this, roadInfoId);
   }
 
-  onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, value: number | boolean): void {
-    onRoadInfoInput(this, field, value);
-  }
+  readonly onRoadInfoInput = (field: Exclude<keyof RoadInfoData, 'id'>, value: number | boolean): void => onRoadInfoInput(this, field, value);
 
   onRoadTexturePick(field: import('./app-level').RoadTextureField, value: number): void {
     onRoadTexturePick(this, field, value);
   }
 
-  onTimeLimitChange(value: number): void {
-    onTimeLimitChange(this, value);
-  }
+  readonly onTimeLimitChange = (value: number): void => onTimeLimitChange(this, value);
 
-  onObjGroupInput(index: number, field: 'resID' | 'numObjs', value: number): void {
-    onObjGroupInput(this, index, field, value);
-  }
+  readonly onObjGroupInput = (index: number, field: 'resID' | 'numObjs', value: number): void => onObjGroupInput(this, index, field, value);
 
   _captureUndoSnapshot(kind: EditorUndoKind): EditorUndoSnapshot {
     return captureUndoSnapshot(this, kind);
@@ -357,13 +341,9 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     resetObjectHistory(this);
   }
 
-  undo(): void {
-    undo(this);
-  }
+  readonly undo = (): void => undo(this);
 
-  redo(): void {
-    redo(this);
-  }
+  readonly redo = (): void => redo(this);
 
   readonly getRoadReferenceLevelNums = (roadInfoId: number): number[] =>
     lookupRoadReferenceLevelNums(this, roadInfoId);
@@ -371,37 +351,21 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   readonly getTileReferenceRoadInfoIds = (texId: number): number[] =>
     lookupTileReferenceRoadInfoIds(this, texId);
 
-  syncSelectedRoadInfoSelection(preferredId?: number | null): void {
-    syncSelectedRoadInfoSelection(this, preferredId ?? this.selectedRoadInfoId());
-  }
+  readonly syncSelectedRoadInfoSelection = (preferredId?: number | null): void => syncSelectedRoadInfoSelection(this, preferredId ?? this.selectedRoadInfoId());
 
-  refreshRoadInfoDerivedState(): void {
-    refreshRoadInfoDerivedState(this);
-  }
+  readonly refreshRoadInfoDerivedState = (): void => refreshRoadInfoDerivedState(this);
 
-  queueRoadInfoSync(syncPromises: Promise<unknown>[]): void {
-    queueRoadInfoSync(this, syncPromises);
-  }
+  readonly queueRoadInfoSync = (syncPromises: Promise<unknown>[]): void => queueRoadInfoSync(this, syncPromises);
 
-  queuePackSync(syncPromises: Promise<unknown>[]): void {
-    queuePackSync(this, syncPromises);
-  }
+  readonly queuePackSync = (syncPromises: Promise<unknown>[]): void => queuePackSync(this, syncPromises);
 
-  markPropertiesDirty(): void {
-    markPropertiesDirty(this);
-  }
+  readonly markPropertiesDirty = (): void => markPropertiesDirty(this);
 
-  scheduleObjectGroupsAutoSave(): void {
-    scheduleObjectGroupsAutoSave(this);
-  }
+  readonly scheduleObjectGroupsAutoSave = (): void => scheduleObjectGroupsAutoSave(this);
 
-  markObjectGroupsDirty(): void {
-    markObjectGroupsDirty(this);
-  }
+  readonly markObjectGroupsDirty = (): void => markObjectGroupsDirty(this);
 
-  saveLevelProperties(): Promise<void> {
-    return saveLevelProperties(this);
-  }
+  readonly saveLevelProperties = (): Promise<void> => saveLevelProperties(this);
 
   looksLikeHtml(bytes: Uint8Array): boolean {
     return bytes.length > 0 && /<html|<!doctype html/i.test(new TextDecoder().decode(bytes.slice(0, 32)));
@@ -415,33 +379,19 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     return nextObjectGroupId(this, groups);
   }
 
-  defaultObjectGroupEntry(): ObjectGroupEntryData {
-    return defaultObjectGroupEntry(this);
-  }
+  readonly defaultObjectGroupEntry = (): ObjectGroupEntryData => defaultObjectGroupEntry(this);
 
-  selectedObjectGroup(): ObjectGroupDefinition | null {
-    return selectedObjectGroup(this);
-  }
+  readonly selectedObjectGroup = (): ObjectGroupDefinition | null => selectedObjectGroup(this);
 
-  selectObjectGroup(groupId: number): void {
-    selectObjectGroup(this, groupId);
-  }
+  readonly selectObjectGroup = (groupId: number): void => selectObjectGroup(this, groupId);
 
-  addObjectGroup(duplicateSelected = false): void {
-    addObjectGroup(this, duplicateSelected);
-  }
+  readonly addObjectGroup = (duplicateSelected = false): void => addObjectGroup(this, duplicateSelected);
 
-  deleteObjectGroup(groupId: number): void {
-    deleteObjectGroup(this, groupId);
-  }
+  readonly deleteObjectGroup = (groupId: number): void => deleteObjectGroup(this, groupId);
 
-  addObjectGroupEntry(groupId: number): void {
-    addObjectGroupEntry(this, groupId);
-  }
+  readonly addObjectGroupEntry = (groupId: number): void => addObjectGroupEntry(this, groupId);
 
-  deleteObjectGroupEntry(groupId: number, entryIndex: number): void {
-    deleteObjectGroupEntry(this, groupId, entryIndex);
-  }
+  readonly deleteObjectGroupEntry = (groupId: number, entryIndex: number): void => deleteObjectGroupEntry(this, groupId, entryIndex);
 
   onObjectGroupEntryInput(
     groupId: number,
@@ -452,9 +402,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     onObjectGroupEntryInput(this, groupId, entryIndex, field, value);
   }
 
-  saveObjectGroups(): Promise<void> {
-    return saveObjectGroups(this);
-  }
+  readonly saveObjectGroups = (): Promise<void> => saveObjectGroups(this);
 
   cloneObjectTypeDefinitions(defs = this.objectTypeDefinitions()): ObjectTypeDefinition[] {
     return cloneObjectTypeDefinitions(this, defs);
@@ -468,33 +416,19 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     return nextObjectTypeId(this, defs);
   }
 
-  selectedObjectType(): ObjectTypeDefinition | null {
-    return selectedObjectType(this);
-  }
+  readonly selectedObjectType = (): ObjectTypeDefinition | null => selectedObjectType(this);
 
-  scheduleObjectTypesAutoSave(): void {
-    scheduleObjectTypesAutoSave(this);
-  }
+  readonly scheduleObjectTypesAutoSave = (): void => scheduleObjectTypesAutoSave(this);
 
-  markObjectTypesDirty(defs: ObjectTypeDefinition[]): void {
-    markObjectTypesDirty(this, defs);
-  }
+  readonly markObjectTypesDirty = (defs: ObjectTypeDefinition[]): void => markObjectTypesDirty(this, defs);
 
-  defaultObjectTypeDefinition(typeRes: number, source?: ObjectTypeDefinition | null): ObjectTypeDefinition {
-    return defaultObjectTypeDefinition(this, typeRes, source);
-  }
+  readonly defaultObjectTypeDefinition = (typeRes: number, source?: ObjectTypeDefinition | null): ObjectTypeDefinition => defaultObjectTypeDefinition(this, typeRes, source);
 
-  selectObjectType(typeRes: number): void {
-    selectObjectType(this, typeRes);
-  }
+  readonly selectObjectType = (typeRes: number): void => selectObjectType(this, typeRes);
 
-  addObjectType(duplicateSelected = false): void {
-    addObjectType(this, duplicateSelected);
-  }
+  readonly addObjectType = (duplicateSelected = false): void => addObjectType(this, duplicateSelected);
 
-  deleteObjectType(typeRes: number): void {
-    deleteObjectType(this, typeRes);
-  }
+  readonly deleteObjectType = (typeRes: number): void => deleteObjectType(this, typeRes);
 
   onObjectTypeFieldInput(
     typeRes: number,
@@ -521,108 +455,60 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     onObjectTypeFlagToggle(this, typeRes, field, bit, checked);
   }
 
-  onObjectTypeFrameChange(typeRes: number, frame: number): void {
-    onObjectTypeFrameChange(this, typeRes, frame);
-  }
+  readonly onObjectTypeFrameChange = (typeRes: number, frame: number): void => onObjectTypeFrameChange(this, typeRes, frame);
 
-  saveObjectTypes(): Promise<void> {
-    return saveObjectTypes(this);
-  }
+  readonly saveObjectTypes = (): Promise<void> => saveObjectTypes(this);
 
-  selectObject(index: number, centerCanvas = false): void {
-    selectObject(this, index, centerCanvas);
-  }
+  readonly selectObject = (index: number, centerCanvas = false): void => selectObject(this, index, centerCanvas);
 
-  onObjDirDegInput(value: string): void {
-    onObjDirDegInput(this, value);
-  }
+  readonly onObjDirDegInput = (value: string): void => onObjDirDegInput(this, value);
 
-  onObjTypeResChange(typeRes: number): void {
-    onObjTypeResChange(this, typeRes);
-  }
+  readonly onObjTypeResChange = (typeRes: number): void => onObjTypeResChange(this, typeRes);
 
-  applyObjEdit(): void {
-    applyObjEdit(this);
-  }
+  readonly applyObjEdit = (): void => applyObjEdit(this);
 
-  addObject(): void {
-    addObject(this);
-  }
+  readonly addObject = (): void => addObject(this);
 
-  duplicateSelectedObject(): void {
-    duplicateSelectedObject(this);
-  }
+  readonly duplicateSelectedObject = (): void => duplicateSelectedObject(this);
 
-  toggleTypeVisibility(typeId: number): void {
-    toggleTypeVisibility(this, typeId);
-  }
+  readonly toggleTypeVisibility = (typeId: number): void => toggleTypeVisibility(this, typeId);
 
-  showAllObjectTypes(): void {
-    showAllObjectTypes(this);
-  }
+  readonly showAllObjectTypes = (): void => showAllObjectTypes(this);
 
-  hideAllObjectTypes(): void {
-    hideAllObjectTypes(this);
-  }
+  readonly hideAllObjectTypes = (): void => hideAllObjectTypes(this);
 
   readonly getObjTypeDimensionLabel = (typeRes: number): string =>
     getObjectTypeDimensionLabel(this, typeRes);
 
-  removeSelectedObject(): void {
-    removeSelectedObject(this);
-  }
+  readonly removeSelectedObject = (): void => removeSelectedObject(this);
 
-  saveLevelObjects(): Promise<void> {
-    return saveLevelObjects(this);
-  }
+  readonly saveLevelObjects = (): Promise<void> => saveLevelObjects(this);
 
-  saveTrack(): Promise<void> {
-    return saveTrack(this);
-  }
+  readonly saveTrack = (): Promise<void> => saveTrack(this);
 
-  worldToCanvas(wx: number, wy: number): [number, number] {
-    return worldToCanvas(this, wx, wy);
-  }
+  readonly worldToCanvas = (wx: number, wy: number): [number, number] => worldToCanvas(this, wx, wy);
 
-  canvasToWorld(cx: number, cy: number): [number, number] {
-    return canvasToWorld(this, cx, cy);
-  }
+  canvasToWorld = (cx: number, cy: number): [number, number] => canvasToWorld(this, cx, cy);
 
-  onCanvasMouseDown(event: MouseEvent): void {
-    onCanvasMouseDown(this, event);
-  }
+  readonly onCanvasMouseDown = (event: MouseEvent): void => onCanvasMouseDown(this, event);
 
-  onCanvasMouseMove(event: MouseEvent): void {
-    onCanvasMouseMove(this, event);
-  }
+  readonly onCanvasMouseMove = (event: MouseEvent): void => onCanvasMouseMove(this, event);
 
-  onCanvasMouseUp(): void {
-    onCanvasMouseUp(this);
-  }
+  readonly onCanvasMouseUp = (): void => onCanvasMouseUp(this);
 
-  onCanvasDoubleClick(event: MouseEvent): void {
-    onCanvasDoubleClick(this, event);
-  }
+  readonly onCanvasDoubleClick = (event: MouseEvent): void => onCanvasDoubleClick(this, event);
 
-  onCanvasContextMenu(event: MouseEvent): void {
-    onCanvasContextMenu(this, event);
-  }
+  readonly onCanvasContextMenu = (event: MouseEvent): void => onCanvasContextMenu(this, event);
 
   _insertWaypointAfter(track: 'up' | 'down', segIdx: number): void {
     insertWaypointAfter(this, track, segIdx);
   }
 
-  onCanvasKeyDown(event: KeyboardEvent): void {
-    onCanvasKeyDown(this, event);
-  }
+  readonly onCanvasKeyDown = (event: KeyboardEvent): void => onCanvasKeyDown(this, event);
 
-  onCanvasKeyUp(event: KeyboardEvent): void {
-    onCanvasKeyUp(this, event);
-  }
+  readonly onCanvasKeyUp = (event: KeyboardEvent): void => onCanvasKeyUp(this, event);
 
-  onCanvasWheel(event: WheelEvent): void {
-    onCanvasWheel(this, event);
-  }
+  readonly onCanvasWheel = (event: WheelEvent): void => onCanvasWheel(this, event);
 
   zoomIn(): void {
     this.canvasZoom.set(Math.min(10, this.canvasZoom() + 0.25));
@@ -632,33 +518,19 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     this.canvasZoom.set(Math.max(0.1, this.canvasZoom() - 0.25));
   }
 
-  resetView(): void {
-    resetView(this);
-  }
+  readonly resetView = (): void => resetView(this);
 
-  frameAllObjects(): void {
-    frameAllObjects(this);
-  }
+  readonly frameAllObjects = (): void => frameAllObjects(this);
 
-  centerOnSelectedObject(): void {
-    centerOnSelectedObject(this);
-  }
+  readonly centerOnSelectedObject = (): void => centerOnSelectedObject(this);
 
-  redrawObjectCanvas(): void {
-    redrawObjectCanvas(this);
-  }
+  readonly redrawObjectCanvas = (): void => redrawObjectCanvas(this);
 
-  addMark(): void {
-    addMark(this);
-  }
+  readonly addMark = (): void => addMark(this);
 
-  startMarkCreateMode(): void {
-    startMarkCreateMode(this);
-  }
+  readonly startMarkCreateMode = (): void => startMarkCreateMode(this);
 
-  confirmMarkCreateMode(): void {
-    confirmMarkCreateMode(this);
-  }
+  readonly confirmMarkCreateMode = (): void => confirmMarkCreateMode(this);
 
   generateSideRoadMarks(
     roadSelection: import('./road-marking-utils').MarkingRoadSelection,
@@ -700,9 +572,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     previewCentreRoadMarks(this, roadSelection, yStart, yEnd, dashLength, gapLength);
   }
 
-  removeSelectedMark(): void {
-    removeSelectedMark(this);
-  }
+  readonly removeSelectedMark = (): void => removeSelectedMark(this);
 
   _addMarkCreatePoint(x: number, y: number): void {
     addMarkCreatePoint(this, x, y);
@@ -720,17 +590,11 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     joinAdjacentMarkNubs(this);
   }
 
-  onMarkFieldInput(markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', value: number): void {
-    onMarkFieldInput(this, markIdx, field, value);
-  }
+  readonly onMarkFieldInput = (markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', value: number): void => onMarkFieldInput(this, markIdx, field, value);
 
-  saveMarks(): Promise<void> {
-    return saveMarks(this);
-  }
+  readonly saveMarks = (): Promise<void> => saveMarks(this);
 
-  scheduleMarkAutoSave(): void {
-    scheduleMarkAutoSave(this);
-  }
+  readonly scheduleMarkAutoSave = (): void => scheduleMarkAutoSave(this);
 
   _handleCurveDrawClick(wx: number, wy: number): void {
     handleCurveDrawClick(this, wx, wy);
@@ -744,49 +608,27 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     applyBarrierDrawPath(this);
   }
 
-  redrawMarkCanvas(): void {
-    redrawMarkCanvas(this);
-  }
+  readonly redrawMarkCanvas = (): void => redrawMarkCanvas(this);
 
-  onMarkCanvasMouseDown(event: MouseEvent): void {
-    onMarkCanvasMouseDown(this, event);
-  }
+  readonly onMarkCanvasMouseDown = (event: MouseEvent): void => onMarkCanvasMouseDown(this, event);
 
-  onMarkCanvasMouseMove(event: MouseEvent): void {
-    onMarkCanvasMouseMove(this, event);
-  }
+  readonly onMarkCanvasMouseMove = (event: MouseEvent): void => onMarkCanvasMouseMove(this, event);
 
-  onMarkCanvasMouseUp(): void {
-    onMarkCanvasMouseUp(this);
-  }
+  readonly onMarkCanvasMouseUp = (): void => onMarkCanvasMouseUp(this);
 
-  selectSprite(spriteId: number): Promise<void> {
-    return selectSprite(this, spriteId);
-  }
+  readonly selectSprite = (spriteId: number): Promise<void> => selectSprite(this, spriteId);
 
-  redrawSpriteCanvas(): void {
-    redrawSpriteCanvas(this);
-  }
+  readonly redrawSpriteCanvas = (): void => redrawSpriteCanvas(this);
 
-  exportSpritePng(): void {
-    exportSpritePng(this);
-  }
+  readonly exportSpritePng = (): void => exportSpritePng(this);
 
   readonly getSpriteFormatLabel = getSpriteFormatLabel;
 
-  openSpriteEditor(frameId: number): void {
-    openSpriteEditor(this, frameId);
-  }
+  readonly openSpriteEditor = (frameId: number): void => openSpriteEditor(this, frameId);
 
-  onSpritePngUpload(event: Event, frameId: number): Promise<void> {
-    return onSpritePngUpload(this, event, frameId);
-  }
+  readonly onSpritePngUpload = (event: Event, frameId: number): Promise<void> => onSpritePngUpload(this, event, frameId);
 
-  addSpriteFrame(): Promise<void> {
-    return addSpriteFrame(this);
-  }
+  readonly addSpriteFrame = (): Promise<void> => addSpriteFrame(this);
 
-  onSpriteEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
-    return onSpriteEditorSaved(this, event);
-  }
+  readonly onSpriteEditorSaved = (event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> => onSpriteEditorSaved(this, event);
 }

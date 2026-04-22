@@ -9,19 +9,10 @@ export type RoadTextureField = 'backgroundTex' | 'foregroundTex' | 'roadLeftBord
 
 declare module './app' {
   interface App {
-    selectLevel(id: number, options?: { preserveView?: boolean }): void;
-    resetViewToRoad(level: ParsedLevel): void;
     onPropsInput(field: keyof LevelProperties, value: number): void;
-    onRoadInfoChange(roadInfo: number): void;
-    selectRoadInfo(roadInfo: number): void;
-    onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, value: number | boolean): void;
     onRoadTexturePick(field: RoadTextureField, value: number): void;
-    onTimeLimitChange(value: number): void;
-    onObjGroupInput(index: number, field: 'resID' | 'numObjs', value: number): void;
   }
 }
-
-
 export function selectLevel(app: App, id: number, options?: { preserveView?: boolean }): void {
   const preserveView = options?.preserveView ?? false;
   const currentLevelId = app.selectedLevelId();
