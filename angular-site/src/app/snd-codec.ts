@@ -46,7 +46,7 @@ import { decodeIMA4 } from './snd-codec-ima4';
  * kept here for completeness (cmpSH, encode=0xFE, format='ima4').
  * A cmpSH header contains 34-byte packets each producing 64 output samples.
  * The step-table and index-table are standard IMA ADPCM (ITU-T G.711 Annex A).
-
+ */
 
 export { IMA4_STEP_TABLE, IMA4_INDEX_TABLE, decodeIMA4Packet, decodeIMA4 } from './snd-codec-ima4';
 
