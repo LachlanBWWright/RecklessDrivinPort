@@ -272,9 +272,7 @@ export function syncGameLoopWithActiveTab(app: App): void {
   }
 }
 
-export async function onCustomResourcesFileSelected(app: App, event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement | null;
-  const file = input?.files?.[0];
+export async function onCustomResourcesFileSelected(app: App, file: File | null): Promise<void> {
   if (!file) return;
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());

@@ -230,10 +230,7 @@ export async function deleteTileImage(app: App, texId: number) {
   finishWorkerBusy(app);
 }
 
-export async function onCustomResourcesFileSelected(app: App, event: Event) {
-  const input = event.target;
-  if (!(input instanceof HTMLInputElement)) return;
-  const file = input.files?.[0];
+export async function onCustomResourcesFileSelected(app: App, file: File | null) {
   if (!file) return;
 
   const bytesResult = await resultFromPromise(file.arrayBuffer(), 'Failed to read custom resources.dat');
@@ -251,7 +248,6 @@ export async function onCustomResourcesFileSelected(app: App, event: Event) {
     },
     (error) => console.error('[Angular] Failed to read custom resources.dat', error),
   );
-  input.value = '';
 }
 
 export function restartGameWithCustomResources(app: App) {

@@ -18,7 +18,12 @@ export class GamePanelComponent {
 
   @Output() toggleFullscreen = new EventEmitter<void>();
   @Output() volumeChange = new EventEmitter<number>();
-  @Output() customResourcesFileSelected = new EventEmitter<Event>();
+  @Output() customResourcesFileSelected = new EventEmitter<File | null>();
   @Output() restartGameWithCustomResources = new EventEmitter<void>();
   @Output() clearCustomResources = new EventEmitter<void>();
+
+  onFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.customResourcesFileSelected.emit(input?.files?.[0] ?? null);
+  }
 }

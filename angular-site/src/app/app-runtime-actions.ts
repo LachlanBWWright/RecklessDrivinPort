@@ -43,7 +43,7 @@ export function createRuntimeActions(app: App): {
   readAssetBytes(path: string): ReturnType<typeof readAssetBytesHelper>;
   applyVolumeToWasm(pct: number): void;
   syncGameLoopWithActiveTab(): void;
-  onCustomResourcesFileSelected(event: Event): Promise<void>;
+  onCustomResourcesFileSelected(file: File | null): Promise<void>;
   restartGameWithCustomResources(): void;
   clearCustomResources(): void;
   mountCustomResourcesFs(bytes: Uint8Array): void;
