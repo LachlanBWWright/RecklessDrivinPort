@@ -29,12 +29,17 @@ export class EditorAudioSectionComponent implements OnChanges {
   @Output() togglePlayPause = new EventEmitter<void>();
   @Output() seekAudio = new EventEmitter<number>();
   @Output() exportAudioWav = new EventEmitter<void>();
-  @Output() audioWavUpload = new EventEmitter<Event>();
+  @Output() audioWavUpload = new EventEmitter<File | null>();
   @Output() addAudioEntry = new EventEmitter<void>();
 
   readonly formatTime = formatTime;
   readonly audioVolumeControl = new FormControl<number | null>(null);
   readonly audioSeekControl = new FormControl<number | null>(null);
+
+  onFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.audioWavUpload.emit(input?.files?.[0] ?? null);
+  }
 
   constructor() {
     this.audioVolumeControl.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {

@@ -224,9 +224,6 @@ export function onObjectTypeFieldInput(
   field: Exclude<keyof ObjectTypeDefinition, 'typeRes'>,
   value: number,
 ): void {
-  if (field === 'numFrames') {
-    console.log('[Frame Count] app-pack-editing.onObjectTypeFieldInput', { typeRes, field, value });
-  }
   const defs = cloneObjectTypeDefinitions(app);
   const def = defs.find((item: ObjectTypeDefinition) => item.typeRes === typeRes);
   if (!def) return;

@@ -64,7 +64,7 @@
                   <mat-icon>download</mat-icon> Export PNG
                 </button>
                 <input #iconPngInput type="file" accept="image/png,image/*" style="display:none"
-                  (change)="iconPngUpload.emit($event)" />
+                  (change)="onFileChange($event)" />
                 <button mat-stroked-button (click)="iconPngInput.click()" [disabled]="workerBusy"
                   [matTooltip]="selectedIconType === 'icl8' ? 'Upload PNG (32×32), converted to 8-bit Mac palette'
                     : selectedIconType === 'ics8' ? 'Upload PNG (16×16), converted to 8-bit Mac palette'

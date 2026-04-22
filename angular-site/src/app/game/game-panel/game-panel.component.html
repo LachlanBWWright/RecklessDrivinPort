@@ -59,7 +59,7 @@
       <div class="custom-resources-row">
         <span class="controls-label">Custom resources.dat:</span>
         <input #customResInput type="file" accept=".dat" style="display:none"
-               (change)="customResourcesFileSelected.emit($event)" />
+               (change)="onFileChange($event)" />
         <button mat-stroked-button (click)="customResInput.click()" matTooltip="Load a custom resources.dat to test edited levels">
           <mat-icon>upload_file</mat-icon> Load Custom resources.dat
         </button>

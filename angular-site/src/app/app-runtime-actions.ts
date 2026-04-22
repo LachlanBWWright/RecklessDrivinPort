@@ -28,11 +28,10 @@ export function createRuntimeActions(app: App): {
   setTab(tab: 'game' | 'editor'): void;
   setSection(section: import('./layout/site-toolbar/site-toolbar.component').EditorSection): void;
   toggleFullscreen(): void;
-  onVolumeChange(event: Event): void;
   onVolumeSliderChange(pct: number): void;
   applyVolume(): void;
   loadDefaultResources(): Promise<void>;
-  onResourceFileSelected(event: Event): Promise<void>;
+  onResourceFileSelected(file: File | null): Promise<void>;
   clearEditorResources(): void;
   downloadEditedResources(): Promise<void>;
   saveEditedResourcesToGame(): Promise<void>;
@@ -44,7 +43,7 @@ export function createRuntimeActions(app: App): {
   readAssetBytes(path: string): ReturnType<typeof readAssetBytesHelper>;
   applyVolumeToWasm(pct: number): void;
   syncGameLoopWithActiveTab(): void;
-  onCustomResourcesFileSelected(event: Event): Promise<void>;
+  onCustomResourcesFileSelected(file: File | null): Promise<void>;
   restartGameWithCustomResources(): void;
   clearCustomResources(): void;
   mountCustomResourcesFs(bytes: Uint8Array): void;
@@ -62,14 +61,6 @@ export function createRuntimeActions(app: App): {
       app.editorSection.set(section);
     },
     toggleFullscreen: toggleFullscreenHelper,
-    onVolumeChange: (event) => {
-      const target = event.target;
-      const value = target instanceof HTMLInputElement ? Number.parseInt(target.value, 10) : NaN;
-      if (!Number.isNaN(value)) {
-        app.masterVolume.set(value);
-        applyVolumeToWasmHelper(app, value);
-      }
-    },
     onVolumeSliderChange: (pct) => {
       app.masterVolume.set(pct);
       applyVolumeToWasmHelper(app, pct);

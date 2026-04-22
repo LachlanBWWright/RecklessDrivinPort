@@ -1,4 +1,4 @@
-import { AppStateResources } from './app-state-resources';
+import { clearCustomResourcesDb } from './app-state-resources';
 import { decodeRoadTexturesInBackground, failEditor } from './app-loaders';
 import { resultFromPromise, resultFromThrowable } from './result-helpers';
 
@@ -79,12 +79,8 @@ export function exportTilePng(app: App, texId: number) {
   anchor.click();
 }
 
-export async function onTilePngUpload(app: App, event: Event, texId: number) {
-  const input = event.target;
-  if (!(input instanceof HTMLInputElement)) return;
-  const file = input.files?.[0];
+export async function onTilePngUpload(app: App, file: File | null, texId: number) {
   if (!file) return;
-  input.value = '';
   const entry = app.tileTileEntries().find((tile: { texId: number }) => tile.texId === texId);
   if (!entry) {
     app.editorError.set('Tile not found');
@@ -230,10 +226,7 @@ export async function deleteTileImage(app: App, texId: number) {
   finishWorkerBusy(app);
 }
 
-export async function onCustomResourcesFileSelected(app: App, event: Event) {
-  const input = event.target;
-  if (!(input instanceof HTMLInputElement)) return;
-  const file = input.files?.[0];
+export async function onCustomResourcesFileSelected(app: App, file: File | null) {
   if (!file) return;
 
   const bytesResult = await resultFromPromise(file.arrayBuffer(), 'Failed to read custom resources.dat');
@@ -251,7 +244,6 @@ export async function onCustomResourcesFileSelected(app: App, event: Event) {
     },
     (error) => console.error('[Angular] Failed to read custom resources.dat', error),
   );
-  input.value = '';
 }
 
 export function restartGameWithCustomResources(app: App) {
@@ -261,7 +253,7 @@ export function restartGameWithCustomResources(app: App) {
 }
 
 export function clearCustomResources(app: App) {
-  AppStateResources._clearCustomResourcesDb()
+  clearCustomResourcesDb()
     .then(() => undefined)
     .catch(() => undefined);
   app.customResourcesLoaded.set(false);

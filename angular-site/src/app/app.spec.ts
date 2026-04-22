@@ -319,7 +319,7 @@ describe('App', () => {
   it('should undo and redo a property edit', () => {
     const app = TestBed.createComponent(App).componentInstance;
 
-    app.onPropsInput('time', { target: { value: '45' } } as unknown as Event);
+    app.onPropsInput('time', 45);
     expect(app.editTime()).toBe(45);
 
     app.undo();
@@ -354,7 +354,7 @@ describe('App', () => {
   it('should update time when editing time directly (seconds stored as-is)', () => {
     const app = TestBed.createComponent(App).componentInstance;
 
-    app.onPropsInput('time', { target: { value: '45' } } as unknown as Event);
+    app.onPropsInput('time', 45);
 
     expect(app.editTime()).toBe(45);
     expect(app.propertiesDirty()).toBe(true);

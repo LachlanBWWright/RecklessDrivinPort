@@ -138,12 +138,8 @@ export function exportIconRaw(host: App): void {
   })();
 }
 
-export async function onIconPngUpload(host: App, event: Event): Promise<void> {
-  const input = event.target instanceof HTMLInputElement ? event.target : null;
-  if (!input) return;
-  const file = input.files?.[0];
+export async function onIconPngUpload(host: App, file: File | null): Promise<void> {
   if (!file) return;
-  input.value = '';
   const id = host.selectedIconId();
   const type = host.selectedIconType();
   if (id === null) return;

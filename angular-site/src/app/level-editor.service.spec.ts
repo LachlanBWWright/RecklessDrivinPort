@@ -1,5 +1,11 @@
 import {
-  LevelEditorService,
+  extractEditableLevels,
+  extractObjectTypeDefinitions,
+  extractSpriteAssets,
+  applySpriteByte,
+  getSpriteBytes,
+  decodeSpriteFrame,
+  applySpritePackPixels,
   parseLevelEntry,
   parseMarkSegs,
   serializeLevelProperties,
@@ -171,15 +177,13 @@ describe('serializeLevelObjects', () => {
 });
 
 describe('LevelEditorService', () => {
-  const svc = new LevelEditorService();
-
   it('extractSpriteAssets returns PPic entries only', () => {
     const resources = [
       { type: 'Pack', id: 140, data: new Uint8Array(0) },
       { type: 'PPic', id: 1, data: new Uint8Array(100) },
       { type: 'PPic', id: 2, data: new Uint8Array(200) },
     ];
-    const sprites = svc.extractSpriteAssets(resources);
+    const sprites = extractSpriteAssets(resources);
     expect(sprites.length).toBe(2);
     expect(sprites[0].size).toBe(100);
     expect(sprites[1].size).toBe(200);
@@ -189,29 +193,29 @@ describe('LevelEditorService', () => {
     const resources = [
       { type: 'PPic', id: 1, data: new Uint8Array([0, 1, 2, 3]) },
     ];
-    const result = svc.applySpriteByte(resources, 1, 2, 0xff);
+    const result = applySpriteByte(resources, 1, 2, 0xff);
     expect(result[0].data[2]).toBe(0xff);
     expect(result[0].data[1]).toBe(1); // unchanged
   });
 
   it('applySpriteByte ignores out-of-range offset', () => {
     const resources = [{ type: 'PPic', id: 1, data: new Uint8Array([10]) }];
-    const result = svc.applySpriteByte(resources, 1, 99, 5);
+    const result = applySpriteByte(resources, 1, 99, 5);
     expect(result[0].data[0]).toBe(10); // unchanged
   });
 
   it('getSpriteBytes returns null for missing id', () => {
     const resources = [{ type: 'PPic', id: 1, data: new Uint8Array(0) }];
-    expect(svc.getSpriteBytes(resources, 999)).toBeNull();
+    expect(getSpriteBytes(resources, 999)).toBeNull();
   });
 
-  it('extractLevels filters to Pack IDs 140-149', () => {
+  it('extractEditableLevels filters to Pack IDs 140-149', () => {
     const resources = [
       { type: 'Pack', id: 128, data: new Uint8Array(256) },
       { type: 'Pack', id: 140, data: new Uint8Array(256) },
       { type: 'Pack', id: 141, data: new Uint8Array(256) },
     ];
-    const levels = svc.extractLevels(resources);
+    const levels = extractEditableLevels(resources);
     expect(levels.length).toBe(2);
     expect(levels[0].resourceId).toBe(140);
     expect(levels[1].resourceId).toBe(141);
@@ -231,7 +235,7 @@ describe('LevelEditorService', () => {
       data: encodePackHandle([{ id: 150, data: objectType }], 128),
     }];
 
-    const defs = svc.extractObjectTypeDefinitions(resources);
+    const defs = extractObjectTypeDefinitions(resources);
     expect(defs.get(150)).toEqual({
       typeRes: 150,
       mass: 0,
@@ -276,7 +280,7 @@ describe('LevelEditorService', () => {
       data: encodePackHandle([{ id: 321, data: sprite }], 137),
     }];
 
-    const decoded = svc.decodeSpriteFrame(resources, 321);
+    const decoded = decodeSpriteFrame(resources, 321);
     expect(decoded?.width).toBe(2);
     expect(decoded?.height).toBe(2);
     expect(decoded?.bitDepth).toBe(16);
@@ -308,7 +312,7 @@ describe('LevelEditorService', () => {
       0, 0, 0, 255,
     ]);
 
-    const updated = svc.applySpritePackPixels(resources, 7, 8, pixels);
+    const updated = applySpritePackPixels(resources, 7, 8, pixels);
     const pack = updated[0];
     expect(pack.type).toBe('Pack');
     expect(pack.id).toBe(129);

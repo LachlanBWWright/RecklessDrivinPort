@@ -1,5 +1,5 @@
 import { App } from './app';
-import { AppStateResources } from './app-state-resources';
+import { saveCustomResourcesDb } from './app-state-resources';
 import { failEditor, loadResourcesBytes } from './app-loaders';
 import { resultFromPromise } from './result-helpers';
 
@@ -86,9 +86,7 @@ export async function loadDefaultResources(app: App): Promise<void> {
   );
 }
 
-export async function onResourceFileSelected(app: App, event: Event): Promise<void> {
-  const input = event.target as EventTarget & { files?: FileList };
-  const file = input?.files?.[0];
+export async function onResourceFileSelected(app: App, file: File | null): Promise<void> {
   if (!file) return;
   app.editorError.set('');
   await resultFromPromise(file.arrayBuffer(), 'Failed to read file')
@@ -209,7 +207,7 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
     .andThen((buf) => {
       const name = app.customResourcesName() ?? 'resources.dat';
       return resultFromPromise(
-        AppStateResources._saveCustomResourcesDb(new Uint8Array(buf), name),
+        saveCustomResourcesDb(new Uint8Array(buf), name),
         'Failed to persist resources to game storage',
       ).map(() => name);
     })

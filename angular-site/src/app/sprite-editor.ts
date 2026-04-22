@@ -79,12 +79,8 @@ export function openSpriteEditor(app: App, frameId: number): void {
   app.spriteEditorOpen.set(true);
 }
 
-export async function onSpritePngUpload(app: App, event: Event, frameId: number): Promise<void> {
-  const input = event.target;
-  if (!(input instanceof HTMLInputElement)) return;
-  const file = input.files?.[0];
+export async function onSpritePngUpload(app: App, file: File | null, frameId: number): Promise<void> {
   if (!file) return;
-  input.value = '';
 
   const frame: DecodedSpriteFrame | null = app.packSpriteDecodedFrames.get(frameId) ?? null;
   if (!frame) {

@@ -18,7 +18,7 @@
           </div>
 
           <div class="object-type-list">
-            @for (type of objectTypes; track trackType($index, type)) {
+            @for (type of objectTypes; track type.typeRes) {
               <button
                 class="object-type-item"
                 [class.object-type-item--active]="selectedObjectTypeId === type.typeRes"
@@ -115,7 +115,7 @@
                     <mat-select-trigger>
                       {{ getFrameLabel(typeForm.controls.frame.value ?? type.frame) }}
                     </mat-select-trigger>
-                    @for (frame of spriteFrames; track trackFrame($index, frame)) {
+                    @for (frame of spriteFrames; track frame.id) {
                       <mat-option [value]="frame.id">{{ getFrameLabel(frame.id) }}</mat-option>
                     }
                     @if (hasCustomFrame(typeForm.controls.frame.value ?? type.frame)) {
@@ -214,7 +214,7 @@
                     <mat-select formControlName="deathObj">
                       <mat-select-trigger>{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }}</mat-select-trigger>
                       <mat-option [value]="-1">None</mat-option>
-                      @for (refType of objectTypes; track trackType($index, refType)) {
+                      @for (refType of objectTypes; track refType.typeRes) {
                         <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
                       }
                       @if ((typeForm.controls.deathObj.value ?? type.deathObj) !== -1 && hasCustomObjectType(typeForm.controls.deathObj.value ?? type.deathObj)) {
@@ -260,7 +260,7 @@
                     <mat-select formControlName="weaponObj">
                       <mat-select-trigger>{{ (typeForm.controls.weaponObj.value ?? type.weaponObj) === 0 ? 'None' : getObjectTypeLabel(typeForm.controls.weaponObj.value ?? type.weaponObj) }}</mat-select-trigger>
                       <mat-option [value]="0">None</mat-option>
-                      @for (refType of objectTypes; track trackType($index, refType)) {
+                      @for (refType of objectTypes; track refType.typeRes) {
                         @if (refType.typeRes !== 0) {
                           <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
                         }

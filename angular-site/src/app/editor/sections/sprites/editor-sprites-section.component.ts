@@ -16,7 +16,7 @@ export class EditorSpritesSectionComponent {
 
   @Output() selectedPackSpriteIdChange = new EventEmitter<number | null>();
   @Output() openSpriteEditor = new EventEmitter<number>();
-  @Output() spritePngUpload = new EventEmitter<{ event: Event; spriteId: number }>();
+  @Output() spritePngUpload = new EventEmitter<{ file: File | null; spriteId: number }>();
   @Output() exportSpritePng = new EventEmitter<void>();
   @Output() addSpriteFrame = new EventEmitter<void>();
 
@@ -26,4 +26,10 @@ export class EditorSpritesSectionComponent {
   }
 
   readonly getSpriteFormatLabel = getSpriteFormatLabel;
+
+  onFileChange(event: Event): void {
+    if (this.selectedPackSpriteId === null) return;
+    const input = event.target as HTMLInputElement | null;
+    this.spritePngUpload.emit({ file: input?.files?.[0] ?? null, spriteId: this.selectedPackSpriteId });
+  }
 }

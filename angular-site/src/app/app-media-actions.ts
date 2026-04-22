@@ -57,10 +57,10 @@ export function createMediaActions(app: App): {
   selectIconEntry(type: string, id: number): Promise<void>;
   exportIconPng(): void;
   exportIconRaw(): void;
-  onIconPngUpload(event: Event): Promise<void>;
+  onIconPngUpload(file: File | null): Promise<void>;
   addIconEntry(): Promise<void>;
   exportAudioWav(): void;
-  onAudioWavUpload(event: Event): Promise<void>;
+  onAudioWavUpload(file: File | null): Promise<void>;
   addAudioEntry(): Promise<void>;
   loadAllIconThumbnails(): Promise<void>;
   downloadSelectedResource(): void;
@@ -75,7 +75,7 @@ export function createMediaActions(app: App): {
   savePackEntryFields(): Promise<void>;
   openTileEditor(texId: number): void;
   exportTilePng(texId: number): void;
-  onTilePngUpload(event: Event, texId: number): Promise<void>;
+  onTilePngUpload(file: File | null, texId: number): Promise<void>;
   onTileEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void>;
   addTileImage(): Promise<void>;
   deleteTileImage(texId: number): Promise<void>;

@@ -222,7 +222,7 @@
             [getPackSpriteDataUrl]="getPackSpriteDataUrl"
             (selectedPackSpriteIdChange)="selectedPackSpriteId.set($event)"
             (openSpriteEditor)="openSpriteEditor($event)"
-            (spritePngUpload)="onSpritePngUpload($event.event, $event.spriteId)"
+            (spritePngUpload)="onSpritePngUpload($event.file, $event.spriteId)"
             (exportSpritePng)="exportSpritePng()"
             (addSpriteFrame)="addSpriteFrame()"
           ></app-editor-sprites-section>
@@ -248,7 +248,7 @@
             (selectedTileIdChange)="selectedTileId.set($event)"
             (deleteTileImage)="media.deleteTileImage($event)"
             (openTileEditor)="media.openTileEditor($event)"
-            (tilePngUpload)="media.onTilePngUpload($event.event, $event.texId)"
+            (tilePngUpload)="media.onTilePngUpload($event.file, $event.texId)"
             (exportTilePng)="media.exportTilePng($event)"
             (addTileImage)="media.addTileImage()"
           ></app-editor-tiles-section>

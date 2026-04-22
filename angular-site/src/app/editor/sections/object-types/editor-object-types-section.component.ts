@@ -10,44 +10,26 @@ import {
 import { FormArray, FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ObjectTypeDefinition } from '../../../level-editor.service';
-
-interface SpriteFrameInfo {
-  id: number;
-  bitDepth: 8 | 16;
-  width: number;
-  height: number;
-}
-
-interface AudioEntryInfo {
-  id: number;
-  sizeBytes: number;
-  durationMs?: number;
-}
-
-interface FlagOption {
-  bit: number;
-  label: string;
-  hint: string;
-}
-
-type ScalarField =
-  | 'frame'
-  | 'numFrames'
-  | 'frameDuration'
-  | 'mass'
-  | 'maxEngineForce'
-  | 'maxNegEngineForce'
-  | 'friction'
-  | 'steering'
-  | 'wheelWidth'
-  | 'wheelLength'
-  | 'width'
-  | 'length'
-  | 'score'
-  | 'maxDamage'
-  | 'weaponInfo';
-
-type ReferenceField = 'deathObj' | 'creationSound' | 'otherSound' | 'weaponObj';
+import {
+  type AudioEntryInfo,
+  clampPreviewOffset,
+  formatFrameLabel,
+  formatObjectTypeLabel,
+  formatSoundLabel,
+  getPreviewFrameIds,
+  hasCustomFrame,
+  hasCustomObjectType,
+  hasCustomSound,
+  hasPreviewFrameControls,
+  resolvePreviewFrameId,
+  type SpriteFrameInfo,
+} from './editor-object-types-section.helpers';
+import {
+  type ReferenceField,
+  FLAG_OPTIONS,
+  SCALAR_FIELDS,
+  REFERENCE_FIELDS,
+} from './editor-object-types-constants';
 
 @Component({
   selector: 'app-editor-object-types-section',
@@ -93,44 +75,7 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
    */
   private previewFrameOffsets = new Map<number, number>();
 
-  readonly flagOptions: Record<'flags' | 'flags2', FlagOption[]> = {
-    flags: [
-      { bit: 1 << 0, label: 'Wheel', hint: 'Uses wheel physics' },
-      { bit: 1 << 1, label: 'Solid friction', hint: 'Applies solid-surface friction' },
-      { bit: 1 << 2, label: 'Back collision', hint: 'Uses back-collision handling' },
-      { bit: 1 << 3, label: 'Random frame', hint: 'Starts on a random animation frame' },
-      { bit: 1 << 4, label: 'Die when anim ends', hint: 'Kills the object at the end of animation' },
-      { bit: 1 << 5, label: 'Default death', hint: 'Spawns the default explosion on death' },
-      { bit: 1 << 6, label: 'Follow marks', hint: 'Uses mark-following behavior' },
-      { bit: 1 << 7, label: 'Overtake', hint: 'Allows overtaking behavior' },
-      { bit: 1 << 8, label: 'Slow', hint: 'Marked as slow-moving' },
-      { bit: 1 << 9, label: 'Long', hint: 'Marked as long' },
-      { bit: 1 << 10, label: 'Killed by cars', hint: 'Can be destroyed by cars' },
-      { bit: 1 << 11, label: 'Kills cars', hint: 'Can destroy cars on contact' },
-      { bit: 1 << 12, label: 'Bounce', hint: 'Bouncy collision response' },
-      { bit: 1 << 13, label: 'Cop', hint: 'Uses cop control logic' },
-      { bit: 1 << 14, label: 'Heli', hint: 'Helicopter-style movement' },
-      { bit: 1 << 15, label: 'Bonus', hint: 'Counts as a bonus object' },
-    ],
-    flags2: [
-      { bit: 1 << 0, label: 'Add-on', hint: 'Treat as an add-on object' },
-      { bit: 1 << 1, label: 'Front collision', hint: 'Uses front collision handling' },
-      { bit: 1 << 2, label: 'Oil', hint: 'Drops oil' },
-      { bit: 1 << 3, label: 'Missile', hint: 'Behaves like a missile' },
-      { bit: 1 << 4, label: 'Road kill', hint: 'Uses road-kill movement' },
-      { bit: 1 << 5, label: 'Layer 1', hint: 'Draw on layer 1' },
-      { bit: 1 << 6, label: 'Layer 2', hint: 'Draw on layer 2' },
-      { bit: 1 << 7, label: 'Engine sound', hint: 'Route sound through engine playback' },
-      { bit: 1 << 8, label: 'Ramp', hint: 'Ramp behavior' },
-      { bit: 1 << 9, label: 'Sink', hint: 'Can sink in water' },
-      { bit: 1 << 10, label: 'Damageable', hint: 'Tracks and applies damage' },
-      { bit: 1 << 11, label: 'Die when off-screen', hint: 'Remove when off-screen' },
-      { bit: 1 << 12, label: 'Rear drive', hint: 'Drive from rear wheels' },
-      { bit: 1 << 13, label: 'Rear steer', hint: 'Steer from rear wheels' },
-      { bit: 1 << 14, label: 'Floating', hint: 'Float in water' },
-      { bit: 1 << 15, label: 'Bump', hint: 'Bump behavior' },
-    ],
-  };
+  readonly flagOptions = FLAG_OPTIONS;
 
   readonly typeForm = new FormGroup({
     frame: new FormControl<number | null>(null),
@@ -199,88 +144,46 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     });
   }
 
-  getFrameLabel(frameId: number): string {
-    const frame = this.spriteFrames.find((item) => item.id === frameId);
-    return frame ? `#${frame.id} · ${frame.width}×${frame.height} · ${frame.bitDepth}-bit` : `#${frameId}`;
-  }
-
-  getPreviewFrameCount(type: ObjectTypeDefinition): number {
-    // The low byte of numFrames is the animation frame count in the original game.
-    return Math.max(1, type.numFrames & 0xff);
-  }
-
-  getPreviewFrameIds(type: ObjectTypeDefinition): number[] {
-    const ids: number[] = [];
-    const count = this.getPreviewFrameCount(type);
-    for (let i = 0; i < count; i++) {
-      const frameId = type.frame + i;
-      if (!this.spriteFrames.some((frame) => frame.id === frameId)) break;
-      ids.push(frameId);
-    }
-    return ids.length > 0 ? ids : [type.frame];
-  }
-
   getPreviewFrameId(type: ObjectTypeDefinition): number {
-    const frames = this.getPreviewFrameIds(type);
-    const offset = this.clampPreviewOffset(type, this.getPreviewOffset(type.typeRes));
-    return frames[offset] ?? type.frame;
+    return resolvePreviewFrameId(type, this.spriteFrames, this.getPreviewOffset(type.typeRes));
   }
 
   hasPreviewFrameControls(type: ObjectTypeDefinition): boolean {
-    return this.getPreviewFrameIds(type).length > 1;
+    return hasPreviewFrameControls(type, this.spriteFrames);
   }
 
   stepPreviewFrame(typeRes: number, delta: number): void {
     const type = this.objectTypes.find((item) => item.typeRes === typeRes);
     if (!type) return;
-    const frames = this.getPreviewFrameIds(type);
+    const frames = getPreviewFrameIds(type, this.spriteFrames);
     if (frames.length <= 1) return;
-    const current = this.clampPreviewOffset(type, this.getPreviewOffset(typeRes));
+    const current = clampPreviewOffset(type, this.spriteFrames, this.getPreviewOffset(typeRes));
     const next = (current + delta + frames.length) % frames.length;
     this.previewFrameOffsets.set(typeRes, next);
   }
 
   hasCustomFrame(frameId: number): boolean {
-    return !this.spriteFrames.some((frame) => frame.id === frameId);
+    return hasCustomFrame(this.spriteFrames, frameId);
   }
 
   hasCustomObjectType(typeRes: number): boolean {
-    return !this.objectTypes.some((type) => type.typeRes === typeRes);
+    return hasCustomObjectType(this.objectTypes, typeRes);
   }
 
   hasCustomSound(soundId: number): boolean {
-    return soundId !== 0 && !this.audioEntries.some((sound) => sound.id === soundId);
+    return hasCustomSound(this.audioEntries, soundId);
   }
 
   getObjectTypeLabel(typeRes: number): string {
-    if (typeRes === -1) return 'None';
-    const type = this.objectTypes.find((item) => item.typeRes === typeRes);
-    if (!type) return `#${typeRes}`;
-    return `Type #${type.typeRes} · ${this.getFrameLabel(type.frame)}`;
+    return formatObjectTypeLabel(this.objectTypes, this.spriteFrames, typeRes);
   }
 
   getSoundLabel(soundId: number): string {
-    if (soundId === 0) return 'None';
-    const sound = this.audioEntries.find((item) => item.id === soundId);
-    if (!sound) return `Sound #${soundId}`;
-    const duration = sound.durationMs !== undefined ? ` · ${(sound.durationMs / 1000).toFixed(1)}s` : '';
-    return `Sound #${sound.id}${duration}`;
+    return formatSoundLabel(this.audioEntries, soundId);
   }
 
-  hasFlag(flags: number, bit: number): boolean {
-    return (flags & bit) !== 0;
-  }
-
-  trackType(_index: number, type: ObjectTypeDefinition): number {
-    return type.typeRes;
-  }
-
-  trackFrame(_index: number, frame: SpriteFrameInfo): number {
-    return frame.id;
-  }
-
-  onFrameChange(typeRes: number, frame: number): void {
-    this.frameChange.emit({ typeRes, frame });
+  getFrameLabel(frameId: number): string {
+    return formatFrameLabel(this.spriteFrames, frameId);
   }
 
   private getPreviewOffset(typeRes: number): number {
@@ -288,9 +191,7 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
   }
 
   private clampPreviewOffset(type: ObjectTypeDefinition, offset: number): number {
-    const frameCount = this.getPreviewFrameIds(type).length;
-    if (frameCount <= 1) return 0;
-    return ((offset % frameCount) + frameCount) % frameCount;
+    return clampPreviewOffset(type, this.spriteFrames, offset);
   }
 
   private createFlagForm(field: 'flags' | 'flags2'): FormArray<FormControl<boolean>> {
@@ -374,36 +275,14 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     const type = this.selectedType;
     if (!type) return;
     const next = this.typeForm.getRawValue();
-    const scalarFields: ScalarField[] = [
-      'frame',
-      'numFrames',
-      'frameDuration',
-      'mass',
-      'maxEngineForce',
-      'maxNegEngineForce',
-      'friction',
-      'steering',
-      'wheelWidth',
-      'wheelLength',
-      'width',
-      'length',
-      'score',
-      'maxDamage',
-      'weaponInfo',
-    ];
-    for (const field of scalarFields) {
+    for (const field of SCALAR_FIELDS) {
       const value = next[field];
       if (value !== null && value !== type[field]) {
-        if (field === 'frame') {
-          this.frameChange.emit({ typeRes: type.typeRes, frame: value });
-        } else {
-          this.fieldInput.emit({ typeRes: type.typeRes, field, value });
-        }
+        if (field === 'frame') this.frameChange.emit({ typeRes: type.typeRes, frame: value });
+        else this.fieldInput.emit({ typeRes: type.typeRes, field, value });
       }
     }
-
-    const referenceFields: ReferenceField[] = ['deathObj', 'creationSound', 'otherSound', 'weaponObj'];
-    for (const field of referenceFields) {
+    for (const field of REFERENCE_FIELDS) {
       const value = next[field];
       if (value !== null && value !== type[field]) {
         this.referenceChange.emit({ typeRes: type.typeRes, field, value });

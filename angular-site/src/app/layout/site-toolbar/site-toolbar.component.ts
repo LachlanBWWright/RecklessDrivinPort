@@ -22,7 +22,7 @@ export class SiteToolbarComponent {
   @Output() tabChange = new EventEmitter<SiteTab>();
   @Output() editorSectionChange = new EventEmitter<EditorSection>();
   @Output() loadDefaultResources = new EventEmitter<void>();
-  @Output() resourceFileSelected = new EventEmitter<Event>();
+  @Output() resourceFileSelected = new EventEmitter<File | null>();
   @Output() downloadEditedResources = new EventEmitter<void>();
   @Output() clearEditorFile = new EventEmitter<void>();
   @Output() selectLevel = new EventEmitter<number>();
@@ -39,4 +39,9 @@ export class SiteToolbarComponent {
   ];
 
   readonly levelDisplayNum = levelDisplayNum;
+
+  onFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.resourceFileSelected.emit(input?.files?.[0] ?? null);
+  }
 }
