@@ -259,8 +259,3 @@ export function toggleFullscreen(): void {
   }
 }
 
-export function onVolumeChange(app: App, event: Event): void {
-  const pct = Number.parseInt((event.target as HTMLInputElement).value, 10);
-  app.masterVolume.set(pct);
-  app.runtime.applyVolumeToWasm(pct);
-}
