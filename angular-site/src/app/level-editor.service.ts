@@ -57,25 +57,11 @@ export {
   listPackEntries, getPackEntryRaw, putPackEntryRaw, removePackEntryRaw,
 } from './level-editor-resource-utils';
 
-// Import concrete implementations for use inside this file and the class adapter.
-import {
-  extractSpriteAssets, getAllSpriteFrameIds, decodeAllSpriteFrames,
-  decodeSpriteFrame, batchDecodeSpriteFrames,
-  applySpriteByte, getSpriteBytes, applySpritePackPixels,
-} from './level-editor-sprites';
-import {
-  extractRoadInfos, extractAllRoadTextures, extractRoadTextures,
-  applyTile16Pixels, TX16_PACK_ID,
-} from './level-editor-road';
-import { applyRoadInfoData, removeRoadInfoData } from './level-editor-road-serializer';
-import {
-  extractObjectTypeDefinitions, applyObjectTypeDefinitions,
-} from './level-editor-object-types';
+// Imports needed for the applyLevel* functions in this file.
 import {
   serializeLevelProperties, serializeLevelTrack,
   serializeLevelObjects, serializeLevelRoadSegs,
 } from './level-editor-serializers';
-import { removePackEntryRaw } from './level-editor-resource-utils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 const LEVEL_RESOURCE_IDS  = Array.from({ length: 10 }, (_, i) => 140 + i);
@@ -267,53 +253,27 @@ export function applyLevelMarks(
   });
 }
 
-// ── LevelEditorService: thin adapter (kept for pack.worker.ts + spec compat) ──
-export class LevelEditorService {
-  extractParsedLevels = extractParsedLevels;
-  extractSpriteAssets = extractSpriteAssets;
-  getAllSpriteFrameIds = getAllSpriteFrameIds;
-  decodeAllSpriteFrames = decodeAllSpriteFrames;
-  decodeSpriteFrame = decodeSpriteFrame;
-  batchDecodeSpriteFrames = batchDecodeSpriteFrames;
-  applySpriteByte = applySpriteByte;
-  getSpriteBytes = getSpriteBytes;
-  applySpritePackPixels = applySpritePackPixels;
-  extractObjectTypeDefinitions = extractObjectTypeDefinitions;
-  applyObjectTypeDefinitions = applyObjectTypeDefinitions;
-  applyLevelProperties = applyLevelProperties;
-  applyRoadInfoData = applyRoadInfoData;
-  removeRoadInfoData = removeRoadInfoData;
-  applyLevelObjects = applyLevelObjects;
-  applyLevelTrack = applyLevelTrack;
-  applyLevelRoadSegs = applyLevelRoadSegs;
-  applyLevelMarks = applyLevelMarks;
-  applyTile16Pixels = applyTile16Pixels;
-  removeTile16Texture(resources: ResourceDatEntry[], texId: number): ResourceDatEntry[] {
-    return removePackEntryRaw(resources, TX16_PACK_ID, texId);
-  }
-  extractRoadInfos = extractRoadInfos;
-  extractAllRoadTextures = extractAllRoadTextures;
-  extractRoadTextures = extractRoadTextures;
-
-  extractLevels(resources: ResourceDatEntry[]): EditableLevel[] {
-    return resources
-      .filter((e) => e.type === 'Pack' && LEVEL_RESOURCE_IDS.includes(e.id))
-      .sort((a, b) => a.id - b.id)
-      .map((e) => ({ resourceId: e.id, width: 16, height: 16, tiles: toTiles(e.data) }));
-  }
-  applyLevels(resources: ResourceDatEntry[], levels: EditableLevel[]): ResourceDatEntry[] {
-    const byId = new Map(levels.map((l) => [l.resourceId, l]));
-    return resources.map((entry) => {
-      const level = byId.get(entry.id);
-      if (entry.type !== 'Pack' || !level) return entry;
-      const next = entry.data.slice();
-      const count = Math.min(level.tiles.length, 256, next.length);
-      for (let i = 0; i < count; i++) next[i] = Math.max(0, Math.min(255, level.tiles[i]));
-      return { ...entry, data: next };
-    });
-  }
-}
+// ── EditableLevel helpers (tile-grid editing) ─────────────────────────────
 
 function toTiles(data: Uint8Array): number[] {
   return Array.from({ length: 256 }, (_, i) => (i < data.length ? data[i] & 0x0f : 0));
+}
+
+export function extractEditableLevels(resources: ResourceDatEntry[]): EditableLevel[] {
+  return resources
+    .filter((e) => e.type === 'Pack' && LEVEL_RESOURCE_IDS.includes(e.id))
+    .sort((a, b) => a.id - b.id)
+    .map((e) => ({ resourceId: e.id, width: 16, height: 16, tiles: toTiles(e.data) }));
+}
+
+export function applyEditableLevels(resources: ResourceDatEntry[], levels: EditableLevel[]): ResourceDatEntry[] {
+  const byId = new Map(levels.map((l) => [l.resourceId, l]));
+  return resources.map((entry) => {
+    const level = byId.get(entry.id);
+    if (entry.type !== 'Pack' || !level) return entry;
+    const next = entry.data.slice();
+    const count = Math.min(level.tiles.length, 256, next.length);
+    for (let i = 0; i < count; i++) next[i] = Math.max(0, Math.min(255, level.tiles[i]));
+    return { ...entry, data: next };
+  });
 }
