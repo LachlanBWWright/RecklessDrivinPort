@@ -96,7 +96,7 @@
                   <mat-icon>download</mat-icon> Export WAV
                 </button>
                 <input #audioWavInput type="file" accept="audio/wav,audio/*" style="display:none"
-                  (change)="audioWavUpload.emit($event)" />
+                  (change)="onFileChange($event)" />
                 <button mat-stroked-button (click)="audioWavInput.click()" [disabled]="workerBusy"
                   matTooltip="Upload a WAV file to replace this sound">
                   <mat-icon>upload</mat-icon> Replace WAV

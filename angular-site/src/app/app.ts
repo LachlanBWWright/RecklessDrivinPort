@@ -624,7 +624,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   readonly openSpriteEditor = (frameId: number): void => openSpriteEditor(this, frameId);
 
-  readonly onSpritePngUpload = (event: Event, frameId: number): Promise<void> => onSpritePngUpload(this, event, frameId);
+  readonly onSpritePngUpload = (file: File | null, frameId: number): Promise<void> => onSpritePngUpload(this, file, frameId);
 
   readonly addSpriteFrame = (): Promise<void> => addSpriteFrame(this);
 

@@ -183,14 +183,9 @@ export async function playAudioEntry(host: App) {
   startAudioBuffer(host, audioBuffer, 0);
 }
 
-export async function onAudioWavUpload(host: App, event: Event) {
-  const input = event.target instanceof HTMLInputElement ? event.target : null;
-  if (!input) return;
-
-  const file = input.files?.[0];
+export async function onAudioWavUpload(host: App, file: File | null) {
   if (!file) return;
 
-  input.value = '';
   const id = host.selectedAudioId();
   if (id === null) return;
 

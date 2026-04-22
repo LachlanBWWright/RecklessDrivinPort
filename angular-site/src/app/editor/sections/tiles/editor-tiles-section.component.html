@@ -430,7 +430,7 @@
                 <mat-icon>brush</mat-icon> Edit Pixels
               </button>
               <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
-                (change)="tilePngUpload.emit({ event: $event, texId: selectedTileId })" />
+                (change)="onFileChange($event, selectedTileId!)" />
               <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy"
                 matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
                 <mat-icon>upload</mat-icon> Upload PNG

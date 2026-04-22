@@ -32,7 +32,7 @@ export class EditorTilesSectionComponent implements OnChanges {
   @Output() selectedTileIdChange = new EventEmitter<number | null>();
   @Output() deleteTileImage = new EventEmitter<number>();
   @Output() openTileEditor = new EventEmitter<number>();
-  @Output() tilePngUpload = new EventEmitter<{ event: Event; texId: number }>();
+  @Output() tilePngUpload = new EventEmitter<{ file: File | null; texId: number }>();
   @Output() exportTilePng = new EventEmitter<number>();
   @Output() addTileImage = new EventEmitter<void>();
 
@@ -172,5 +172,10 @@ export class EditorTilesSectionComponent implements OnChanges {
         this.roadTextureChange.emit({ field, value });
       }
     }
+  }
+
+  onFileChange(event: Event, texId: number): void {
+    const input = event.target as HTMLInputElement | null;
+    this.tilePngUpload.emit({ file: input?.files?.[0] ?? null, texId });
   }
 }

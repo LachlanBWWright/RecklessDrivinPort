@@ -19,7 +19,7 @@ export class EditorScreensSectionComponent implements OnChanges {
   @Output() selectIconEntry = new EventEmitter<{ type: string; id: number }>();
   @Output() exportIconPng = new EventEmitter<void>();
   @Output() exportIconRaw = new EventEmitter<void>();
-  @Output() iconPngUpload = new EventEmitter<Event>();
+  @Output() iconPngUpload = new EventEmitter<File | null>();
   @Output() addIconEntry = new EventEmitter<void>();
 
   /** Cached data URL for the large preview canvas — recomputed only when the canvas reference changes. */
@@ -28,6 +28,11 @@ export class EditorScreensSectionComponent implements OnChanges {
   /** Stable track-by key for icon entries. */
   trackIconEntry(_index: number, icon: { type: string; id: number; label: string }): string {
     return `${icon.type}:${icon.id}`;
+  }
+
+  onFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.iconPngUpload.emit(input?.files?.[0] ?? null);
   }
 
   ngOnChanges(changes: SimpleChanges): void {

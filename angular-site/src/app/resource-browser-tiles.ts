@@ -79,12 +79,8 @@ export function exportTilePng(app: App, texId: number) {
   anchor.click();
 }
 
-export async function onTilePngUpload(app: App, event: Event, texId: number) {
-  const input = event.target;
-  if (!(input instanceof HTMLInputElement)) return;
-  const file = input.files?.[0];
+export async function onTilePngUpload(app: App, file: File | null, texId: number) {
   if (!file) return;
-  input.value = '';
   const entry = app.tileTileEntries().find((tile: { texId: number }) => tile.texId === texId);
   if (!entry) {
     app.editorError.set('Tile not found');
