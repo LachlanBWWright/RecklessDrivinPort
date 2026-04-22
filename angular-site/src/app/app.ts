@@ -501,9 +501,6 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     field: Exclude<keyof ObjectTypeDefinition, 'typeRes'>,
     value: number,
   ): void {
-    if (field === 'numFrames') {
-      console.log('[Frame Count] app.onObjectTypeFieldInput', { typeRes, field, value });
-    }
     onObjectTypeFieldInput(this, typeRes, field, value);
   }
 
