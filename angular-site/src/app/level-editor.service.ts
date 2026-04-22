@@ -1,7 +1,8 @@
 /**
- * LevelEditorService
+ * level-editor.service.ts
  *
- * Parses and serializes Reckless Drivin' level pack entries.
+ * Barrel that re-exports all level editor helpers and parses/serialises
+ * Reckless Drivin' level pack entries.
  *
  * Sub-modules:
  *   level-editor-colors.ts          — colour conversion helpers
@@ -11,6 +12,12 @@
  *   level-editor-object-types.ts    — object type / group codec
  *   level-editor-serializers.ts     — level/track/objects/road serializers
  *   level-editor-resource-utils.ts  — raw resource / pack entry helpers
+ *
+ * Functions defined in this file:
+ *   parseLevelEntry, parseMarkSegs, serializeMarkSegs
+ *   extractParsedLevels, applyLevelProperties, applyLevelObjects,
+ *   applyLevelTrack, applyLevelRoadSegs, applyLevelMarks
+ *   extractEditableLevels, applyEditableLevels
  */
 import { ok, err, type Result } from 'neverthrow';
 import type { ResourceDatEntry } from './resource-dat.service';

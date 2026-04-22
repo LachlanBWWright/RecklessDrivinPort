@@ -11,39 +11,16 @@ declare module './app' {
   interface App {
     selectLevel(id: number, options?: { preserveView?: boolean }): void;
     resetViewToRoad(level: ParsedLevel): void;
-    onPropsInput(field: keyof LevelProperties, event: Event): void;
+    onPropsInput(field: keyof LevelProperties, value: number): void;
     onRoadInfoChange(roadInfo: number): void;
     selectRoadInfo(roadInfo: number): void;
     onRoadInfoInput(field: Exclude<keyof RoadInfoData, 'id'>, value: number | boolean): void;
     onRoadTexturePick(field: RoadTextureField, value: number): void;
     onTimeLimitChange(value: number): void;
-    onPropertiesTabInput(e: { field: keyof LevelProperties; event: Event }): void;
     onObjGroupInput(index: number, field: 'resID' | 'numObjs', value: number): void;
   }
 }
 
-function getInputValue(event: Event): string | null {
-  const target = event.target;
-  if (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement
-  ) {
-    return target.value;
-  }
-  // Duck-type fallback for synthetic/test events whose target is not an HTML
-  // form element instance (e.g. cross-frame targets or objects created in unit
-  // tests).  Only accept a plain string `value` property.
-  if (
-    target !== null &&
-    typeof target === 'object' &&
-    'value' in target &&
-    typeof (target as Record<string, unknown>)['value'] === 'string'
-  ) {
-    return (target as { value: string }).value;
-  }
-  return null;
-}
 
 export function selectLevel(app: App, id: number, options?: { preserveView?: boolean }): void {
   const preserveView = options?.preserveView ?? false;
@@ -104,25 +81,23 @@ export function resetViewToRoad(app: App, level: ParsedLevel): void {
   }
 }
 
-export function onPropsInput(app: App, field: keyof LevelProperties, event: Event): void {
-  const value = getInputValue(event);
-  const val = Number.parseInt(value ?? '', 10);
-  if (Number.isNaN(val)) return;
+export function onPropsInput(app: App, field: keyof LevelProperties, value: number): void {
+  if (Number.isNaN(value)) return;
   app._pushUndo('props');
   switch (field) {
     case 'roadInfo':
-      app.editRoadInfo.set(val);
+      app.editRoadInfo.set(value);
       break;
     case 'time': {
-      const nextTime = Math.max(0, Math.min(MAX_TIME_VALUE, val));
+      const nextTime = Math.max(0, Math.min(MAX_TIME_VALUE, value));
       app.editTime.set(nextTime);
       break;
     }
     case 'xStartPos':
-      app.editXStartPos.set(val);
+      app.editXStartPos.set(value);
       break;
     case 'levelEnd':
-      app.editLevelEnd.set(Math.max(0, val));
+      app.editLevelEnd.set(Math.max(0, value));
       break;
   }
   app.markPropertiesDirty();
@@ -227,10 +202,6 @@ export function onRoadTexturePick(app: App, field: RoadTextureField, value: numb
   });
   app.refreshRoadInfoDerivedState();
   app.markPropertiesDirty();
-}
-
-export function onPropertiesTabInput(app: App, e: { field: keyof LevelProperties; event: Event }): void {
-  onPropsInput(app, e.field, e.event);
 }
 
 export function onObjGroupInput(app: App, index: number, field: 'resID' | 'numObjs', value: number): void {

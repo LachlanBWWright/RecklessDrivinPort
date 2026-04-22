@@ -18,7 +18,6 @@ import {
   applyLevelsResult,
   onObjGroupInput,
   onPropsInput,
-  onPropertiesTabInput,
   onRoadInfoChange,
   onRoadInfoInput,
   onRoadTexturePick,
@@ -306,8 +305,8 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     resetViewToRoad(this, level);
   }
 
-  onPropsInput(field: keyof import('./level-editor.service').LevelProperties, event: Event): void {
-    onPropsInput(this, field, event);
+  onPropsInput(field: keyof import('./level-editor.service').LevelProperties, value: number): void {
+    onPropsInput(this, field, value);
   }
 
   onRoadInfoChange(roadInfo: number): void {
@@ -336,10 +335,6 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   onTimeLimitChange(value: number): void {
     onTimeLimitChange(this, value);
-  }
-
-  onPropertiesTabInput(e: { field: keyof import('./level-editor.service').LevelProperties; event: Event }): void {
-    onPropertiesTabInput(this, e);
   }
 
   onObjGroupInput(index: number, field: 'resID' | 'numObjs', value: number): void {
