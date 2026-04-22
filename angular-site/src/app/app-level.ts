@@ -7,12 +7,7 @@ export const MAX_TIME_VALUE = 65535;
 /** Texture fields stored in road info data that correspond to asset references. */
 export type RoadTextureField = 'backgroundTex' | 'foregroundTex' | 'roadLeftBorder' | 'roadRightBorder' | 'marks' | 'tracks' | 'skidSound';
 
-declare module './app' {
-  interface App {
-    onPropsInput(field: keyof LevelProperties, value: number): void;
-    onRoadTexturePick(field: RoadTextureField, value: number): void;
-  }
-}
+
 export function selectLevel(app: App, id: number, options?: { preserveView?: boolean }): void {
   const preserveView = options?.preserveView ?? false;
   const currentLevelId = app.selectedLevelId();

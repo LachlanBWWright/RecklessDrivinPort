@@ -13,6 +13,7 @@ import type {
   ObjectTypeDefinition,
   RoadInfoData,
   ObjectGroupDefinition,
+  LevelProperties,
 } from './level-editor.service';
 import {
   applyLevelsResult,
@@ -25,6 +26,7 @@ import {
   resetViewToRoad,
   selectLevel,
   selectRoadInfo,
+  type RoadTextureField,
 } from './app-level';
 import {
   addObjectGroup,
@@ -301,9 +303,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   readonly resetViewToRoad = (level: ParsedLevel): void => resetViewToRoad(this, level);
 
-  onPropsInput(field: keyof import('./level-editor.service').LevelProperties, value: number): void {
-    onPropsInput(this, field, value);
-  }
+  readonly onPropsInput = (field: keyof LevelProperties, value: number): void => onPropsInput(this, field, value);
 
   readonly onRoadInfoChange = (roadInfo: number): void => onRoadInfoChange(this, roadInfo);
 
@@ -317,9 +317,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   readonly onRoadInfoInput = (field: Exclude<keyof RoadInfoData, 'id'>, value: number | boolean): void => onRoadInfoInput(this, field, value);
 
-  onRoadTexturePick(field: import('./app-level').RoadTextureField, value: number): void {
-    onRoadTexturePick(this, field, value);
-  }
+  readonly onRoadTexturePick = (field: RoadTextureField, value: number): void => onRoadTexturePick(this, field, value);
 
   readonly onTimeLimitChange = (value: number): void => onTimeLimitChange(this, value);
 
