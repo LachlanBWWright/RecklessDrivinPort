@@ -19,6 +19,11 @@ import {
 } from './resource-fields';
 import type { EditorUndoSnapshot } from './app-history';
 import { AppStateBase } from './app-state-base';
+import {
+  saveCustomResourcesDb,
+  loadCustomResourcesDb,
+  clearCustomResourcesDb,
+} from './app-idb';
 
 interface WorkerResponse {
   id: number;
