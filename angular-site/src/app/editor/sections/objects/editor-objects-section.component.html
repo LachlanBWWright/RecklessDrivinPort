@@ -108,16 +108,6 @@
             (objectSelected)="objectSelected.emit($event)"
             (searchTermChange)="searchTermChange.emit($event)"
           ></app-object-list>
-
-          @if (showMarks) {
-            <app-marks-editor
-              [marks]="marks"
-              [selectedMarkIndex]="selectedMarkIndex"
-              [workerBusy]="workerBusy"
-              (markSelected)="markSelected.emit($event)"
-              (markFieldInput)="markFieldInput.emit($event)"
-            ></app-marks-editor>
-          }
         </div>
       </div>
     </mat-card-content>

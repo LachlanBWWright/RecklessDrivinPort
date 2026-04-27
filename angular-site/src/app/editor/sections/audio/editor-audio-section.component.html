@@ -1,16 +1,13 @@
 <mat-card class="tab-panel-card">
-  <mat-card-header>
-    <mat-card-title>Sound Editor</mat-card-title>
-    <mat-card-subtitle>Pack 134 (kPackSnds - Mac OS 'snd ' format)</mat-card-subtitle>
-  </mat-card-header>
   <mat-card-content>
     @if (audioEntries.length > 0) {
       <div class="audio-sidebar-layout">
         <aside class="audio-sidebar">
           <div class="audio-sidebar-header">
-            <div>
-              <div class="audio-sidebar-title">Sounds</div>
-              <div class="audio-sidebar-subtitle">{{ audioEntries.length }} entries</div>
+            <div class="audio-sidebar-copy">
+              <div class="audio-sidebar-title">Sound Editor</div>
+              <div class="audio-sidebar-subtitle">Pack 134 (kPackSnds - Mac OS 'snd ' format)</div>
+              <div class="audio-sidebar-meta">{{ audioEntries.length }} entries</div>
             </div>
             <button
               mat-icon-button

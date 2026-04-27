@@ -1,16 +1,13 @@
 <mat-card class="tab-panel-card">
-  <mat-card-header>
-    <mat-card-title>Object Group Editor</mat-card-title>
-    <mat-card-subtitle>Pack 130 (kPackOgrp) - shared spawn tables referenced by level object-group slots</mat-card-subtitle>
-  </mat-card-header>
   <mat-card-content>
     @if (objectGroups.length > 0) {
       <div class="object-group-viewer">
         <aside class="object-group-sidebar">
           <div class="object-group-sidebar-header">
-            <div>
-              <div class="object-group-sidebar-title">Groups</div>
-              <div class="object-group-sidebar-subtitle">{{ objectGroups.length }} definitions</div>
+            <div class="object-group-sidebar-copy">
+              <div class="object-group-sidebar-title">Object Group Editor</div>
+              <div class="object-group-sidebar-subtitle">Pack 130 (kPackOgrp) - shared spawn tables referenced by level object-group slots</div>
+              <div class="object-group-sidebar-meta">{{ objectGroups.length }} definitions</div>
             </div>
             <button mat-icon-button color="primary" (click)="addGroup.emit()" [disabled]="workerBusy" matTooltip="Create a new group">
               <mat-icon>add</mat-icon>

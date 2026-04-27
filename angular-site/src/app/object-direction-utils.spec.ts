@@ -3,6 +3,7 @@ import {
   worldDirToCanvasForwardVector,
   worldDirToCanvasRotationRad,
   worldDirToKonvaRotationDeg,
+  worldVectorToDir,
 } from './object-direction-utils';
 
 describe('object direction utils', () => {
@@ -20,5 +21,11 @@ describe('object direction utils', () => {
     const vector = worldDirToCanvasForwardVector(Math.PI / 2, 8);
     expect(vector.dx).toBeCloseTo(8);
     expect(vector.dy).toBeCloseTo(0);
+  });
+
+  it('inverts world forward vectors back to direction angles', () => {
+    expect(worldVectorToDir(0, -10)).toBeCloseTo(0);
+    expect(worldVectorToDir(10, 0)).toBeCloseTo(Math.PI / 2);
+    expect(worldVectorToDir(-10, 0)).toBeCloseTo(-Math.PI / 2);
   });
 });

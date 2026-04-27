@@ -1,16 +1,13 @@
 <mat-card class="tab-panel-card">
-  <mat-card-header>
-    <mat-card-title>Screens &amp; HUD Icons Editor</mat-card-title>
-    <mat-card-subtitle>Icon and screen image resources - ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</mat-card-subtitle>
-  </mat-card-header>
   <mat-card-content>
     @if (iconEntries.length > 0) {
       <div class="screens-sidebar-layout">
         <aside class="screens-sidebar">
           <div class="screens-sidebar-header">
-            <div>
-              <div class="screens-sidebar-title">Screens</div>
-              <div class="screens-sidebar-subtitle">{{ iconEntries.length }} resources</div>
+            <div class="screens-sidebar-copy">
+              <div class="screens-sidebar-title">Screens &amp; HUD Icons Editor</div>
+              <div class="screens-sidebar-subtitle">Icon and screen image resources - ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</div>
+              <div class="screens-sidebar-meta">{{ iconEntries.length }} resources</div>
             </div>
             <button
               mat-icon-button

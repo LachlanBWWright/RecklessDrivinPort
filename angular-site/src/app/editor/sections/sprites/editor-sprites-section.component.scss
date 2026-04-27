@@ -43,18 +43,24 @@ mat-card-content {
   padding-bottom: 4px;
 }
 
-.sprite-sidebar-title {
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
+.sprite-sidebar-copy {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.sprite-sidebar-subtitle {
-  margin-top: 2px;
-  font-size: 0.88rem;
+.sprite-sidebar-title {
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--text);
+}
+
+.sprite-sidebar-meta {
+  margin-top: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .sprite-list {

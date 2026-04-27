@@ -12,3 +12,7 @@ export function worldDirToCanvasForwardVector(dir: number, length: number): { dx
     dy: -Math.cos(dir) * length,
   };
 }
+
+export function worldVectorToDir(dx: number, dy: number): number {
+  return Math.atan2(dx, -dy);
+}

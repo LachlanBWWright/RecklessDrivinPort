@@ -192,6 +192,27 @@ export function initializeKonvaOverlay(app: App): void {
     }
   };
   app.konva.onObjectClick = (index) => app.selectObject(index);
+  app.konva.onObjectRotateMove = (e) => {
+    if (app.selectedObjIndex() === e.index) {
+      app.editObjDir.set(e.worldDir);
+    }
+  };
+  app.konva.onObjectRotateEnd = (e) => {
+    const objs = [...app.objects()];
+    if (e.index >= objs.length) return;
+    if (objs[e.index].dir === e.worldDir) {
+      if (app.selectedObjIndex() === e.index) {
+        app.editObjDir.set(e.worldDir);
+      }
+      return;
+    }
+    app._pushUndo('objects');
+    objs[e.index] = { ...objs[e.index], dir: e.worldDir };
+    app.objects.set(objs);
+    if (app.selectedObjIndex() === e.index) {
+      app.editObjDir.set(e.worldDir);
+    }
+  };
   app.konva.onStageDblClick = (wx, wy) => {
     if (app.markCreateMode() || app.drawMode() !== 'none') return;
     const objs = [...app.objects()];

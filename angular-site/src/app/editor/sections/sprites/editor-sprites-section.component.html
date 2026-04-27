@@ -1,15 +1,12 @@
 <mat-card class="tab-panel-card">
-  <mat-card-header>
-    <mat-card-title>Sprite Viewer &amp; PPic Asset Editor</mat-card-title>
-  </mat-card-header>
   <mat-card-content>
     @if (packSpriteFrames.length > 0) {
       <div class="sprite-sidebar-layout">
         <aside class="sprite-sidebar">
           <div class="sprite-sidebar-header">
-            <div>
-              <div class="sprite-sidebar-title">Sprites</div>
-              <div class="sprite-sidebar-subtitle">{{ packSpriteFrames.length }} frames</div>
+            <div class="sprite-sidebar-copy">
+              <div class="sprite-sidebar-title">Sprite Viewer &amp; PPic Asset Editor</div>
+              <div class="sprite-sidebar-meta">{{ packSpriteFrames.length }} frames</div>
             </div>
             <button
               mat-icon-button

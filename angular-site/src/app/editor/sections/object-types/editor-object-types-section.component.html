@@ -1,16 +1,13 @@
 <mat-card class="tab-panel-card">
-  <mat-card-header>
-    <mat-card-title>Object Type Editor</mat-card-title>
-    <mat-card-subtitle>Pack 128 (kPackObTy) - reusable object definitions used by placed objects and object groups</mat-card-subtitle>
-  </mat-card-header>
   <mat-card-content>
     @if (objectTypes.length > 0) {
       <div class="object-type-viewer">
         <aside class="object-type-sidebar">
           <div class="object-type-sidebar-header">
-            <div>
-              <div class="object-type-sidebar-title">Types</div>
-              <div class="object-type-sidebar-subtitle">{{ objectTypes.length }} definitions</div>
+            <div class="object-type-sidebar-copy">
+              <div class="object-type-sidebar-title">Object Type Editor</div>
+              <div class="object-type-sidebar-subtitle">Pack 128 (kPackObTy) - reusable object definitions used by placed objects and object groups</div>
+              <div class="object-type-sidebar-meta">{{ objectTypes.length }} definitions</div>
             </div>
             <button mat-icon-button color="primary" (click)="addType.emit()" [disabled]="workerBusy" matTooltip="Create a new type">
               <mat-icon>add</mat-icon>

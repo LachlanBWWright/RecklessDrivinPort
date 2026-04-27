@@ -106,6 +106,4 @@ export class EditorObjectsSectionComponent {
   @Output() hideAll = new EventEmitter<void>();
   @Output() removeSelected = new EventEmitter<void>();
   @Output() deselect = new EventEmitter<void>();
-  @Output() markSelected = new EventEmitter<number>();
-  @Output() markFieldInput = new EventEmitter<{ idx: number; field: 'x1' | 'y1' | 'x2' | 'y2'; value: number }>();
 }

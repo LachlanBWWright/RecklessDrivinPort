@@ -57,6 +57,7 @@ import type {
   KonvaWaypointDragEndEvent,
   KonvaMarkDragEndEvent,
   KonvaFinishLineDragEvent,
+  KonvaObjectRotateEvent,
   KonvaWorldNode,
 } from './konva-editor.types';
 import {
@@ -98,6 +99,8 @@ export class KonvaEditorService implements OnDestroy {
   // ── External callbacks ────────────────────────────────────────────────────
   onObjectDragEnd?: (e: KonvaDragEndEvent) => void;
   onObjectClick?: (index: number) => void;
+  onObjectRotateMove?: (e: KonvaObjectRotateEvent) => void;
+  onObjectRotateEnd?: (e: KonvaObjectRotateEvent) => void;
   onWaypointDragEnd?: (e: KonvaWaypointDragEndEvent) => void;
   onWaypointRightClick?: (track: 'up' | 'down', segIdx: number, worldX: number, worldY: number) => void;
   onWaypointDoubleClick?: (track: 'up' | 'down', segIdx: number) => void;
@@ -429,6 +432,8 @@ export class KonvaEditorService implements OnDestroy {
       this._panMode, this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
       (idx, wx, wy) => this.onObjectDragEnd?.({ index: idx, worldX: wx, worldY: wy }),
       (idx) => this.onObjectClick?.(idx),
+      (idx, worldDir) => this.onObjectRotateMove?.({ index: idx, worldDir }),
+      (idx, worldDir) => this.onObjectRotateEnd?.({ index: idx, worldDir }),
     );
     this._konvaObjNodes = result.nodes;
     this._applyGroupTransform();
