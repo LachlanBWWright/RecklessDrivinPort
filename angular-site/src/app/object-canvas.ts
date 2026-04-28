@@ -6,7 +6,7 @@ import {
   drawObjectTrackOverlay,
   getObjTypeDimensionLabel,
 } from './app-helpers';
-import { worldDirToCanvasForwardVector, worldDirToCanvasRotationRad } from './object-direction-utils';
+import { worldDirToCanvasRotationRad } from './object-direction-utils';
 import type { App } from './app';
 
 export interface RoadTheme {
@@ -894,29 +894,6 @@ export function redrawObjectCanvas(app: App): void {
       ctx.beginPath();
       ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
       ctx.fill();
-    }
-
-    ctx.strokeStyle = isSel ? '#ffffff' : isPlayerCar ? '#ffe082' : color;
-    ctx.lineWidth = isSel ? 2 : 1;
-    ctx.strokeRect(cx - drawWidth / 2, cy - drawHeight / 2, drawWidth, drawHeight);
-
-    const arrowLen = Math.max(baseRadius * 1.2, drawHeight * 0.6);
-    ctx.strokeStyle = isSel ? '#ffffff' : 'rgba(255,255,255,0.6)';
-    ctx.lineWidth = isSel ? 2 : 1;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    const arrow = worldDirToCanvasForwardVector(obj.dir, arrowLen);
-    ctx.lineTo(cx + arrow.dx, cy + arrow.dy);
-    ctx.stroke();
-
-    if (isSel) {
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(drawWidth, drawHeight) / 2 + 5, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
     }
 
     if (isPlayerCar) {

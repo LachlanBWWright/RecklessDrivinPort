@@ -19,6 +19,11 @@ export interface MarkingCentreGenerateEvent {
   gapLength: number;
 }
 
+export interface MarkingRemoveEvent {
+  yStart: number;
+  yEnd: number;
+}
+
 /** Road-marking generation popup — encapsulates the side/dash form state. */
 @Component({
   selector: 'app-marking-popup',
@@ -37,9 +42,10 @@ export class MarkingPopupComponent {
   @Output() generateCentreMarks = new EventEmitter<MarkingCentreGenerateEvent>();
   @Output() previewSideMarks = new EventEmitter<MarkingGenerateEvent>();
   @Output() previewCentreMarks = new EventEmitter<MarkingCentreGenerateEvent>();
+  @Output() removeMarks = new EventEmitter<MarkingRemoveEvent>();
   @Output() clearPreview = new EventEmitter<void>();
 
-  markingTab: 'side' | 'dash' = 'side';
+  markingTab: 'side' | 'dash' | 'remove' = 'side';
 
   readonly sideForm = new FormGroup({
     combined: new FormControl(true, { nonNullable: true }),
@@ -61,6 +67,11 @@ export class MarkingPopupComponent {
     gapLength: new FormControl(16, { nonNullable: true }),
   });
 
+  readonly removeForm = new FormGroup({
+    yStart: new FormControl(0, { nonNullable: true }),
+    yEnd: new FormControl(400, { nonNullable: true }),
+  });
+
   private _previewDebounce: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -68,6 +79,9 @@ export class MarkingPopupComponent {
       this.schedulePreview();
     });
     this.centreForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.schedulePreview();
+    });
+    this.removeForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
       this.schedulePreview();
     });
   }
@@ -114,7 +128,7 @@ export class MarkingPopupComponent {
         inset: this.toNumber(this.sideForm.controls.inset.value),
         yFrequency: Math.max(1, this.toNumber(this.sideForm.controls.yFrequency.value)),
       });
-    } else {
+    } else if (this.markingTab === 'dash') {
       const { combined, left, right } = this.centreForm.getRawValue();
       this.previewCentreMarks.emit({
         roadSelection: this.checkboxesToSelection(combined, left, right),
@@ -126,7 +140,7 @@ export class MarkingPopupComponent {
     }
   }
 
-  onTabChange(tab: 'side' | 'dash'): void {
+  onTabChange(tab: 'side' | 'dash' | 'remove'): void {
     this.markingTab = tab;
     this.clearPreview.emit();
     this.schedulePreview(0);
@@ -142,7 +156,7 @@ export class MarkingPopupComponent {
         inset: this.toNumber(this.sideForm.controls.inset.value),
         yFrequency: Math.max(1, this.toNumber(this.sideForm.controls.yFrequency.value)),
       });
-    } else {
+    } else if (this.markingTab === 'dash') {
       const { combined, left, right } = this.centreForm.getRawValue();
       this.generateCentreMarks.emit({
         roadSelection: this.checkboxesToSelection(combined, left, right),
@@ -150,6 +164,11 @@ export class MarkingPopupComponent {
         yEnd: this.toNumber(this.centreForm.controls.yEnd.value),
         dashLength: Math.max(1, this.toNumber(this.centreForm.controls.dashLength.value)),
         gapLength: Math.max(1, this.toNumber(this.centreForm.controls.gapLength.value)),
+      });
+    } else {
+      this.removeMarks.emit({
+        yStart: this.toNumber(this.removeForm.controls.yStart.value),
+        yEnd: this.toNumber(this.removeForm.controls.yEnd.value),
       });
     }
     this.clearPreview.emit();

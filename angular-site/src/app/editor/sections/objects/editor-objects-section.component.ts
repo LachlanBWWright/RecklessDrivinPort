@@ -94,6 +94,7 @@ export class EditorObjectsSectionComponent {
   @Output() generateCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashLength: number; gapLength: number }>();
   @Output() previewSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number; yFrequency: number }>();
   @Output() previewCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashLength: number; gapLength: number }>();
+  @Output() removeMarks = new EventEmitter<{ yStart: number; yEnd: number }>();
   @Output() clearMarkingPreview = new EventEmitter<void>();
   @Output() panXChange = new EventEmitter<number>();
   @Output() panYChange = new EventEmitter<number>();

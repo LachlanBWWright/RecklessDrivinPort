@@ -2,6 +2,7 @@ import {
   clampBarrierPoint,
   generateCentreDashMarkings,
   generateSideMarkings,
+  removeMarkingsInYRange,
   sampleQuadraticBezier,
 } from './road-marking-utils';
 
@@ -71,6 +72,22 @@ describe('generateCentreDashMarkings', () => {
       { x1: -60, y1: 8, x2: -60, y2: 11 },
       { x1: 60, y1: 0, x2: 60, y2: 3 },
       { x1: 60, y1: 8, x2: 60, y2: 11 },
+    ]);
+  });
+});
+
+describe('removeMarkingsInYRange', () => {
+  it('removes only segments whose endpoints both fall within the inclusive y range', () => {
+    const marks = [
+      { x1: 0, y1: 10, x2: 10, y2: 20 },
+      { x1: 0, y1: 20, x2: 10, y2: 30 },
+      { x1: 0, y1: 30, x2: 10, y2: 40 },
+      { x1: 0, y1: 35, x2: 10, y2: 55 },
+    ];
+
+    expect(removeMarkingsInYRange(marks, { yStart: 20, yEnd: 40 })).toEqual([
+      { x1: 0, y1: 10, x2: 10, y2: 20 },
+      { x1: 0, y1: 35, x2: 10, y2: 55 },
     ]);
   });
 });

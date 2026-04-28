@@ -308,8 +308,6 @@ export class KonvaEditorService implements OnDestroy {
     this._panX = panX;
     this._panY = panY;
     this._applyGroupTransform();
-    // Selection ring stroke widths need updating so they stay visually thin
-    this._updateSelectionRingWidths();
   }
 
   /**
@@ -338,25 +336,6 @@ export class KonvaEditorService implements OnDestroy {
       _applyBackgroundTransform(this.bgImageNode, this._zoom, this._panX, this._panY, this._cssW, this._cssH, this._logicalW, this._logicalH);
       // All layers need redraw when the transform changes
       this._markAllLayersDirty();
-    }
-  }
-
-  /**
-   * Keep selection-ring stroke widths at ~2 CSS pixels regardless of zoom.
-   * (We want the ring to be a thin outline, not scale up hugely when zoomed in.)
-   */
-  private _updateSelectionRingWidths(): void {
-    const sx = this._zoom * (this._cssW / this._logicalW);
-    if (sx === 0) return;
-    const w = 2 / sx; // 2 CSS pixels expressed in world units
-    for (const node of this._konvaObjNodes) {
-      if (node instanceof Konva.Group) {
-        for (const child of node.children) {
-          if (child instanceof Konva.Circle && child.stroke() === '#ffffff') {
-            child.strokeWidth(w);
-          }
-        }
-      }
     }
   }
 
@@ -418,7 +397,6 @@ export class KonvaEditorService implements OnDestroy {
     // Fast path: only pan/zoom changed – just update the group transform.
     if (objsUnchanged && selUnchanged && visUnchanged) {
       this._applyGroupTransform();
-      this._updateSelectionRingWidths();
       t.end();
       return;
     }
@@ -432,8 +410,6 @@ export class KonvaEditorService implements OnDestroy {
       this._panMode, this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
       (idx, wx, wy) => this.onObjectDragEnd?.({ index: idx, worldX: wx, worldY: wy }),
       (idx) => this.onObjectClick?.(idx),
-      (idx, worldDir) => this.onObjectRotateMove?.({ index: idx, worldDir }),
-      (idx, worldDir) => this.onObjectRotateEnd?.({ index: idx, worldDir }),
     );
     this._konvaObjNodes = result.nodes;
     this._applyGroupTransform();

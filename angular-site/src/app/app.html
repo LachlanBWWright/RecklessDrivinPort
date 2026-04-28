@@ -199,6 +199,7 @@
             (generateCentreMarks)="generateCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashLength, $event.gapLength)"
             (previewSideMarks)="previewSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset, $event.yFrequency)"
             (previewCentreMarks)="previewCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashLength, $event.gapLength)"
+            (removeMarks)="removeMarksByYRange($event.yStart, $event.yEnd)"
             (clearMarkingPreview)="markingPreview.set([])"
             (objectSelected)="selectObject($event, true)"
             (searchTermChange)="objectSearchTerm.set($event)"

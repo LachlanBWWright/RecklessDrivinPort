@@ -1,4 +1,4 @@
-import { clampBarrierPoint, generateCentreDashMarkings, generateSideMarkings, sampleQuadraticBezier, type MarkingRoadSelection } from './road-marking-utils';
+import { clampBarrierPoint, generateCentreDashMarkings, generateSideMarkings, removeMarkingsInYRange, sampleQuadraticBezier, type MarkingRoadSelection } from './road-marking-utils';
 import type { MarkSeg, RoadSeg } from './level-editor.service';
 import type { App } from './app';
 import { resultFromPromise } from './result-helpers';
@@ -108,6 +108,27 @@ export function removeSelectedMark(app: App): void {
   const ms = app.marks().filter((_: MarkSeg, i: number) => i !== idx);
   app.marks.set(ms);
   app.selectedMarkIndex.set(ms.length > 0 ? Math.min(idx, ms.length - 1) : null);
+  app.scheduleMarkAutoSave();
+}
+
+export function removeMarksByYRange(app: App, yStart: number, yEnd: number): void {
+  const currentMarks = app.marks();
+  const selectedMarkIndex = app.selectedMarkIndex();
+  const selectedMark = selectedMarkIndex !== null ? currentMarks[selectedMarkIndex] ?? null : null;
+  const nextMarks = removeMarkingsInYRange(currentMarks, { yStart, yEnd });
+  const removedCount = currentMarks.length - nextMarks.length;
+  if (removedCount === 0) {
+    app.snackBar.open('No mark segments were found in that Y range.', undefined, {
+      duration: 2000,
+    });
+    return;
+  }
+  app._pushUndo('marks');
+  app.marks.set(nextMarks);
+  app.selectedMarkIndex.set(selectedMark === null ? null : nextMarks.indexOf(selectedMark));
+  app.snackBar.open(`Removed ${removedCount} marking segments.`, undefined, {
+    duration: 2200,
+  });
   app.scheduleMarkAutoSave();
 }
 

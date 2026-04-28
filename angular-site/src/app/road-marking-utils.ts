@@ -24,6 +24,11 @@ export interface CentreDashGenerationOptions {
   gapLength: number;
 }
 
+export interface RemoveMarkingsInYRangeOptions {
+  yStart: number;
+  yEnd: number;
+}
+
 interface LinePoint {
   x: number;
   y: number;
@@ -250,4 +255,18 @@ export function generateCentreDashMarkings(
   });
 
   return groups.flatMap((group) => dashedSegmentsFromGroup(group, dashLength, gapLength));
+}
+
+export function removeMarkingsInYRange(
+  marks: readonly MarkSeg[],
+  options: RemoveMarkingsInYRangeOptions,
+): MarkSeg[] {
+  const minY = Math.min(options.yStart, options.yEnd);
+  const maxY = Math.max(options.yStart, options.yEnd);
+  return marks.filter((mark) => (
+    mark.y1 < minY
+    || mark.y1 > maxY
+    || mark.y2 < minY
+    || mark.y2 > maxY
+  ));
 }

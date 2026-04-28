@@ -14,6 +14,10 @@
       (click)="onTabChange('dash')">
       <mat-icon>linear_scale</mat-icon> Centre Dashes
     </button>
+    <button type="button" class="marking-tab-btn" [class.marking-tab-btn--active]="markingTab === 'remove'"
+      (click)="onTabChange('remove')">
+      <mat-icon>delete_sweep</mat-icon> Remove Marks
+    </button>
   </div>
   @if (markingTab === 'side') {
     <form class="popup-form" [formGroup]="sideForm">
@@ -47,7 +51,7 @@
         </mat-form-field>
       </div>
     </form>
-  } @else {
+  } @else if (markingTab === 'dash') {
     <form class="popup-form" [formGroup]="centreForm">
       <div class="popup-road-checkboxes">
         <label class="popup-checkbox-label">
@@ -79,11 +83,28 @@
         </mat-form-field>
       </div>
     </form>
+  } @else {
+    <form class="popup-form" [formGroup]="removeForm">
+      <div class="popup-fields">
+        <mat-form-field appearance="outline" class="popup-field">
+          <mat-label>Y start</mat-label>
+          <input matInput type="number" formControlName="yStart" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="popup-field">
+          <mat-label>Y end</mat-label>
+          <input matInput type="number" formControlName="yEnd" />
+        </mat-form-field>
+      </div>
+      <p class="popup-hint popup-hint--inline">
+        Removes segments whose two endpoints both fall inside the Y range.
+      </p>
+    </form>
   }
   <p class="popup-hint">Road Y range: 0 &#8594; {{ roadMaxY }}</p>
   <div class="popup-actions">
     <button type="button" mat-raised-button color="primary" (click)="onGenerate()" [disabled]="workerBusy">
-      <mat-icon>add</mat-icon> Generate
+      <mat-icon>{{ markingTab === 'remove' ? 'delete' : 'add' }}</mat-icon>
+      {{ markingTab === 'remove' ? 'Remove' : 'Generate' }}
     </button>
   </div>
 </div>

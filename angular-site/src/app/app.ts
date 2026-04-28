@@ -128,6 +128,7 @@ import {
   onMarkFieldInput,
   previewCentreRoadMarks,
   previewSideRoadMarks,
+  removeMarksByYRange,
   removeSelectedMark,
   saveMarks,
   scheduleMarkAutoSave,
@@ -706,6 +707,10 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     gapLength: number,
   ): void {
     previewCentreRoadMarks(this, roadSelection, yStart, yEnd, dashLength, gapLength);
+  }
+
+  removeMarksByYRange(yStart: number, yEnd: number): void {
+    removeMarksByYRange(this, yStart, yEnd);
   }
 
   removeSelectedMark(): void {

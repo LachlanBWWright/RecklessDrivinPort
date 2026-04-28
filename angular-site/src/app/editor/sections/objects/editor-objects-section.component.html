@@ -1,8 +1,5 @@
 @if (selectedLevel) {
   <mat-card class="tab-panel-card objects-panel-card">
-    <mat-card-header>
-      <mat-card-title></mat-card-title>
-    </mat-card-header>
     <mat-card-content class="objects-card-content">
       <div class="object-canvas-layout">
         <app-editor-canvas
@@ -73,6 +70,7 @@
           (generateCentreMarks)="generateCentreMarks.emit($event)"
           (previewSideMarks)="previewSideMarks.emit($event)"
           (previewCentreMarks)="previewCentreMarks.emit($event)"
+          (removeMarks)="removeMarks.emit($event)"
           (clearMarkingPreview)="clearMarkingPreview.emit()"
         ></app-editor-canvas>
 
