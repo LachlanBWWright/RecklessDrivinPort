@@ -64,10 +64,13 @@
 }
 
 .mat-mdc-slider {
-  --mdc-slider-active-track-color: var(--accent2);
+  --mdc-slider-active-track-color: var(--accent);
   --mdc-slider-inactive-track-color: var(--surface4);
-  --mdc-slider-handle-color: var(--accent2);
-  --mdc-slider-focus-handle-color: #64b5f6;
+  --mdc-slider-handle-color: var(--accent);
+  --mdc-slider-hover-handle-color: var(--accent);
+  --mdc-slider-focus-handle-color: var(--accent-light);
+  --mdc-slider-with-tick-marks-active-container-color: var(--accent);
+  --mdc-slider-with-tick-marks-inactive-container-color: var(--surface4);
 }
 
 .mat-mdc-progress-bar {

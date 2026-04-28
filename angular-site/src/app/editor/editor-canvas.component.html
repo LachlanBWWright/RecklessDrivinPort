@@ -2,10 +2,10 @@
 <div class="flex flex-col gap-1.5 border-b border-[var(--border)] bg-[var(--surface)] px-[14px] py-2 text-[var(--muted)]">
   <div class="flex flex-wrap items-center gap-0.5">
     <!-- Undo / Redo -->
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="undo.emit()" [disabled]="!canUndo" matTooltip="Undo (Ctrl+Z)">
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="undo.emit()" [disabled]="!canUndo" matTooltip="Undo (Ctrl+Z)">
       <mat-icon>undo</mat-icon>
     </button>
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="redo.emit()" [disabled]="!canRedo" matTooltip="Redo (Ctrl+Y)">
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="redo.emit()" [disabled]="!canRedo" matTooltip="Redo (Ctrl+Y)">
       <mat-icon>redo</mat-icon>
     </button>
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
@@ -13,39 +13,39 @@
     <button mat-stroked-button class="!h-10 !min-w-0 !border-[var(--border)] !bg-[var(--surface2)] !px-3 !text-[0.76rem] !text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px] hover:!border-[var(--accent2)] hover:!text-[var(--accent2)]" (click)="addObject.emit()" matTooltip="Add new object">
       <mat-icon>add</mat-icon> Object
     </button>
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
       <mat-icon>content_copy</mat-icon>
     </button>
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected (Del)">
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected (Del)">
       <mat-icon>delete</mat-icon>
     </button>
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- View controls -->
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="frameAll.emit()" matTooltip="Frame all objects">
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="frameAll.emit()" matTooltip="Frame all objects">
       <mat-icon>fit_screen</mat-icon>
     </button>
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
       <mat-icon>center_focus_strong</mat-icon>
     </button>
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Marks toggle + mark management (visible when marks enabled) -->
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showMarks ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showMarks ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
       <mat-icon>edit_location</mat-icon>
     </button>
     @if (showMarks) {
-      <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="addMark.emit()" [disabled]="workerBusy" matTooltip="Add mark">
+      <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="addMark.emit()" [disabled]="workerBusy" matTooltip="Add mark">
         <mat-icon>add_location</mat-icon>
       </button>
-      <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="markCreateMode ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''"
+      <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="markCreateMode ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''"
         (click)="markCreateMode ? confirmMarkCreate.emit() : startMarkCreate.emit()"
         [disabled]="workerBusy"
         [matTooltip]="markCreateMode ? 'Confirm create (' + pendingMarkPointCount + ' pts)' : 'Create mark by click'">
         <mat-icon>{{ markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon>
       </button>
-      <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
+      <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
         <mat-icon>remove_circle_outline</mat-icon>
       </button>
-      <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showMarkingPopup ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''"
+      <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showMarkingPopup ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''"
         (click)="toggleMarkingPopup()"
         [matTooltip]="showMarkingPopup ? 'Close marking generator' : 'Generate road markings'">
         <mat-icon>auto_awesome</mat-icon>
@@ -138,12 +138,12 @@
     }
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Zoom controls -->
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Info button -->
-    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showInfoPopup ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''" (click)="showInfoPopup = !showInfoPopup" matTooltip="Editor help &amp; info">
+    <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showInfoPopup ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''" (click)="showInfoPopup = !showInfoPopup" matTooltip="Editor help &amp; info">
       <mat-icon>info</mat-icon>
     </button>
   </div>
