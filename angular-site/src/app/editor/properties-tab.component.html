@@ -1,12 +1,12 @@
 @if (selectedLevel) {
-  <mat-card class="tab-panel-card">
-    <mat-card-content class="props-card-content">
-      <h4 class="section-subtitle">Road Info <span class="badge">Road {{ editRoadInfo }}</span></h4>
-      <p class="muted hint-text">
+  <mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
+    <mat-card-content class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto box-border px-5 py-4">
+      <h4 class="mb-3 text-[0.88rem] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">Road Info <span class="ml-1.5 inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 align-middle text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]">Road {{ editRoadInfo }}</span></h4>
+      <p class="text-sm leading-relaxed text-[var(--muted)]">
         Select the shared road record used by this level here. Texture assignments are edited in the Tiles tab.
       </p>
 
-      <mat-form-field appearance="outline" class="texture-select-field road-select-field">
+      <mat-form-field appearance="outline" class="w-full min-w-0">
         <mat-label>Shared road</mat-label>
         <mat-select
           [value]="editRoadInfo"
@@ -16,30 +16,30 @@
         >
           <mat-select-trigger>
             @if (getRoadInfoOption(editRoadInfo); as selectedRoadInfo) {
-              <span class="texture-option texture-option--trigger">
+              <span class="inline-flex w-full min-w-0 items-center gap-2">
                 @if (selectedRoadInfo.previewUrl) {
-                  <img class="texture-thumb" [src]="selectedRoadInfo.previewUrl" [alt]="'Road info ' + selectedRoadInfo.id" />
+                  <img class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [src]="selectedRoadInfo.previewUrl" [alt]="'Road info ' + selectedRoadInfo.id" />
                 } @else {
-                  <span class="texture-thumb texture-thumb--fallback" [class.water]="selectedRoadInfo.water"></span>
+                  <span class="h-6 w-12 shrink-0 rounded border border-white/20" [style.background]="selectedRoadInfo.water ? 'linear-gradient(135deg,#0a7a1e,#354ab5)' : 'linear-gradient(135deg,#555,#2c2c2c)'"></span>
                 }
-                <span class="texture-option-label">{{ selectedRoadInfo.label }}</span>
+                <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ selectedRoadInfo.label }}</span>
               </span>
             } @else {
-              <span class="texture-option texture-option--trigger">
-                <span class="texture-thumb texture-thumb--fallback"></span>
-                <span class="texture-option-label">Road {{ editRoadInfo }}</span>
+              <span class="inline-flex w-full min-w-0 items-center gap-2">
+                <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Road {{ editRoadInfo }}</span>
               </span>
             }
           </mat-select-trigger>
           @for (option of roadInfoOptions; track option.id) {
             <mat-option [value]="option.id">
-              <span class="texture-option">
+              <span class="inline-flex min-w-0 items-center gap-2">
                 @if (option.previewUrl) {
-                  <img class="texture-thumb" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
+                  <img class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
                 } @else {
-                  <span class="texture-thumb texture-thumb--fallback" [class.water]="option.water"></span>
+                  <span class="h-6 w-12 shrink-0 rounded border border-white/20" [style.background]="option.water ? 'linear-gradient(135deg,#0a7a1e,#354ab5)' : 'linear-gradient(135deg,#555,#2c2c2c)'"></span>
                 }
-                <span class="texture-option-label">{{ option.label }}</span>
+                <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ option.label }}</span>
               </span>
             </mat-option>
           }
@@ -47,132 +47,132 @@
       </mat-form-field>
 
       @if (roadInfoData) {
-        <form class="road-info-section" [formGroup]="roadInfoForm">
-          <table class="data-table plain-table road-info-table">
+        <form class="mb-4" [formGroup]="roadInfoForm">
+          <table class="mb-4 w-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface2)] border-collapse [&_th]:border-b [&_th]:border-[var(--border)] [&_th]:bg-[var(--surface3)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-[0.75rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.05em] [&_th]:text-[var(--muted)] [&_td]:border-b [&_td]:border-[var(--border)] [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-[0.85rem] [&_td]:text-[var(--on-surface)] [&_tbody_tr:hover_td]:bg-[var(--surface3)]">
             <tbody>
               <tr><th colspan="2">Physics</th></tr>
               <tr>
-                <td>friction</td>
+                <td class="w-[190px] text-white/80">friction</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="friction" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>airResistance</td>
+                <td class="w-[190px] text-white/80">airResistance</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="airResistance" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>backResistance</td>
+                <td class="w-[190px] text-white/80">backResistance</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="backResistance" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>tolerance</td>
+                <td class="w-[190px] text-white/80">tolerance</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" formControlName="tolerance" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>deathOffs</td>
+                <td class="w-[190px] text-white/80">deathOffs</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" formControlName="deathOffs" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>water</td>
-                <td><input class="road-info-checkbox" type="checkbox" formControlName="water" /></td>
+                <td class="w-[190px] text-white/80">water</td>
+                <td><input class="h-[18px] w-[18px] align-middle" type="checkbox" formControlName="water" /></td>
               </tr>
 
               <tr><th colspan="2">Handling</th></tr>
               <tr>
-                <td>xDrift</td>
+                <td class="w-[190px] text-white/80">xDrift</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="xDrift" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>yDrift</td>
+                <td class="w-[190px] text-white/80">yDrift</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="yDrift" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>xFrontDrift</td>
+                <td class="w-[190px] text-white/80">xFrontDrift</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="xFrontDrift" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>yFrontDrift</td>
+                <td class="w-[190px] text-white/80">yFrontDrift</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="yFrontDrift" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>trackSlide</td>
+                <td class="w-[190px] text-white/80">trackSlide</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="trackSlide" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>dustSlide</td>
+                <td class="w-[190px] text-white/80">dustSlide</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="dustSlide" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>dustColor</td>
+                <td class="w-[190px] text-white/80">dustColor</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" formControlName="dustColor" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>filler</td>
+                <td class="w-[190px] text-white/80">filler</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" formControlName="filler" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>filler2</td>
+                <td class="w-[190px] text-white/80">filler2</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" formControlName="filler2" />
                   </mat-form-field>
                 </td>
               </tr>
               <tr>
-                <td>slideFriction</td>
+                <td class="w-[190px] text-white/80">slideFriction</td>
                 <td>
-                  <mat-form-field appearance="outline" class="road-info-field">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-[140px]">
                     <input matInput type="number" step="any" formControlName="slideFriction" />
                   </mat-form-field>
                 </td>
@@ -183,18 +183,18 @@
       }
 
       <hr />
-      <p class="muted hint-text">
+      <p class="text-sm leading-relaxed text-[var(--muted)]">
         Level property groups and object counts are still edited below.
       </p>
 
-      <h4 class="section-subtitle">Object Groups</h4>
+      <h4 class="mb-3 text-[0.88rem] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">Object Groups</h4>
       @for (objGroup of editObjectGroups; track $index) {
-        <div class="object-group-row">
-          <div class="object-group-row__header">
-            <span class="object-group-slot-label">Slot {{ $index }}</span>
+        <div class="grid grid-cols-[92px_minmax(0,1fr)_150px] items-end gap-3 border-b border-white/[0.06] py-2.5 last:border-b-0 max-[900px]:grid-cols-1">
+          <div class="flex min-w-0 items-center self-center">
+            <span class="whitespace-nowrap text-[0.78rem] font-bold uppercase tracking-[0.08em] text-[var(--muted)]">Slot {{ $index }}</span>
           </div>
 
-          <mat-form-field appearance="outline" class="object-group-select-field">
+          <mat-form-field appearance="outline" class="w-full min-w-0 self-stretch">
             <mat-label>Group type</mat-label>
             <mat-select
               [value]="objGroup.resID"
@@ -202,35 +202,35 @@
               (selectionChange)="setObjectGroupValue($index, $event.value)"
             >
               <mat-select-trigger>
-                <span class="object-group-option object-group-option--trigger">
-                  <span class="object-group-option__label">{{ getObjectGroupLabel(objGroup.resID) }}</span>
-                  <span class="object-group-sprites" aria-hidden="true">
+                <span class="flex w-full items-center justify-between gap-2 min-w-0">
+                  <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectGroupLabel(objGroup.resID) }}</span>
+                  <span class="flex min-w-0 flex-[0_1_auto] items-center justify-end gap-1 overflow-hidden" aria-hidden="true">
                     @for (typeRes of getObjectGroupSprites(objGroup.resID); track $index) {
                       @if (getSpriteUrl(typeRes); as url) {
-                        <img class="object-group-sprite" [src]="url" [alt]="" />
+                        <img class="h-[18px] w-[18px] shrink-0 rounded border border-white/20 bg-white/5 object-contain" [src]="url" [alt]="" />
                       } @else {
-                        <span class="object-group-sprite object-group-sprite--fallback"></span>
+                        <span class="h-[18px] w-[18px] shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
                       }
                     }
                   </span>
                 </span>
               </mat-select-trigger>
               <mat-option [value]="0">
-                <span class="object-group-option">
-                  <span class="object-group-option__label">0 · empty slot</span>
+                <span class="flex w-full min-w-0 items-center gap-2">
+                  <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">0 · empty slot</span>
                 </span>
               </mat-option>
               @for (group of objectGroupDefinitions; track group.id) {
                 @if (group.id !== 0) {
                   <mat-option [value]="group.id">
-                    <span class="object-group-option">
-                      <span class="object-group-option__label">#{{ group.id }}</span>
-                      <span class="object-group-sprites" aria-hidden="true">
+                    <span class="flex w-full min-w-0 items-center gap-2">
+                      <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">#{{ group.id }}</span>
+                      <span class="flex min-w-0 flex-[0_1_auto] items-center justify-end gap-1 overflow-hidden" aria-hidden="true">
                         @for (entry of group.entries; track $index) {
                           @if (getSpriteUrl(entry.typeRes); as url) {
-                            <img class="object-group-sprite" [src]="url" [alt]="" />
+                            <img class="h-[18px] w-[18px] shrink-0 rounded border border-white/20 bg-white/5 object-contain" [src]="url" [alt]="" />
                           } @else {
-                            <span class="object-group-sprite object-group-sprite--fallback"></span>
+                            <span class="h-[18px] w-[18px] shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
                           }
                         }
                       </span>
@@ -240,14 +240,14 @@
               }
               @if (objGroup.resID !== 0 && !hasObjectGroupDefinition(objGroup.resID)) {
                 <mat-option [value]="objGroup.resID">
-                  <span class="object-group-option">
-                    <span class="object-group-option__label">#{{ objGroup.resID }} (custom)</span>
-                    <span class="object-group-sprites" aria-hidden="true">
+                  <span class="flex w-full min-w-0 items-center gap-2">
+                    <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">#{{ objGroup.resID }} (custom)</span>
+                    <span class="flex min-w-0 flex-[0_1_auto] items-center justify-end gap-1 overflow-hidden" aria-hidden="true">
                       @for (typeRes of getObjectGroupSprites(objGroup.resID); track $index) {
                         @if (getSpriteUrl(typeRes); as url) {
-                          <img class="object-group-sprite" [src]="url" [alt]="" />
+                          <img class="h-[18px] w-[18px] shrink-0 rounded border border-white/20 bg-white/5 object-contain" [src]="url" [alt]="" />
                         } @else {
-                          <span class="object-group-sprite object-group-sprite--fallback"></span>
+                          <span class="h-[18px] w-[18px] shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
                         }
                       }
                     </span>
@@ -257,7 +257,7 @@
             </mat-select>
           </mat-form-field>
 
-          <mat-form-field appearance="outline" class="object-group-count-field">
+          <mat-form-field appearance="outline" class="w-full min-w-0 max-w-[150px] max-[900px]:max-w-none">
             <mat-label>numObjs</mat-label>
             <input matInput type="number" [formControl]="objectGroupNumObjsForm.controls[$index]" />
           </mat-form-field>

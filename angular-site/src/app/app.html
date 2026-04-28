@@ -35,26 +35,26 @@
   ></app-game-panel>
 
   @if (activeTab() === 'editor') {
-    <section id="panel-editor" role="tabpanel" class="editor-section">
+    <section id="panel-editor" role="tabpanel" class="flex w-full min-h-0 flex-1 flex-col self-stretch overflow-hidden">
       @if (!hasEditorData() && !workerBusy()) {
-        <mat-card class="no-data-card">
+        <mat-card class="w-full border border-dashed border-[var(--border)] bg-[var(--surface)]">
           <mat-card-content>
-            <div class="no-data-content">
-              <mat-icon class="no-data-icon">folder_open</mat-icon>
-              <h3>No data loaded</h3>
-              <p>Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
+            <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
+              <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">folder_open</mat-icon>
+              <h3 class="text-[1.2rem] font-bold text-[var(--on-surface)]">No data loaded</h3>
+              <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
             </div>
           </mat-card-content>
         </mat-card>
       }
 
       @if (workerBusy() && !hasEditorData()) {
-        <mat-card class="loading-card">
+        <mat-card class="w-full border border-dashed border-[var(--border)] bg-[var(--surface)]">
           <mat-card-content>
-            <div class="loading-content">
+            <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
               <mat-spinner diameter="40"></mat-spinner>
-              <p>{{ resourcesStatus() }}</p>
-              <p class="muted">Decompressing LZRW3-A level packs in background worker…</p>
+              <p class="max-w-[600px] leading-[1.6] text-[var(--on-surface)]">{{ resourcesStatus() }}</p>
+              <p class="text-[0.85rem] text-[var(--muted)]">Decompressing LZRW3-A level packs in background worker…</p>
             </div>
           </mat-card-content>
         </mat-card>

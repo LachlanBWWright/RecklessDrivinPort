@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
+import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
 import { FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { MarkingRoadSelection } from '../../road-marking-utils';
@@ -28,10 +28,11 @@ export interface MarkingRemoveEvent {
 @Component({
   selector: 'app-marking-popup',
   templateUrl: './marking-popup.component.html',
-  styleUrl: './marking-popup.component.scss',
+  host: {
+    class: 'pointer-events-none col-[1/-1] row-[1/-1] block',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  encapsulation: ViewEncapsulation.None,
 })
 export class MarkingPopupComponent {
   @Input() roadMaxY = 0;
@@ -86,7 +87,11 @@ export class MarkingPopupComponent {
     });
   }
 
-  private checkboxesToSelection(combined: boolean, left: boolean, right: boolean): MarkingRoadSelection {
+  private checkboxesToSelection(
+    combined: boolean,
+    left: boolean,
+    right: boolean,
+  ): MarkingRoadSelection {
     if (combined && (left || right)) return 'both';
     if (combined) return 'single';
     if (left && right) return 'both';

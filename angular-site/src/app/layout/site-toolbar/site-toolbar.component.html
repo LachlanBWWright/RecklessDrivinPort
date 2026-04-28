@@ -1,44 +1,44 @@
-<mat-toolbar class="site-toolbar" color="primary">
+<mat-toolbar class="custom-scrollbar sticky top-0 z-[200] flex h-auto min-h-14 flex-nowrap items-center gap-3 overflow-x-auto overflow-y-hidden border-b-2 border-b-[var(--accent)] bg-[#0d0d0d] px-4 shadow-[0_2px_12px_rgba(0,0,0,0.6)]" color="primary">
   @if (activeTab === 'editor') {
-    <button mat-button class="nav-tab nav-tab--back" (click)="tabChange.emit('game')">
+    <button mat-button class="!min-h-14 !whitespace-nowrap !rounded-none !border-b-4 !border-b-transparent !px-4 !text-[0.9rem] !font-semibold !tracking-[0.02em] !text-[var(--muted)] hover:!text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]" (click)="tabChange.emit('game')">
       <mat-icon>arrow_back</mat-icon>
-      <span class="nav-tab-label">Back to Game</span>
+      <span>Back to Game</span>
     </button>
 
-    <div class="toolbar-editor-strip">
-      <div class="toolbar-actions">
+    <div class="flex min-w-0 flex-[1_0_auto] items-center justify-start gap-2 overflow-visible">
+      <div class="flex flex-[0_0_auto] items-center gap-2">
         @if (!hasEditorData) {
           <button mat-stroked-button (click)="loadDefaultResources.emit()" [disabled]="workerBusy">
-            <mat-icon>cloud_download</mat-icon> <span class="nav-tab-label">Load Default</span>
+            <mat-icon>cloud_download</mat-icon> <span>Load Default</span>
           </button>
           <input #fileInput type="file" accept=".dat" (change)="resourceFileSelected.emit($event)" [disabled]="workerBusy" style="display:none" />
           <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy">
-            <mat-icon>folder_open</mat-icon> <span class="nav-tab-label">Upload resources.dat</span>
+            <mat-icon>folder_open</mat-icon> <span>Upload resources.dat</span>
           </button>
         } @else {
           <button mat-stroked-button color="warn" (click)="clearEditorFile.emit()" [disabled]="workerBusy">
-            <mat-icon>delete</mat-icon> <span class="nav-tab-label">Clear File</span>
+            <mat-icon>delete</mat-icon> <span>Clear File</span>
           </button>
           <button mat-raised-button color="primary" (click)="downloadEditedResources.emit()" [disabled]="workerBusy">
-            <mat-icon>download</mat-icon> <span class="nav-tab-label">Download</span>
+            <mat-icon>download</mat-icon> <span>Download</span>
           </button>
         }
       </div>
 
-      <div class="toolbar-status" [class.toolbar-status--error]="!!editorError">
+      <div class="flex items-center gap-2.5 text-[0.82rem]" [ngClass]="editorError ? 'text-[var(--danger)]' : ''">
         @if (workerBusy) {
-          <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
-          <span class="muted">Processing…</span>
+          <mat-spinner diameter="18" class="inline-block"></mat-spinner>
+          <span class="text-[0.85rem] text-[var(--muted)]">Processing…</span>
         }
         @if (editorError) {
-          <span class="editor-error">
+          <span class="flex items-center gap-1 text-[var(--danger)]">
             <mat-icon>warning</mat-icon> {{ editorError }}
           </span>
         }
       </div>
 
       @if (hasEditorData) {
-        <mat-form-field appearance="outline" class="level-select-field">
+        <mat-form-field appearance="outline" class="w-[180px] max-[900px]:w-[150px]">
           <mat-select
             [value]="selectedLevelId"
             (valueChange)="selectLevel.emit($event)"
@@ -47,8 +47,8 @@
           >
             <mat-select-trigger>
               @if (selectedLevelId !== null) {
-                <span class="level-select-trigger level-select-trigger--full">Level {{ levelDisplayNum(selectedLevelId) }}</span>
-                <span class="level-select-trigger level-select-trigger--short">{{ levelDisplayNum(selectedLevelId) }}</span>
+                <span class="max-[900px]:hidden">Level {{ levelDisplayNum(selectedLevelId) }}</span>
+                <span class="hidden max-[900px]:inline">{{ levelDisplayNum(selectedLevelId) }}</span>
               }
             </mat-select-trigger>
             @for (level of parsedLevels; track level.resourceId) {
@@ -60,28 +60,28 @@
         </mat-form-field>
       }
 
-      <nav class="nav-tabs nav-tabs--editor" role="tablist" aria-label="Level editor sections">
+      <nav class="flex w-max min-w-max flex-[0_0_auto] flex-nowrap gap-1" role="tablist" aria-label="Level editor sections">
         @for (section of editorSections; track section.id) {
           <button
             mat-button
-            class="nav-tab nav-tab--editor"
-            [class.active]="activeEditorSection === section.id"
+            class="!min-h-14 !min-w-0 !rounded-none !border-b-4 !border-b-transparent !px-[14px] !text-[0.9rem] !font-semibold !tracking-[0.02em] !text-[var(--muted)] hover:!text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]"
+            [ngClass]="activeEditorSection === section.id ? '!border-b-[var(--accent)] !text-[var(--accent)]' : ''"
             [attr.aria-selected]="activeEditorSection === section.id"
             (click)="editorSectionChange.emit(section.id)"
           >
-            <mat-icon>{{ section.icon }}</mat-icon> <span class="nav-tab-label">{{ section.label }}</span>
+            <mat-icon>{{ section.icon }}</mat-icon> <span>{{ section.label }}</span>
           </button>
         }
       </nav>
     </div>
   } @else {
-    <span class="toolbar-spacer"></span>
-    <nav class="nav-tabs nav-tabs--site" role="tablist" aria-label="Site sections">
-      <button mat-button class="nav-tab active" aria-selected="true" (click)="tabChange.emit('game')">
-        <mat-icon>sports_esports</mat-icon> <span class="nav-tab-label">Play Game</span>
+    <span class="flex-1"></span>
+    <nav class="flex w-max min-w-max flex-[0_0_auto] flex-nowrap gap-1" role="tablist" aria-label="Site sections">
+      <button mat-button class="!min-h-14 !whitespace-nowrap !rounded-none !border-b-4 !border-b-[var(--accent)] !px-4 !text-[0.9rem] !font-semibold !tracking-[0.02em] !text-[var(--accent)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]" aria-selected="true" (click)="tabChange.emit('game')">
+        <mat-icon>sports_esports</mat-icon> <span>Play Game</span>
       </button>
-      <button mat-button class="nav-tab" aria-selected="false" (click)="tabChange.emit('editor')">
-        <mat-icon>map</mat-icon> <span class="nav-tab-label">Level Editor</span>
+      <button mat-button class="!min-h-14 !whitespace-nowrap !rounded-none !border-b-4 !border-b-transparent !px-4 !text-[0.9rem] !font-semibold !tracking-[0.02em] !text-[var(--muted)] hover:!text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]" aria-selected="false" (click)="tabChange.emit('editor')">
+        <mat-icon>map</mat-icon> <span>Level Editor</span>
       </button>
     </nav>
   }

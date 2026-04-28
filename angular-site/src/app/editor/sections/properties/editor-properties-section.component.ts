@@ -10,6 +10,9 @@ import type {
 @Component({
   selector: 'app-editor-properties-section',
   templateUrl: './editor-properties-section.component.html',
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col w-full',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -26,6 +29,13 @@ export class EditorPropertiesSectionComponent {
   @Input() workerBusy = false;
 
   @Output() roadInfoChange = new EventEmitter<number>();
-  @Output() roadInfoInput = new EventEmitter<{ field: Exclude<keyof RoadInfoData, 'id'>; value: number | boolean }>();
-  @Output() objGroupInput = new EventEmitter<{ index: number; field: 'resID' | 'numObjs'; value: number }>();
+  @Output() roadInfoInput = new EventEmitter<{
+    field: Exclude<keyof RoadInfoData, 'id'>;
+    value: number | boolean;
+  }>();
+  @Output() objGroupInput = new EventEmitter<{
+    index: number;
+    field: 'resID' | 'numObjs';
+    value: number;
+  }>();
 }

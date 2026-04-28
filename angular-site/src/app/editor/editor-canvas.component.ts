@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ObjectPos, MarkSeg, RoadInfoOption, TrackWaypointRef } from '../level-editor.service';
@@ -9,7 +17,9 @@ export type DrawMode = 'none' | 'freehand' | 'straight' | 'curve';
 @Component({
   selector: 'app-editor-canvas',
   templateUrl: './editor-canvas.component.html',
-  styleUrl: './editor-canvas.component.scss',
+  host: {
+    class: 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -83,10 +93,34 @@ export class EditorCanvasComponent implements OnChanges {
   @Output() confirmMarkCreate = new EventEmitter<void>();
   @Output() panXChange = new EventEmitter<number>();
   @Output() panYChange = new EventEmitter<number>();
-  @Output() generateSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number; yFrequency: number }>();
-  @Output() generateCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashLength: number; gapLength: number }>();
-  @Output() previewSideMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; inset: number; yFrequency: number }>();
-  @Output() previewCentreMarks = new EventEmitter<{ roadSelection: MarkingRoadSelection; yStart: number; yEnd: number; dashLength: number; gapLength: number }>();
+  @Output() generateSideMarks = new EventEmitter<{
+    roadSelection: MarkingRoadSelection;
+    yStart: number;
+    yEnd: number;
+    inset: number;
+    yFrequency: number;
+  }>();
+  @Output() generateCentreMarks = new EventEmitter<{
+    roadSelection: MarkingRoadSelection;
+    yStart: number;
+    yEnd: number;
+    dashLength: number;
+    gapLength: number;
+  }>();
+  @Output() previewSideMarks = new EventEmitter<{
+    roadSelection: MarkingRoadSelection;
+    yStart: number;
+    yEnd: number;
+    inset: number;
+    yFrequency: number;
+  }>();
+  @Output() previewCentreMarks = new EventEmitter<{
+    roadSelection: MarkingRoadSelection;
+    yStart: number;
+    yEnd: number;
+    dashLength: number;
+    gapLength: number;
+  }>();
   @Output() removeMarks = new EventEmitter<{ yStart: number; yEnd: number }>();
   @Output() clearMarkingPreview = new EventEmitter<void>();
 

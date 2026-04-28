@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { SndInfo } from '../../../snd-codec';
@@ -7,7 +15,9 @@ import { formatTime } from '../../../app-runtime';
 @Component({
   selector: 'app-editor-audio-section',
   templateUrl: './editor-audio-section.component.html',
-  styleUrls: ['./editor-audio-section.component.scss'],
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

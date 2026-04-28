@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ObjectPos } from '../level-editor.service';
@@ -6,7 +14,9 @@ import type { ObjectPos } from '../level-editor.service';
 @Component({
   selector: 'app-object-list',
   templateUrl: './object-list.component.html',
-  styleUrl: './object-list.component.scss',
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col overflow-hidden',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

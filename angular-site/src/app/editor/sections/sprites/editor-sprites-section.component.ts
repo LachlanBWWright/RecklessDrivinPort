@@ -4,7 +4,9 @@ import { getSpriteFormatLabel } from '../../../sprite-editor';
 @Component({
   selector: 'app-editor-sprites-section',
   templateUrl: './editor-sprites-section.component.html',
-  styleUrls: ['./editor-sprites-section.component.scss'],
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -20,7 +22,12 @@ export class EditorSpritesSectionComponent {
   @Output() exportSpritePng = new EventEmitter<void>();
   @Output() addSpriteFrame = new EventEmitter<void>();
 
-  get selectedPackSpriteFrame(): { id: number; bitDepth: 8 | 16; width: number; height: number } | null {
+  get selectedPackSpriteFrame(): {
+    id: number;
+    bitDepth: 8 | 16;
+    width: number;
+    height: number;
+  } | null {
     if (this.selectedPackSpriteId === null) return null;
     return this.packSpriteFrames.find((f) => f.id === this.selectedPackSpriteId) ?? null;
   }

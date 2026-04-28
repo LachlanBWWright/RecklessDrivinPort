@@ -97,7 +97,11 @@ import {
   setEditorSectionIndex as setEditorSectionIndexHelper,
   SECTION_ORDER as APP_SECTION_ORDER,
 } from './app-runtime';
-import { beginFinishLineDrag, beginStartMarkerDrag, handleTrackContextMenuAtWorld } from './app-runtime-track';
+import {
+  beginFinishLineDrag,
+  beginStartMarkerDrag,
+  handleTrackContextMenuAtWorld,
+} from './app-runtime-track';
 import {
   getPackSpriteDataUrl,
   getRoadInfoPreviewDataUrl,
@@ -215,7 +219,6 @@ export type { EditorUndoKind, EditorUndoSnapshot } from './app-history';
   selector: 'app-root',
   templateUrl: './app.html',
   standalone: false,
-  styleUrl: './app.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
 })
@@ -268,7 +271,8 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     setEditorSectionIndexHelper(this, idx);
   }
 
-  readonly getPackSpriteDataUrl = (frameId: number): string | null => getPackSpriteDataUrl(this, frameId);
+  readonly getPackSpriteDataUrl = (frameId: number): string | null =>
+    getPackSpriteDataUrl(this, frameId);
 
   readonly getTileDataUrl = (texId: number): string | null => getTileDataUrl(this, texId);
 
@@ -285,7 +289,8 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   readonly getSpritePreviewDataUrl = (typeRes: number): string | null =>
     getCanvasDataUrl(this._spritePreviewDataUrls, this.objectSpritePreviews, typeRes);
 
-  readonly getObjFallbackColor = (typeRes: number): string => getObjFallbackColor(typeRes, OBJ_PALETTE);
+  readonly getObjFallbackColor = (typeRes: number): string =>
+    getObjFallbackColor(typeRes, OBJ_PALETTE);
 
   /** Apply fresh level list received from the worker after a save operation. */
   applyLevelsResult(
@@ -339,7 +344,10 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     onTimeLimitChange(this, value);
   }
 
-  onPropertiesTabInput(e: { field: keyof import('./level-editor.service').LevelProperties; event: Event }): void {
+  onPropertiesTabInput(e: {
+    field: keyof import('./level-editor.service').LevelProperties;
+    event: Event;
+  }): void {
     onPropertiesTabInput(this, e);
   }
 
@@ -410,7 +418,9 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   }
 
   looksLikeHtml(bytes: Uint8Array): boolean {
-    return bytes.length > 0 && /<html|<!doctype html/i.test(new TextDecoder().decode(bytes.slice(0, 32)));
+    return (
+      bytes.length > 0 && /<html|<!doctype html/i.test(new TextDecoder().decode(bytes.slice(0, 32)))
+    );
   }
 
   cloneObjectGroupDefinitions(groups = this.objectGroupDefinitions()): ObjectGroupDefinition[] {
@@ -486,7 +496,10 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     markObjectTypesDirty(this, defs);
   }
 
-  defaultObjectTypeDefinition(typeRes: number, source?: ObjectTypeDefinition | null): ObjectTypeDefinition {
+  defaultObjectTypeDefinition(
+    typeRes: number,
+    source?: ObjectTypeDefinition | null,
+  ): ObjectTypeDefinition {
     return defaultObjectTypeDefinition(this, typeRes, source);
   }
 

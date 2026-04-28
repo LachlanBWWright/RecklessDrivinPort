@@ -1,7 +1,7 @@
-<mat-card class="editor-toolbar-card">
-  <mat-card-content>
-    <div class="editor-toolbar-row">
-      <div class="toolbar-actions">
+<mat-card class="border border-[var(--border)] bg-[var(--surface)]">
+  <mat-card-content class="!px-4 !py-3">
+    <div class="flex items-center gap-3">
+      <div class="flex flex-1 items-center gap-2">
         <button mat-stroked-button (click)="loadDefaultResources.emit()" [disabled]="workerBusy">
           <mat-icon>cloud_download</mat-icon> Load Default
         </button>
@@ -17,13 +17,13 @@
           <mat-icon>save</mat-icon> Save to Game
         </button>
 
-        <div class="level-btns-inline">
-          <span class="level-label">Level</span>
+        <div class="ml-2 flex items-center gap-1.5">
+          <span class="mr-1 text-[0.82rem] text-[var(--muted)]">Level</span>
           @for (level of parsedLevels; track level.resourceId) {
             <button mat-mini-fab
               [color]="selectedLevelId === level.resourceId ? 'primary' : undefined"
-              class="level-btn"
-              [class.level-btn--active]="selectedLevelId === level.resourceId"
+              class="!h-[38px] !min-h-[38px] !w-[38px] !min-w-[38px] !border !border-[var(--border)] !bg-[var(--surface3)] !text-[0.9rem] !font-bold !text-[var(--on-surface)] hover:!border-[var(--accent)]"
+              [ngClass]="selectedLevelId === level.resourceId ? '!border-transparent !bg-[var(--accent)] !text-white !shadow-[0_2px_8px_rgba(229,57,53,0.4)]' : ''"
               (click)="selectLevel.emit(level.resourceId)"
               [matTooltip]="'Level ' + levelDisplayNum(level.resourceId)">
               {{ levelDisplayNum(level.resourceId) }}
@@ -31,13 +31,13 @@
           }
         </div>
       </div>
-      <div class="toolbar-status">
+      <div class="flex items-center gap-2.5 text-[0.82rem]">
         @if (workerBusy) {
-          <mat-spinner diameter="18" class="busy-spinner"></mat-spinner>
-          <span class="muted">Processing…</span>
+          <mat-spinner diameter="18" class="inline-block"></mat-spinner>
+          <span class="text-[0.85rem] text-[var(--muted)]">Processing…</span>
         }
         @if (editorError) {
-          <span class="editor-error">
+          <span class="flex items-center gap-1 text-[var(--danger)]">
             <mat-icon>warning</mat-icon> {{ editorError }}
           </span>
         }

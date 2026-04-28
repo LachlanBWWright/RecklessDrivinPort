@@ -1,13 +1,13 @@
-<mat-card class="tab-panel-card">
-  <mat-card-content>
+<mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
+  <mat-card-content class="min-h-0 overflow-hidden">
     @if (audioEntries.length > 0) {
-      <div class="audio-sidebar-layout">
-        <aside class="audio-sidebar">
-          <div class="audio-sidebar-header">
-            <div class="audio-sidebar-copy">
-              <div class="audio-sidebar-title">Sound Editor</div>
-              <div class="audio-sidebar-subtitle">Pack 134 (kPackSnds - Mac OS 'snd ' format)</div>
-              <div class="audio-sidebar-meta">{{ audioEntries.length }} entries</div>
+      <div class="flex min-h-0 flex-1 items-stretch gap-6 overflow-hidden max-[1100px]:flex-col">
+        <aside class="flex min-h-0 w-[340px] shrink-0 flex-col gap-3 rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] max-[1100px]:w-auto">
+          <div class="flex items-start justify-between gap-3 pb-1">
+            <div class="min-w-0 flex-1">
+              <div class="text-base font-bold text-[var(--text)]">Sound Editor</div>
+              <div class="mt-1 text-[0.82rem] leading-[1.45] text-[var(--muted)]">Pack 134 (kPackSnds - Mac OS 'snd ' format)</div>
+              <div class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">{{ audioEntries.length }} entries</div>
             </div>
             <button
               mat-icon-button
@@ -19,56 +19,58 @@
             </button>
           </div>
 
-          <div class="audio-list">
+          <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
             @for (entry of audioEntries; track entry.id) {
               <button
                 type="button"
-                class="audio-list-item"
-                [class.audio-list-item--active]="selectedAudioId === entry.id"
+                class="flex w-full items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition"
+                [ngClass]="selectedAudioId === entry.id
+                  ? 'border-[color:rgba(66,165,245,0.6)] bg-[color:rgba(66,165,245,0.12)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]'
+                  : 'border-transparent bg-[var(--surface2)] hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]'"
                 (click)="selectAudioEntry.emit(entry.id)">
-                <mat-icon class="audio-list-item__icon">audiotrack</mat-icon>
-                <span class="audio-list-item__main">
-                  <span class="audio-list-item__title">Sound #{{ entry.id }}</span>
+                <mat-icon class="!h-5 !w-5 !text-xl shrink-0 text-[var(--muted)]">audiotrack</mat-icon>
+                <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span class="text-[0.94rem] font-bold">Sound #{{ entry.id }}</span>
                   @if (entry.durationMs !== undefined) {
-                    <span class="audio-list-item__meta">{{ entry.durationMs / 1000 | number:'1.1-1' }}s</span>
+                    <span class="text-[0.76rem] text-[var(--muted)]">{{ entry.durationMs / 1000 | number:'1.1-1' }}s</span>
                   } @else {
-                    <span class="audio-list-item__meta">{{ entry.sizeBytes | number }} B</span>
+                    <span class="text-[0.76rem] text-[var(--muted)]">{{ entry.sizeBytes | number }} B</span>
                   }
                 </span>
-                <mat-icon class="audio-list-item__chevron">chevron_right</mat-icon>
+                <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)] opacity-85">chevron_right</mat-icon>
               </button>
             }
           </div>
         </aside>
 
         @if (selectedAudioId !== null && selectedAudioBytes) {
-          <div class="audio-detail">
-            <h4 class="audio-detail-title">Sound #{{ selectedAudioId }}</h4>
+          <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden py-1">
+            <h4 class="text-base font-bold text-[var(--on-surface)]">Sound #{{ selectedAudioId }}</h4>
             @if (selectedAudioSndInfo; as info) {
-              <div class="audio-meta">
-                <span class="badge">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
-                <span class="badge">{{ info.numChannels === 2 ? 'Stereo' : 'Mono' }}</span>
-                <span class="badge">{{ (info.numFrames / info.sampleRate) | number:'1.1-1' }}s</span>
-                <span class="badge">
+              <div class="flex flex-wrap gap-1.5">
+                <span class="inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]">{{ info.sampleRate | number:'1.0-0' }} Hz</span>
+                <span class="inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]">{{ info.numChannels === 2 ? 'Stereo' : 'Mono' }}</span>
+                <span class="inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]">{{ (info.numFrames / info.sampleRate) | number:'1.1-1' }}s</span>
+                <span class="inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]">
                   @if (info.encode === 0) { PCM 8-bit }
                   @else if (info.encode === 255) { PCM 16-bit }
                   @else { encode={{ info.encode }} }
                 </span>
               </div>
             }
-            <div class="audio-waveform-placeholder">
-              <mat-icon class="waveform-icon">graphic_eq</mat-icon>
+            <div class="flex items-center gap-2 rounded-lg bg-white/5 p-4 text-white/50">
+              <mat-icon class="!h-8 !w-8 !text-[32px]">graphic_eq</mat-icon>
               <span>{{ selectedAudioBytes.length | number }} bytes</span>
             </div>
-            <div class="audio-actions">
-              <div class="audio-volume-row">
-                <mat-icon class="audio-volume-icon">volume_up</mat-icon>
-                <mat-slider min="0" max="100" step="1" discrete class="audio-volume-slider">
+            <div class="flex flex-col gap-2">
+              <div class="flex flex-wrap items-center gap-2.5">
+                <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">volume_up</mat-icon>
+                <mat-slider min="0" max="100" step="1" discrete class="w-[140px]">
                   <input matSliderThumb [formControl]="audioVolumeControl" />
                 </mat-slider>
-                <span class="audio-volume-value">{{ audioPlayerVolume }}%</span>
+                <span class="min-w-8 text-[0.78rem] text-[var(--muted)]">{{ audioPlayerVolume }}%</span>
               </div>
-              <div class="audio-playback-row">
+              <div class="flex flex-wrap items-center gap-3">
                 <button
                   mat-raised-button
                   color="primary"
@@ -77,18 +79,18 @@
                   <mat-icon matButtonIcon>{{ audioPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
                   {{ audioPlaying ? 'Pause' : 'Play' }}
                 </button>
-                <div class="audio-progress-row">
+                <div class="inline-flex items-center gap-2">
                   <input
                     type="range"
                     min="0"
                     [max]="audioDuration"
                     step="0.01"
                     [formControl]="audioSeekControl"
-                    class="audio-progress-slider" />
-                  <span class="audio-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span>
+                    class="w-[240px]" />
+                  <span class="text-[0.78rem] text-[var(--muted)]">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span>
                 </div>
               </div>
-              <div class="audio-export-row">
+              <div class="flex flex-wrap items-center gap-3">
                 <button mat-stroked-button (click)="exportAudioWav.emit()" [disabled]="!selectedAudioBytes">
                   <mat-icon>download</mat-icon> Export WAV
                 </button>
@@ -102,19 +104,19 @@
             </div>
           </div>
         } @else if (selectedAudioId !== null) {
-          <div class="res-placeholder">
+          <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
             <mat-spinner diameter="32"></mat-spinner>
           </div>
         } @else {
-          <div class="res-placeholder">
-            <p class="muted">Select a sound from the list.</p>
+          <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
+            <p class="text-[0.85rem] text-[var(--muted)]">Select a sound from the list.</p>
           </div>
         }
       </div>
     } @else {
-      <div class="no-data-content">
-        <mat-icon class="no-data-icon">music_off</mat-icon>
-        <p>Sound entries from Pack 134 (kPackSnds) will appear here once a resources.dat is loaded.</p>
+      <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">music_off</mat-icon>
+        <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Sound entries from Pack 134 (kPackSnds) will appear here once a resources.dat is loaded.</p>
       </div>
     }
   </mat-card-content>

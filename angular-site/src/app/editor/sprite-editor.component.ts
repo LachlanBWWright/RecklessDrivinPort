@@ -18,7 +18,6 @@ export type SpriteEditorTool = 'pencil' | 'fill' | 'eyedropper' | 'eraser';
 @Component({
   selector: 'app-sprite-editor',
   templateUrl: './sprite-editor.component.html',
-  styleUrl: './sprite-editor.component.scss',
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -49,14 +48,30 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   /** Palette colours extracted from the sprite */
   palette: { r: number; g: number; b: number; a: number }[] = [];
   readonly presetPalette: { r: number; g: number; b: number; a: number }[] = [
-    { r: 0, g: 0, b: 0, a: 255 }, { r: 255, g: 255, b: 255, a: 255 }, { r: 224, g: 64, b: 64, a: 255 },
-    { r: 255, g: 167, b: 38, a: 255 }, { r: 255, g: 235, b: 59, a: 255 }, { r: 102, g: 187, b: 106, a: 255 },
-    { r: 38, g: 198, b: 218, a: 255 }, { r: 66, g: 165, b: 245, a: 255 }, { r: 126, g: 87, b: 194, a: 255 },
-    { r: 236, g: 64, b: 122, a: 255 }, { r: 121, g: 85, b: 72, a: 255 }, { r: 158, g: 158, b: 158, a: 255 },
-    { r: 76, g: 175, b: 80, a: 255 }, { r: 0, g: 121, b: 107, a: 255 }, { r: 30, g: 136, b: 229, a: 255 },
-    { r: 57, g: 73, b: 171, a: 255 }, { r: 216, g: 27, b: 96, a: 255 }, { r: 255, g: 112, b: 67, a: 255 },
-    { r: 141, g: 110, b: 99, a: 255 }, { r: 84, g: 110, b: 122, a: 255 }, { r: 255, g: 179, b: 0, a: 255 },
-    { r: 124, g: 179, b: 66, a: 255 }, { r: 41, g: 182, b: 246, a: 255 }, { r: 171, g: 71, b: 188, a: 255 },
+    { r: 0, g: 0, b: 0, a: 255 },
+    { r: 255, g: 255, b: 255, a: 255 },
+    { r: 224, g: 64, b: 64, a: 255 },
+    { r: 255, g: 167, b: 38, a: 255 },
+    { r: 255, g: 235, b: 59, a: 255 },
+    { r: 102, g: 187, b: 106, a: 255 },
+    { r: 38, g: 198, b: 218, a: 255 },
+    { r: 66, g: 165, b: 245, a: 255 },
+    { r: 126, g: 87, b: 194, a: 255 },
+    { r: 236, g: 64, b: 122, a: 255 },
+    { r: 121, g: 85, b: 72, a: 255 },
+    { r: 158, g: 158, b: 158, a: 255 },
+    { r: 76, g: 175, b: 80, a: 255 },
+    { r: 0, g: 121, b: 107, a: 255 },
+    { r: 30, g: 136, b: 229, a: 255 },
+    { r: 57, g: 73, b: 171, a: 255 },
+    { r: 216, g: 27, b: 96, a: 255 },
+    { r: 255, g: 112, b: 67, a: 255 },
+    { r: 141, g: 110, b: 99, a: 255 },
+    { r: 84, g: 110, b: 122, a: 255 },
+    { r: 255, g: 179, b: 0, a: 255 },
+    { r: 124, g: 179, b: 66, a: 255 },
+    { r: 41, g: 182, b: 246, a: 255 },
+    { r: 171, g: 71, b: 188, a: 255 },
   ];
 
   /** Is the mouse button currently down */
@@ -119,12 +134,18 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   private fitZoom(): void {
     // Fit to roughly 512px
     const maxDim = Math.max(this.spriteW, this.spriteH);
-    if (maxDim <= 0) { this.zoom = 8; return; }
+    if (maxDim <= 0) {
+      this.zoom = 8;
+      return;
+    }
     this.zoom = Math.max(1, Math.min(16, Math.floor(512 / maxDim)));
   }
 
   private extractPalette(): void {
-    if (!this.pixels) { this.palette = []; return; }
+    if (!this.pixels) {
+      this.palette = [];
+      return;
+    }
     const seen = new Set<number>();
     const cols: { r: number; g: number; b: number; a: number }[] = [];
     for (let i = 0; i < this.pixels.length; i += 4) {
@@ -141,7 +162,7 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
       }
     }
     // sort by luminance
-    cols.sort((a, b) => (a.r + a.g + a.b) - (b.r + b.g + b.b));
+    cols.sort((a, b) => a.r + a.g + a.b - (b.r + b.g + b.b));
     this.palette = cols;
   }
 
@@ -159,7 +180,7 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     const newW = w * z;
     const newH = h * z;
     if (canvas.width !== newW || canvas.height !== newH) {
-      canvas.width  = newW;
+      canvas.width = newW;
       canvas.height = newH;
       // Resizing the canvas resets the 2D context; any cached patterns must be
       // re-created with the fresh context on the next draw call.
@@ -212,10 +233,12 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       for (let px = 0; px <= w; px++) {
-        ctx.moveTo(px * z, 0); ctx.lineTo(px * z, h * z);
+        ctx.moveTo(px * z, 0);
+        ctx.lineTo(px * z, h * z);
       }
       for (let py = 0; py <= h; py++) {
-        ctx.moveTo(0, py * z); ctx.lineTo(w * z, py * z);
+        ctx.moveTo(0, py * z);
+        ctx.lineTo(w * z, py * z);
       }
       ctx.stroke();
     }
@@ -262,18 +285,29 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
       this._lastPy = py;
     } else {
       switch (this.tool) {
-        case 'eyedropper': this.pickColor(px, py); break;
-        case 'fill': this.floodFill(px, py); break;
+        case 'eyedropper':
+          this.pickColor(px, py);
+          break;
+        case 'fill':
+          this.floodFill(px, py);
+          break;
       }
     }
     this.queueDraw();
   }
 
   /** Draw (or erase) all pixels along a Bresenham line from (x0,y0) to (x1,y1). */
-  private _bresenhamLine(x0: number, y0: number, x1: number, y1: number, tool: 'pencil' | 'eraser'): void {
-    const apply = tool === 'pencil'
-      ? (x: number, y: number) => this.drawPixel(x, y)
-      : (x: number, y: number) => this.erasePixel(x, y);
+  private _bresenhamLine(
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    tool: 'pencil' | 'eraser',
+  ): void {
+    const apply =
+      tool === 'pencil'
+        ? (x: number, y: number) => this.drawPixel(x, y)
+        : (x: number, y: number) => this.erasePixel(x, y);
 
     const dx = Math.abs(x1 - x0);
     const dy = Math.abs(y1 - y0);
@@ -285,8 +319,14 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
       apply(x0, y0);
       if (x0 === x1 && y0 === y1) break;
       const e2 = 2 * err;
-      if (e2 > -dy) { err -= dy; x0 += sx; }
-      if (e2 < dx)  { err += dx; y0 += sy; }
+      if (e2 > -dy) {
+        err -= dy;
+        x0 += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y0 += sy;
+      }
     }
   }
 
@@ -314,7 +354,7 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     if (!this.pixels) return;
     if (x < 0 || y < 0 || x >= this.spriteW || y >= this.spriteH) return;
     const i = (y * this.spriteW + x) * 4;
-    this.pixels[i]     = r;
+    this.pixels[i] = r;
     this.pixels[i + 1] = g;
     this.pixels[i + 2] = b;
     this.pixels[i + 3] = a;
@@ -352,9 +392,14 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
       if (visited[idx]) continue;
       visited[idx] = 1;
       const i = idx * 4;
-      if (this.pixels[i] !== targetR || this.pixels[i + 1] !== targetG ||
-          this.pixels[i + 2] !== targetB || this.pixels[i + 3] !== targetA) continue;
-      this.pixels[i]     = fillR;
+      if (
+        this.pixels[i] !== targetR ||
+        this.pixels[i + 1] !== targetG ||
+        this.pixels[i + 2] !== targetB ||
+        this.pixels[i + 3] !== targetA
+      )
+        continue;
+      this.pixels[i] = fillR;
       this.pixels[i + 1] = fillG;
       this.pixels[i + 2] = fillB;
       this.pixels[i + 3] = fillA;
@@ -389,8 +434,14 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   // ---- Zoom ----
 
-  zoomIn(): void  { this.zoom = Math.min(24, this.zoom + 1); this.queueDraw(); }
-  zoomOut(): void { this.zoom = Math.max(1,  this.zoom - 1); this.queueDraw(); }
+  zoomIn(): void {
+    this.zoom = Math.min(24, this.zoom + 1);
+    this.queueDraw();
+  }
+  zoomOut(): void {
+    this.zoom = Math.max(1, this.zoom - 1);
+    this.queueDraw();
+  }
 
   // ---- Color input ----
 

@@ -1,57 +1,57 @@
 <!-- Canvas toolbar -->
-<div class="canvas-toolbar">
-  <div class="canvas-controls">
+<div class="flex flex-col gap-1.5 border-b border-[var(--border)] bg-[var(--surface)] px-[14px] py-2 text-[var(--muted)]">
+  <div class="flex flex-wrap items-center gap-0.5">
     <!-- Undo / Redo -->
-    <button mat-icon-button (click)="undo.emit()" [disabled]="!canUndo" matTooltip="Undo (Ctrl+Z)">
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="undo.emit()" [disabled]="!canUndo" matTooltip="Undo (Ctrl+Z)">
       <mat-icon>undo</mat-icon>
     </button>
-    <button mat-icon-button (click)="redo.emit()" [disabled]="!canRedo" matTooltip="Redo (Ctrl+Y)">
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="redo.emit()" [disabled]="!canRedo" matTooltip="Redo (Ctrl+Y)">
       <mat-icon>redo</mat-icon>
     </button>
-    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Object actions -->
-    <button mat-stroked-button class="canvas-add-object-button" (click)="addObject.emit()" matTooltip="Add new object">
+    <button mat-stroked-button class="!h-10 !min-w-0 !border-[var(--border)] !bg-[var(--surface2)] !px-3 !text-[0.76rem] !text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px] hover:!border-[var(--accent2)] hover:!text-[var(--accent2)]" (click)="addObject.emit()" matTooltip="Add new object">
       <mat-icon>add</mat-icon> Object
     </button>
-    <button mat-icon-button (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
       <mat-icon>content_copy</mat-icon>
     </button>
-    <button mat-icon-button (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected (Del)">
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="removeObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Remove selected (Del)">
       <mat-icon>delete</mat-icon>
     </button>
-    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- View controls -->
-    <button mat-icon-button (click)="frameAll.emit()" matTooltip="Frame all objects">
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="frameAll.emit()" matTooltip="Frame all objects">
       <mat-icon>fit_screen</mat-icon>
     </button>
-    <button mat-icon-button (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="centerSelected.emit()" [disabled]="selectedObjIndex === null" matTooltip="Center on selected">
       <mat-icon>center_focus_strong</mat-icon>
     </button>
-    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Marks toggle + mark management (visible when marks enabled) -->
-    <button mat-icon-button [class.btn-active]="showMarks" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showMarks ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''" (click)="toggleMarks.emit()" matTooltip="Toggle checkpoint marks">
       <mat-icon>edit_location</mat-icon>
     </button>
     @if (showMarks) {
-      <button mat-icon-button (click)="addMark.emit()" [disabled]="workerBusy" matTooltip="Add mark">
+      <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="addMark.emit()" [disabled]="workerBusy" matTooltip="Add mark">
         <mat-icon>add_location</mat-icon>
       </button>
-      <button mat-icon-button [class.btn-active]="markCreateMode"
+      <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="markCreateMode ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''"
         (click)="markCreateMode ? confirmMarkCreate.emit() : startMarkCreate.emit()"
         [disabled]="workerBusy"
         [matTooltip]="markCreateMode ? 'Confirm create (' + pendingMarkPointCount + ' pts)' : 'Create mark by click'">
         <mat-icon>{{ markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon>
       </button>
-      <button mat-icon-button (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
+      <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="removeMark.emit()" [disabled]="selectedMarkIndex === null || workerBusy" matTooltip="Remove selected mark">
         <mat-icon>remove_circle_outline</mat-icon>
       </button>
-      <button mat-icon-button [class.btn-active]="showMarkingPopup"
+      <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showMarkingPopup ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''"
         (click)="toggleMarkingPopup()"
         [matTooltip]="showMarkingPopup ? 'Close marking generator' : 'Generate road markings'">
         <mat-icon>auto_awesome</mat-icon>
       </button>
     }
-    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Draw mode selector: 'none' = select/pan; other values enable barrier drawing -->
     <mat-button-toggle-group [value]="drawMode" (change)="drawModeChange.emit($event.value)"
                              matTooltip="Select draw mode">
@@ -68,9 +68,9 @@
         <mat-icon>timeline</mat-icon>
       </mat-button-toggle>
     </mat-button-toggle-group>
-    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
-    <form class="canvas-property-controls" [formGroup]="canvasForm">
-      <mat-form-field appearance="outline" class="canvas-inline-field canvas-inline-field--road">
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
+    <form class="flex min-w-0 flex-wrap items-center gap-2 overflow-visible py-1.5" [formGroup]="canvasForm">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 min-w-[140px] max-w-[220px] flex-[1_1_0]">
         <mat-label>Road Info</mat-label>
         <mat-select
           formControlName="roadInfo"
@@ -78,40 +78,41 @@
         >
           <mat-select-trigger>
             @if (getRoadInfoOption(canvasForm.controls.roadInfo.value ?? editRoadInfo); as selectedRoadInfo) {
-              <span class="road-info-trigger">
+              <span class="inline-flex min-w-0 items-center gap-2">
                 @if (selectedRoadInfo.previewUrl) {
-                  <img class="road-info-thumb" [src]="selectedRoadInfo.previewUrl" [alt]="'Road info ' + selectedRoadInfo.id" />
+                  <img class="h-4 max-h-3 w-8 max-w-7 shrink-0 rounded border border-[var(--border)] object-cover" [src]="selectedRoadInfo.previewUrl" [alt]="'Road info ' + selectedRoadInfo.id" />
                 } @else {
-                  <span class="road-info-thumb road-info-thumb--fallback" [class.water]="selectedRoadInfo.water"></span>
+                  <span class="h-4 max-h-3 w-8 max-w-7 shrink-0 rounded border border-[var(--border)]" [style.background]="selectedRoadInfo.water ? 'linear-gradient(135deg,var(--success),var(--track-up))' : 'linear-gradient(135deg,var(--surface4),var(--surface2))'"></span>
                 }
                 <span>{{ selectedRoadInfo.label }}</span>
               </span>
             } @else {
-              <span class="road-info-trigger">
-                <span class="road-info-thumb road-info-thumb--fallback"></span>
+              <span class="inline-flex min-w-0 items-center gap-2">
+                <span class="h-4 max-h-3 w-8 max-w-7 shrink-0 rounded border border-[var(--border)] bg-[linear-gradient(135deg,var(--surface4),var(--surface2))]"></span>
                 <span>Road {{ canvasForm.controls.roadInfo.value ?? editRoadInfo }}</span>
               </span>
             }
           </mat-select-trigger>
           @for (option of roadInfoOptions; track option.id) {
             <mat-option [value]="option.id">
-              <span class="road-info-option">
+              <span class="inline-flex min-w-0 items-center gap-2">
                 @if (option.previewUrl) {
-                  <img class="road-info-thumb" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
+                  <img class="h-4 max-h-3 w-8 max-w-7 shrink-0 rounded border border-[var(--border)] object-cover" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
                 } @else {
-                  <span class="road-info-thumb road-info-thumb--fallback" [class.water]="option.water"></span>
+                  <span class="h-4 max-h-3 w-8 max-w-7 shrink-0 rounded border border-[var(--border)]" [style.background]="option.water ? 'linear-gradient(135deg,var(--success),var(--track-up))' : 'linear-gradient(135deg,var(--surface4),var(--surface2))'"></span>
                 }
-                <span class="road-info-option-label">{{ option.label }}</span>
+                <span class="whitespace-nowrap">{{ option.label }}</span>
               </span>
             </mat-option>
           }
         </mat-select>
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="canvas-inline-field canvas-inline-field--time">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 min-w-[100px] max-w-[120px] flex-[1_1_0]">
         <mat-label>Time Limit</mat-label>
         <input
           matInput
+          class="text-right"
           type="text"
           formControlName="editTimeText"
           inputmode="numeric"
@@ -135,22 +136,22 @@
         <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
       </mat-button-toggle-group>
     }
-    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Zoom controls -->
-    <button mat-icon-button (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
-    <button mat-icon-button (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
-    <button mat-icon-button (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
-    <mat-divider [vertical]="true" class="toolbar-divider"></mat-divider>
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="zoomOut.emit()" matTooltip="Zoom out (-)"><mat-icon>zoom_out</mat-icon></button>
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="resetView.emit()" matTooltip="Reset view"><mat-icon>home</mat-icon></button>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Info button -->
-    <button mat-icon-button [class.btn-active]="showInfoPopup" (click)="showInfoPopup = !showInfoPopup" matTooltip="Editor help &amp; info">
+    <button mat-icon-button class="!h-7 !w-7 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" [ngClass]="showInfoPopup ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''" (click)="showInfoPopup = !showInfoPopup" matTooltip="Editor help &amp; info">
       <mat-icon>info</mat-icon>
     </button>
   </div>
 </div>
 
-<div class="object-canvas-col">
-  <div class="canvas-with-scrollbars" style="position:relative">
-    <canvas id="object-canvas" class="object-canvas" width="900" height="700"
+<div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+  <div class="relative grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_14px] grid-rows-[minmax(0,1fr)_14px] overflow-hidden">
+    <canvas id="object-canvas" class="col-[1] row-[1] block h-full min-h-0 w-full min-w-0 bg-[#1a2a1a]" width="900" height="700"
       tabindex="0"
       (mousedown)="canvasMouseDown.emit($event)"
       (mousemove)="canvasMouseMove.emit($event)"
@@ -163,13 +164,13 @@
       [style.cursor]="isDragging || dragTrackWaypoint ? 'grabbing' : (hoverTrackWaypoint ? 'grab' : (spaceDown ? 'grab' : 'default'))"
     ></canvas>
     <!-- Vertical scrollbar: direct mapping - value=min(=0) → see start(Y=0), value=max → see end -->
-    <input type="range" class="canvas-scrollbar canvas-scrollbar--vert"
+    <input type="range" class="col-[2] row-[1] w-[14px] self-stretch border-l border-l-[var(--border)] bg-[var(--bg)] [appearance:none] [direction:rtl] [writing-mode:vertical-lr] focus:outline-none [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:w-[10px] [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--surface4)] [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:h-10 [&::-webkit-slider-thumb]:w-[10px] [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-[5px] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[var(--border)] [&::-webkit-slider-thumb]:bg-[var(--surface4)] hover:[&::-webkit-slider-thumb]:bg-[var(--accent2)]"
       aria-label="Vertical scroll position"
       [min]="0" [max]="scrollYMax" [step]="10"
       [formControl]="canvasForm.controls.panY"
     />
     <!-- Horizontal scrollbar -->
-    <input type="range" class="canvas-scrollbar canvas-scrollbar--horiz"
+    <input type="range" class="col-[1] row-[2] h-[14px] w-full border-t border-t-[var(--border)] bg-[var(--bg)] [appearance:none] focus:outline-none [&::-moz-range-thumb]:h-[10px] [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--surface4)] [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:h-[10px] [&::-webkit-slider-thumb]:w-10 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-[5px] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[var(--border)] [&::-webkit-slider-thumb]:bg-[var(--surface4)] hover:[&::-webkit-slider-thumb]:bg-[var(--accent2)]"
       [min]="scrollXMin" [max]="scrollXMax" [step]="5"
       [formControl]="canvasForm.controls.panX"
     />
@@ -198,13 +199,13 @@
       ></app-canvas-info-popup>
     }
   </div>
-  <div class="canvas-status-bar">
-    <span class="zoom-info">{{ (zoom * 100).toFixed(0) }}%</span>
-    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
-    <span class="pan-info">({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})</span>
-    <mat-divider [vertical]="true" class="status-divider"></mat-divider>
-    <span class="legend-item" style="color:#42a5f5">&#9632; Up</span>
-    <span class="legend-item" style="color:#ef5350">&#9632; Down</span>
-    <span class="legend-item" style="color:#00e5ff">&#9650; Start X</span>
+  <div class="flex flex-wrap items-center gap-2 border-t border-t-[var(--border)] bg-[var(--bg)] px-[14px] py-1 text-[0.72rem] text-[var(--muted)]">
+    <span class="font-semibold text-[var(--on-surface)]">{{ (zoom * 100).toFixed(0) }}%</span>
+    <mat-divider [vertical]="true" class="!h-[14px] !border-r-[var(--border)]"></mat-divider>
+    <span class="font-mono text-[var(--muted)]">({{ panX | number:'1.0-0' }}, {{ panY | number:'1.0-0' }})</span>
+    <mat-divider [vertical]="true" class="!h-[14px] !border-r-[var(--border)]"></mat-divider>
+    <span class="text-[0.7rem]" style="color:#42a5f5">&#9632; Up</span>
+    <span class="text-[0.7rem]" style="color:#ef5350">&#9632; Down</span>
+    <span class="text-[0.7rem]" style="color:#00e5ff">&#9650; Start X</span>
   </div>
 </div>

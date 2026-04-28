@@ -1,9 +1,19 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, OnChanges, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  EventEmitter,
+  Input,
+  Output,
+  OnChanges,
+  SimpleChanges,
+} from '@angular/core';
 
 @Component({
   selector: 'app-editor-screens-section',
   templateUrl: './editor-screens-section.component.html',
-  styleUrls: ['./editor-screens-section.component.scss'],
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

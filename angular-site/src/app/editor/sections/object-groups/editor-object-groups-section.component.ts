@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormArray, FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ObjectGroupDefinition, ObjectGroupEntryData } from '../../../level-editor.service';
@@ -15,7 +23,9 @@ type EntryForm = FormGroup<{
 @Component({
   selector: 'app-editor-object-groups-section',
   templateUrl: './editor-object-groups-section.component.html',
-  styleUrl: './editor-object-groups-section.component.scss',
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

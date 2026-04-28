@@ -1,38 +1,38 @@
-<mat-card class="tab-panel-card">
-  <mat-card-content>
+<mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
+  <mat-card-content class="min-h-0 overflow-hidden">
     @if (objectTypes.length > 0) {
-      <div class="object-type-viewer">
-        <aside class="object-type-sidebar">
-          <div class="object-type-sidebar-header">
-            <div class="object-type-sidebar-copy">
-              <div class="object-type-sidebar-title">Object Type Editor</div>
-              <div class="object-type-sidebar-subtitle">Pack 128 (kPackObTy) - reusable object definitions used by placed objects and object groups</div>
-              <div class="object-type-sidebar-meta">{{ objectTypes.length }} definitions</div>
+      <div class="flex min-h-0 flex-1 gap-6 overflow-hidden max-[1200px]:flex-col">
+        <aside class="custom-scrollbar flex min-h-0 min-w-0 basis-[340px] flex-col gap-3 rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] p-[14px] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] max-[1200px]:basis-auto">
+          <div class="flex items-start justify-between gap-3 pb-1">
+            <div class="min-w-0 flex-1">
+              <div class="text-base font-bold text-[var(--text)]">Object Type Editor</div>
+              <div class="mt-1 text-[0.82rem] leading-[1.45] text-[var(--muted)]">Pack 128 (kPackObTy) - reusable object definitions used by placed objects and object groups</div>
+              <div class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">{{ objectTypes.length }} definitions</div>
             </div>
             <button mat-icon-button color="primary" (click)="addType.emit()" [disabled]="workerBusy" matTooltip="Create a new type">
               <mat-icon>add</mat-icon>
             </button>
           </div>
 
-          <div class="object-type-list">
+          <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
             @for (type of objectTypes; track trackType($index, type)) {
               <button
-                class="object-type-item"
-                [class.object-type-item--active]="selectedObjectTypeId === type.typeRes"
+                class="flex w-full items-center gap-3 rounded-[10px] border border-transparent bg-[var(--surface2)] px-3 py-2.5 text-left transition duration-100 ease-out hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]"
+                [ngClass]="selectedObjectTypeId === type.typeRes ? 'border-[color:rgba(66,165,245,0.55)] bg-[color:rgba(66,165,245,0.16)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]' : ''"
                 (click)="selectedObjectTypeIdChange.emit(type.typeRes)">
-                <span class="object-type-item__thumb">
+                <span class="grid h-[52px] w-[52px] shrink-0 place-items-center overflow-hidden rounded-[10px] border border-white/10 bg-white/[0.04]">
                   @if (getSpriteUrl(type.frame); as url) {
-                    <img [src]="url" class="object-type-item__img" [style.imageRendering]="'pixelated'" alt="" />
+                    <img [src]="url" class="block h-full w-full object-contain" [style.imageRendering]="'pixelated'" alt="" />
                   } @else {
-                    <span class="object-type-item__img object-type-item__img--fallback">{{ type.frame }}</span>
+                    <span class="text-[0.8rem] font-bold text-[var(--muted)]">{{ type.frame }}</span>
                   }
                 </span>
-                <span class="object-type-item__main">
-                  <span class="object-type-item__title">Type #{{ type.typeRes }}</span>
-                  <span class="object-type-item__meta">{{ getFrameLabel(type.frame) }}</span>
-                  <span class="object-type-item__meta">{{ type.width.toFixed(1) }}×{{ type.length.toFixed(1) }} m</span>
+                <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span class="text-[0.94rem] font-bold">Type #{{ type.typeRes }}</span>
+                  <span class="text-[0.76rem] text-[var(--muted)]">{{ getFrameLabel(type.frame) }}</span>
+                  <span class="text-[0.76rem] text-[var(--muted)]">{{ type.width.toFixed(1) }}×{{ type.length.toFixed(1) }} m</span>
                 </span>
-                <mat-icon class="object-type-item__chevron">chevron_right</mat-icon>
+                <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)] opacity-85">chevron_right</mat-icon>
               </button>
             }
           </div>
@@ -40,15 +40,15 @@
         </aside>
 
         @if (selectedType; as type) {
-          <div class="object-type-detail">
-            <div class="object-type-detail-header">
+          <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-[14px] overflow-y-auto pr-1">
+            <div class="flex items-start justify-between gap-[18px] max-[1200px]:flex-col">
               <div>
-                <h4 class="audio-detail-title">Type #{{ type.typeRes }}</h4>
-                <p class="muted object-type-detail-copy">
+                <h4 class="text-base font-bold text-[var(--on-surface)]">Type #{{ type.typeRes }}</h4>
+                <p class="max-w-[760px] text-[0.85rem] text-[var(--muted)]">
                   This definition controls the sprite frame, animation, collision, physics, scoring, and special gameplay flags.
                 </p>
               </div>
-              <div class="object-type-detail-actions">
+              <div class="flex flex-wrap justify-end gap-2 max-[1200px]:justify-start">
                 <button mat-raised-button color="primary" (click)="addType.emit()" [disabled]="workerBusy">
                   <mat-icon>add</mat-icon> Add Type
                 </button>
@@ -58,12 +58,12 @@
               </div>
             </div>
 
-            <div class="object-type-hero">
-              <div class="object-type-preview-shell">
+            <div class="grid grid-cols-[minmax(180px,260px)_minmax(0,1fr)] items-start gap-4 max-[1200px]:grid-cols-1">
+              <div class="relative w-full max-w-[260px] max-[1200px]:max-w-[320px]">
                 @if (getSpriteUrl(getPreviewFrameId(type)); as url) {
-                  <img [src]="url" class="object-type-preview" [style.imageRendering]="'pixelated'" alt="object type preview" />
+                  <img [src]="url" class="aspect-square w-full rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_25%_25%,rgba(144,202,249,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),var(--surface2)] object-contain shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]" [style.imageRendering]="'pixelated'" alt="object type preview" />
                 } @else {
-                  <div class="object-type-preview object-type-preview--placeholder">
+                  <div class="flex aspect-square w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_25%_25%,rgba(144,202,249,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),var(--surface2)] font-semibold text-[var(--muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                     <mat-icon>photo_library</mat-icon>
                     <span>Preview unavailable</span>
                   </div>
@@ -71,7 +71,7 @@
                 @if (hasPreviewFrameControls(type)) {
                   <button
                     mat-icon-button
-                    class="object-type-preview-nav object-type-preview-nav--left"
+                    class="!absolute !left-[10px] !top-1/2 !h-[38px] !w-[38px] !-translate-y-1/2 !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !shadow-[0_4px_18px_rgba(0,0,0,0.24)]"
                     [disabled]="workerBusy"
                     aria-label="Previous preview frame"
                     matTooltip="Previous frame"
@@ -80,7 +80,7 @@
                   </button>
                   <button
                     mat-icon-button
-                    class="object-type-preview-nav object-type-preview-nav--right"
+                    class="!absolute !right-[10px] !top-1/2 !h-[38px] !w-[38px] !-translate-y-1/2 !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !shadow-[0_4px_18px_rgba(0,0,0,0.24)]"
                     [disabled]="workerBusy"
                     aria-label="Next preview frame"
                     matTooltip="Next frame"
@@ -89,9 +89,9 @@
                   </button>
                 }
               </div>
-              <mat-card class="sprite-meta-card object-type-meta-card">
-                <mat-card-content>
-                  <p class="sprite-meta">
+              <mat-card class="self-stretch !border !border-[var(--border)] !bg-[var(--surface3)]">
+                <mat-card-content class="!px-3.5 !py-2.5">
+                  <p class="m-0 text-[0.82rem] leading-[1.7] text-[var(--on-surface)] [&_strong]:font-semibold [&_strong]:text-[var(--muted)]">
                     <strong>Preview</strong> {{ getFrameLabel(getPreviewFrameId(type)) }}<br>
                     <strong>Base</strong> {{ getFrameLabel(type.frame) }}<br>
                     <strong>Collision</strong> {{ type.width.toFixed(1) }}×{{ type.length.toFixed(1) }} m<br>
@@ -101,10 +101,10 @@
               </mat-card>
             </div>
 
-            <div class="object-type-field-stack" [formGroup]="typeForm">
-              <div class="object-type-field-section">
-                <div class="object-type-section-title">Sprite frame</div>
-                <mat-form-field appearance="outline" class="object-type-sprite-frame-field">
+            <div class="flex min-h-0 flex-col gap-3" [formGroup]="typeForm">
+              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
+                <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Sprite frame</div>
+                <mat-form-field appearance="outline" class="w-full max-w-[520px]">
                   <mat-label>Sprite Frame</mat-label>
                   <mat-select
                     panelClass="object-type-frame-select-panel"
@@ -122,9 +122,9 @@
                 </mat-form-field>
               </div>
 
-              <div class="object-type-field-section">
-                <div class="object-type-section-title">Core data</div>
-                <div class="object-type-field-grid object-type-field-grid--dense">
+              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
+                <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Core data</div>
+                <div class="grid min-h-0 grid-cols-2 gap-3 max-[1200px]:grid-cols-1">
                   <mat-form-field appearance="outline">
                     <mat-label>Frame Count</mat-label>
                     <input
@@ -203,9 +203,9 @@
                 </div>
               </div>
 
-              <div class="object-type-field-section">
-                <div class="object-type-section-title">References</div>
-                <div class="object-type-field-grid object-type-field-grid--dense">
+              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
+                <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">References</div>
+                <div class="grid min-h-0 grid-cols-2 gap-3 max-[1200px]:grid-cols-1">
                   <mat-form-field appearance="outline">
                     <mat-label>Death Object</mat-label>
                     <mat-select formControlName="deathObj">
@@ -270,12 +270,12 @@
                 </div>
               </div>
 
-              <div class="object-type-field-section">
-                <div class="object-type-section-title">Flags</div>
-                <div class="object-type-flag-panel">
-                  <div class="object-type-flag-group">
-                    <div class="object-type-flag-group-title">flags</div>
-                    <div class="object-type-flag-grid">
+              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
+                <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Flags</div>
+                <div class="grid grid-cols-2 gap-[14px] max-[1200px]:grid-cols-1">
+                  <div class="min-w-0">
+                    <div class="mb-2.5 text-[0.84rem] font-bold text-[var(--text)]">flags</div>
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-2 max-[1200px]:grid-cols-1">
                       @for (flag of flagOptions.flags; track flag.bit; let i = $index) {
                         <mat-checkbox
                           [formControl]="flagForms.flags.controls[i]"
@@ -287,9 +287,9 @@
                     </div>
                   </div>
 
-                  <div class="object-type-flag-group">
-                    <div class="object-type-flag-group-title">flags2</div>
-                    <div class="object-type-flag-grid">
+                  <div class="min-w-0">
+                    <div class="mb-2.5 text-[0.84rem] font-bold text-[var(--text)]">flags2</div>
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-2 max-[1200px]:grid-cols-1">
                       @for (flag of flagOptions.flags2; track flag.bit; let i = $index) {
                         <mat-checkbox
                           [formControl]="flagForms.flags2.controls[i]"
@@ -305,18 +305,18 @@
             </div>
           </div>
         } @else {
-          <div class="object-type-detail object-type-detail--empty">
-            <div class="res-placeholder">
-              <p class="muted">Select an object type from the list.</p>
+          <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-[14px] overflow-y-auto pr-1">
+            <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
+              <p class="text-[0.85rem] text-[var(--muted)]">Select an object type from the list.</p>
             </div>
           </div>
         }
       </div>
 
     } @else {
-      <div class="no-data-content">
-        <mat-icon class="no-data-icon">category</mat-icon>
-        <p>Object type definitions from Pack 128 (kPackObTy) will appear here once a resources.dat is loaded.</p>
+      <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">category</mat-icon>
+        <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Object type definitions from Pack 128 (kPackObTy) will appear here once a resources.dat is loaded.</p>
       </div>
     }
   </mat-card-content>

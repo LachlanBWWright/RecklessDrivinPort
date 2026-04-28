@@ -1,4 +1,12 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, OnChanges, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  ChangeDetectionStrategy,
+  OnChanges,
+  SimpleChanges,
+} from '@angular/core';
 import { FormArray, FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type {
@@ -39,7 +47,9 @@ type RoadInfoFormModel = {
 @Component({
   selector: 'app-properties-tab',
   templateUrl: './properties-tab.component.html',
-  styleUrl: './properties-tab.component.scss',
+  host: {
+    class: 'flex min-h-0 w-full flex-1 flex-col',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -57,7 +67,11 @@ export class PropertiesTabComponent implements OnChanges {
 
   @Output() roadInfoChange = new EventEmitter<number>();
   @Output() roadInfoInput = new EventEmitter<{ field: RoadField; value: RoadFieldValue }>();
-  @Output() objGroupInput = new EventEmitter<{ index: number; field: 'resID' | 'numObjs'; value: number }>();
+  @Output() objGroupInput = new EventEmitter<{
+    index: number;
+    field: 'resID' | 'numObjs';
+    value: number;
+  }>();
 
   readonly roadInfoForm = new FormGroup<RoadInfoFormModel>({
     friction: new FormControl<number | null>(null),
@@ -205,7 +219,9 @@ export class PropertiesTabComponent implements OnChanges {
         this.objectGroupNumObjsForm.push(new FormControl(0, { nonNullable: true }));
       }
       for (let i = 0; i < this.editObjectGroups.length; i += 1) {
-        this.objectGroupNumObjsForm.at(i).setValue(this.editObjectGroups[i].numObjs, { emitEvent: false });
+        this.objectGroupNumObjsForm
+          .at(i)
+          .setValue(this.editObjectGroups[i].numObjs, { emitEvent: false });
       }
     } finally {
       this.syncingObjectGroupNumObjsForm = false;

@@ -1,13 +1,13 @@
-<mat-card class="tab-panel-card">
-  <mat-card-content>
+<mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
+  <mat-card-content class="min-h-0 overflow-hidden">
     @if (iconEntries.length > 0) {
-      <div class="screens-sidebar-layout">
-        <aside class="screens-sidebar">
-          <div class="screens-sidebar-header">
-            <div class="screens-sidebar-copy">
-              <div class="screens-sidebar-title">Screens &amp; HUD Icons Editor</div>
-              <div class="screens-sidebar-subtitle">Icon and screen image resources - ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</div>
-              <div class="screens-sidebar-meta">{{ iconEntries.length }} resources</div>
+      <div class="flex min-h-0 flex-1 items-stretch gap-6 overflow-hidden max-[1100px]:flex-col">
+        <aside class="flex min-h-0 w-[340px] shrink-0 flex-col gap-3 rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] max-[1100px]:w-auto">
+          <div class="flex items-start justify-between gap-3 pb-1">
+            <div class="min-w-0 flex-1">
+              <div class="text-base font-bold text-[var(--text)]">Screens &amp; HUD Icons Editor</div>
+              <div class="mt-1 text-[0.82rem] leading-[1.45] text-[var(--muted)]">Icon and screen image resources - ICN# (1-bit), icl8/ics8 (8-bit colour), PICT (QuickDraw pictures)</div>
+              <div class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">{{ iconEntries.length }} resources</div>
             </div>
             <button
               mat-icon-button
@@ -19,44 +19,46 @@
             </button>
           </div>
 
-          <div class="screens-list">
+          <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
             @for (icon of iconEntries; track trackIconEntry($index, icon)) {
               <button
                 type="button"
-                class="screens-list-item"
-                [class.screens-list-item--active]="selectedIconId === icon.id && selectedIconType === icon.type"
+                class="flex w-full items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition"
+                [ngClass]="selectedIconId === icon.id && selectedIconType === icon.type
+                  ? 'border-[color:rgba(66,165,245,0.6)] bg-[color:rgba(66,165,245,0.12)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]'
+                  : 'border-transparent bg-[var(--surface2)] hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]'"
                 (click)="selectIconEntry.emit({ type: icon.type, id: icon.id })">
-                <span class="screens-list-item__thumb">
+                <span class="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-white/5">
                   @if (getIconThumbDataUrl(icon.type, icon.id); as thumbUrl) {
-                    <img [src]="thumbUrl" class="screens-list-item__img" alt="" />
+                    <img [src]="thumbUrl" class="block h-full w-full object-contain [image-rendering:pixelated]" alt="" />
                   } @else {
-                    <mat-icon class="screens-list-item__icon">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
+                    <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">{{ icon.type === 'PICT' ? 'wallpaper' : 'image' }}</mat-icon>
                   }
                 </span>
-                <span class="screens-list-item__main">
-                  <span class="screens-list-item__title">{{ icon.label }}</span>
-                  <span class="screens-list-item__meta">{{ icon.type }}</span>
+                <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span class="text-[0.94rem] font-bold">{{ icon.label }}</span>
+                  <span class="text-[0.76rem] text-[var(--muted)]">{{ icon.type }}</span>
                 </span>
-                <span class="res-size-badge">{{ icon.type }}</span>
-                <mat-icon class="screens-list-item__chevron">chevron_right</mat-icon>
+                <span class="ml-1 text-[0.72rem] text-[var(--muted)]">{{ icon.type }}</span>
+                <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)] opacity-85">chevron_right</mat-icon>
               </button>
             }
           </div>
         </aside>
 
         @if (selectedIconId !== null) {
-          <div class="icon-detail">
-            <h4 class="audio-detail-title">{{ selectedIconLabel }}</h4>
+          <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden py-1">
+            <h4 class="text-base font-bold text-[var(--on-surface)]">{{ selectedIconLabel }}</h4>
             @if (iconPreviewDataUrl; as url) {
-              <img [src]="url" class="icon-large-preview"
+              <img [src]="url" class="h-32 w-32 rounded border-2 border-white/20 [image-rendering:pixelated]"
                 [style.imageRendering]="'pixelated'" alt="icon preview">
             } @else {
-              <div class="icon-placeholder">
+              <div class="flex h-32 w-32 items-center justify-center">
                 <mat-spinner diameter="32"></mat-spinner>
               </div>
             }
             @if (selectedIconType !== 'PICT' && selectedIconType !== 'PPic') {
-              <div class="sprite-actions">
+              <div class="flex flex-wrap gap-2">
                 <button mat-stroked-button (click)="exportIconPng.emit()">
                   <mat-icon>download</mat-icon> Export PNG
                 </button>
@@ -70,7 +72,7 @@
                   <mat-icon>upload</mat-icon> Replace PNG
                 </button>
               </div>
-              <p class="muted" style="margin-top:12px;font-size:0.85em">
+              <p class="mt-3 text-[0.85em] text-[var(--muted)]">
                 @if (selectedIconType === 'ICN#' || selectedIconType === 'ics#') {
                   ICN# / ics# resources are 32×32 1-bit black-and-white bitmaps.
                 } @else if (selectedIconType === 'icl8') {
@@ -80,7 +82,7 @@
                 }
               </p>
             } @else {
-              <div class="sprite-actions">
+              <div class="flex flex-wrap gap-2">
                 <button mat-stroked-button (click)="exportIconRaw.emit()">
                   <mat-icon>download</mat-icon> Export Raw
                 </button>
@@ -88,15 +90,15 @@
             }
           </div>
         } @else {
-          <div class="res-placeholder">
-            <p class="muted">Select an entry from the list.</p>
+          <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
+            <p class="text-[0.85rem] text-[var(--muted)]">Select an entry from the list.</p>
           </div>
         }
       </div>
     } @else {
-      <div class="no-data-content">
-        <mat-icon class="no-data-icon">image_not_supported</mat-icon>
-        <p>Screen and icon resources will appear here once a resources.dat is loaded.</p>
+      <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">image_not_supported</mat-icon>
+        <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Screen and icon resources will appear here once a resources.dat is loaded.</p>
       </div>
     }
   </mat-card-content>

@@ -1,14 +1,36 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, OnChanges, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  EventEmitter,
+  Input,
+  Output,
+  OnChanges,
+  SimpleChanges,
+} from '@angular/core';
 import { FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import type { RoadInfoData, RoadInfoOption, RoadTileGroup, TextureTileEntry } from '../../../level-editor.service';
+import type {
+  RoadInfoData,
+  RoadInfoOption,
+  RoadTileGroup,
+  TextureTileEntry,
+} from '../../../level-editor.service';
 
-type TextureField = 'backgroundTex' | 'foregroundTex' | 'roadLeftBorder' | 'roadRightBorder' | 'marks' | 'tracks' | 'skidSound';
+type TextureField =
+  | 'backgroundTex'
+  | 'foregroundTex'
+  | 'roadLeftBorder'
+  | 'roadRightBorder'
+  | 'marks'
+  | 'tracks'
+  | 'skidSound';
 
 @Component({
   selector: 'app-editor-tiles-section',
   templateUrl: './editor-tiles-section.component.html',
-  styleUrl: './editor-tiles-section.component.scss',
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -57,9 +79,10 @@ export class EditorTilesSectionComponent implements OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if ('selectedTileId' in changes || 'tileTileEntries' in changes) {
-      const entry = this.selectedTileId !== null
-        ? this.tileTileEntries.find((t) => t.texId === this.selectedTileId)
-        : undefined;
+      const entry =
+        this.selectedTileId !== null
+          ? this.tileTileEntries.find((t) => t.texId === this.selectedTileId)
+          : undefined;
       this.selectedTileDimensions = entry ? `${entry.width}×${entry.height}` : '?';
     }
     if ('selectedRoadInfoData' in changes) {
@@ -104,7 +127,9 @@ export class EditorTilesSectionComponent implements OnChanges {
     if (refs.length > 0) {
       return `Referenced by road${refs.length > 1 ? 's' : ''} ${refs.join(', ')}. Reassign those road textures first.`;
     }
-    return this.workerBusy ? 'Wait until the current operation finishes.' : 'Delete this tile image.';
+    return this.workerBusy
+      ? 'Wait until the current operation finishes.'
+      : 'Delete this tile image.';
   }
 
   getAudioEntry(audioId: number): { id: number; sizeBytes: number; durationMs?: number } | null {

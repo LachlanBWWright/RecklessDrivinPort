@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { MarkSeg } from '../level-editor.service';
@@ -13,7 +21,9 @@ type MarkField = 'x1' | 'y1' | 'x2' | 'y2';
 @Component({
   selector: 'app-marks-editor',
   templateUrl: './marks-editor.component.html',
-  styleUrl: './marks-editor.component.scss',
+  host: {
+    class: 'block',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -22,7 +32,7 @@ export class MarksEditorComponent implements OnChanges {
   @Input() selectedMarkIndex: number | null = null;
   @Input() workerBusy = false;
 
-  @Output() markSelected   = new EventEmitter<number>();
+  @Output() markSelected = new EventEmitter<number>();
   @Output() markFieldInput = new EventEmitter<{ idx: number; field: MarkField; value: number }>();
 
   readonly markForm = new FormGroup({

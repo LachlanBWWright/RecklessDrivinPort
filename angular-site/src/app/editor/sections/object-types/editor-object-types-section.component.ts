@@ -52,7 +52,9 @@ type ReferenceField = 'deathObj' | 'creationSound' | 'otherSound' | 'weaponObj';
 @Component({
   selector: 'app-editor-object-types-section',
   templateUrl: './editor-object-types-section.component.html',
-  styleUrl: './editor-object-types-section.component.scss',
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -99,7 +101,11 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
       { bit: 1 << 1, label: 'Solid friction', hint: 'Applies solid-surface friction' },
       { bit: 1 << 2, label: 'Back collision', hint: 'Uses back-collision handling' },
       { bit: 1 << 3, label: 'Random frame', hint: 'Starts on a random animation frame' },
-      { bit: 1 << 4, label: 'Die when anim ends', hint: 'Kills the object at the end of animation' },
+      {
+        bit: 1 << 4,
+        label: 'Die when anim ends',
+        hint: 'Kills the object at the end of animation',
+      },
       { bit: 1 << 5, label: 'Default death', hint: 'Spawns the default explosion on death' },
       { bit: 1 << 6, label: 'Follow marks', hint: 'Uses mark-following behavior' },
       { bit: 1 << 7, label: 'Overtake', hint: 'Allows overtaking behavior' },
@@ -168,7 +174,10 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     if (changes['selectedObjectTypeId'] && this.selectedObjectTypeId !== null) {
       const type = this.selectedType;
       if (type) {
-        this.previewFrameOffsets.set(type.typeRes, this.clampPreviewOffset(type, this.getPreviewOffset(type.typeRes)));
+        this.previewFrameOffsets.set(
+          type.typeRes,
+          this.clampPreviewOffset(type, this.getPreviewOffset(type.typeRes)),
+        );
       }
     }
     if (changes['objectTypes'] || changes['selectedObjectTypeId']) {
@@ -201,7 +210,9 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
 
   getFrameLabel(frameId: number): string {
     const frame = this.spriteFrames.find((item) => item.id === frameId);
-    return frame ? `#${frame.id} · ${frame.width}×${frame.height} · ${frame.bitDepth}-bit` : `#${frameId}`;
+    return frame
+      ? `#${frame.id} · ${frame.width}×${frame.height} · ${frame.bitDepth}-bit`
+      : `#${frameId}`;
   }
 
   getPreviewFrameCount(type: ObjectTypeDefinition): number {
@@ -263,7 +274,8 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     if (soundId === 0) return 'None';
     const sound = this.audioEntries.find((item) => item.id === soundId);
     if (!sound) return `Sound #${soundId}`;
-    const duration = sound.durationMs !== undefined ? ` · ${(sound.durationMs / 1000).toFixed(1)}s` : '';
+    const duration =
+      sound.durationMs !== undefined ? ` · ${(sound.durationMs / 1000).toFixed(1)}s` : '';
     return `Sound #${sound.id}${duration}`;
   }
 
@@ -402,7 +414,12 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
       }
     }
 
-    const referenceFields: ReferenceField[] = ['deathObj', 'creationSound', 'otherSound', 'weaponObj'];
+    const referenceFields: ReferenceField[] = [
+      'deathObj',
+      'creationSound',
+      'otherSound',
+      'weaponObj',
+    ];
     for (const field of referenceFields) {
       const value = next[field];
       if (value !== null && value !== type[field]) {

@@ -1,11 +1,21 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-object-inspector',
   templateUrl: './object-inspector.component.html',
-  styleUrl: './object-inspector.component.scss',
+  host: {
+    class: 'block',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -17,7 +27,7 @@ export class ObjectInspectorComponent implements OnChanges {
   @Input() spriteUrl: string | null = null;
   @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
   @Input() getFallbackColor: (typeRes: number) => string = () => '#888';
-  @Input() typePalette: {hex: string, typeId: number}[] = [];
+  @Input() typePalette: { hex: string; typeId: number }[] = [];
   @Input() visibleTypeFilter: Set<number> = new Set();
   @Input() workerBusy = false;
   @Input() typeDimLabel = '';
@@ -54,11 +64,13 @@ export class ObjectInspectorComponent implements OnChanges {
   }
 
   constructor() {
-    this.inspectorForm.controls.typeRes.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
-      if (value !== null) {
-        this.typeResChange.emit(value);
-      }
-    });
+    this.inspectorForm.controls.typeRes.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe((value) => {
+        if (value !== null) {
+          this.typeResChange.emit(value);
+        }
+      });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
