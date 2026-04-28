@@ -40,8 +40,12 @@ describe('App', () => {
     let resumeCount = 0;
 
     window.Module = {
-      pauseMainLoop: () => { pauseCount += 1; },
-      resumeMainLoop: () => { resumeCount += 1; },
+      pauseMainLoop: () => {
+        pauseCount += 1;
+      },
+      resumeMainLoop: () => {
+        resumeCount += 1;
+      },
     } as unknown as NonNullable<typeof window.Module>;
 
     try {
@@ -63,7 +67,7 @@ describe('App', () => {
     await fixture.whenStable();
     const gamePanel = (fixture.nativeElement as HTMLElement).querySelector('#panel-game');
     expect(gamePanel).toBeTruthy();
-    expect(gamePanel?.classList.contains('tab-panel--hidden')).toBe(true);
+    expect(gamePanel?.classList.contains('hidden')).toBe(true);
   });
 
   it('should show game panel when on game tab', async () => {
@@ -72,7 +76,7 @@ describe('App', () => {
     await fixture.whenStable();
     const gamePanel = (fixture.nativeElement as HTMLElement).querySelector('#panel-game');
     expect(gamePanel).toBeTruthy();
-    expect(gamePanel?.classList.contains('tab-panel--hidden')).toBe(false);
+    expect(gamePanel?.classList.contains('hidden')).toBe(false);
   });
 
   it('should show editor section when on editor tab', async () => {
@@ -98,7 +102,7 @@ describe('App', () => {
     // With NO_ERRORS_SCHEMA, child component internals are not rendered.
     // Verify that the game panel host element is hidden instead.
     const gamePanel = (fixture.nativeElement as HTMLElement).querySelector('#panel-game');
-    expect(gamePanel?.classList.contains('tab-panel--hidden')).toBe(true);
+    expect(gamePanel?.classList.contains('hidden')).toBe(true);
   });
 
   it('should show hero card when on game tab', async () => {
@@ -108,7 +112,7 @@ describe('App', () => {
     // With NO_ERRORS_SCHEMA, child component internals are not rendered.
     // Verify that the game panel host element is visible instead.
     const gamePanel = (fixture.nativeElement as HTMLElement).querySelector('#panel-game');
-    expect(gamePanel?.classList.contains('tab-panel--hidden')).toBe(false);
+    expect(gamePanel?.classList.contains('hidden')).toBe(false);
   });
 
   it('should default to properties section', () => {
@@ -150,30 +154,32 @@ describe('App', () => {
     app.hasEditorData.set(true);
     app.parsedLevels.set([]);
     app.selectedLevelId.set(null);
-    app.objectTypeDefinitions.set([{
-      typeRes: 200,
-      mass: 1,
-      maxEngineForce: 0,
-      maxNegEngineForce: 0,
-      friction: 1,
-      flags: 1 << 13,
-      deathObj: -1,
-      frame: 128,
-      numFrames: 1,
-      frameDuration: 0,
-      wheelWidth: 0,
-      wheelLength: 0,
-      steering: 0,
-      width: 0,
-      length: 0,
-      score: 0,
-      flags2: 0,
-      creationSound: -1,
-      otherSound: -1,
-      maxDamage: 0,
-      weaponObj: -1,
-      weaponInfo: -1,
-    }]);
+    app.objectTypeDefinitions.set([
+      {
+        typeRes: 200,
+        mass: 1,
+        maxEngineForce: 0,
+        maxNegEngineForce: 0,
+        friction: 1,
+        flags: 1 << 13,
+        deathObj: -1,
+        frame: 128,
+        numFrames: 1,
+        frameDuration: 0,
+        wheelWidth: 0,
+        wheelLength: 0,
+        steering: 0,
+        width: 0,
+        length: 0,
+        score: 0,
+        flags2: 0,
+        creationSound: -1,
+        otherSound: -1,
+        maxDamage: 0,
+        weaponObj: -1,
+        weaponInfo: -1,
+      },
+    ]);
     app.objectTypesDirty.set(true);
 
     const dispatchCalls: string[] = [];
@@ -198,8 +204,14 @@ describe('App', () => {
       await app.runtime.downloadEditedResources();
     } finally {
       app.runtime.dispatchWorker = originalDispatchWorker;
-      Object.defineProperty(URL, 'createObjectURL', { value: originalCreateObjectURL, configurable: true });
-      Object.defineProperty(URL, 'revokeObjectURL', { value: originalRevokeObjectURL, configurable: true });
+      Object.defineProperty(URL, 'createObjectURL', {
+        value: originalCreateObjectURL,
+        configurable: true,
+      });
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        value: originalRevokeObjectURL,
+        configurable: true,
+      });
     }
 
     expect(dispatchCalls).toContain('APPLY_OBJECT_TYPES');
@@ -461,20 +473,22 @@ describe('App', () => {
     const app = TestBed.createComponent(App).componentInstance;
     app.showTrackOverlay.set(true);
     const roadSegs = Array.from({ length: 5 }, () => ({ v0: -100, v1: -20, v2: 20, v3: 100 }));
-    app.parsedLevels.set([{
-      resourceId: 140,
-      objects: [],
-      marks: [],
-      roadSegs,
-      roadSegCount: roadSegs.length,
-      properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
-      objectGroups: [],
-      trackUp: [{ x: 0, y: 0, flags: 0, velo: 0 }],
-      trackDown: [],
-      rawEntry1: new Uint8Array(0),
-      rawEntry2: new Uint8Array(0),
-      encrypted: false,
-    }]);
+    app.parsedLevels.set([
+      {
+        resourceId: 140,
+        objects: [],
+        marks: [],
+        roadSegs,
+        roadSegCount: roadSegs.length,
+        properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
+        objectGroups: [],
+        trackUp: [{ x: 0, y: 0, flags: 0, velo: 0 }],
+        trackDown: [],
+        rawEntry1: new Uint8Array(0),
+        rawEntry2: new Uint8Array(0),
+        encrypted: false,
+      },
+    ]);
     app.selectedLevelId.set(140);
     app.editTrackUp.set([{ x: 0, y: 0, flags: 0, velo: 0 }]);
     app.canvasToWorld = (() => [0, 0]) as typeof app.canvasToWorld;
@@ -495,23 +509,37 @@ describe('App', () => {
     const app = TestBed.createComponent(App).componentInstance;
     app.showTrackOverlay.set(true);
     const roadSegs = Array.from({ length: 5 }, () => ({ v0: -100, v1: -10, v2: 10, v3: 100 }));
-    app.parsedLevels.set([{
-      resourceId: 140,
-      objects: [],
-      marks: [],
-      roadSegs,
-      roadSegCount: roadSegs.length,
-      properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
-      objectGroups: [],
-      trackUp: [{ x: -100, y: 0, flags: 0, velo: 0 }, { x: 100, y: 20, flags: 0, velo: 0 }],
-      trackDown: [{ x: -100, y: 0, flags: 0, velo: 0 }, { x: 100, y: 20, flags: 0, velo: 0 }],
-      rawEntry1: new Uint8Array(0),
-      rawEntry2: new Uint8Array(0),
-      encrypted: false,
-    }]);
+    app.parsedLevels.set([
+      {
+        resourceId: 140,
+        objects: [],
+        marks: [],
+        roadSegs,
+        roadSegCount: roadSegs.length,
+        properties: { roadInfo: 0, time: 120, xStartPos: 0, levelEnd: 1000, objectGroups: [] },
+        objectGroups: [],
+        trackUp: [
+          { x: -100, y: 0, flags: 0, velo: 0 },
+          { x: 100, y: 20, flags: 0, velo: 0 },
+        ],
+        trackDown: [
+          { x: -100, y: 0, flags: 0, velo: 0 },
+          { x: 100, y: 20, flags: 0, velo: 0 },
+        ],
+        rawEntry1: new Uint8Array(0),
+        rawEntry2: new Uint8Array(0),
+        encrypted: false,
+      },
+    ]);
     app.selectedLevelId.set(140);
-    app.editTrackUp.set([{ x: -100, y: 0, flags: 0, velo: 0 }, { x: 100, y: 20, flags: 0, velo: 0 }]);
-    app.editTrackDown.set([{ x: -100, y: 0, flags: 0, velo: 0 }, { x: 100, y: 20, flags: 0, velo: 0 }]);
+    app.editTrackUp.set([
+      { x: -100, y: 0, flags: 0, velo: 0 },
+      { x: 100, y: 20, flags: 0, velo: 0 },
+    ]);
+    app.editTrackDown.set([
+      { x: -100, y: 0, flags: 0, velo: 0 },
+      { x: 100, y: 20, flags: 0, velo: 0 },
+    ]);
     app.canvasToWorld = (() => [0, 200]) as typeof app.canvasToWorld;
 
     (app as unknown as Record<string, unknown>)['_roadOffscreenKey'] = 'stale-key';

@@ -1,4 +1,4 @@
-<section id="panel-game" role="tabpanel" class="flex min-h-0 flex-1 flex-col items-stretch gap-4 overflow-y-auto px-5 pb-10 pt-5 overscroll-contain" [class.hidden]="activeTab !== 'game'">
+<section id="panel-game" role="tabpanel" class="flex min-h-0 flex-1 flex-col items-stretch gap-4 px-5 pb-10 pt-5 overscroll-contain" style="overflow-y:auto" [class.hidden]="activeTab !== 'game'">
   @if (activeTab === 'game') {
     <mat-card class="w-full border border-[var(--border)] bg-[var(--surface)]">
       <mat-card-header>
@@ -10,7 +10,7 @@
           <em>Reckless Drivin'</em> by Jonas Echterhoff. Hold a number key when clicking Start to skip
           directly to that level.
         </p>
-        <p class="mt-2 text-[0.9rem] leading-[1.7] text-[var(--muted)]">
+        <p class="mt-2 text-[0.9rem] leading-[1.7] text-[var(--muted)] [&_a]:text-[var(--accent2)] [&_a]:no-underline [&_a:hover]:underline">
           Ported by <a href="https://github.com/LachlanBWWright" target="_blank" rel="noopener">LachlanBWWright</a>,
           built on <a href="https://github.com/natecraddock/open-reckless-drivin" target="_blank" rel="noopener">Nathan Craddock's work</a>
           and <a href="https://github.com/jorio/Pomme" target="_blank" rel="noopener">Pomme</a>.
@@ -20,7 +20,7 @@
     </mat-card>
   }
 
-  <mat-card class="flex w-full min-h-0 flex-col border border-[var(--border)] bg-[var(--surface)]">
+  <mat-card class="flex w-full min-h-0 shrink-0 flex-col border border-[var(--border)] bg-[var(--surface)]">
     <mat-card-header class="!relative !flex !items-start !px-4 !py-3">
       <mat-card-title class="!text-base !font-bold !text-[var(--on-surface)]">Game</mat-card-title>
       <mat-card-subtitle class="!text-[0.82rem] !text-[var(--muted)]">{{ statusText }}</mat-card-subtitle>
@@ -28,7 +28,7 @@
         <mat-icon>fullscreen</mat-icon>
       </button>
     </mat-card-header>
-    <mat-card-content class="!flex !min-h-0 !items-stretch !justify-center !px-4 !pb-4 !pt-0">
+    <mat-card-content class="!block !px-4 !pb-4 !pt-0">
       <div class="relative mx-auto flex aspect-[4/3] h-[clamp(300px,calc(100dvh-360px),720px)] w-[min(100%,calc(clamp(300px,calc(100dvh-360px),720px)*4/3))] max-w-full flex-[0_0_auto] justify-center overflow-hidden rounded border border-[var(--border)] bg-black">
         <canvas id="canvas" class="block h-full w-full [image-rendering:pixelated]" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
         <div class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/85" [class.hidden]="!overlayVisible">
@@ -39,7 +39,7 @@
       </div>
     </mat-card-content>
     <mat-card-footer class="!flex !flex-col !gap-2 !px-4 !pb-4 !pt-2">
-      <div class="flex flex-wrap items-center gap-1 px-0 py-1 text-[0.82rem] text-[var(--muted)]">
+      <div class="flex flex-wrap items-center gap-1 px-0 py-1 text-[0.82rem] text-[var(--muted)] [&_kbd]:rounded [&_kbd]:border [&_kbd]:border-[var(--border)] [&_kbd]:bg-[var(--surface3)] [&_kbd]:px-[5px] [&_kbd]:py-px [&_kbd]:font-mono [&_kbd]:text-[0.78rem] [&_kbd]:text-[var(--on-surface)]">
         <span class="mr-1 font-semibold text-[var(--on-surface)]">Controls:</span>
         <kbd>↑</kbd> Gas &nbsp;
         <kbd>↓</kbd> Brake &nbsp;
@@ -64,7 +64,7 @@
           <mat-icon>upload_file</mat-icon> Load Custom resources.dat
         </button>
         @if (customResourcesLoaded) {
-          <button mat-raised-button color="accent"
+          <button mat-raised-button class="!bg-[var(--accent2)] !text-white hover:!bg-[#1e88e5] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
             [disabled]="gameRestarting"
             (click)="restartGameWithCustomResources.emit()"
             matTooltip="Reload the page to apply the custom resources.dat">
@@ -75,7 +75,7 @@
             }
             Restart Game
           </button>
-          <button mat-stroked-button color="warn"
+          <button mat-stroked-button class="!border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)]"
             (click)="clearCustomResources.emit()"
             matTooltip="Remove the custom resources.dat and revert to the built-in defaults">
             <mat-icon>delete</mat-icon> Clear

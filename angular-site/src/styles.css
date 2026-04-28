@@ -39,6 +39,9 @@
 
 .mat-mdc-card {
   --mdc-elevated-card-container-color: var(--surface);
+  --mat-card-filled-container-color: var(--surface) !important;
+  --mat-card-elevated-container-color: var(--surface) !important;
+  background-color: var(--surface) !important;
 }
 
 .mat-mdc-tab-group,
@@ -75,11 +78,66 @@
 .mat-toolbar {
   --mat-toolbar-container-background-color: var(--bg);
   --mat-toolbar-container-text-color: var(--on-surface);
+  background-color: var(--bg) !important;
+  color: var(--on-surface) !important;
+}
+
+.mat-toolbar.mat-primary {
+  --mat-toolbar-container-background-color: var(--bg) !important;
+  --mat-toolbar-container-text-color: var(--on-surface) !important;
+  background-color: var(--bg) !important;
+}
+
+.mat-mdc-raised-button.mat-primary,
+.mat-mdc-unelevated-button.mat-primary {
+  --mat-button-protected-container-color: var(--accent) !important;
+  --mat-button-filled-container-color: var(--accent) !important;
+  --mat-button-protected-label-text-color: #fff !important;
+  --mat-button-filled-label-text-color: #fff !important;
+}
+
+.mat-mdc-raised-button.mat-accent,
+.mat-mdc-unelevated-button.mat-accent {
+  --mat-button-protected-container-color: var(--accent2) !important;
+  --mat-button-filled-container-color: var(--accent2) !important;
+  --mat-button-protected-label-text-color: #fff !important;
+  --mat-button-filled-label-text-color: #fff !important;
+}
+
+.mat-mdc-outlined-button.mat-warn,
+.mat-mdc-outlined-button.mat-primary,
+.mat-mdc-button.mat-primary,
+.mat-mdc-icon-button.mat-primary,
+.mat-mdc-icon-button.mat-warn {
+  --mat-button-outlined-label-text-color: var(--accent) !important;
+  --mat-button-outlined-state-layer-color: var(--accent) !important;
+  --mat-button-outlined-ripple-color: color-mix(in srgb, var(--accent) 12%, transparent) !important;
+}
+
+.mat-mdc-outlined-button.mat-warn,
+.mat-mdc-icon-button.mat-warn {
+  --mat-button-outlined-label-text-color: var(--danger) !important;
+  --mat-button-outlined-state-layer-color: var(--danger) !important;
+  --mat-button-outlined-ripple-color: color-mix(in srgb, var(--danger) 12%, transparent) !important;
+}
+
+.mat-mdc-icon-button.mat-primary {
+  color: var(--accent) !important;
+}
+
+.mat-mdc-icon-button.mat-warn {
+  color: var(--danger) !important;
 }
 
 @layer base {
   html {
     height: 100%;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
   }
 
   body {
@@ -96,61 +154,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  app-root {
-    display: flex;
-    min-height: 0;
-    flex: 1 1 auto;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  main {
-    display: flex;
-    min-height: 0;
-    flex: 1 1 auto;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--bg);
-  }
-
   canvas:focus {
     outline: none;
-  }
-
-  a {
-    color: var(--accent2);
-    text-decoration: none;
-  }
-
-  a:hover {
-    text-decoration: underline;
-  }
-
-  code {
-    background: var(--surface3);
-    border-radius: 4px;
-    color: var(--accent2);
-    font-family: monospace;
-    font-size: 0.85em;
-    padding: 1px 6px;
-  }
-
-  kbd {
-    background: var(--surface3);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    color: var(--on-surface);
-    font-family: monospace;
-    font-size: 0.78rem;
-    padding: 1px 5px;
   }
 }
 
 @layer components {
-  .tab-panel--hidden {
-    display: none !important;
-  }
-
   .type-id-select-panel {
     max-width: min(100vw - 32px, 520px);
   }

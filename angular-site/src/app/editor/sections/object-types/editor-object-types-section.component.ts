@@ -53,7 +53,7 @@ type ReferenceField = 'deathObj' | 'creationSound' | 'otherSound' | 'weaponObj';
   selector: 'app-editor-object-types-section',
   templateUrl: './editor-object-types-section.component.html',
   host: {
-    class: 'flex min-h-0 flex-1 flex-col',
+    class: 'flex min-h-0 w-full flex-1 flex-col',
   },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,

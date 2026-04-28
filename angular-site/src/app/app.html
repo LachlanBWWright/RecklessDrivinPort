@@ -15,10 +15,10 @@
   (selectLevel)="selectLevel($event)"
 ></app-site-toolbar>
 
-<main>
+<main class="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--bg)]">
   <app-game-panel
     id="panel-game"
-    [class.tab-panel--hidden]="activeTab() !== 'game'"
+    [class.hidden]="activeTab() !== 'game'"
     [activeTab]="activeTab()"
     [statusText]="statusText()"
     [progressPct]="progressPct()"
@@ -35,14 +35,14 @@
   ></app-game-panel>
 
   @if (activeTab() === 'editor') {
-    <section id="panel-editor" role="tabpanel" class="flex w-full min-h-0 flex-1 flex-col self-stretch overflow-hidden">
+    <section id="panel-editor" role="tabpanel" class="flex w-full min-h-0 flex-1 flex-col overflow-hidden">
       @if (!hasEditorData() && !workerBusy()) {
         <mat-card class="w-full border border-dashed border-[var(--border)] bg-[var(--surface)]">
           <mat-card-content>
             <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
               <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">folder_open</mat-icon>
               <h3 class="text-[1.2rem] font-bold text-[var(--on-surface)]">No data loaded</h3>
-              <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
+              <p class="max-w-[600px] leading-[1.6] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
             </div>
           </mat-card-content>
         </mat-card>

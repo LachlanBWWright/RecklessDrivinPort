@@ -218,6 +218,9 @@ export type { EditorUndoKind, EditorUndoSnapshot } from './app-history';
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
+  host: {
+    class: 'flex min-h-0 flex-1 flex-col overflow-hidden',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,

@@ -5,7 +5,7 @@ import { getSpriteFormatLabel } from '../../../sprite-editor';
   selector: 'app-editor-sprites-section',
   templateUrl: './editor-sprites-section.component.html',
   host: {
-    class: 'flex min-h-0 flex-1 flex-col',
+    class: 'flex min-h-0 w-full flex-1 flex-col',
   },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
