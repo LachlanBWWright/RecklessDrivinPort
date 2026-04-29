@@ -70,42 +70,143 @@
           (generateCentreMarks)="generateCentreMarks.emit($event)"
           (previewSideMarks)="previewSideMarks.emit($event)"
           (previewCentreMarks)="previewCentreMarks.emit($event)"
+          (previewRange)="previewRange.emit($event)"
           (removeMarks)="removeMarks.emit($event)"
           (clearMarkingPreview)="clearMarkingPreview.emit()"
         ></app-editor-canvas>
 
-        <div class="custom-scrollbar flex min-h-0 w-[290px] min-w-[270px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-l-[var(--border)] bg-[var(--surface2)] p-4 max-[1200px]:max-h-[42vh] max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:flex-[0_0_auto] max-[1200px]:border-l-0 max-[1200px]:border-t max-[1200px]:border-t-[var(--border)] max-[1200px]:p-3">
-          <app-object-inspector
-            [selectedIndex]="selectedObjIndex"
-            [editDirDeg]="editObjDirDeg"
-            [editTypeRes]="editObjTypeRes"
-            [availableTypeIds]="availableTypeIds"
-            [spriteUrl]="spriteUrl"
-            [getSpriteUrl]="getSpriteUrl"
-            [getFallbackColor]="getFallbackColor"
-            [typePalette]="typePalette"
-            [visibleTypeFilter]="visibleTypeFilter"
-            [workerBusy]="workerBusy"
-            [typeDimLabel]="typeDimLabel"
-            (dirDegInput)="dirDegInput.emit($event)"
-            (typeResChange)="typeResChange.emit($event)"
-            (typeVisibilityToggle)="typeVisibilityToggle.emit($event)"
-            (showAll)="showAll.emit()"
-            (hideAll)="hideAll.emit()"
-            (removeSelected)="removeSelected.emit()"
-            (deselect)="deselect.emit()"
-          ></app-object-inspector>
+        <div class="flex min-h-0 w-[320px] min-w-[300px] shrink-0 flex-col gap-3 overflow-hidden border-l border-l-[var(--border)] bg-[var(--surface2)] p-4 max-[1200px]:max-h-[42vh] max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:flex-[0_0_auto] max-[1200px]:border-l-0 max-[1200px]:border-t max-[1200px]:border-t-[var(--border)] max-[1200px]:p-3">
+          <div class="flex rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1">
+            <button
+              type="button"
+              class="flex-1 rounded-[10px] px-3 py-2 text-[0.8rem] font-semibold transition"
+              [ngClass]="sidebarTab === 'objects' ? 'bg-[color:rgba(66,165,245,0.16)] text-[var(--accent2)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]' : 'text-[var(--muted)] hover:bg-white/[0.04]'"
+              (click)="setSidebarTab('objects')"
+            >
+              Objects
+            </button>
+            <button
+              type="button"
+              class="flex-1 rounded-[10px] px-3 py-2 text-[0.8rem] font-semibold transition"
+              [ngClass]="sidebarTab === 'groups' ? 'bg-[color:rgba(66,165,245,0.16)] text-[var(--accent2)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]' : 'text-[var(--muted)] hover:bg-white/[0.04]'"
+              (click)="setSidebarTab('groups')"
+            >
+              Groups
+            </button>
+          </div>
 
-          <app-object-list
-            [objects]="objects"
-            [filteredIndices]="filteredIndices"
-            [selectedIndex]="selectedObjIndex"
-            [searchTerm]="searchTerm"
-            [getSpriteUrl]="getSpriteUrl"
-            [getFallbackColor]="getFallbackColor"
-            (objectSelected)="objectSelected.emit($event)"
-            (searchTermChange)="searchTermChange.emit($event)"
-          ></app-object-list>
+          @if (sidebarTab === 'objects') {
+            <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+              <app-object-inspector
+                [selectedIndex]="selectedObjIndex"
+                [editDirDeg]="editObjDirDeg"
+                [editTypeRes]="editObjTypeRes"
+                [availableTypeIds]="availableTypeIds"
+                [spriteUrl]="spriteUrl"
+                [getSpriteUrl]="getSpriteUrl"
+                [getFallbackColor]="getFallbackColor"
+                [typePalette]="typePalette"
+                [visibleTypeFilter]="visibleTypeFilter"
+                [workerBusy]="workerBusy"
+                [typeDimLabel]="typeDimLabel"
+                (dirDegInput)="dirDegInput.emit($event)"
+                (typeResChange)="typeResChange.emit($event)"
+                (typeVisibilityToggle)="typeVisibilityToggle.emit($event)"
+                (showAll)="showAll.emit()"
+                (hideAll)="hideAll.emit()"
+                (removeSelected)="removeSelected.emit()"
+                (deselect)="deselect.emit()"
+              ></app-object-inspector>
+
+              <app-object-list
+                [objects]="objects"
+                [filteredIndices]="filteredIndices"
+                [selectedIndex]="selectedObjIndex"
+                [searchTerm]="searchTerm"
+                [getSpriteUrl]="getSpriteUrl"
+                [getFallbackColor]="getFallbackColor"
+                (objectSelected)="objectSelected.emit($event)"
+                (searchTermChange)="searchTermChange.emit($event)"
+              ></app-object-list>
+            </div>
+          } @else {
+            <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
+              <div class="rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] px-3.5 py-3">
+                <div class="text-[0.84rem] font-semibold text-[var(--on-surface)]">Level Object Groups</div>
+                <p class="mt-1 text-[0.72rem] leading-[1.45] text-[var(--muted)]">
+                  Click a configured slot to preview its spawn band on the canvas and inspect the weighted object mix.
+                </p>
+              </div>
+
+              @for (slot of editObjectGroups; track trackGroupSlot($index)) {
+                <section class="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                  <button
+                    type="button"
+                    class="flex w-full items-start justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition hover:bg-white/[0.03]"
+                    [ngClass]="selectedObjectGroupSlotIndex === $index ? 'bg-[color:rgba(66,165,245,0.12)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]' : ''"
+                    (click)="selectObjectGroupSlot($index)"
+                  >
+                    <span class="min-w-0 flex-1">
+                      <span class="flex items-center gap-2 text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-[var(--muted)]">
+                        <span>Slot {{ $index }}</span>
+                        <span class="rounded-full bg-white/[0.06] px-2 py-0.5 text-[0.66rem] tracking-[0.06em] text-[var(--on-surface)]">{{ slot.numObjs }} max</span>
+                      </span>
+                      <span class="mt-1 block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.9rem] font-semibold text-[var(--on-surface)]">{{ getObjectGroupLabel(slot.resID) }}</span>
+                      <span class="mt-1 block text-[0.72rem] text-[var(--muted)]">
+                        @if (slot.resID === 0) {
+                          Empty level slot.
+                        } @else if (canPreviewObjectGroupSlot($index)) {
+                          Spawn band: Y {{ objectGroupPreviewStartY }} → {{ levelEnd }}
+                        } @else {
+                          Definition unavailable for preview.
+                        }
+                      </span>
+                    </span>
+                    <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)]">chevron_right</mat-icon>
+                  </button>
+
+                  @if (selectedObjectGroupSlotIndex === $index) {
+                    <div class="border-t border-t-[var(--border)] px-3.5 py-3">
+                      @if (slot.resID === 0) {
+                        <p class="text-[0.76rem] leading-[1.45] text-[var(--muted)]">This slot is not linked to any object-group definition.</p>
+                      } @else if (getObjectGroupDefinition(slot.resID); as group) {
+                        <div class="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[0.72rem] text-[var(--muted)]">
+                          <span>Weighted entries</span>
+                          <span class="font-semibold text-[var(--on-surface)]">{{ group.entries.length }} total</span>
+                        </div>
+
+                        <div class="mt-2.5 flex flex-col gap-2">
+                          @for (entry of group.entries; track trackGroupEntry($index, entry)) {
+                            <div class="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                              <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-[var(--surface2)]">
+                                @if (getSpriteUrl(entry.typeRes); as url) {
+                                  <img [src]="url" class="block h-full w-full object-contain" [style.imageRendering]="'pixelated'" alt="" />
+                                } @else {
+                                  <span class="text-[0.68rem] font-extrabold text-[var(--muted)]">#</span>
+                                }
+                              </span>
+
+                              <span class="min-w-0 flex-1">
+                                <span class="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.82rem] font-semibold text-[var(--on-surface)]">{{ getTypeLabel(entry.typeRes) }}</span>
+                                <span class="block text-[0.7rem] text-[var(--muted)]">Offs {{ entry.minOffs }} → {{ entry.maxOffs }}</span>
+                              </span>
+
+                              <span class="shrink-0 text-right">
+                                <span class="block text-[0.8rem] font-semibold text-[var(--accent2)]">{{ getRelativeOddsLabel(group.entries, entry) }}</span>
+                                <span class="block text-[0.68rem] uppercase tracking-[0.08em] text-[var(--muted)]">w {{ entry.probility }}</span>
+                              </span>
+                            </div>
+                          }
+                        </div>
+                      } @else {
+                        <p class="text-[0.76rem] leading-[1.45] text-[var(--muted)]">This level references object group {{ getObjectGroupLabel(slot.resID) }}, but its definition is not loaded in the current resources set.</p>
+                      }
+                    </div>
+                  }
+                </section>
+              }
+            </div>
+          }
         </div>
       </div>
     </mat-card-content>

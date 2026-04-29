@@ -67,6 +67,8 @@ export function resetEditorData(app: App): void {
   app.hoverTrackWaypoint.set(null);
   app.hoverTrackMidpoint.set(null);
   app.markingPreview.set([]);
+  app.markingRangePreview.set(null);
+  app.objectGroupRangePreview.set(null);
   app.media.stopAudio();
   app._lastAudioBuffer = null;
   app.audioCurrentTime.set(0);
@@ -92,7 +94,12 @@ export async function onResourceFileSelected(app: App, event: Event): Promise<vo
   if (!file) return;
   app.editorError.set('');
   await resultFromPromise(file.arrayBuffer(), 'Failed to read file')
-    .andThen((buf) => resultFromPromise(loadResourcesBytes(app, new Uint8Array(buf), file.name), 'Failed to parse file'))
+    .andThen((buf) =>
+      resultFromPromise(
+        loadResourcesBytes(app, new Uint8Array(buf), file.name),
+        'Failed to parse file',
+      ),
+    )
     .match(
       () => {},
       (error) => {
@@ -128,7 +135,9 @@ async function flushPendingEdits(app: App): Promise<void> {
   }
   const selId = app.selectedLevelId();
   if (selId !== null) {
-    syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }));
+    syncPromises.push(
+      app.runtime.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }),
+    );
     syncPromises.push(
       app.runtime.dispatchWorker<void>('APPLY_TRACK', {
         resourceId: selId,
@@ -136,7 +145,12 @@ async function flushPendingEdits(app: App): Promise<void> {
         trackDown: app.editTrackDown(),
       }),
     );
-    syncPromises.push(app.runtime.dispatchWorker<void>('APPLY_OBJECTS', { resourceId: selId, objects: app.objects() }));
+    syncPromises.push(
+      app.runtime.dispatchWorker<void>('APPLY_OBJECTS', {
+        resourceId: selId,
+        objects: app.objects(),
+      }),
+    );
     if (app.propertiesDirty()) {
       syncPromises.push(
         app.runtime.dispatchWorker<void>('APPLY_PROPS', {
@@ -182,7 +196,10 @@ export async function downloadEditedResources(app: App): Promise<void> {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         app.resourcesStatus.set('Downloaded updated resources.dat.');
-        app.snackBar.open('✓ Downloaded resources.dat', 'OK', { duration: 3000, panelClass: 'snack-success' });
+        app.snackBar.open('✓ Downloaded resources.dat', 'OK', {
+          duration: 3000,
+          panelClass: 'snack-success',
+        });
       },
       (msg) => {
         app.editorError.set(msg);
@@ -219,7 +236,10 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
         app.customResourcesLoaded.set(true);
         app.resourcesStatus.set('Saved to game. Restart the game to apply changes.');
         app.snackBar
-          .open('✓ Saved to game – click Restart Game to apply', 'Restart', { duration: 8000, panelClass: 'snack-success' })
+          .open('✓ Saved to game – click Restart Game to apply', 'Restart', {
+            duration: 8000,
+            panelClass: 'snack-success',
+          })
           .onAction()
           .subscribe(() => app.runtime.restartGameWithCustomResources());
       },

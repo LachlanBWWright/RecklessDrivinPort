@@ -121,6 +121,7 @@ export class EditorCanvasComponent implements OnChanges {
     dashLength: number;
     gapLength: number;
   }>();
+  @Output() previewRange = new EventEmitter<{ yStart: number; yEnd: number }>();
   @Output() removeMarks = new EventEmitter<{ yStart: number; yEnd: number }>();
   @Output() clearMarkingPreview = new EventEmitter<void>();
 

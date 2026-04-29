@@ -30,8 +30,13 @@ export interface RoadPreviewDeps {
 export const ROAD_OVERHANG_PX = 700;
 
 const createPatternWithTransform = resultFromThrowable(
-  (ctx: CanvasRenderingContext2D, texture: HTMLCanvasElement, transform: DOMMatrix) => {
-    const pattern = ctx.createPattern(texture, 'repeat');
+  (
+    ctx: CanvasRenderingContext2D,
+    texture: HTMLCanvasElement,
+    transform: DOMMatrix,
+    repeat: 'repeat' | 'repeat-y' = 'repeat',
+  ) => {
+    const pattern = ctx.createPattern(texture, repeat);
     if (!pattern) return null;
     pattern.setTransform(transform);
     return pattern;
@@ -65,7 +70,9 @@ export function buildRoadTileGroups(
     }
   }
 
-  const referenced = new Set<number>(groups.flatMap((group) => group.tiles.map((tile) => tile.texId)));
+  const referenced = new Set<number>(
+    groups.flatMap((group) => group.tiles.map((tile) => tile.texId)),
+  );
   const unassigned = sortedEntries.filter((tile) => !referenced.has(tile.texId));
   if (unassigned.length > 0) {
     groups.push({ roadInfoId: -1, label: 'Unassigned', tiles: unassigned });
@@ -95,7 +102,11 @@ export function buildRoadInfoPreviewCanvas(
     const texture = roadTextureCanvases.get(texId);
     if (!texture) return null;
     const scale = texWorldSize / texture.width;
-    return createPatternWithTransform(ctx, texture, new DOMMatrix([scale, 0, 0, scale, 0, 0])).match(
+    return createPatternWithTransform(
+      ctx,
+      texture,
+      new DOMMatrix([scale, 0, 0, scale, 0, 0]),
+    ).match(
       (pattern) => pattern,
       () => null,
     );
@@ -103,8 +114,8 @@ export function buildRoadInfoPreviewCanvas(
 
   const bgFill = ri ? (makePattern(ri.backgroundTex, 128) ?? theme.bg) : theme.bg;
   const roadFill = ri ? (makePattern(ri.foregroundTex, 128) ?? theme.road) : theme.road;
-  const leftFill = ri ? (makePattern(ri.roadLeftBorder, 16) ?? theme.kerbA) : theme.kerbA;
-  const rightFill = ri ? (makePattern(ri.roadRightBorder, 16) ?? theme.kerbB) : theme.kerbB;
+  const leftFill = ri ? (makePattern(ri.roadRightBorder, 16) ?? theme.kerbA) : theme.kerbA;
+  const rightFill = ri ? (makePattern(ri.roadLeftBorder, 16) ?? theme.kerbB) : theme.kerbB;
 
   ctx.fillStyle = bgFill;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -134,7 +145,10 @@ export function computeFramedWorldRect(
   const worldHeight = Math.max(120, maxY - minY);
   const paddedWidth = worldWidth * 1.25;
   const paddedHeight = worldHeight * 1.25;
-  const zoom = Math.min(10, Math.max(0.1, Math.min(viewportWidth / paddedWidth, viewportHeight / paddedHeight)));
+  const zoom = Math.min(
+    10,
+    Math.max(0.1, Math.min(viewportWidth / paddedWidth, viewportHeight / paddedHeight)),
+  );
   return {
     zoom,
     panX: (minX + maxX) / 2,
@@ -172,7 +186,11 @@ export function drawObjectRoadPreviewCached(
 
   if (needsRender) {
     cache._roadOffscreenPanY = panY;
-    if (!cache._roadOffscreen || cache._roadOffscreen.width !== width || cache._roadOffscreen.height !== offH) {
+    if (
+      !cache._roadOffscreen ||
+      cache._roadOffscreen.width !== width ||
+      cache._roadOffscreen.height !== offH
+    ) {
       cache._roadOffscreen = doc?.createElement('canvas') ?? null;
       if (!cache._roadOffscreen) return;
       cache._roadOffscreen.width = width;
@@ -208,7 +226,8 @@ export function drawObjectRoadPreviewCached(
   }
 
   if (!cache._roadOffscreen) return;
-  const offscreenSrcY = offscreenCentreCanvasY - (panY - cache._roadOffscreenPanY) * zoom - height / 2;
+  const offscreenSrcY =
+    offscreenCentreCanvasY - (panY - cache._roadOffscreenPanY) * zoom - height / 2;
   if (offscreenSrcY >= 0 && offscreenSrcY + height <= offH) {
     ctx.drawImage(cache._roadOffscreen, 0, offscreenSrcY, width, height, 0, 0, width, height);
   } else {
@@ -242,15 +261,26 @@ export function drawObjectRoadPreview(
   const roadInfo = level.properties.roadInfo;
   const ri = deps.roadInfoDataMap.get(roadInfo);
   const KERB_WIDTH = 16;
-  const makePattern = (texId: number, texWorldSize: number, anchorWorldX = 0) => {
+  const makePattern = (
+    texId: number,
+    texWorldSize: number,
+    anchorWorldX = 0,
+    repeat: 'repeat' | 'repeat-y' = 'repeat',
+  ) => {
     const texture = deps.roadTextureCanvases.get(texId);
     if (!texture) return null;
     const scale = (texWorldSize * zoom) / texture.width;
     const tileW = texWorldSize * zoom;
     const tileH = texture.height * scale;
-    const tx = (((width / 2 + (anchorWorldX - panX) * zoom) % tileW) + tileW) % tileW;
+    const anchorCanvasX = width / 2 + (anchorWorldX - panX) * zoom;
+    const tx = repeat === 'repeat-y' ? anchorCanvasX : ((anchorCanvasX % tileW) + tileW) % tileW;
     const ty = (((height / 2 + yOverhang + panY * zoom) % tileH) + tileH) % tileH;
-    return createPatternWithTransform(ctx, texture, new DOMMatrix([scale, 0, 0, scale, tx, ty])).match(
+    return createPatternWithTransform(
+      ctx,
+      texture,
+      new DOMMatrix([scale, 0, 0, scale, tx, ty]),
+      repeat,
+    ).match(
       (pattern) => pattern,
       () => null,
     );
@@ -259,12 +289,11 @@ export function drawObjectRoadPreview(
   const bgPat = ri ? (makePattern(ri.backgroundTex, 128) ?? theme.bg) : theme.bg;
   const fgPat = ri ? (makePattern(ri.foregroundTex, 128) ?? theme.road) : theme.road;
   const KERB_TEX_WORLD = 16;
-  const lbPat = ri ? (makePattern(ri.roadLeftBorder, KERB_TEX_WORLD) ?? theme.kerbA) : theme.kerbA;
-  const rbPat = ri ? (makePattern(ri.roadRightBorder, KERB_TEX_WORLD) ?? theme.kerbB) : theme.kerbB;
+  const leftBorderTextureId = ri ? ri.roadRightBorder : null;
+  const rightBorderTextureId = ri ? ri.roadLeftBorder : null;
   const CENTRE_COLOUR = theme.water ? 'rgba(80, 255, 180, 0.85)' : 'rgba(255, 248, 140, 0.85)';
 
-  const addQuad = (
-    batch: number[],
+  const projectQuad = (
     x0: number,
     y0: number,
     x1: number,
@@ -280,7 +309,23 @@ export function drawObjectRoadPreview(
     const [ax3, ay3] = wtc(x3, y3);
     if (ay0 < 0 && ay1 < 0 && ay2 < 0 && ay3 < 0) return;
     if (ay0 > canvasH && ay1 > canvasH && ay2 > canvasH && ay3 > canvasH) return;
-    batch.push(ax0, ay0, ax1, ay1, ax2, ay2, ax3, ay3);
+    return [ax0, ay0, ax1, ay1, ax2, ay2, ax3, ay3];
+  };
+
+  const addQuad = (
+    batch: number[],
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    x3: number,
+    y3: number,
+  ) => {
+    const quad = projectQuad(x0, y0, x1, y1, x2, y2, x3, y3);
+    if (!quad) return;
+    batch.push(...quad);
   };
 
   const flushBatch = (fill: CanvasPattern | string, batch: number[]) => {
@@ -297,6 +342,31 @@ export function drawObjectRoadPreview(
     ctx.fill();
   };
 
+  const fillQuad = (fill: CanvasPattern | string, quad: readonly number[]) => {
+    ctx.fillStyle = fill as string;
+    ctx.beginPath();
+    ctx.moveTo(quad[0], quad[1]);
+    ctx.lineTo(quad[2], quad[3]);
+    ctx.lineTo(quad[4], quad[5]);
+    ctx.lineTo(quad[6], quad[7]);
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  const fillBorderQuad = (
+    textureId: number | null,
+    fallback: string,
+    quad: readonly number[] | null | undefined,
+    anchorWorldX: number,
+  ) => {
+    if (!quad) return;
+    const fill =
+      textureId === null
+        ? fallback
+        : (makePattern(textureId, KERB_TEX_WORLD, anchorWorldX, 'repeat-y') ?? fallback);
+    fillQuad(fill, quad);
+  };
+
   const visibleWorldMinY = panY - (height / 2 + yOverhang) / zoom - 4;
   const visibleWorldMaxY = panY + (height / 2 + yOverhang) / zoom + 4;
   const firstSeg = Math.max(0, Math.floor(visibleWorldMinY / 2));
@@ -306,8 +376,6 @@ export function drawObjectRoadPreview(
   const worldMaxX = panX + width / (2 * zoom) + 200;
   const bgBatch: number[] = [];
   const fgBatch: number[] = [];
-  const lbBatch: number[] = [];
-  const rbBatch: number[] = [];
 
   for (let index = firstSeg; index <= lastSeg; index += step) {
     const cur = level.roadSegs[index];
@@ -316,28 +384,76 @@ export function drawObjectRoadPreview(
     const y0 = index * 2;
     const y1 = nxtIdx * 2;
 
-    addQuad(bgBatch, worldMinX, y0, cur.v0 - KERB_WIDTH, y0, nxt.v0 - KERB_WIDTH, y1, worldMinX, y1);
-    addQuad(lbBatch, cur.v0 - KERB_WIDTH, y0, cur.v0, y0, nxt.v0, y1, nxt.v0 - KERB_WIDTH, y1);
+    addQuad(
+      bgBatch,
+      worldMinX,
+      y0,
+      cur.v0 - KERB_WIDTH,
+      y0,
+      nxt.v0 - KERB_WIDTH,
+      y1,
+      worldMinX,
+      y1,
+    );
+    fillBorderQuad(
+      leftBorderTextureId,
+      theme.kerbA,
+      projectQuad(cur.v0 - KERB_WIDTH, y0, cur.v0, y0, nxt.v0, y1, nxt.v0 - KERB_WIDTH, y1),
+      Math.min(cur.v0 - KERB_WIDTH, nxt.v0 - KERB_WIDTH),
+    );
     addQuad(fgBatch, cur.v0, y0, cur.v1, y0, nxt.v1, y1, nxt.v0, y1);
 
     const medianW = Math.min(cur.v2 - cur.v1, nxt.v2 - nxt.v1);
     if (medianW > 0) {
       const halfKerb = Math.min(KERB_WIDTH, medianW / 2);
-      addQuad(rbBatch, cur.v1, y0, cur.v1 + halfKerb, y0, nxt.v1 + halfKerb, y1, nxt.v1, y1);
+      fillBorderQuad(
+        rightBorderTextureId,
+        theme.kerbB,
+        projectQuad(cur.v1, y0, cur.v1 + halfKerb, y0, nxt.v1 + halfKerb, y1, nxt.v1, y1),
+        Math.min(cur.v1, nxt.v1),
+      );
       if (medianW > halfKerb * 2) {
-        addQuad(bgBatch, cur.v1 + halfKerb, y0, cur.v2 - halfKerb, y0, nxt.v2 - halfKerb, y1, nxt.v1 + halfKerb, y1);
+        addQuad(
+          bgBatch,
+          cur.v1 + halfKerb,
+          y0,
+          cur.v2 - halfKerb,
+          y0,
+          nxt.v2 - halfKerb,
+          y1,
+          nxt.v1 + halfKerb,
+          y1,
+        );
       }
-      addQuad(lbBatch, cur.v2 - halfKerb, y0, cur.v2, y0, nxt.v2, y1, nxt.v2 - halfKerb, y1);
+      fillBorderQuad(
+        leftBorderTextureId,
+        theme.kerbA,
+        projectQuad(cur.v2 - halfKerb, y0, cur.v2, y0, nxt.v2, y1, nxt.v2 - halfKerb, y1),
+        Math.min(cur.v2 - halfKerb, nxt.v2 - halfKerb),
+      );
     }
 
     addQuad(fgBatch, cur.v2, y0, cur.v3, y0, nxt.v3, y1, nxt.v2, y1);
-    addQuad(rbBatch, cur.v3, y0, cur.v3 + KERB_WIDTH, y0, nxt.v3 + KERB_WIDTH, y1, nxt.v3, y1);
-    addQuad(bgBatch, cur.v3 + KERB_WIDTH, y0, worldMaxX, y0, worldMaxX, y1, nxt.v3 + KERB_WIDTH, y1);
+    fillBorderQuad(
+      rightBorderTextureId,
+      theme.kerbB,
+      projectQuad(cur.v3, y0, cur.v3 + KERB_WIDTH, y0, nxt.v3 + KERB_WIDTH, y1, nxt.v3, y1),
+      Math.min(cur.v3, nxt.v3),
+    );
+    addQuad(
+      bgBatch,
+      cur.v3 + KERB_WIDTH,
+      y0,
+      worldMaxX,
+      y0,
+      worldMaxX,
+      y1,
+      nxt.v3 + KERB_WIDTH,
+      y1,
+    );
   }
 
   flushBatch(bgPat, bgBatch);
-  flushBatch(lbPat, lbBatch);
-  flushBatch(rbPat, rbBatch);
   flushBatch(fgPat, fgBatch);
 
   ctx.strokeStyle = CENTRE_COLOUR;
@@ -391,4 +507,7 @@ export function drawObjectRoadPreview(
   }
 }
 
-const drawObjectRoadPreviewSafe = resultFromThrowable(drawObjectRoadPreview, 'Failed to draw road preview');
+const drawObjectRoadPreviewSafe = resultFromThrowable(
+  drawObjectRoadPreview,
+  'Failed to draw road preview',
+);

@@ -36,15 +36,78 @@ export const OBJ_PALETTE = [
 export const PLAYER_CAR_TYPE_RES = 128;
 
 export const ROAD_THEMES: Record<number, RoadTheme> = {
-  128: { bg: '#0f7d1e', road: '#848484', dirt: '#4a6830', kerbA: '#6b8066', kerbB: '#d4e8d0', water: false },
-  129: { bg: '#8f4e28', road: '#bf8460', dirt: '#7a4a2a', kerbA: '#9f764b', kerbB: '#d9b888', water: false },
-  130: { bg: '#354ab5', road: '#505090', dirt: '#3a3a6e', kerbA: '#4c4c9e', kerbB: '#c0c0ff', water: false },
-  131: { bg: '#b8dde0', road: '#98aeb0', dirt: '#8099a0', kerbA: '#aacccc', kerbB: '#ffffff', water: false },
-  132: { bg: '#b8dde0', road: '#98aeb0', dirt: '#8099a0', kerbA: '#6b8066', kerbB: '#d4e8d0', water: false },
-  133: { bg: '#0a7a1e', road: '#354ab5', dirt: '#2a6050', kerbA: '#207b44', kerbB: '#30bb66', water: true },
-  134: { bg: '#5e5a5c', road: '#848484', dirt: '#4a4648', kerbA: '#606060', kerbB: '#c0c0c0', water: false },
-  135: { bg: '#354ab5', road: '#d8c830', dirt: '#555580', kerbA: '#b8b050', kerbB: '#ffff88', water: false },
-  136: { bg: '#0a7a1e', road: '#a06840', dirt: '#4a6830', kerbA: '#5a7034', kerbB: '#99cc44', water: false },
+  128: {
+    bg: '#0f7d1e',
+    road: '#848484',
+    dirt: '#4a6830',
+    kerbA: '#6b8066',
+    kerbB: '#d4e8d0',
+    water: false,
+  },
+  129: {
+    bg: '#8f4e28',
+    road: '#bf8460',
+    dirt: '#7a4a2a',
+    kerbA: '#9f764b',
+    kerbB: '#d9b888',
+    water: false,
+  },
+  130: {
+    bg: '#354ab5',
+    road: '#505090',
+    dirt: '#3a3a6e',
+    kerbA: '#4c4c9e',
+    kerbB: '#c0c0ff',
+    water: false,
+  },
+  131: {
+    bg: '#b8dde0',
+    road: '#98aeb0',
+    dirt: '#8099a0',
+    kerbA: '#aacccc',
+    kerbB: '#ffffff',
+    water: false,
+  },
+  132: {
+    bg: '#b8dde0',
+    road: '#98aeb0',
+    dirt: '#8099a0',
+    kerbA: '#6b8066',
+    kerbB: '#d4e8d0',
+    water: false,
+  },
+  133: {
+    bg: '#0a7a1e',
+    road: '#354ab5',
+    dirt: '#2a6050',
+    kerbA: '#207b44',
+    kerbB: '#30bb66',
+    water: true,
+  },
+  134: {
+    bg: '#5e5a5c',
+    road: '#848484',
+    dirt: '#4a4648',
+    kerbA: '#606060',
+    kerbB: '#c0c0c0',
+    water: false,
+  },
+  135: {
+    bg: '#354ab5',
+    road: '#d8c830',
+    dirt: '#555580',
+    kerbA: '#b8b050',
+    kerbB: '#ffff88',
+    water: false,
+  },
+  136: {
+    bg: '#0a7a1e',
+    road: '#a06840',
+    dirt: '#4a6830',
+    kerbA: '#5a7034',
+    kerbB: '#99cc44',
+    water: false,
+  },
 };
 
 export const DEFAULT_ROAD_THEME: RoadTheme = ROAD_THEMES[128];
@@ -88,7 +151,71 @@ export function distToSegment2d(
   return dist2d(px, py, ax + t * dx, ay + t * dy);
 }
 
-export function insertBetweenClosestSegment(points: readonly TrackPoint[], wx: number, wy: number): TrackPoint[] {
+function drawMarkingRangeOverlay(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  worldToCanvasY: (worldY: number) => number,
+  range: { yStart: number; yEnd: number },
+  palette: { stroke: string; fill: string },
+): void {
+  const start = Math.min(range.yStart, range.yEnd);
+  const end = Math.max(range.yStart, range.yEnd);
+  const startY = worldToCanvasY(start);
+  const endY = worldToCanvasY(end);
+  const x = width - 12;
+  const markerW = 12;
+  const markerH = 7;
+  const labelOffset = 20;
+  const clampedStartY = Math.max(10, Math.min(height - 10, startY));
+  const clampedEndY = Math.max(10, Math.min(height - 10, endY));
+
+  const drawMarker = (y: number, value: number, offscreen: 'none' | 'top' | 'bottom') => {
+    ctx.beginPath();
+    if (offscreen === 'top') {
+      ctx.moveTo(x, y - markerH);
+      ctx.lineTo(x + markerW, y - markerH);
+      ctx.lineTo(x + markerW / 2, y);
+    } else if (offscreen === 'bottom') {
+      ctx.moveTo(x, y + markerH);
+      ctx.lineTo(x + markerW, y + markerH);
+      ctx.lineTo(x + markerW / 2, y);
+    } else {
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + markerW, y - markerH);
+      ctx.lineTo(x + markerW, y + markerH);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(value), x - labelOffset, y);
+  };
+
+  ctx.save();
+  ctx.font = '11px monospace';
+  ctx.strokeStyle = palette.stroke;
+  ctx.fillStyle = palette.fill;
+  ctx.lineWidth = 2;
+
+  if (Math.abs(clampedEndY - clampedStartY) > 10) {
+    ctx.beginPath();
+    ctx.moveTo(x - 6, clampedStartY);
+    ctx.lineTo(x - 6, clampedEndY);
+    ctx.stroke();
+  }
+
+  drawMarker(clampedStartY, start, startY < 0 ? 'top' : startY > height ? 'bottom' : 'none');
+  drawMarker(clampedEndY, end, endY < 0 ? 'top' : endY > height ? 'bottom' : 'none');
+  ctx.restore();
+}
+
+export function insertBetweenClosestSegment(
+  points: readonly TrackPoint[],
+  wx: number,
+  wy: number,
+): TrackPoint[] {
   const newPoint = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
   if (points.length === 0) return [newPoint];
   if (points.length === 1) return [...points, newPoint];
@@ -159,7 +286,12 @@ export function applyObjEdit(app: App): void {
 export function addObject(app: App): void {
   app._pushUndo('objects');
   const objs = [...app.objects()];
-  objs.push({ x: Math.round(app.canvasPanX()), y: Math.round(app.canvasPanY()), dir: 0, typeRes: 128 });
+  objs.push({
+    x: Math.round(app.canvasPanX()),
+    y: Math.round(app.canvasPanY()),
+    dir: 0,
+    typeRes: 128,
+  });
   app.objects.set(objs);
   selectObject(app, objs.length - 1);
 }
@@ -184,7 +316,9 @@ export function toggleTypeVisibility(app: App, typeId: number): void {
 }
 
 export function showAllObjectTypes(app: App): void {
-  app.visibleTypeFilter.set(new Set(app.typePalette.map((item: { typeId: number }) => item.typeId)));
+  app.visibleTypeFilter.set(
+    new Set(app.typePalette.map((item: { typeId: number }) => item.typeId)),
+  );
 }
 
 export function hideAllObjectTypes(app: App): void {
@@ -199,7 +333,9 @@ export function removeSelectedObject(app: App): void {
   const idx = app.selectedObjIndex();
   if (idx === null) return;
   app._pushUndo('objects');
-  const objs = app.objects().filter((_: { x: number; y: number; dir: number; typeRes: number }, i: number) => i !== idx);
+  const objs = app
+    .objects()
+    .filter((_: { x: number; y: number; dir: number; typeRes: number }, i: number) => i !== idx);
   app.objects.set(objs);
   app.selectedObjIndex.set(objs.length > 0 ? Math.min(idx, objs.length - 1) : null);
 }
@@ -545,7 +681,11 @@ export function onCanvasContextMenu(app: App, event: MouseEvent): void {
   for (let i = 0; i < trackUp.length; i++) {
     if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
       app._pushUndo('tracks');
-      app.editTrackUp.set(trackUp.filter((_: { x: number; y: number; flags: number; velo: number }, j: number) => j !== i));
+      app.editTrackUp.set(
+        trackUp.filter(
+          (_: { x: number; y: number; flags: number; velo: number }, j: number) => j !== i,
+        ),
+      );
       app._roadOffscreenKey = '';
       return;
     }
@@ -553,7 +693,11 @@ export function onCanvasContextMenu(app: App, event: MouseEvent): void {
   for (let i = 0; i < trackDown.length; i++) {
     if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
       app._pushUndo('tracks');
-      app.editTrackDown.set(trackDown.filter((_: { x: number; y: number; flags: number; velo: number }, j: number) => j !== i));
+      app.editTrackDown.set(
+        trackDown.filter(
+          (_: { x: number; y: number; flags: number; velo: number }, j: number) => j !== i,
+        ),
+      );
       app._roadOffscreenKey = '';
       return;
     }
@@ -562,14 +706,28 @@ export function onCanvasContextMenu(app: App, event: MouseEvent): void {
 
   let nearestSegDistUp = Infinity;
   for (let i = 0; i < trackUp.length - 1; i++) {
-    const d = distToSegment2d(wx, wy, trackUp[i].x, trackUp[i].y, trackUp[i + 1].x, trackUp[i + 1].y);
+    const d = distToSegment2d(
+      wx,
+      wy,
+      trackUp[i].x,
+      trackUp[i].y,
+      trackUp[i + 1].x,
+      trackUp[i + 1].y,
+    );
     if (d < nearestSegDistUp) nearestSegDistUp = d;
   }
   if (trackUp.length === 1) nearestSegDistUp = dist2d(trackUp[0].x, trackUp[0].y, wx, wy);
 
   let nearestSegDistDown = Infinity;
   for (let i = 0; i < trackDown.length - 1; i++) {
-    const d = distToSegment2d(wx, wy, trackDown[i].x, trackDown[i].y, trackDown[i + 1].x, trackDown[i + 1].y);
+    const d = distToSegment2d(
+      wx,
+      wy,
+      trackDown[i].x,
+      trackDown[i].y,
+      trackDown[i + 1].x,
+      trackDown[i + 1].y,
+    );
     if (d < nearestSegDistDown) nearestSegDistDown = d;
   }
   if (trackDown.length === 1) nearestSegDistDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
@@ -846,6 +1004,22 @@ export function redrawObjectCanvas(app: App): void {
     ctx.restore();
   }
 
+  const markingRangePreview = app.markingRangePreview();
+  const objectGroupRangePreview = app.objectGroupRangePreview();
+  const activeRangePreview = markingRangePreview ?? objectGroupRangePreview;
+  if (level && activeRangePreview) {
+    drawMarkingRangeOverlay(
+      ctx,
+      width,
+      height,
+      (worldY) => worldToCanvas(app, 0, worldY)[1],
+      activeRangePreview,
+      markingRangePreview === null
+        ? { stroke: 'rgba(77,208,225,0.72)', fill: 'rgba(77,208,225,0.96)' }
+        : { stroke: 'rgba(255,214,102,0.65)', fill: 'rgba(255,214,102,0.95)' },
+    );
+  }
+
   if (level && app.showBarriers() && level.roadSegs.length > 0) {
     const segs = level.roadSegs;
     const sampleStep = Math.max(1, Math.floor(segs.length / 20));
@@ -878,8 +1052,12 @@ export function redrawObjectCanvas(app: App): void {
     ctx.globalAlpha = isFilteredOut ? 0.3 : 1.0;
     const color = OBJ_PALETTE[typeIdx] ?? '#888888';
     const previewCanvas = app.getObjectSpritePreview(obj.typeRes);
-    const drawWidth = previewCanvas ? Math.max(MIN_HIT_RADIUS * 2, previewCanvas.width * zoom) : baseRadius * 2.5;
-    const drawHeight = previewCanvas ? Math.max(MIN_HIT_RADIUS * 2, previewCanvas.height * zoom) : baseRadius * 2.5;
+    const drawWidth = previewCanvas
+      ? Math.max(MIN_HIT_RADIUS * 2, previewCanvas.width * zoom)
+      : baseRadius * 2.5;
+    const drawHeight = previewCanvas
+      ? Math.max(MIN_HIT_RADIUS * 2, previewCanvas.height * zoom)
+      : baseRadius * 2.5;
     const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
     const isSel = i === selIdx;
 

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, OnInit } from '@angular/core';
 import { FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { MarkingRoadSelection } from '../../road-marking-utils';
@@ -34,7 +34,7 @@ export interface MarkingRemoveEvent {
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MarkingPopupComponent {
+export class MarkingPopupComponent implements OnInit {
   @Input() roadMaxY = 0;
   @Input() workerBusy = false;
 
@@ -43,6 +43,7 @@ export class MarkingPopupComponent {
   @Output() generateCentreMarks = new EventEmitter<MarkingCentreGenerateEvent>();
   @Output() previewSideMarks = new EventEmitter<MarkingGenerateEvent>();
   @Output() previewCentreMarks = new EventEmitter<MarkingCentreGenerateEvent>();
+  @Output() previewRange = new EventEmitter<MarkingRemoveEvent>();
   @Output() removeMarks = new EventEmitter<MarkingRemoveEvent>();
   @Output() clearPreview = new EventEmitter<void>();
 
@@ -105,6 +106,25 @@ export class MarkingPopupComponent {
     return Number.isFinite(next) ? next : 0;
   }
 
+  private getActiveRangeValues(): { yStart: number; yEnd: number } {
+    if (this.markingTab === 'side') {
+      return {
+        yStart: this.toNumber(this.sideForm.controls.yStart.value),
+        yEnd: this.toNumber(this.sideForm.controls.yEnd.value),
+      };
+    }
+    if (this.markingTab === 'dash') {
+      return {
+        yStart: this.toNumber(this.centreForm.controls.yStart.value),
+        yEnd: this.toNumber(this.centreForm.controls.yEnd.value),
+      };
+    }
+    return {
+      yStart: this.toNumber(this.removeForm.controls.yStart.value),
+      yEnd: this.toNumber(this.removeForm.controls.yEnd.value),
+    };
+  }
+
   get sideRoadSelection(): MarkingRoadSelection {
     const { combined, left, right } = this.sideForm.getRawValue();
     return this.checkboxesToSelection(combined, left, right);
@@ -113,6 +133,10 @@ export class MarkingPopupComponent {
   get centreRoadSelection(): MarkingRoadSelection {
     const { combined, left, right } = this.centreForm.getRawValue();
     return this.checkboxesToSelection(combined, left, right);
+  }
+
+  ngOnInit(): void {
+    this.schedulePreview(0);
   }
 
   schedulePreview(delayMs = 300): void {
@@ -124,6 +148,8 @@ export class MarkingPopupComponent {
   }
 
   onPreview(): void {
+    const { yStart, yEnd } = this.getActiveRangeValues();
+    this.previewRange.emit({ yStart, yEnd });
     if (this.markingTab === 'side') {
       const { combined, left, right } = this.sideForm.getRawValue();
       this.previewSideMarks.emit({

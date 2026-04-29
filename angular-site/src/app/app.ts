@@ -123,6 +123,7 @@ import {
   addMark,
   addMarkCreatePoint,
   applyBarrierDrawPath,
+  clearMarkingPreviews,
   confirmMarkCreateMode,
   generateCentreRoadMarks,
   generateSideRoadMarks,
@@ -136,6 +137,7 @@ import {
   removeSelectedMark,
   saveMarks,
   scheduleMarkAutoSave,
+  setMarkingRangePreview,
   splitCollocatedMarkNubs,
   startMarkCreateMode,
   updateCurvePreview,
@@ -723,6 +725,25 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     gapLength: number,
   ): void {
     previewCentreRoadMarks(this, roadSelection, yStart, yEnd, dashLength, gapLength);
+  }
+
+  setMarkingRangePreview(yStart: number, yEnd: number): void {
+    setMarkingRangePreview(this, yStart, yEnd);
+  }
+
+  setObjectGroupRangePreview(range: { yStart: number; yEnd: number } | null): void {
+    if (range === null) {
+      this.objectGroupRangePreview.set(null);
+      return;
+    }
+    const { yStart, yEnd } = range;
+    this.objectGroupRangePreview.set(
+      yStart <= yEnd ? { yStart, yEnd } : { yStart: yEnd, yEnd: yStart },
+    );
+  }
+
+  clearMarkingPreviews(): void {
+    clearMarkingPreviews(this);
   }
 
   removeMarksByYRange(yStart: number, yEnd: number): void {

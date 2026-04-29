@@ -1,6 +1,17 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import type {
   MarkSeg,
+  ObjectGroupDefinition,
+  ObjectGroupEntryData,
   ObjectPos,
   RoadInfoOption,
   TrackWaypointRef,
@@ -17,7 +28,7 @@ import type { MarkingRoadSelection } from '../../../road-marking-utils';
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class EditorObjectsSectionComponent {
+export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   @Input() selectedLevel: {
     resourceId: number;
     roadSegs: { v0: number; v3: number }[];
@@ -58,12 +69,16 @@ export class EditorObjectsSectionComponent {
   @Input() hasMarkingPreview = false;
   @Input() markCreateMode = false;
   @Input() pendingMarkPointCount = 0;
+  @Input() editObjectGroups: { resID: number; numObjs: number }[] = [];
+  @Input() objectGroupDefinitions: ObjectGroupDefinition[] = [];
+  @Input() levelEnd = 0;
   @Input() editObjDirDeg = 0;
   @Input() editObjTypeRes = 128;
   @Input() availableTypeIds: number[] = [];
   @Input() spriteUrl: string | null = null;
   @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
   @Input() getFallbackColor: (typeRes: number) => string = () => '#888';
+  @Input() getObjTypeDimensionLabel: (typeRes: number) => string = () => '';
   @Input() typePalette: { hex: string; typeId: number }[] = [];
   @Input() visibleTypeFilter: Set<number> = new Set();
   @Input() typeDimLabel = '';
@@ -126,8 +141,10 @@ export class EditorObjectsSectionComponent {
     dashLength: number;
     gapLength: number;
   }>();
+  @Output() previewRange = new EventEmitter<{ yStart: number; yEnd: number }>();
   @Output() removeMarks = new EventEmitter<{ yStart: number; yEnd: number }>();
   @Output() clearMarkingPreview = new EventEmitter<void>();
+  @Output() objectGroupPreviewChange = new EventEmitter<{ yStart: number; yEnd: number } | null>();
   @Output() panXChange = new EventEmitter<number>();
   @Output() panYChange = new EventEmitter<number>();
   @Output() objectSelected = new EventEmitter<number>();
@@ -139,4 +156,103 @@ export class EditorObjectsSectionComponent {
   @Output() hideAll = new EventEmitter<void>();
   @Output() removeSelected = new EventEmitter<void>();
   @Output() deselect = new EventEmitter<void>();
+
+  sidebarTab: 'objects' | 'groups' = 'objects';
+  selectedObjectGroupSlotIndex: number | null = null;
+  readonly objectGroupPreviewStartY = 500;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['editObjectGroups'] || changes['objectGroupDefinitions'] || changes['levelEnd']) {
+      this.syncSelectedObjectGroupSlot();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.objectGroupPreviewChange.emit(null);
+  }
+
+  setSidebarTab(tab: 'objects' | 'groups'): void {
+    if (this.sidebarTab === tab) return;
+    this.sidebarTab = tab;
+    this.syncSelectedObjectGroupSlot();
+  }
+
+  selectObjectGroupSlot(index: number): void {
+    this.selectedObjectGroupSlotIndex = index;
+    this.emitCurrentObjectGroupPreview();
+  }
+
+  trackGroupSlot(index: number): number {
+    return index;
+  }
+
+  trackGroupEntry(index: number, entry: ObjectGroupEntryData): string {
+    return `${index}:${entry.typeRes}:${entry.minOffs}:${entry.maxOffs}:${entry.probility}:${entry.dir}`;
+  }
+
+  getObjectGroupDefinition(resId: number): ObjectGroupDefinition | null {
+    return this.objectGroupDefinitions.find((group) => group.id === resId) ?? null;
+  }
+
+  getObjectGroupLabel(resId: number): string {
+    if (resId === 0) return '0 · empty slot';
+    const group = this.getObjectGroupDefinition(resId);
+    return group ? `#${group.id}` : `#${resId} (custom)`;
+  }
+
+  getTypeLabel(typeRes: number): string {
+    const dims = this.getObjTypeDimensionLabel(typeRes);
+    return dims ? `#${typeRes} · ${dims}` : `#${typeRes}`;
+  }
+
+  getRelativeOddsLabel(
+    entries: readonly ObjectGroupEntryData[],
+    entry: ObjectGroupEntryData,
+  ): string {
+    const total = entries.reduce((sum, item) => sum + Math.max(0, item.probility), 0);
+    const weight = Math.max(0, entry.probility);
+    if (total <= 0) return '0%';
+    const percent = (weight / total) * 100;
+    return `${percent >= 10 || Number.isInteger(percent) ? percent.toFixed(0) : percent.toFixed(1)}%`;
+  }
+
+  canPreviewObjectGroupSlot(index: number): boolean {
+    const slot = this.editObjectGroups[index];
+    return (
+      !!slot &&
+      slot.resID !== 0 &&
+      this.getObjectGroupDefinition(slot.resID) !== null &&
+      this.levelEnd > 0
+    );
+  }
+
+  private syncSelectedObjectGroupSlot(): void {
+    if (this.sidebarTab !== 'groups') {
+      this.objectGroupPreviewChange.emit(null);
+      return;
+    }
+    const currentIndex = this.selectedObjectGroupSlotIndex;
+    const currentIsValid =
+      currentIndex !== null && currentIndex >= 0 && currentIndex < this.editObjectGroups.length;
+    if (!currentIsValid) {
+      const nextIndex = this.editObjectGroups.findIndex((slot) => slot.resID !== 0);
+      this.selectedObjectGroupSlotIndex = nextIndex >= 0 ? nextIndex : null;
+    }
+    this.emitCurrentObjectGroupPreview();
+  }
+
+  private emitCurrentObjectGroupPreview(): void {
+    if (
+      this.sidebarTab !== 'groups' ||
+      this.selectedObjectGroupSlotIndex === null ||
+      !this.canPreviewObjectGroupSlot(this.selectedObjectGroupSlotIndex)
+    ) {
+      this.objectGroupPreviewChange.emit(null);
+      return;
+    }
+    this.objectGroupPreviewChange.emit({
+      yStart: this.objectGroupPreviewStartY,
+      yEnd: this.levelEnd,
+    });
+  }
 }

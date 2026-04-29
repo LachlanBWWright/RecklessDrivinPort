@@ -204,6 +204,10 @@ export class AppStateBase {
   pendingMarkPointCount = signal(0);
   /** Preview marks shown on canvas with distinct styling (blue dashed) when generating. */
   markingPreview = signal<MarkSeg[]>([]);
+  /** Active Y-range preview shown on the object canvas for road-marking tools. */
+  markingRangePreview = signal<{ yStart: number; yEnd: number } | null>(null);
+  /** Active Y-range preview shown for the selected level object-group slot. */
+  objectGroupRangePreview = signal<{ yStart: number; yEnd: number } | null>(null);
   _markAutoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   _lastDraggedNubKey: { markIdx: number; endpoint: 'p1' | 'p2' } | null = null;
   _pendingMarkPoints: { x: number; y: number }[] = [];
@@ -218,6 +222,7 @@ export class AppStateBase {
   _curveEndPoint: { wx: number; wy: number } | null = null;
   /** True after the Konva overlay has been created for the current canvas. */
   _konvaInitialized = false;
+  _konvaResizeObserver: ResizeObserver | null = null;
   /** Serialized barrier path cache used to avoid unnecessary redraw work. */
   _lastBarriersSerialized = '';
 

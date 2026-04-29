@@ -17,6 +17,11 @@ export const SECTION_ORDER: EditorSection[] = [
   'screens',
 ];
 
+function disconnectKonvaResizeObserver(app: App): void {
+  app._konvaResizeObserver?.disconnect();
+  app._konvaResizeObserver = null;
+}
+
 export function setupAppLifecycle(app: App): void {
   effect(() => {
     const tab = app.activeTab();
@@ -48,6 +53,8 @@ export function setupAppLifecycle(app: App): void {
     app.markCreateMode();
     app.pendingMarkPointCount();
     app.markingPreview();
+    app.markingRangePreview();
+    app.objectGroupRangePreview();
     app.editXStartPos();
     app.editLevelEnd();
     app.selectedLevel();
@@ -85,56 +92,100 @@ export function setupAppLifecycle(app: App): void {
 export function initializeKonvaOverlay(app: App): void {
   if (typeof window === 'undefined') return;
   const canvas = document.getElementById('object-canvas') as HTMLCanvasElement | null;
-  if (!canvas || app._konvaInitialized) return;
+  if (!canvas) return;
   const parent = canvas.parentElement;
   if (!parent) return;
+
+  let konvaContainer = document.getElementById('konva-container');
+  const hasStaleOverlay =
+    app._konvaInitialized &&
+    (!konvaContainer ||
+      konvaContainer.parentElement !== parent ||
+      konvaContainer.previousElementSibling !== canvas);
+  if (hasStaleOverlay) {
+    disconnectKonvaResizeObserver(app);
+    app.konva.destroy();
+    app._konvaInitialized = false;
+    konvaContainer = null;
+  }
 
   const rect = canvas.getBoundingClientRect();
   const cssW = Math.max(1, Math.round(rect.width));
   const cssH = Math.max(1, Math.round(rect.height));
 
-  let konvaContainer = document.getElementById('konva-container');
+  if (canvas.width !== cssW || canvas.height !== cssH) {
+    canvas.width = cssW;
+    canvas.height = cssH;
+    app._roadOffscreenKey = '';
+    app._roadOffscreen = null;
+  }
+
+  parent.style.position = 'relative';
+
+  if (app._konvaInitialized) {
+    if (konvaContainer) {
+      konvaContainer.style.cssText = `
+        position:absolute; inset:0;
+        overflow:hidden;
+        pointer-events:all;
+        outline:none;
+        cursor:default;
+      `;
+      konvaContainer.style.width = `${cssW}px`;
+      konvaContainer.style.height = `${cssH}px`;
+    }
+    app.konva.resize(cssW, cssH);
+    return;
+  }
+
   if (!konvaContainer) {
     konvaContainer = document.createElement('div');
     konvaContainer.id = 'konva-container';
-    parent.style.position = 'relative';
     canvas.insertAdjacentElement('afterend', konvaContainer);
 
-    konvaContainer.addEventListener('wheel', (e) => {
-      const fwd = new WheelEvent('wheel', e);
-      canvas.dispatchEvent(fwd);
-    }, { passive: false });
+    konvaContainer.addEventListener(
+      'wheel',
+      (e) => {
+        const fwd = new WheelEvent('wheel', e);
+        canvas.dispatchEvent(fwd);
+      },
+      { passive: false },
+    );
 
     konvaContainer.tabIndex = 0;
     konvaContainer.addEventListener('keydown', (e) => {
-      canvas.dispatchEvent(new KeyboardEvent('keydown', {
-        key: e.key,
-        code: e.code,
-        keyCode: e.keyCode,
-        which: e.which,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-        shiftKey: e.shiftKey,
-        altKey: e.altKey,
-        repeat: e.repeat,
-        bubbles: true,
-        cancelable: true,
-      }));
+      canvas.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: e.key,
+          code: e.code,
+          keyCode: e.keyCode,
+          which: e.which,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          repeat: e.repeat,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     });
     konvaContainer.addEventListener('keyup', (e) => {
-      canvas.dispatchEvent(new KeyboardEvent('keyup', {
-        key: e.key,
-        code: e.code,
-        keyCode: e.keyCode,
-        which: e.which,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-        shiftKey: e.shiftKey,
-        altKey: e.altKey,
-        repeat: e.repeat,
-        bubbles: true,
-        cancelable: true,
-      }));
+      canvas.dispatchEvent(
+        new KeyboardEvent('keyup', {
+          key: e.key,
+          code: e.code,
+          keyCode: e.keyCode,
+          which: e.which,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          repeat: e.repeat,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     });
     konvaContainer.addEventListener('mousedown', () => {
       const el = document.getElementById('konva-container');
@@ -149,13 +200,8 @@ export function initializeKonvaOverlay(app: App): void {
       outline:none;
       cursor:default;
     `;
-
-  if (canvas.width !== cssW || canvas.height !== cssH) {
-    canvas.width = cssW;
-    canvas.height = cssH;
-    app._roadOffscreenKey = '';
-    app._roadOffscreen = null;
-  }
+  konvaContainer.style.width = `${cssW}px`;
+  konvaContainer.style.height = `${cssH}px`;
 
   app.konva.init('konva-container', canvas.width, canvas.height, cssW, cssH);
   app._konvaInitialized = true;
@@ -177,6 +223,8 @@ export function initializeKonvaOverlay(app: App): void {
     app.konva.resize(w, h);
     app.runtime.scheduleCanvasRedraw();
   });
+  disconnectKonvaResizeObserver(app);
+  app._konvaResizeObserver = resizeObserver;
   resizeObserver.observe(canvas);
 
   app.konva.onObjectDragEnd = (e) => {
@@ -403,7 +451,12 @@ export function initializeKonvaOverlay(app: App): void {
         app._isPanning = false;
         app.isPanning.set(false);
         const kc = document.getElementById('konva-container');
-        if (kc) kc.style.cursor = app.spaceDown() ? 'grab' : app.drawMode() !== 'none' ? 'crosshair' : 'default';
+        if (kc)
+          kc.style.cursor = app.spaceDown()
+            ? 'grab'
+            : app.drawMode() !== 'none'
+              ? 'crosshair'
+              : 'default';
       }
       if (app._barrierDrawing) {
         app._barrierDrawing = false;
@@ -415,7 +468,12 @@ export function initializeKonvaOverlay(app: App): void {
           app._applyBarrierDrawPath();
         }
         const kc = document.getElementById('konva-container');
-        if (kc) kc.style.cursor = app.spaceDown() ? 'grab' : app.drawMode() !== 'none' ? 'crosshair' : 'default';
+        if (kc)
+          kc.style.cursor = app.spaceDown()
+            ? 'grab'
+            : app.drawMode() !== 'none'
+              ? 'crosshair'
+              : 'default';
       }
       if (app._draggingStartMarker || app._draggingFinishLine) {
         app._draggingStartMarker = false;
@@ -428,7 +486,10 @@ export function initializeKonvaOverlay(app: App): void {
 }
 
 export function destroyApp(app: App): void {
-  const stopAudioResult = resultFromThrowable((host: App) => host.media.stopAudio(), 'Failed to stop audio')(app);
+  const stopAudioResult = resultFromThrowable(
+    (host: App) => host.media.stopAudio(),
+    'Failed to stop audio',
+  )(app);
   stopAudioResult.match(
     () => undefined,
     () => undefined,
@@ -439,6 +500,7 @@ export function destroyApp(app: App): void {
   app.wasmScript = null;
   app.packWorker?.terminate();
   app.packWorker = null;
+  disconnectKonvaResizeObserver(app);
   app.konva.destroy();
   app._konvaInitialized = false;
 }
@@ -461,7 +523,7 @@ export function scheduleCanvasRedraw(app: App): void {
 export function onInit(app: App): void {
   app.runtime.initPackWorker();
   if (typeof indexedDB !== 'undefined') {
-        AppStateResources._loadCustomResourcesDb()
+    AppStateResources._loadCustomResourcesDb()
       .then((entry) => {
         if (entry) {
           app.customResourcesLoaded.set(true);

@@ -3,6 +3,19 @@ import type { MarkSeg, RoadSeg } from './level-editor.service';
 import type { App } from './app';
 import { resultFromPromise } from './result-helpers';
 
+function normalizeRange(yStart: number, yEnd: number): { yStart: number; yEnd: number } {
+  return yStart <= yEnd ? { yStart, yEnd } : { yStart: yEnd, yEnd: yStart };
+}
+
+export function setMarkingRangePreview(app: App, yStart: number, yEnd: number): void {
+  app.markingRangePreview.set(normalizeRange(yStart, yEnd));
+}
+
+export function clearMarkingPreviews(app: App): void {
+  app.markingPreview.set([]);
+  app.markingRangePreview.set(null);
+}
+
 export function addMark(app: App): void {
   app._pushUndo('marks');
   const ms = [...app.marks()];
@@ -45,6 +58,7 @@ export function generateSideRoadMarks(
   if (!level) return;
   const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset, yFrequency });
   appendGeneratedMarks(app, generated, 'side road');
+  clearMarkingPreviews(app);
 }
 
 export function generateCentreRoadMarks(
@@ -65,6 +79,7 @@ export function generateCentreRoadMarks(
     gapLength,
   });
   appendGeneratedMarks(app, generated, 'centre dashed');
+  clearMarkingPreviews(app);
 }
 
 export function previewSideRoadMarks(
@@ -77,6 +92,7 @@ export function previewSideRoadMarks(
 ): void {
   const level = app.selectedLevel();
   if (!level) return;
+  setMarkingRangePreview(app, yStart, yEnd);
   const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset, yFrequency });
   app.markingPreview.set(generated);
 }
@@ -91,6 +107,7 @@ export function previewCentreRoadMarks(
 ): void {
   const level = app.selectedLevel();
   if (!level) return;
+  setMarkingRangePreview(app, yStart, yEnd);
   const generated = generateCentreDashMarkings(level.roadSegs, {
     roadSelection,
     yStart,
@@ -112,6 +129,7 @@ export function removeSelectedMark(app: App): void {
 }
 
 export function removeMarksByYRange(app: App, yStart: number, yEnd: number): void {
+  clearMarkingPreviews(app);
   const currentMarks = app.marks();
   const selectedMarkIndex = app.selectedMarkIndex();
   const selectedMark = selectedMarkIndex !== null ? currentMarks[selectedMarkIndex] ?? null : null;
