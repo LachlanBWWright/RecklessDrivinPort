@@ -18,7 +18,7 @@ export type DrawMode = 'none' | 'freehand' | 'straight' | 'curve';
   selector: 'app-editor-canvas',
   templateUrl: './editor-canvas.component.html',
   host: {
-    class: 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+    class: 'flex h-full min-h-0 min-w-0 flex-1 self-stretch flex-col overflow-hidden',
   },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,

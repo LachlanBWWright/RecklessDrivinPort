@@ -33,11 +33,24 @@
         @if (selectedGroup; as group) {
           <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-[14px] overflow-y-auto px-4 py-4 pr-1 max-[1100px]:px-3 max-[1100px]:py-3">
             <div class="flex items-start justify-between gap-[18px] max-[1100px]:flex-col">
-              <div>
+              <div class="min-w-0 flex-1">
                 <h4 class="text-base font-bold text-[var(--on-surface)]">Group #{{ group.id }}</h4>
-                <p class="max-w-[760px] text-[0.85rem] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
+                <p class="text-[0.85rem] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
                   Each row is one spawn candidate. The game picks an entry using the <code>probility</code> weights,
                   then spawns up to the level slot's <code>numObjs</code> objects from that group.
+                </p>
+                <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
+                  Native spawn Y is chosen separately at random from <code>500</code> to the level's <code>levelEnd</code>.
+                  When <code>dir = -1</code>, the game first picks the up-track or down-track at that Y, and if there is no down-track it uses the up-track.
+                  That randomly chosen line is the reference for <code>minOffs</code> and <code>maxOffs</code>.
+                </p>
+                <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
+                  When the road diverges and the entry uses an explicit direction, the game does not use the track lines at all.
+                  It picks a road border instead: on a single road that means the outer left or right edge, and on a split road it can be any of the four borders.
+                  The offsets are measured from whichever border the game picked for that spawn.
+                </p>
+                <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)]">
+                  The whole-group preview Y start is level-scoped, so it is edited from the Objects &gt; Groups panel rather than inside Pack 130.
                 </p>
               </div>
               <div class="flex flex-wrap justify-end gap-2 max-[1100px]:justify-start">

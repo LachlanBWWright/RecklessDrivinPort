@@ -1,13 +1,14 @@
 <div class="pointer-events-auto absolute right-7 top-3 z-50 w-[min(420px,calc(100%-28px))] max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[0_8px_32px_rgba(0,0,0,0.7)]">
   <div class="flex items-center justify-between border-b border-[var(--border)] px-3.5 pb-2 pt-2.5">
     <span class="text-[0.88rem] font-bold text-[var(--on-surface)]">Level {{ levelNum }} &mdash; {{ objectCount }} objects</span>
-    <button mat-icon-button class="!h-6 !min-h-6 !w-6 !min-w-6" (click)="close.emit()">
+    <button mat-icon-button class="!flex !h-7 !min-h-7 !w-7 !min-w-7 !items-center !justify-center !p-0" (click)="close.emit()">
       <mat-icon class="!h-4 !w-4 !text-base">close</mat-icon>
     </button>
   </div>
   <div class="px-3.5 pb-3.5 pt-2.5 text-[0.79rem] leading-[1.55] text-[var(--muted)] [&_kbd]:rounded-[3px] [&_kbd]:border [&_kbd]:border-[var(--border)] [&_kbd]:bg-[var(--surface3)] [&_kbd]:px-1 [&_kbd]:font-mono [&_kbd]:text-[0.72rem] [&_kbd]:text-[var(--on-surface)] [&_p:last-child]:mb-0 [&_p]:mb-2 [&_strong]:text-[var(--on-surface)]">
     <p><strong>Objects:</strong> Drag to move &middot; Dbl-click canvas to add &middot; <kbd>Del</kbd> removes &middot; <kbd>Ctrl+D</kbd> dupes</p>
-    <p><strong>Marks:</strong> Toggle <mat-icon class="inline-block !h-[13px] !w-[13px] !text-[13px] align-middle">edit_location</mat-icon> to show mark tools &middot; Drag yellow nubs to reposition &middot; <kbd>N</kbd> joins/splits nubs &middot; Use toolbar buttons to add/remove &middot; Use <mat-icon class="inline-block !h-[13px] !w-[13px] !text-[13px] align-middle">auto_awesome</mat-icon> to generate</p>
+    <p><strong>Tracks:</strong> The blue line is the up-track and the red line is the down-track. The yellow diamonds on those paths are waypoint midpoints; click one to insert a waypoint between two existing points.</p>
+    <p><strong>Marks / checkpoints:</strong> Toggle <mat-icon class="inline-block !h-[13px] !w-[13px] !text-[13px] align-middle">edit_location</mat-icon> to show checkpoint marks. The yellow dashed lines are the checkpoint/mark segments, and selected marks turn cyan. The marks editor below lists the same segments in table form.</p>
     <p><strong>Barriers:</strong> Select draw mode (<mat-icon class="inline-block !h-[13px] !w-[13px] !text-[13px] align-middle">gesture</mat-icon> freehand, <mat-icon class="inline-block !h-[13px] !w-[13px] !text-[13px] align-middle">show_chart</mat-icon> straight, <mat-icon class="inline-block !h-[13px] !w-[13px] !text-[13px] align-middle">timeline</mat-icon> curve) &middot; Select L/Li/I/Ri/R &middot; <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd></p>
     <p><strong>Draw mode <mat-icon class="inline-block !h-[13px] !w-[13px] !text-[13px] align-middle">pan_tool</mat-icon> None:</strong> select/drag objects &amp; marks without triggering barrier draws</p>
     <p><strong>Navigation:</strong> <kbd>Space</kbd>+drag pans &middot; Scroll/zoom wheel &middot; <kbd>+</kbd>/<kbd>-</kbd> zoom &middot; Arrow keys pan</p>

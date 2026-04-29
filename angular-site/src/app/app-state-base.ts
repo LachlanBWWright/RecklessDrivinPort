@@ -10,6 +10,7 @@ import type {
   TrackWaypointRef,
   TrackMidpointRef,
   ObjectGroupDefinition,
+  ObjectGroupSpawnPreviewObject,
 } from './level-editor.service';
 import { KonvaEditorService } from './konva-editor.service';
 import { parseSndHeader, type SndInfo } from './snd-codec';
@@ -208,6 +209,8 @@ export class AppStateBase {
   markingRangePreview = signal<{ yStart: number; yEnd: number } | null>(null);
   /** Active Y-range preview shown for the selected level object-group slot. */
   objectGroupRangePreview = signal<{ yStart: number; yEnd: number } | null>(null);
+  /** Generated sample objects previewed for level object-group slots. */
+  objectGroupSpawnPreviewObjects = signal<ObjectGroupSpawnPreviewObject[]>([]);
   _markAutoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   _lastDraggedNubKey: { markIdx: number; endpoint: 'p1' | 'p2' } | null = null;
   _pendingMarkPoints: { x: number; y: number }[] = [];

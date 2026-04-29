@@ -13,6 +13,7 @@ import type {
   ObjectTypeDefinition,
   RoadInfoData,
   ObjectGroupDefinition,
+  ObjectGroupSpawnPreviewObject,
 } from './level-editor.service';
 import {
   applyLevelsResult,
@@ -740,6 +741,10 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     this.objectGroupRangePreview.set(
       yStart <= yEnd ? { yStart, yEnd } : { yStart: yEnd, yEnd: yStart },
     );
+  }
+
+  setObjectGroupSpawnPreview(objects: ObjectGroupSpawnPreviewObject[]): void {
+    this.objectGroupSpawnPreviewObjects.set(objects);
   }
 
   clearMarkingPreviews(): void {

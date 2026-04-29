@@ -1,4 +1,9 @@
-import type { ParsedLevel, TrackMidpointRef, TrackWaypointRef } from './level-editor.service';
+import type {
+  ObjectGroupSpawnPreviewObject,
+  ParsedLevel,
+  TrackMidpointRef,
+  TrackWaypointRef,
+} from './level-editor.service';
 import {
   computeFramedWorldRect,
   drawMarksOnCanvas,
@@ -127,6 +132,81 @@ function getObjectCanvas(): HTMLCanvasElement | null {
 function getKonvaContainer(): HTMLElement | null {
   const element = document.getElementById('konva-container');
   return element instanceof HTMLElement ? element : null;
+}
+
+function drawObjectGroupSpawnPreviewObjects(
+  ctx: CanvasRenderingContext2D,
+  app: App,
+  previewObjects: readonly ObjectGroupSpawnPreviewObject[],
+  width: number,
+  height: number,
+  zoom: number,
+  visibleTypes: ReadonlySet<number>,
+): void {
+  if (previewObjects.length === 0) {
+    return;
+  }
+
+  const fallbackRadius = Math.min(20, Math.max(6, 8 * zoom));
+  const badgeFont = `${Math.max(9, 10 * zoom)}px monospace`;
+
+  ctx.save();
+  ctx.font = badgeFont;
+  for (const previewObject of previewObjects) {
+    const typeIdx =
+      ((previewObject.typeRes % OBJ_PALETTE.length) + OBJ_PALETTE.length) % OBJ_PALETTE.length;
+    if (!visibleTypes.has(typeIdx)) {
+      continue;
+    }
+
+    const [cx, cy] = worldToCanvas(app, previewObject.x, previewObject.y);
+    if (cx < -60 || cx > width + 60 || cy < -60 || cy > height + 60) {
+      continue;
+    }
+
+    const accent = OBJ_PALETTE[previewObject.slotIndex % OBJ_PALETTE.length] ?? '#80deea';
+    const spritePreview = app.getObjectSpritePreview(previewObject.typeRes);
+    const drawWidth = spritePreview
+      ? Math.max(MIN_HIT_RADIUS * 2, spritePreview.width * zoom)
+      : fallbackRadius * 2.4;
+    const drawHeight = spritePreview
+      ? Math.max(MIN_HIT_RADIUS * 2, spritePreview.height * zoom)
+      : fallbackRadius * 2.4;
+
+    if (spritePreview) {
+      ctx.save();
+      ctx.globalAlpha = 0.72;
+      ctx.translate(cx, cy);
+      ctx.rotate(worldDirToCanvasRotationRad(previewObject.dir));
+      ctx.drawImage(spritePreview, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(cx, cy, fallbackRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = Math.max(1.5, zoom * 1.5);
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(cx - drawWidth / 2 - 2, cy - drawHeight / 2 - 2, drawWidth + 4, drawHeight + 4);
+    ctx.restore();
+
+    const badgeText = `S${previewObject.slotIndex}`;
+    const badgeWidth = ctx.measureText(badgeText).width + 8;
+    const badgeX = cx - badgeWidth / 2;
+    const badgeY = cy - drawHeight / 2 - 16;
+    ctx.fillStyle = 'rgba(9, 12, 18, 0.86)';
+    ctx.fillRect(badgeX, badgeY, badgeWidth, 12);
+    ctx.fillStyle = accent;
+    ctx.fillText(badgeText, badgeX + 4, badgeY + 9);
+  }
+  ctx.restore();
 }
 
 export function dist2d(ax: number, ay: number, bx: number, by: number): number {
@@ -1086,6 +1166,19 @@ export function redrawObjectCanvas(app: App): void {
       ctx.fillText(`#${i} T${obj.typeRes}`, cx + drawWidth / 2 + 4, cy + 4);
     }
     ctx.globalAlpha = 1.0;
+  }
+
+  const objectGroupSpawnPreviewObjects = app.objectGroupSpawnPreviewObjects();
+  if (objectGroupSpawnPreviewObjects.length > 0) {
+    drawObjectGroupSpawnPreviewObjects(
+      ctx,
+      app,
+      objectGroupSpawnPreviewObjects,
+      width,
+      height,
+      zoom,
+      visibleTypes,
+    );
   }
 
   const [originX, originY] = worldToCanvas(app, 0, 0);

@@ -1,8 +1,9 @@
 @if (selectedLevel) {
   <mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
     <mat-card-content class="!flex !min-h-0 !flex-1 !flex-col !p-0">
-      <div class="flex min-h-0 w-full flex-1 items-stretch gap-4 overflow-hidden p-4 max-[1200px]:flex-col max-[1200px]:p-3">
+      <div class="flex min-h-0 w-full flex-1 items-stretch gap-4 overflow-hidden p-4 max-[1024px]:flex-col max-[1024px]:p-3">
         <app-editor-canvas
+          class="max-[1024px]:min-h-[360px]"
           [objects]="objects"
           [selectedObjIndex]="selectedObjIndex"
           [marks]="marks"
@@ -75,7 +76,7 @@
           (clearMarkingPreview)="clearMarkingPreview.emit()"
         ></app-editor-canvas>
 
-        <div class="flex min-h-0 w-[320px] min-w-[300px] shrink-0 flex-col gap-3 overflow-hidden border-l border-l-[var(--border)] bg-[var(--surface2)] p-4 max-[1200px]:max-h-[42vh] max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:flex-[0_0_auto] max-[1200px]:border-l-0 max-[1200px]:border-t max-[1200px]:border-t-[var(--border)] max-[1200px]:p-3">
+        <div class="flex min-h-0 w-[320px] min-w-[300px] shrink-0 flex-col gap-3 overflow-hidden border-l border-l-[var(--border)] bg-[var(--surface2)] p-4 max-[1024px]:max-h-[42vh] max-[1024px]:w-full max-[1024px]:min-w-0 max-[1024px]:flex-[0_0_auto] max-[1024px]:border-l-0 max-[1024px]:border-t max-[1024px]:border-t-[var(--border)] max-[1024px]:p-3">
           <div class="flex rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1">
             <button
               type="button"
@@ -134,76 +135,196 @@
               <div class="rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] px-3.5 py-3">
                 <div class="text-[0.84rem] font-semibold text-[var(--on-surface)]">Level Object Groups</div>
                 <p class="mt-1 text-[0.72rem] leading-[1.45] text-[var(--muted)]">
-                  Click a configured slot to preview its spawn band on the canvas and inspect the weighted object mix.
+                  Click a configured slot to inspect its weighted entries, change the whole-slot preview Y start,
+                  and generate a source-based in-game sample on the canvas.
                 </p>
+                <p class="mt-2 text-[0.72rem] leading-[1.5] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
+                  Native spawn Y is random from <code>{{ previewStartY }}</code> to <code>{{ levelEnd }}</code>.
+                  When <code>dir = -1</code>, the game first picks a track line at that Y: usually the up-track or down-track at random,
+                  and if there is no down-track it always uses the up-track. That randomly picked line is the reference for
+                  <code>minOffs</code> and <code>maxOffs</code>.
+                </p>
+                <p class="mt-2 text-[0.72rem] leading-[1.5] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
+                  When the entry uses an explicit direction, the game does not use the track lines. It picks a road border instead.
+                  On a single road it uses the outer left or right edge. When the road diverges, it may use any of the four borders,
+                  so the offsets are measured from whichever border the game picked for that spawn.
+                </p>
+
+                <div class="mt-3 grid grid-cols-1 gap-3">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                    <mat-label>Preview Y start</mat-label>
+                    <input
+                      #previewStartYInput
+                      matInput
+                      type="number"
+                      inputmode="numeric"
+                      [value]="previewStartY"
+                      (input)="onPreviewStartYInput(previewStartYInput.value)"
+                    />
+                    <mat-hint>Level-scoped editor preview value.</mat-hint>
+                  </mat-form-field>
+
+                  <div class="flex flex-wrap items-center gap-3">
+                    <mat-checkbox
+                      class="text-[0.76rem] text-[var(--on-surface)]"
+                      [checked]="showGeneratedObjectGroupPreviews"
+                      (change)="setShowGeneratedObjectGroupPreviews($event.checked)"
+                    >
+                      Show generated samples
+                    </mat-checkbox>
+
+                    <button
+                      mat-stroked-button
+                      color="primary"
+                      type="button"
+                      (click)="regenerateEnabledGeneratedPreviews()"
+                      [disabled]="enabledGeneratedObjectGroupPreviewCount === 0"
+                    >
+                      <mat-icon>refresh</mat-icon> Regenerate Enabled
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              @for (slot of editObjectGroups; track trackGroupSlot($index)) {
-                <section class="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                  <button
-                    type="button"
-                    class="flex w-full items-start justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition hover:bg-white/[0.03]"
-                    [ngClass]="selectedObjectGroupSlotIndex === $index ? 'bg-[color:rgba(66,165,245,0.12)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]' : ''"
-                    (click)="selectObjectGroupSlot($index)"
+              @if (visibleObjectGroupSlots.length > 0) {
+                @for (slot of visibleObjectGroupSlots; track trackVisibleObjectGroupSlot($index, slot)) {
+                  <section
+                    class="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                    [ngClass]="selectedObjectGroupSlotIndex === slot.slotIndex ? 'bg-[color:rgba(66,165,245,0.12)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]' : ''"
                   >
-                    <span class="min-w-0 flex-1">
-                      <span class="flex items-center gap-2 text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-[var(--muted)]">
-                        <span>Slot {{ $index }}</span>
-                        <span class="rounded-full bg-white/[0.06] px-2 py-0.5 text-[0.66rem] tracking-[0.06em] text-[var(--on-surface)]">{{ slot.numObjs }} max</span>
-                      </span>
-                      <span class="mt-1 block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.9rem] font-semibold text-[var(--on-surface)]">{{ getObjectGroupLabel(slot.resID) }}</span>
-                      <span class="mt-1 block text-[0.72rem] text-[var(--muted)]">
-                        @if (slot.resID === 0) {
-                          Empty level slot.
-                        } @else if (canPreviewObjectGroupSlot($index)) {
-                          Spawn band: Y {{ objectGroupPreviewStartY }} → {{ levelEnd }}
-                        } @else {
-                          Definition unavailable for preview.
+                    <div class="flex items-start gap-2 px-3.5 py-3">
+                      <button
+                        type="button"
+                        class="min-w-0 flex-1 rounded-lg text-left transition hover:bg-white/[0.03]"
+                        (click)="selectObjectGroupSlot(slot.slotIndex)"
+                      >
+                        <span class="flex items-center gap-2 text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-[var(--muted)]">
+                          <span>Slot {{ slot.slotIndex }}</span>
+                          <span class="rounded-full bg-white/[0.06] px-2 py-0.5 text-[0.66rem] tracking-[0.06em] text-[var(--on-surface)]">{{ slot.numObjs }} max</span>
+                        </span>
+                        <span class="mt-1 block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.9rem] font-semibold text-[var(--on-surface)]">{{ getObjectGroupLabel(slot.resID) }}</span>
+                        <span class="mt-1 block text-[0.72rem] text-[var(--muted)]">
+                          @if (canPreviewObjectGroupSlot(slot.slotIndex)) {
+                            Spawn Y sample: {{ previewStartY }} → {{ levelEnd }}
+                          } @else {
+                            Definition unavailable for preview.
+                          }
+                        </span>
+                        @if (isGeneratedObjectGroupPreviewEnabled(slot.slotIndex)) {
+                          <span class="mt-1 inline-flex rounded-full bg-[color:rgba(77,208,225,0.12)] px-2 py-0.5 text-[0.66rem] font-semibold tracking-[0.05em] text-[#4dd0e1]">
+                            {{ showGeneratedObjectGroupPreviews ? 'Sample visible on canvas' : 'Sample ready (hidden)' }}
+                          </span>
                         }
-                      </span>
-                    </span>
-                    <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)]">chevron_right</mat-icon>
-                  </button>
 
-                  @if (selectedObjectGroupSlotIndex === $index) {
-                    <div class="border-t border-t-[var(--border)] px-3.5 py-3">
-                      @if (slot.resID === 0) {
-                        <p class="text-[0.76rem] leading-[1.45] text-[var(--muted)]">This slot is not linked to any object-group definition.</p>
-                      } @else if (getObjectGroupDefinition(slot.resID); as group) {
-                        <div class="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[0.72rem] text-[var(--muted)]">
-                          <span>Weighted entries</span>
-                          <span class="font-semibold text-[var(--on-surface)]">{{ group.entries.length }} total</span>
-                        </div>
-
-                        <div class="mt-2.5 flex flex-col gap-2">
-                          @for (entry of group.entries; track trackGroupEntry($index, entry)) {
-                            <div class="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
-                              <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-[var(--surface2)]">
+                        @if (slot.group; as group) {
+                          <span class="mt-2 flex flex-wrap items-center gap-1.5">
+                            @for (entry of getPreviewEntries(group, 3); track trackPreviewEntry($index, entry)) {
+                              <span
+                                class="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-[var(--surface2)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                                [matTooltip]="getTypeLabel(entry.typeRes) + ' · ' + getRelativeOddsLabel(group.entries, entry) + ' · ' + (entry.dir < 0 ? 'auto' : getPreviewRotationDegrees(entry.dir).toFixed(0) + '°')"
+                              >
                                 @if (getSpriteUrl(entry.typeRes); as url) {
-                                  <img [src]="url" class="block h-full w-full object-contain" [style.imageRendering]="'pixelated'" alt="" />
+                                  <img
+                                    [src]="url"
+                                    class="block h-full w-full object-contain [image-rendering:pixelated]"
+                                    [style.transform]="'rotate(' + getPreviewRotationDegrees(entry.dir) + 'deg)'"
+                                    [style.transformOrigin]="'50% 50%'"
+                                    alt=""
+                                  />
                                 } @else {
-                                  <span class="text-[0.68rem] font-extrabold text-[var(--muted)]">#</span>
+                                  <span
+                                    class="flex h-full w-full items-center justify-center rounded text-[0.68rem] font-extrabold text-[var(--muted)]"
+                                    [style.transform]="'rotate(' + getPreviewRotationDegrees(entry.dir) + 'deg)'"
+                                  >
+                                    #
+                                  </span>
                                 }
                               </span>
+                            }
+                            @if (getPreviewOverflowCount(group, 3) > 0) {
+                              <span class="inline-flex h-9 min-w-9 items-center justify-center rounded-md border border-dashed border-white/10 bg-white/[0.03] px-2 text-[0.68rem] font-bold text-[var(--muted)]">+{{ getPreviewOverflowCount(group, 3) }}</span>
+                            }
+                          </span>
+                        }
+                      </button>
 
-                              <span class="min-w-0 flex-1">
-                                <span class="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.82rem] font-semibold text-[var(--on-surface)]">{{ getTypeLabel(entry.typeRes) }}</span>
-                                <span class="block text-[0.7rem] text-[var(--muted)]">Offs {{ entry.minOffs }} → {{ entry.maxOffs }}</span>
-                              </span>
-
-                              <span class="shrink-0 text-right">
-                                <span class="block text-[0.8rem] font-semibold text-[var(--accent2)]">{{ getRelativeOddsLabel(group.entries, entry) }}</span>
-                                <span class="block text-[0.68rem] uppercase tracking-[0.08em] text-[var(--muted)]">w {{ entry.probility }}</span>
-                              </span>
-                            </div>
-                          }
-                        </div>
-                      } @else {
-                        <p class="text-[0.76rem] leading-[1.45] text-[var(--muted)]">This level references object group {{ getObjectGroupLabel(slot.resID) }}, but its definition is not loaded in the current resources set.</p>
-                      }
+                      <div class="flex shrink-0 items-center gap-1 pt-0.5">
+                        <button
+                          mat-icon-button
+                          type="button"
+                          color="primary"
+                          (click)="regeneratePreviewForSlot(slot.slotIndex)"
+                          [disabled]="!canPreviewObjectGroupSlot(slot.slotIndex)"
+                          matTooltip="Generate a fresh in-game sample for this slot"
+                        >
+                          <mat-icon>refresh</mat-icon>
+                        </button>
+                        <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)]">{{ selectedObjectGroupSlotIndex === slot.slotIndex ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                      </div>
                     </div>
-                  }
-                </section>
+
+                    @if (selectedObjectGroupSlotIndex === slot.slotIndex) {
+                      <div class="border-t border-t-[var(--border)] px-3.5 py-3">
+                        @if (slot.group; as group) {
+                          <div class="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[0.72rem] text-[var(--muted)]">
+                            <div class="min-w-0 flex-1">
+                              <span>Weighted entries</span>
+                              <p class="mt-1 text-[0.68rem] leading-[1.45] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
+                                Track-aligned entries (<code>dir = -1</code>) randomly pick the up-track or down-track at that Y first,
+                                then apply <code>minOffs</code>/<code>maxOffs</code> from that chosen line. Explicit-direction entries pick a road border instead,
+                                and on split roads that border can be any of the four road edges. Y is sampled separately from {{ previewStartY }} to {{ levelEnd }}.
+                              </p>
+                            </div>
+                            <div class="flex flex-wrap items-center justify-end gap-2">
+                              <mat-checkbox
+                                class="text-[0.74rem] text-[var(--on-surface)]"
+                                [checked]="isGeneratedObjectGroupPreviewEnabled(slot.slotIndex)"
+                                [disabled]="!canPreviewObjectGroupSlot(slot.slotIndex)"
+                                (change)="toggleGeneratedPreviewForSlot(slot.slotIndex, $event.checked)"
+                              >
+                                Show sample
+                              </mat-checkbox>
+                              <span class="font-semibold text-[var(--on-surface)]">{{ group.entries.length }} total</span>
+                              @if (getGeneratedObjectGroupPreviewCount(slot.slotIndex) > 0) {
+                                <span class="rounded-full bg-[color:rgba(77,208,225,0.12)] px-2 py-0.5 text-[0.66rem] tracking-[0.05em] text-[#4dd0e1]">{{ getGeneratedObjectGroupPreviewCount(slot.slotIndex) }} sampled</span>
+                              }
+                            </div>
+                          </div>
+
+                          <div class="mt-2.5 flex flex-col gap-2">
+                            @for (entry of group.entries; track trackGroupEntry($index, entry)) {
+                              <div class="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-[var(--surface2)]">
+                                  @if (getSpriteUrl(entry.typeRes); as url) {
+                                    <img [src]="url" class="block h-full w-full object-contain" [style.imageRendering]="'pixelated'" alt="" />
+                                  } @else {
+                                    <span class="text-[0.68rem] font-extrabold text-[var(--muted)]">#</span>
+                                  }
+                                </span>
+
+                                <span class="min-w-0 flex-1">
+                                  <span class="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.82rem] font-semibold text-[var(--on-surface)]">{{ getTypeLabel(entry.typeRes) }}</span>
+                                  <span class="block text-[0.7rem] text-[var(--muted)]">X offs {{ entry.minOffs }} → {{ entry.maxOffs }} {{ getOffsetReferenceSummary(entry) }}</span>
+                                </span>
+
+                                <span class="shrink-0 text-right">
+                                  <span class="block text-[0.8rem] font-semibold text-[var(--accent2)]">{{ getRelativeOddsLabel(group.entries, entry) }}</span>
+                                  <span class="block text-[0.68rem] uppercase tracking-[0.08em] text-[var(--muted)]">w {{ entry.probility }}</span>
+                                </span>
+                              </div>
+                            }
+                          </div>
+                        } @else {
+                          <p class="text-[0.76rem] leading-[1.45] text-[var(--muted)]">This level references object group {{ getObjectGroupLabel(slot.resID) }}, but its definition is not loaded in the current resources set.</p>
+                        }
+                      </div>
+                    }
+                  </section>
+                }
+              } @else {
+                <div class="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-8 text-center text-[0.8rem] text-[var(--muted)]">
+                  This level has no assigned object groups.
+                </div>
               }
             </div>
           }

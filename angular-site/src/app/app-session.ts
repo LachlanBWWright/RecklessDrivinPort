@@ -69,6 +69,7 @@ export function resetEditorData(app: App): void {
   app.markingPreview.set([]);
   app.markingRangePreview.set(null);
   app.objectGroupRangePreview.set(null);
+  app.objectGroupSpawnPreviewObjects.set([]);
   app.media.stopAudio();
   app._lastAudioBuffer = null;
   app.audioCurrentTime.set(0);

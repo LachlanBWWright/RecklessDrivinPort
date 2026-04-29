@@ -13,16 +13,16 @@
 // ------------------------------------------------------------------
 
 export interface ObjectGroupRef {
-  resID: number;    // SInt16
-  numObjs: number;  // SInt16
+  resID: number; // SInt16
+  numObjs: number; // SInt16
 }
 
 export interface ObjectGroupEntryData {
-  typeRes: number;   // SInt16
-  minOffs: number;   // SInt16
-  maxOffs: number;   // SInt16
-  probility: number;  // SInt16
-  dir: number;       // float
+  typeRes: number; // SInt16
+  minOffs: number; // SInt16
+  maxOffs: number; // SInt16
+  probility: number; // SInt16
+  dir: number; // float
 }
 
 export interface ObjectGroupDefinition {
@@ -30,32 +30,43 @@ export interface ObjectGroupDefinition {
   entries: ObjectGroupEntryData[];
 }
 
+export interface ObjectGroupSpawnPreviewObject {
+  slotIndex: number;
+  groupId: number;
+  entryIndex: number;
+  typeRes: number;
+  x: number;
+  y: number;
+  dir: number;
+  control: 'track-up' | 'track-down' | 'road';
+}
+
 export interface TrackSeg {
-  flags: number;  // UInt16
-  x: number;      // SInt16
-  y: number;      // SInt32
-  velo: number;   // float (big-endian)
+  flags: number; // UInt16
+  x: number; // SInt16
+  y: number; // SInt32
+  velo: number; // float (big-endian)
 }
 
 export interface ObjectPos {
-  x: number;        // SInt32
-  y: number;        // SInt32
-  dir: number;      // float
-  typeRes: number;  // SInt16
+  x: number; // SInt32
+  y: number; // SInt32
+  dir: number; // float
+  typeRes: number; // SInt16
 }
 
 export interface RoadSeg {
-  v0: number;  // SInt16
-  v1: number;  // SInt16
-  v2: number;  // SInt16
-  v3: number;  // SInt16
+  v0: number; // SInt16
+  v1: number; // SInt16
+  v2: number; // SInt16
+  v3: number; // SInt16
 }
 
 export interface MarkSeg {
-  x1: number;  // SInt32
-  y1: number;  // SInt32
-  x2: number;  // SInt32
-  y2: number;  // SInt32
+  x1: number; // SInt32
+  y1: number; // SInt32
+  x2: number; // SInt32
+  y2: number; // SInt32
 }
 
 /** Identifies a single draggable or hovered track waypoint. */
@@ -76,18 +87,18 @@ export interface TrackMidpointRef {
 }
 
 export interface LevelProperties {
-  roadInfo: number;   // SInt16 – index into kPackRoad
-  time: number;       // UInt16 – level time limit
-  xStartPos: number;  // SInt16 – player start X position
-  levelEnd: number;   // UInt16 – Y position of finish line
-  objectGroups: ObjectGroupRef[];  // 10 slots
+  roadInfo: number; // SInt16 – index into kPackRoad
+  time: number; // UInt16 – level time limit
+  xStartPos: number; // SInt16 – player start X position
+  levelEnd: number; // UInt16 – Y position of finish line
+  objectGroups: ObjectGroupRef[]; // 10 slots
 }
 
 /** Full in-memory representation of a decoded level. */
 export interface ParsedLevel {
   resourceId: number;
   properties: LevelProperties;
-  objectGroups: ObjectGroupRef[];  // 10 entries
+  objectGroups: ObjectGroupRef[]; // 10 entries
   trackUp: TrackSeg[];
   trackDown: TrackSeg[];
   objects: ObjectPos[];

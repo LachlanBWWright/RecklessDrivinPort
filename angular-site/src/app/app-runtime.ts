@@ -55,6 +55,7 @@ export function setupAppLifecycle(app: App): void {
     app.markingPreview();
     app.markingRangePreview();
     app.objectGroupRangePreview();
+    app.objectGroupSpawnPreviewObjects();
     app.editXStartPos();
     app.editLevelEnd();
     app.selectedLevel();
