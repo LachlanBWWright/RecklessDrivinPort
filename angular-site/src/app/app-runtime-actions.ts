@@ -1,5 +1,8 @@
 import type { App } from './app';
-import { scheduleCanvasRedraw as scheduleCanvasRedrawHelper, toggleFullscreen as toggleFullscreenHelper } from './app-runtime';
+import {
+  scheduleCanvasRedraw as scheduleCanvasRedrawHelper,
+  toggleFullscreen as toggleFullscreenHelper,
+} from './app-runtime';
 import {
   clearEditorResources as clearEditorResourcesHelper,
   downloadEditedResources as downloadEditedResourcesHelper,
@@ -20,6 +23,7 @@ import {
   restartGameWithCustomResources as restartGameWithCustomResourcesHelper,
   setupEmscriptenModule as setupEmscriptenModuleHelper,
   syncGameLoopWithActiveTab as syncGameLoopWithActiveTabHelper,
+  restartIntoEditorTestDrive as restartIntoEditorTestDriveHelper,
 } from './app-platform';
 import { bindAppAction } from './bind-app-action';
 
@@ -46,6 +50,7 @@ export function createRuntimeActions(app: App): {
   syncGameLoopWithActiveTab(): void;
   onCustomResourcesFileSelected(event: Event): Promise<void>;
   restartGameWithCustomResources(): void;
+  restartIntoEditorTestDrive(): void;
   clearCustomResources(): void;
   mountCustomResourcesFs(bytes: Uint8Array): void;
 } {
@@ -93,6 +98,7 @@ export function createRuntimeActions(app: App): {
     syncGameLoopWithActiveTab: bindAppAction(app, syncGameLoopWithActiveTabHelper),
     onCustomResourcesFileSelected: bindAppAction(app, onCustomResourcesFileSelectedHelper),
     restartGameWithCustomResources: bindAppAction(app, restartGameWithCustomResourcesHelper),
+    restartIntoEditorTestDrive: bindAppAction(app, restartIntoEditorTestDriveHelper),
     clearCustomResources: bindAppAction(app, clearCustomResourcesHelper),
     mountCustomResourcesFs: bindAppAction(app, mountCustomResourcesFsHelper),
   };

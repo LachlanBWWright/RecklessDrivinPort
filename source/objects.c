@@ -11,6 +11,7 @@
 #include "packs.h"
 #include "objectcontrol.h"
 #include "random.h"
+#include "gameinitexit.h"
 
 #define kWreckDelay			0.3
 #define kPlayerDeathDelay	2.5
@@ -87,6 +88,18 @@ tObject *GetCloseObj(t2DPoint pos,tObject *posObj,float *dist)
 	return closeObj;
 }
 
+static float GetObjectGroupStartY(void)
+{
+	int startY=500;
+	if(gEditorLaunchOptions.enabled&&gEditorLaunchOptions.hasObjectGroupStartY)
+		startY=gEditorLaunchOptions.objectGroupStartY;
+	if(startY<0)
+		startY=0;
+	if(startY>gLevelData->levelEnd)
+		startY=gLevelData->levelEnd;
+	return (float)startY;
+}
+
 t2DPoint GetUniquePos(SInt16 minOffs,SInt16 maxOffs,float *objDir,int *dir)
 {
 	t2DPoint pos;
@@ -95,7 +108,7 @@ t2DPoint GetUniquePos(SInt16 minOffs,SInt16 maxOffs,float *objDir,int *dir)
 	do{
 		tRoad roadData;
 		float sqdist;
-		pos.y=RanFl(500,gLevelData->levelEnd);
+		pos.y=RanFl(GetObjectGroupStartY(),gLevelData->levelEnd);
 		roadData=gRoadData+(int)(pos.y/2);
 		if(*objDir==-1)
 		{

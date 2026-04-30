@@ -55,6 +55,17 @@ enum{
 };
 
 enum{
+	kBonusRollLock=1<<0,
+	kBonusRollMines=1<<1,
+	kBonusRollMissiles=1<<2,
+	kBonusRollSpikes=1<<3,
+	kBonusRollCop=1<<4,
+	kBonusRollTurbo=1<<5,
+	kBonusRollScore=1<<6,
+	kBonusRollExtraLife=1<<7
+};
+
+enum{
 	kFrontBumper=1<<0,
 	kBackBumper=1<<1,
 	kFrontLeftTire=1<<2,

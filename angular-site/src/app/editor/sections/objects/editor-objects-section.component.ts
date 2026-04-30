@@ -291,8 +291,11 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
     return `${percent >= 10 || Number.isInteger(percent) ? percent.toFixed(0) : percent.toFixed(1)}%`;
   }
 
-  getOffsetReferenceSummary(entry: ObjectGroupEntryData): string {
-    return entry.dir === -1 ? 'from the chosen track line' : 'from the chosen road border';
+  getOffsetSummary(entry: ObjectGroupEntryData): string {
+    if (entry.dir === -1) {
+      return `Stored offs ${entry.minOffs} -> ${entry.maxOffs} (ignored by native auto-track spawn)`;
+    }
+    return `Signed X offs ${entry.minOffs} -> ${entry.maxOffs} from the chosen road border (+ inward, - outward relative to that border)`;
   }
 
   setShowGeneratedObjectGroupPreviews(show: boolean): void {

@@ -7,8 +7,7 @@
       <mat-card-content>
         <p class="mt-2 text-[0.9rem] leading-[1.7] text-[var(--muted)]">
           A fan-made SDL2 / Emscripten port of the classic Mac OS&nbsp;9 racing game
-          <em>Reckless Drivin'</em> by Jonas Echterhoff. Hold a number key when clicking Start to skip
-          directly to that level.
+          <em>Reckless Drivin'</em> by Jonas Echterhoff.
         </p>
         <p class="mt-2 text-[0.9rem] leading-[1.7] text-[var(--muted)] [&_a]:text-[var(--accent2)] [&_a]:no-underline [&_a:hover]:underline">
           Ported by <a href="https://github.com/LachlanBWWright" target="_blank" rel="noopener">LachlanBWWright</a>,
@@ -87,6 +86,125 @@
             {{ customResourcesName }} loaded
           </span>
         }
+      </div>
+
+      <div class="rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] p-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <div class="text-[0.9rem] font-semibold text-[var(--on-surface)]">Editor Test Drive</div>
+            <p class="mt-1 text-[0.78rem] leading-[1.55] text-[var(--muted)]">
+              Reload the page, then auto-start a test drive with a chosen level, optional Y overrides, forced addons,
+              and disabled bonus-roll outcomes. If launch options are invalid or unavailable, the game stays at the main menu.
+            </p>
+          </div>
+          <button
+            mat-raised-button
+            class="!bg-[var(--accent2)] !text-white hover:!bg-[#1e88e5] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+            [disabled]="gameRestarting"
+            (click)="restartIntoEditorTestDrive.emit()"
+            matTooltip="Reload the page and auto-start the configured test drive"
+          >
+            @if (gameRestarting) {
+              <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
+            } @else {
+              <mat-icon>sports_esports</mat-icon>
+            }
+            Restart Into Test Drive
+          </button>
+        </div>
+
+        <div class="mt-3 grid gap-3 md:grid-cols-3">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full">
+            <mat-label>Level</mat-label>
+            <input
+              #testDriveLevelInput
+              matInput
+              type="number"
+              min="1"
+              inputmode="numeric"
+              [value]="editorTestDriveLevelNumber"
+              (input)="editorTestDriveLevelNumberInput.emit(testDriveLevelInput.value)"
+            />
+            <mat-hint>1-based level number.</mat-hint>
+          </mat-form-field>
+
+          <div class="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+            <mat-checkbox
+              [checked]="editorTestDriveUseStartY"
+              (change)="editorTestDriveUseStartYChange.emit($event.checked)"
+            >
+              Override player start Y
+            </mat-checkbox>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mt-2 mb-0 w-full">
+              <mat-label>Player start Y</mat-label>
+              <input
+                #testDriveStartYInput
+                matInput
+                type="number"
+                min="0"
+                inputmode="numeric"
+                [disabled]="!editorTestDriveUseStartY"
+                [value]="editorTestDriveStartY"
+                (input)="editorTestDriveStartYInput.emit(testDriveStartYInput.value)"
+              />
+              <mat-hint>Applied in <code>LoadLevel()</code>.</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <div class="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+            <mat-checkbox
+              [checked]="editorTestDriveUseObjectGroupStartY"
+              (change)="editorTestDriveUseObjectGroupStartYChange.emit($event.checked)"
+            >
+              Override object-group start Y
+            </mat-checkbox>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mt-2 mb-0 w-full">
+              <mat-label>Object-group Y floor</mat-label>
+              <input
+                #testDriveObjectGroupStartYInput
+                matInput
+                type="number"
+                min="0"
+                inputmode="numeric"
+                [disabled]="!editorTestDriveUseObjectGroupStartY"
+                [value]="editorTestDriveObjectGroupStartY"
+                (input)="editorTestDriveObjectGroupStartYInput.emit(testDriveObjectGroupStartYInput.value)"
+              />
+              <mat-hint>Overrides the native <code>GetUniquePos()</code> lower bound.</mat-hint>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="mt-3 grid gap-3 lg:grid-cols-2">
+          <div class="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+            <div class="text-[0.8rem] font-semibold text-[var(--on-surface)]">Forced addons</div>
+            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+              @for (option of forcedAddonOptions; track option.mask) {
+                <mat-checkbox
+                  [checked]="hasMask(editorTestDriveForcedAddOns, option.mask)"
+                  (change)="editorTestDriveForcedAddonToggle.emit({ mask: option.mask, checked: $event.checked })"
+                  [matTooltip]="option.description"
+                >
+                  {{ option.label }}
+                </mat-checkbox>
+              }
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+            <div class="text-[0.8rem] font-semibold text-[var(--on-surface)]">Disabled bonus rolls</div>
+            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+              @for (option of disabledBonusRollOptions; track option.mask) {
+                <mat-checkbox
+                  [checked]="hasMask(editorTestDriveDisabledBonusRollMask, option.mask)"
+                  (change)="editorTestDriveDisabledBonusRollToggle.emit({ mask: option.mask, checked: $event.checked })"
+                >
+                  {{ option.label }}
+                </mat-checkbox>
+              }
+            </div>
+          </div>
+        </div>
       </div>
     </mat-card-footer>
   </mat-card>

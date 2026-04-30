@@ -10,6 +10,7 @@
 #include "packs.h"
 #include "random.h"
 #include "input.h"
+#include "gameinitexit.h"
 
 #define kSeperatio			1.01
 #define kMaxCollDist		120.0
@@ -354,94 +355,129 @@ void BounceObjects(tObject *obj1,tObject *obj2)
 	DoBounce(obj1,obj2,diff);    
 }
 
+static UInt32 BonusRollMaskForRoll(int roll)
+{
+	switch(roll)
+	{
+		case 0: return kBonusRollLock;
+		case 1: return kBonusRollMines;
+		case 2: return kBonusRollMissiles;
+		case 3: return kBonusRollSpikes;
+		case 4: return kBonusRollCop;
+		case 5: return kBonusRollTurbo;
+		case 6: return kBonusRollScore;
+		case 7: return kBonusRollExtraLife;
+	}
+	return 0;
+}
+
+static int BonusRollIsAllowed(int roll)
+{
+	if(gEditorLaunchOptions.disabledBonusRollMask&BonusRollMaskForRoll(roll))
+		return false;
+	switch(roll)
+	{
+		case 0:
+			return !(gPlayerAddOns&kAddOnLock);
+		case 3:
+			return !(gPlayerAddOns&kAddOnSpikes);
+		case 4:
+			return !(gPlayerAddOns&kAddOnCop);
+		case 5:
+			return !(gPlayerAddOns&kAddOnTurbo);
+	}
+	return true;
+}
+
+static void ApplyBonusRoll(int roll)
+{
+	switch(roll)
+	{
+		case 0:
+			LOG_DEBUG("Addon: Lock triggered\n");
+			if(!(gPlayerAddOns&kAddOnLock))
+			{
+				tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\x0e" "ADDONShLOCKEDf"};
+				NewTextEffect(&fx);
+				gPlayerAddOns|=kAddOnLock;
+			}
+			break;
+		case 1:
+			LOG_DEBUG("Addon: Mines triggered\n");
+			{
+				tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x07" "MINESee"};
+				NewTextEffect(&fx);
+				gNumMines+=5;
+			}
+			break;
+		case 2:
+			LOG_DEBUG("Addon: Missiles triggered\n");
+			{
+				tTextEffect fx={320,240,kEffectExplode,0,"\x09" "MISSILESe"};
+				NewTextEffect(&fx);
+				gNumMissiles+=5;
+			}
+			break;
+		case 3:
+			LOG_DEBUG("Addon: Spikes triggered\n");
+			if(!(gPlayerAddOns&kAddOnSpikes))
+			{
+				tTextEffect fx={320,240,kEffectExplode,0,"\x07" "SPIKESe"};
+				NewTextEffect(&fx);
+				gPlayerAddOns|=kAddOnSpikes;
+			}
+			break;
+		case 4:
+			LOG_DEBUG("Addon: Police jammer triggered\n");
+			if(!(gPlayerAddOns&kAddOnCop))
+			{
+				tTextEffect fx={320,240,kEffectSinLines,0,"\x0d" "POLICEhJAMMER"};
+				NewTextEffect(&fx);
+				gPlayerAddOns|=kAddOnCop;
+			}
+			break;
+		case 5:
+			LOG_DEBUG("Addon: Turbo engine triggered\n");
+			if(!(gPlayerAddOns&kAddOnTurbo))
+			{
+				tTextEffect fx={320,240,kEffectExplode,0,"\x0f" "TURBOhENGINEeee"};
+				NewTextEffect(&fx);
+				gPlayerAddOns|=kAddOnTurbo;
+			}
+			break;
+		case 6:
+			LOG_DEBUG("Addon: Score award triggered\n");
+			{
+				tTextEffect fx={320,240,kEffectExplode,0,"\x0d" "][[[hAWARDEDf"};
+				NewTextEffect(&fx);
+				gPlayerScore+=2000;
+			}
+			break;
+		case 7:
+			LOG_DEBUG("Addon: Extra life triggered\n");
+			{
+				tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0c" "EXTRAhLIFEee"};
+				NewTextEffect(&fx);
+				gPlayerLives++;
+				SimplePlaySound(154);
+			}
+			break;
+	}
+}
+
 void BonusObject(tObject *theObj)
 {
 	tObjectTypePtr objType=theObj->type;
 	if((*objType).flags2&kObjectAddOnFlag)
 	{
-		int ok=false;
-		do{
-			switch(RanInt(0,8))
-			{
-				case 0:
-        LOG_DEBUG("Addon: Lock triggered\n");
-					if(!(gPlayerAddOns&kAddOnLock))
-					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveLeft,0,"\x0e" "ADDONShLOCKEDf"};
-						NewTextEffect(&fx);
-						gPlayerAddOns|=kAddOnLock;
-						ok=true;
-					}
-					break;	
-				case 1:
-        LOG_DEBUG("Addon: Mines triggered\n");
-					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x07" "MINESee"};
-						NewTextEffect(&fx);
-						gNumMines+=5;
-						ok=true;
-					}
-					break;	
-				case 2:
-        LOG_DEBUG("Addon: Missiles triggered\n");
-					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\x09" "MISSILESe"};
-						NewTextEffect(&fx);
-						gNumMissiles+=5;
-						ok=true;
-					}
-					break;	
-				case 3:
-        LOG_DEBUG("Addon: Spikes triggered\n");
-					if(!(gPlayerAddOns&kAddOnSpikes))
-					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\x07" "SPIKESe"};
-						NewTextEffect(&fx);
-						gPlayerAddOns|=kAddOnSpikes;
-						ok=true;
-					}
-					break;
-				case 4:
-        LOG_DEBUG("Addon: Police jammer triggered\n");
-					if(!(gPlayerAddOns&kAddOnCop))
-					{
-						tTextEffect fx={320,240,kEffectSinLines,0,"\x0d" "POLICEhJAMMER"};
-						NewTextEffect(&fx);
-						gPlayerAddOns|=kAddOnCop;
-						ok=true;
-					}
-					break;	
-				case 5:
-        LOG_DEBUG("Addon: Turbo engine triggered\n");
-					if(!(gPlayerAddOns&kAddOnTurbo))
-					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\x0f" "TURBOhENGINEeee"};
-						NewTextEffect(&fx);
-						gPlayerAddOns|=kAddOnTurbo;
-						ok=true;
-					}
-					break;	
-				case 6:
-        LOG_DEBUG("Addon: Score award triggered\n");
-					{
-						tTextEffect fx={320,240,kEffectExplode,0,"\x0d" "][[[hAWARDEDf"};
-						NewTextEffect(&fx);
-						gPlayerScore+=2000;
-						ok=true;
-					}
-					break;
-				case 7:
-        LOG_DEBUG("Addon: Extra life triggered\n");
-					{
-						tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0c" "EXTRAhLIFEee"};
-						NewTextEffect(&fx);
-						gPlayerLives++;
-						SimplePlaySound(154);
-						ok=true;
-					}
-					break;
-			}
-		}while(!ok);
+		int candidates[8];
+		int candidateCount=0;
+		int roll;
+		for(roll=0;roll<8;roll++)
+			if(BonusRollIsAllowed(roll))
+				candidates[candidateCount++]=roll;
+		if(candidateCount>0)
+			ApplyBonusRoll(candidates[RanInt(0,candidateCount)]);
 	}
 	else
 		gPlayerBonus=theObj->frame-(*objType).frame+2;

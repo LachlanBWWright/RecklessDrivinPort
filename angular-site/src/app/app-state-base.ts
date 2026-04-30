@@ -18,6 +18,8 @@ import type { EditorSection } from './layout/site-toolbar/site-toolbar.component
 import { levelDisplayNum } from './app-helpers';
 import { OBJ_PALETTE } from './object-canvas';
 
+const DEFAULT_EDITOR_TEST_DRIVE_START_Y = 500;
+
 /** Shared UI and editing state for the root app. */
 export class AppStateBase {
   readonly typePalette = OBJ_PALETTE.map((hex, typeId) => ({ hex, typeId }));
@@ -42,6 +44,18 @@ export class AppStateBase {
   progressPct = signal(0);
   overlayVisible = signal(true);
   masterVolume = signal(80);
+  editorTestDriveLevelNumberOverride = signal<number | null>(null);
+  readonly editorTestDriveLevelNumber = computed(() => {
+    const override = this.editorTestDriveLevelNumberOverride();
+    if (override !== null) return override;
+    return Math.max(1, this.selectedLevelNum() || 1);
+  });
+  editorTestDriveUseStartY = signal(false);
+  editorTestDriveStartY = signal(DEFAULT_EDITOR_TEST_DRIVE_START_Y);
+  editorTestDriveUseObjectGroupStartY = signal(false);
+  editorTestDriveObjectGroupStartY = signal(DEFAULT_EDITOR_TEST_DRIVE_START_Y);
+  editorTestDriveForcedAddOns = signal(0);
+  editorTestDriveDisabledBonusRollMask = signal(0);
 
   // ---- Editor global state ----
   resourcesStatus = signal('No resources.dat loaded. Use the buttons below to load one.');

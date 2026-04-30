@@ -193,6 +193,16 @@ interface EmscriptenModuleInterface {
   preRun: (() => void)[];
   postRun: (() => void)[];
   _set_wasm_master_volume?: (vol: number) => void;
+  _rd_set_editor_launch_options?: (
+    levelID: number,
+    hasStartY: number,
+    startY: number,
+    hasObjectGroupStartY: number,
+    objectGroupStartY: number,
+    forcedAddOns: number,
+    disabledBonusRollMask: number,
+  ) => void;
+  _rd_start_editor_test_drive?: () => void;
   /** Pause the Emscripten main loop before a restart. */
   pauseMainLoop?: () => void;
   /** Resume the Emscripten main loop after a pause. */
@@ -316,6 +326,70 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   resetViewToRoad(level: ParsedLevel): void {
     resetViewToRoad(this, level);
+  }
+
+  private clampEditorTestDriveLevelNumber(levelNumber: number): number {
+    const maxLevel = Math.max(1, this.parsedLevels().length || 10);
+    return Math.max(1, Math.min(maxLevel, Math.round(levelNumber)));
+  }
+
+  private clampEditorTestDriveStartY(startY: number): number {
+    return Math.max(0, Math.round(startY));
+  }
+
+  setEditorTestDriveLevelNumber(rawValue: string): void {
+    const trimmed = rawValue.trim();
+    if (trimmed === '') {
+      this.editorTestDriveLevelNumberOverride.set(null);
+      return;
+    }
+    const parsed = Number.parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+    this.editorTestDriveLevelNumberOverride.set(this.clampEditorTestDriveLevelNumber(parsed));
+  }
+
+  setEditorTestDriveUseStartY(enabled: boolean): void {
+    this.editorTestDriveUseStartY.set(enabled);
+  }
+
+  setEditorTestDriveStartY(rawValue: string): void {
+    const trimmed = rawValue.trim();
+    const parsed = trimmed === '' ? 500 : Number.parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+    this.editorTestDriveStartY.set(this.clampEditorTestDriveStartY(parsed));
+  }
+
+  setEditorTestDriveUseObjectGroupStartY(enabled: boolean): void {
+    this.editorTestDriveUseObjectGroupStartY.set(enabled);
+  }
+
+  setEditorTestDriveObjectGroupStartY(rawValue: string): void {
+    const trimmed = rawValue.trim();
+    const parsed = trimmed === '' ? 500 : Number.parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+    this.editorTestDriveObjectGroupStartY.set(this.clampEditorTestDriveStartY(parsed));
+  }
+
+  toggleEditorTestDriveForcedAddon(mask: number, checked: boolean): void {
+    this.editorTestDriveForcedAddOns.set(
+      checked
+        ? this.editorTestDriveForcedAddOns() | mask
+        : this.editorTestDriveForcedAddOns() & ~mask,
+    );
+  }
+
+  toggleEditorTestDriveDisabledBonusRoll(mask: number, checked: boolean): void {
+    this.editorTestDriveDisabledBonusRollMask.set(
+      checked
+        ? this.editorTestDriveDisabledBonusRollMask() | mask
+        : this.editorTestDriveDisabledBonusRollMask() & ~mask,
+    );
   }
 
   onPropsInput(field: keyof import('./level-editor.service').LevelProperties, event: Event): void {

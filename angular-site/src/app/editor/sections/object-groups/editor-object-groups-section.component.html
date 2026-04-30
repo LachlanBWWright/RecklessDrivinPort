@@ -42,12 +42,14 @@
                 <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
                   Native spawn Y is chosen separately at random from <code>500</code> to the level's <code>levelEnd</code>.
                   When <code>dir = -1</code>, the game first picks the up-track or down-track at that Y, and if there is no down-track it uses the up-track.
-                  That randomly chosen line is the reference for <code>minOffs</code> and <code>maxOffs</code>.
+                  In the native spawn code, that auto-track path snaps to the chosen line and does not use <code>minOffs</code> or <code>maxOffs</code>.
                 </p>
                 <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
                   When the road diverges and the entry uses an explicit direction, the game does not use the track lines at all.
                   It picks a road border instead: on a single road that means the outer left or right edge, and on a split road it can be any of the four borders.
-                  The offsets are measured from whichever border the game picked for that spawn.
+                  <code>minOffs</code>/<code>maxOffs</code> are signed X offsets from whichever border was picked for that spawn, not absolute world X values.
+                  Positive values move inward from that border into its road segment; negative values move outward away from that border.
+                  Because the chosen border may be on the left or right, the same sign can move world X either left or right. On split roads, outward from an inner border means toward the center gap.
                 </p>
                 <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)]">
                   The whole-group preview Y start is level-scoped, so it is edited from the Objects &gt; Groups panel rather than inside Pack 130.

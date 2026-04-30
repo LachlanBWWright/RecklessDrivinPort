@@ -9,11 +9,150 @@ interface EmscriptenModuleLike {
   pauseMainLoop?: () => void;
   resumeMainLoop?: () => void;
   _set_wasm_master_volume?: (vol: number) => void;
+  _rd_set_editor_launch_options?: (
+    levelID: number,
+    hasStartY: number,
+    startY: number,
+    hasObjectGroupStartY: number,
+    objectGroupStartY: number,
+    forcedAddOns: number,
+    disabledBonusRollMask: number,
+  ) => void;
+  _rd_start_editor_test_drive?: () => void;
 }
+
+interface PendingEditorTestDriveLaunch {
+  levelNumber: number;
+  hasStartY: boolean;
+  startY: number;
+  hasObjectGroupStartY: boolean;
+  objectGroupStartY: number;
+  forcedAddOns: number;
+  disabledBonusRollMask: number;
+}
+
+const EDITOR_TEST_DRIVE_STORAGE_KEY = 'reckless-drivin-editor-test-drive';
 
 let keyboardGateInstalled = false;
 let xhrOpenPatched = false;
 let activeTabGetter: (() => 'game' | 'editor') | null = null;
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  ) {
+    return true;
+  }
+  return (
+    target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]') !==
+    null
+  );
+}
+
+function clampNonNegativeInteger(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.round(value));
+}
+
+function clampLevelNumber(value: number, maxLevel: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(1, Math.min(maxLevel, Math.round(value)));
+}
+
+function validateLevelNumber(value: number, maxLevel: number): number | null {
+  if (!Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  if (rounded < 1 || rounded > maxLevel) return null;
+  return rounded;
+}
+
+function buildPendingEditorTestDriveLaunch(app: App): PendingEditorTestDriveLaunch {
+  const maxLevel = Math.max(1, app.parsedLevels().length || 10);
+  return {
+    levelNumber: clampLevelNumber(app.editorTestDriveLevelNumber(), maxLevel),
+    hasStartY: app.editorTestDriveUseStartY(),
+    startY: clampNonNegativeInteger(app.editorTestDriveStartY(), 500),
+    hasObjectGroupStartY: app.editorTestDriveUseObjectGroupStartY(),
+    objectGroupStartY: clampNonNegativeInteger(app.editorTestDriveObjectGroupStartY(), 500),
+    forcedAddOns: app.editorTestDriveForcedAddOns() >>> 0,
+    disabledBonusRollMask: app.editorTestDriveDisabledBonusRollMask() >>> 0,
+  };
+}
+
+function savePendingEditorTestDriveLaunch(launch: PendingEditorTestDriveLaunch): boolean {
+  try {
+    sessionStorage.setItem(EDITOR_TEST_DRIVE_STORAGE_KEY, JSON.stringify(launch));
+    return true;
+  } catch (error) {
+    console.warn('[Angular] Failed to persist pending editor test drive launch', error);
+    return false;
+  }
+}
+
+function consumePendingEditorTestDriveLaunch(): PendingEditorTestDriveLaunch | null {
+  try {
+    const raw = sessionStorage.getItem(EDITOR_TEST_DRIVE_STORAGE_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(EDITOR_TEST_DRIVE_STORAGE_KEY);
+    const parsed = JSON.parse(raw) as Partial<PendingEditorTestDriveLaunch>;
+    if (typeof parsed.levelNumber !== 'number') {
+      return null;
+    }
+    return {
+      levelNumber: parsed.levelNumber,
+      hasStartY: parsed.hasStartY === true,
+      startY: clampNonNegativeInteger(parsed.startY ?? 500, 500),
+      hasObjectGroupStartY: parsed.hasObjectGroupStartY === true,
+      objectGroupStartY: clampNonNegativeInteger(parsed.objectGroupStartY ?? 500, 500),
+      forcedAddOns: clampNonNegativeInteger(parsed.forcedAddOns ?? 0, 0),
+      disabledBonusRollMask: clampNonNegativeInteger(parsed.disabledBonusRollMask ?? 0, 0),
+    };
+  } catch (error) {
+    console.warn('[Angular] Failed to restore pending editor test drive launch', error);
+    return null;
+  }
+}
+
+function tryStartPendingEditorTestDrive(app: App): void {
+  const launch = consumePendingEditorTestDriveLaunch();
+  if (!launch) return;
+
+  const mod = window.Module as EmscriptenModuleLike | undefined;
+  if (!mod || typeof mod._rd_set_editor_launch_options !== 'function') {
+    console.warn('[Angular] Editor test drive launch requested but WASM export is unavailable');
+    return;
+  }
+
+  // Set the launch options immediately in onRuntimeInitialized.
+  // The C emscripten_main_loop checks gEditorLaunchOptions.enabled on its
+  // first tick (after Init() completes) and calls StartGame(1) itself.
+  // This avoids the timing race where a JS setTimeout(0) fires before
+  // main()/Init() has finished setting up the game state.
+  const maxLevel = Math.max(1, app.parsedLevels().length || 10);
+  const launchLevel = validateLevelNumber(launch.levelNumber, maxLevel);
+  if (launchLevel === null) {
+    console.warn(
+      '[Angular] Ignoring editor test drive launch with invalid level',
+      launch.levelNumber,
+      `(expected 1..${maxLevel})`,
+    );
+    return;
+  }
+  console.log('[Angular] Setting editor test drive launch options for level', launch.levelNumber);
+  mod._rd_set_editor_launch_options(
+    launchLevel - 1,
+    launch.hasStartY ? 1 : 0,
+    launch.startY,
+    launch.hasObjectGroupStartY ? 1 : 0,
+    launch.objectGroupStartY,
+    launch.forcedAddOns >>> 0,
+    launch.disabledBonusRollMask >>> 0,
+  );
+}
 
 export function initPackWorker(app: App): void {
   if (typeof Worker === 'undefined') {
@@ -117,6 +256,7 @@ export function setupEmscriptenModule(app: App): void {
         mountCustomResourcesFs(app, app._pendingCustomResources);
         app._pendingCustomResources = null;
       }
+      tryStartPendingEditorTestDrive(app);
     },
     preRun: [
       () => {
@@ -195,6 +335,7 @@ function installKeyboardGate(canvas: HTMLCanvasElement): void {
       if (typeof listener === 'function') {
         const wrapped: EventListener = function (this: EventTarget, event: Event): unknown {
           if (activeTabGetter?.() !== 'game') return undefined;
+          if (isEditableTarget(event.target)) return undefined;
           return listener.call(this, event);
         };
         origAddEventListener.call(this, type, wrapped, options);
@@ -203,6 +344,7 @@ function installKeyboardGate(canvas: HTMLCanvasElement): void {
       const wrappedListener: EventListenerObject = {
         handleEvent(event: Event): void {
           if (activeTabGetter?.() !== 'game') return;
+          if (isEditableTarget(event.target)) return;
           listener.handleEvent(event);
         },
       };
@@ -221,7 +363,9 @@ export function loadWasmScript(app: App): void {
   app.wasmScript.src = assetUrl(app, 'reckless_drivin.js');
   app.wasmScript.async = true;
   app.wasmScript.onerror = () => {
-    app.statusText.set('WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).');
+    app.statusText.set(
+      'WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).',
+    );
     console.error('[Angular] Failed to load WASM JS module');
   };
   document.body.appendChild(app.wasmScript);
@@ -290,6 +434,18 @@ export function restartGameWithCustomResources(app: App): void {
   // (e.g. blocked by the browser or in a test environment) the restarting
   // flag intentionally remains set so the UI stays in the loading state.
   window.location.reload();
+}
+
+export function restartIntoEditorTestDrive(app: App): void {
+  const launch = buildPendingEditorTestDriveLaunch(app);
+  if (!savePendingEditorTestDriveLaunch(launch)) {
+    app.snackBar.open('Could not persist test drive options for restart.', 'Dismiss', {
+      duration: 5000,
+      panelClass: 'snack-error',
+    });
+    return;
+  }
+  restartGameWithCustomResources(app);
 }
 
 export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {
