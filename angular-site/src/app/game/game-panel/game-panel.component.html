@@ -63,17 +63,6 @@
           <mat-icon>upload_file</mat-icon> Load Custom resources.dat
         </button>
         @if (customResourcesLoaded) {
-          <button mat-raised-button class="!bg-[var(--accent2)] !text-white hover:!bg-[#1e88e5] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
-            [disabled]="gameRestarting"
-            (click)="restartGameWithCustomResources.emit()"
-            matTooltip="Reload the page to apply the custom resources.dat">
-            @if (gameRestarting) {
-              <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
-            } @else {
-              <mat-icon>restart_alt</mat-icon>
-            }
-            Restart Game
-          </button>
           <button mat-stroked-button class="!border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)]"
             (click)="clearCustomResources.emit()"
             matTooltip="Remove the custom resources.dat and revert to the built-in defaults">
@@ -93,23 +82,31 @@
           <div class="min-w-0 flex-1">
             <div class="text-[0.9rem] font-semibold text-[var(--on-surface)]">Editor Test Drive</div>
             <p class="mt-1 text-[0.78rem] leading-[1.55] text-[var(--muted)]">
-              Reload the page, then auto-start a test drive with a chosen level, optional Y overrides, forced addons,
-              and disabled bonus-roll outcomes. If launch options are invalid or unavailable, the game stays at the main menu.
+              Configure startup options once, then restart with default resources.dat, custom resources.dat, editor test drive params, or both.
             </p>
           </div>
+        </div>
+
+        <div class="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <mat-checkbox #useCustomResourcesCheckbox [checked]="customResourcesLoaded" [disabled]="!customResourcesLoaded" matTooltip="Use custom resources.dat from IndexedDB for this restart">
+            Use custom resources.dat
+          </mat-checkbox>
+          <mat-checkbox #useEditorLaunchCheckbox checked matTooltip="Apply Editor Test Drive launch parameters on restart">
+            Use editor test drive params
+          </mat-checkbox>
           <button
             mat-raised-button
             class="!bg-[var(--accent2)] !text-white hover:!bg-[#1e88e5] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
             [disabled]="gameRestarting"
-            (click)="restartIntoEditorTestDrive.emit()"
-            matTooltip="Reload the page and auto-start the configured test drive"
+            (click)="restartWithStartupOptions.emit({ useCustomResources: customResourcesLoaded && useCustomResourcesCheckbox.checked, useEditorTestDrive: useEditorLaunchCheckbox.checked })"
+            matTooltip="Restart using the selected startup options; if launch params are invalid the game remains at main menu"
           >
             @if (gameRestarting) {
               <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
             } @else {
-              <mat-icon>sports_esports</mat-icon>
+              <mat-icon>restart_alt</mat-icon>
             }
-            Restart Into Test Drive
+            Restart With Selected Options
           </button>
         </div>
 

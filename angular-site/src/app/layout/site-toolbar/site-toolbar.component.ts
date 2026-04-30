@@ -3,7 +3,16 @@ import type { ParsedLevel } from '../../level-editor.service';
 import { levelDisplayNum } from '../../app-helpers';
 
 export type SiteTab = 'game' | 'editor';
-export type EditorSection = 'properties' | 'object-groups' | 'object-types' | 'objects' | 'sprites' | 'tiles' | 'audio' | 'screens';
+export type EditorSection =
+  | 'properties'
+  | 'object-groups'
+  | 'object-types'
+  | 'objects'
+  | 'sprites'
+  | 'tiles'
+  | 'audio'
+  | 'screens'
+  | 'strings';
 
 @Component({
   selector: 'app-site-toolbar',
@@ -36,6 +45,7 @@ export class SiteToolbarComponent {
     { id: 'tiles', label: 'Tiles', icon: 'grid_on' },
     { id: 'audio', label: 'Audio', icon: 'audiotrack' },
     { id: 'screens', label: 'Screens', icon: 'tv' },
+    { id: 'strings', label: 'Strings', icon: 'text_fields' },
   ];
 
   readonly levelDisplayNum = levelDisplayNum;

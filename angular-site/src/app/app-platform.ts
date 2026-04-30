@@ -31,11 +31,18 @@ interface PendingEditorTestDriveLaunch {
   disabledBonusRollMask: number;
 }
 
+interface PendingGameRestartOptions {
+  useCustomResources: boolean;
+  launch: PendingEditorTestDriveLaunch | null;
+}
+
 const EDITOR_TEST_DRIVE_STORAGE_KEY = 'reckless-drivin-editor-test-drive';
+const RESTART_OPTIONS_STORAGE_KEY = 'reckless-drivin-restart-options';
 
 let keyboardGateInstalled = false;
 let xhrOpenPatched = false;
 let activeTabGetter: (() => 'game' | 'editor') | null = null;
+let pendingRestartOptions: PendingGameRestartOptions | null = null;
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -117,8 +124,11 @@ function consumePendingEditorTestDriveLaunch(): PendingEditorTestDriveLaunch | n
   }
 }
 
-function tryStartPendingEditorTestDrive(app: App): void {
-  const launch = consumePendingEditorTestDriveLaunch();
+function tryStartPendingEditorTestDrive(
+  app: App,
+  pendingLaunch: PendingEditorTestDriveLaunch | null,
+): void {
+  const launch = pendingLaunch ?? consumePendingEditorTestDriveLaunch();
   if (!launch) return;
 
   const mod = window.Module as EmscriptenModuleLike | undefined;
@@ -152,6 +162,61 @@ function tryStartPendingEditorTestDrive(app: App): void {
     launch.forcedAddOns >>> 0,
     launch.disabledBonusRollMask >>> 0,
   );
+}
+
+function savePendingRestartOptions(options: PendingGameRestartOptions): boolean {
+  try {
+    sessionStorage.setItem(RESTART_OPTIONS_STORAGE_KEY, JSON.stringify(options));
+    return true;
+  } catch (error) {
+    console.warn('[Angular] Failed to persist restart options', error);
+    return false;
+  }
+}
+
+function consumePendingRestartOptions(): PendingGameRestartOptions | null {
+  try {
+    const raw = sessionStorage.getItem(RESTART_OPTIONS_STORAGE_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(RESTART_OPTIONS_STORAGE_KEY);
+    const parsed = JSON.parse(raw) as Partial<PendingGameRestartOptions>;
+    return {
+      useCustomResources: parsed.useCustomResources !== false,
+      launch:
+        parsed.launch && typeof parsed.launch.levelNumber === 'number'
+          ? {
+              levelNumber: parsed.launch.levelNumber,
+              hasStartY: parsed.launch.hasStartY === true,
+              startY: clampNonNegativeInteger(parsed.launch.startY ?? 500, 500),
+              hasObjectGroupStartY: parsed.launch.hasObjectGroupStartY === true,
+              objectGroupStartY: clampNonNegativeInteger(
+                parsed.launch.objectGroupStartY ?? 500,
+                500,
+              ),
+              forcedAddOns: clampNonNegativeInteger(parsed.launch.forcedAddOns ?? 0, 0),
+              disabledBonusRollMask: clampNonNegativeInteger(
+                parsed.launch.disabledBonusRollMask ?? 0,
+                0,
+              ),
+            }
+          : null,
+    };
+  } catch (error) {
+    console.warn('[Angular] Failed to restore restart options', error);
+    return null;
+  }
+}
+
+function scheduleGameRestart(app: App, options: PendingGameRestartOptions): void {
+  if (!savePendingRestartOptions(options)) {
+    app.snackBar.open('Could not persist restart options.', 'Dismiss', {
+      duration: 5000,
+      panelClass: 'snack-error',
+    });
+    return;
+  }
+  app.gameRestarting.set(true);
+  window.location.reload();
 }
 
 export function initPackWorker(app: App): void {
@@ -214,6 +279,7 @@ export function setupEmscriptenModule(app: App): void {
   activeTabGetter = () => app.activeTab();
   installKeyboardGate(canvas);
   patchXmlHttpRequestProgress(app);
+  pendingRestartOptions = consumePendingRestartOptions();
 
   if (typeof window.crossOriginIsolated !== 'undefined' && !window.crossOriginIsolated) {
     // Log a developer hint to the console only – do not pollute the game status
@@ -256,13 +322,19 @@ export function setupEmscriptenModule(app: App): void {
         mountCustomResourcesFs(app, app._pendingCustomResources);
         app._pendingCustomResources = null;
       }
-      tryStartPendingEditorTestDrive(app);
+      tryStartPendingEditorTestDrive(app, pendingRestartOptions?.launch ?? null);
+      pendingRestartOptions = null;
     },
     preRun: [
       () => {
         const mod = window.Module;
         if (!mod?.addRunDependency || typeof indexedDB === 'undefined') return;
         mod.addRunDependency('customResourcesDat');
+        const shouldInjectCustomResources = pendingRestartOptions?.useCustomResources ?? true;
+        if (!shouldInjectCustomResources) {
+          window.Module?.removeRunDependency?.('customResourcesDat');
+          return;
+        }
         AppStateResources._loadCustomResourcesDb()
           .then((entry: { bytes: Uint8Array; name: string } | null) => {
             if (entry) {
@@ -429,11 +501,10 @@ export async function onCustomResourcesFileSelected(app: App, event: Event): Pro
 }
 
 export function restartGameWithCustomResources(app: App): void {
-  app.gameRestarting.set(true);
-  // window.location.reload() will destroy the page; if it doesn't execute
-  // (e.g. blocked by the browser or in a test environment) the restarting
-  // flag intentionally remains set so the UI stays in the loading state.
-  window.location.reload();
+  scheduleGameRestart(app, {
+    useCustomResources: true,
+    launch: null,
+  });
 }
 
 export function restartIntoEditorTestDrive(app: App): void {
@@ -445,7 +516,29 @@ export function restartIntoEditorTestDrive(app: App): void {
     });
     return;
   }
-  restartGameWithCustomResources(app);
+  scheduleGameRestart(app, {
+    useCustomResources: true,
+    launch,
+  });
+}
+
+export function restartWithStartupOptions(
+  app: App,
+  useCustomResources: boolean,
+  useEditorTestDrive: boolean,
+): void {
+  const launch = useEditorTestDrive ? buildPendingEditorTestDriveLaunch(app) : null;
+  if (launch && !savePendingEditorTestDriveLaunch(launch)) {
+    app.snackBar.open('Could not persist test drive options for restart.', 'Dismiss', {
+      duration: 5000,
+      panelClass: 'snack-error',
+    });
+    return;
+  }
+  scheduleGameRestart(app, {
+    useCustomResources,
+    launch,
+  });
 }
 
 export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {

@@ -42,6 +42,7 @@ import { EditorSpritesSectionComponent } from './editor/sections/sprites/editor-
 import { EditorTilesSectionComponent } from './editor/sections/tiles/editor-tiles-section.component';
 import { EditorAudioSectionComponent } from './editor/sections/audio/editor-audio-section.component';
 import { EditorScreensSectionComponent } from './editor/sections/screens/editor-screens-section.component';
+import { EditorStringsSectionComponent } from './editor/sections/strings/editor-strings-section.component';
 import { EditorCanvasComponent } from './editor/editor-canvas.component';
 import { MarksEditorComponent } from './editor/marks-editor.component';
 import { ObjectInspectorComponent } from './editor/object-inspector.component';
@@ -52,13 +53,32 @@ import { MarkingPopupComponent } from './editor/canvas-toolbar/marking-popup.com
 import { CanvasInfoPopupComponent } from './editor/canvas-toolbar/canvas-info-popup.component';
 
 const MATERIAL_MODULES = [
-  MatButtonModule, MatIconModule, MatTooltipModule, MatInputModule,
-  MatFormFieldModule, MatSelectModule, MatCardModule, MatToolbarModule,
-  MatTabsModule, MatDividerModule, MatChipsModule, MatSliderModule,
-  MatTableModule, MatBadgeModule, MatProgressSpinnerModule, MatProgressBarModule,
-  MatMenuModule, MatSnackBarModule, MatDialogModule, MatCheckboxModule,
-  MatRadioModule, MatExpansionModule, MatListModule, MatSidenavModule,
-  MatGridListModule, MatButtonToggleModule,
+  MatButtonModule,
+  MatIconModule,
+  MatTooltipModule,
+  MatInputModule,
+  MatFormFieldModule,
+  MatSelectModule,
+  MatCardModule,
+  MatToolbarModule,
+  MatTabsModule,
+  MatDividerModule,
+  MatChipsModule,
+  MatSliderModule,
+  MatTableModule,
+  MatBadgeModule,
+  MatProgressSpinnerModule,
+  MatProgressBarModule,
+  MatMenuModule,
+  MatSnackBarModule,
+  MatDialogModule,
+  MatCheckboxModule,
+  MatRadioModule,
+  MatExpansionModule,
+  MatListModule,
+  MatSidenavModule,
+  MatGridListModule,
+  MatButtonToggleModule,
 ];
 
 @NgModule({
@@ -75,6 +95,7 @@ const MATERIAL_MODULES = [
     EditorTilesSectionComponent,
     EditorAudioSectionComponent,
     EditorScreensSectionComponent,
+    EditorStringsSectionComponent,
     EditorCanvasComponent,
     MarksEditorComponent,
     ObjectInspectorComponent,

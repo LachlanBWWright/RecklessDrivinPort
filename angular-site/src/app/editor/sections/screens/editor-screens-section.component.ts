@@ -40,6 +40,11 @@ export class EditorScreensSectionComponent implements OnChanges {
     return `${icon.type}:${icon.id}`;
   }
 
+  isPictureResourceType(type: string): boolean {
+    const normalized = type.trim().toUpperCase();
+    return normalized === 'PICT' || normalized === 'PPIC';
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if ('iconPreviewCanvas' in changes) {
       const canvas = this.iconPreviewCanvas;

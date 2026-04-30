@@ -1,6 +1,13 @@
 import { ok } from 'neverthrow';
 import { packHandleDecompress } from './lzrw.service';
-import { imageDataToIconHash, imageDataToIcl8, renderIconBytes, renderIcl8Bytes, renderIcs8Bytes, renderPictBytes } from './image-resource-codec';
+import {
+  imageDataToIconHash,
+  imageDataToIcl8,
+  renderIconBytes,
+  renderIcl8Bytes,
+  renderIcs8Bytes,
+  renderPictBytes,
+} from './image-resource-codec';
 import { failEditor } from './app-loaders';
 
 import type { App } from './app';
@@ -14,6 +21,19 @@ export {
   playAudioEntry,
   selectAudioEntry,
 } from './app-media-audio';
+
+function normalizeResourceType(type: string): string {
+  return type.trim().toUpperCase();
+}
+
+function isPictType(type: string): boolean {
+  const normalized = normalizeResourceType(type);
+  return normalized === 'PICT' || normalized === 'PPIC';
+}
+
+function isPackedPictType(type: string): boolean {
+  return normalizeResourceType(type) === 'PPIC';
+}
 
 function triggerBytesDownload(bytes: Uint8Array, filename: string): void {
   const blob = new Blob([new Uint8Array(bytes).buffer], { type: 'application/octet-stream' });
@@ -29,9 +49,9 @@ export async function loadIconEntries(host: App): Promise<void> {
   try {
     type ListResult = { entries: { type: string; id: number; size: number }[] };
     const result: ListResult = await host.runtime.dispatchWorker<ListResult>('LIST_RESOURCES');
-    const SCREEN_TYPES = new Set(['ICN#', 'ics#', 'icl8', 'ics8', 'PICT', 'PPic']);
+    const SCREEN_TYPES = new Set(['ICN#', 'ICS#', 'ICL8', 'ICS8', 'PICT', 'PPIC']);
     const entries = result.entries
-      .filter((e) => SCREEN_TYPES.has(e.type))
+      .filter((e) => SCREEN_TYPES.has(normalizeResourceType(e.type)))
       .map((e) => ({
         type: e.type,
         id: e.id,
@@ -52,7 +72,7 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
   host.selectedIconId.set(id);
   host.selectedIconType.set(type);
   host.iconPreviewCanvas.set(null);
-  if (type === 'PICT' || type === 'PPic') {
+  if (isPictType(type)) {
     try {
       type RawResult = { bytes: ArrayBuffer | null };
       const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', {
@@ -61,10 +81,10 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
       });
       if (result.bytes) {
         const bytes = new Uint8Array(result.bytes);
-        const pictResult = type === 'PPic' ? packHandleDecompress(bytes) : ok(bytes);
-        const pictBytes = pictResult.match(
+        const packedDecodeResult = isPackedPictType(type) ? packHandleDecompress(bytes) : ok(bytes);
+        const pictBytes = packedDecodeResult.match(
           (value) => value,
-          () => null,
+          () => bytes,
         );
         if (!pictBytes) return;
         const canvas = renderPictBytes(pictBytes);
@@ -82,12 +102,15 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
   }
   try {
     type RawResult = { bytes: ArrayBuffer | null };
-    const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
+    const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', {
+      type,
+      id,
+    });
     if (result.bytes) {
       const bytes = new Uint8Array(result.bytes);
       let canvas: HTMLCanvasElement | null = null;
       if (type === 'ICN#' || type === 'ics#') {
-        canvas = renderIconBytes(bytes);
+        canvas = renderIconBytes(bytes, type);
       } else if (type === 'icl8') {
         canvas = renderIcl8Bytes(bytes);
       } else if (type === 'ics8') {
@@ -128,7 +151,10 @@ export function exportIconRaw(host: App): void {
   void (async () => {
     try {
       type RawResult = { bytes: ArrayBuffer | null };
-      const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', { type, id });
+      const result: RawResult = await host.runtime.dispatchWorker<RawResult>('GET_RESOURCE_RAW', {
+        type,
+        id,
+      });
       if (result.bytes) {
         triggerBytesDownload(new Uint8Array(result.bytes), `${type.trim()}-${id}.bin`);
       }
@@ -183,15 +209,20 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
       iconBytes = imageDataToIcl8(ctx.getImageData(0, 0, 16, 16).data);
     } else {
       const offscreen = document.createElement('canvas');
-      offscreen.width = 32;
-      offscreen.height = 32;
+      const monoSize = type === 'ics#' ? 16 : 32;
+      offscreen.width = monoSize;
+      offscreen.height = monoSize;
       const ctx = offscreen.getContext('2d');
       if (!ctx) {
         failEditor(host, 'Failed to get 2D context');
         return;
       }
-      ctx.drawImage(img, 0, 0, 32, 32);
-      iconBytes = imageDataToIconHash(ctx.getImageData(0, 0, 32, 32).data);
+      ctx.drawImage(img, 0, 0, monoSize, monoSize);
+      iconBytes = imageDataToIconHash(
+        ctx.getImageData(0, 0, monoSize, monoSize).data,
+        monoSize,
+        monoSize,
+      );
     }
     await host.runtime.dispatchWorker('PUT_RESOURCE_RAW', {
       type,
@@ -234,7 +265,8 @@ export async function addIconEntry(host: App): Promise<void> {
       }
       ctx.drawImage(img, 0, 0, 32, 32);
       const iconBytes = imageDataToIconHash(ctx.getImageData(0, 0, 32, 32).data);
-      const existing = host.iconEntries()
+      const existing = host
+        .iconEntries()
         .filter((e) => e.type === 'ICN#')
         .map((e) => e.id);
       const nextId = existing.length > 0 ? Math.max(...existing) + 1 : 200;
@@ -242,12 +274,22 @@ export async function addIconEntry(host: App): Promise<void> {
         failEditor(host, 'Too many icon entries');
         return;
       }
-      const buf = iconBytes.buffer.slice(iconBytes.byteOffset, iconBytes.byteOffset + iconBytes.byteLength);
-      await host.runtime.dispatchWorker('PUT_RESOURCE_RAW', { type: 'ICN#', id: nextId, bytes: buf }, [buf]);
+      const buf = iconBytes.buffer.slice(
+        iconBytes.byteOffset,
+        iconBytes.byteOffset + iconBytes.byteLength,
+      );
+      await host.runtime.dispatchWorker(
+        'PUT_RESOURCE_RAW',
+        { type: 'ICN#', id: nextId, bytes: buf },
+        [buf],
+      );
       await loadIconEntries(host);
       await selectIconEntry(host, 'ICN#', nextId);
       host.resourcesStatus.set(`New ICN# #${nextId} created.`);
-      host.snackBar.open(`✓ Icon #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      host.snackBar.open(`✓ Icon #${nextId} added`, 'OK', {
+        duration: 3000,
+        panelClass: 'snack-success',
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to add icon';
       host.editorError.set(msg);
@@ -277,7 +319,7 @@ export function iconLabel(type: string, id: number): string {
     129: 'In-Game HUD',
     130: 'Level Complete Screen',
   };
-  if (type === 'PPic') return ppicLabels[id] ?? `PPic #${id}`;
+  if (normalizeResourceType(type) === 'PPIC') return ppicLabels[id] ?? `PPic #${id}`;
   if (type === 'ICN#' || type === 'ics#') return iconLabels[id] ?? `ICN# #${id}`;
   if (type === 'icl8') return iconLabels[id] ?? `icl8 #${id} (32×32 color)`;
   if (type === 'ics8') return iconLabels[id] ?? `ics8 #${id} (16×16 color)`;
@@ -298,16 +340,18 @@ export async function loadAllIconThumbnails(host: App): Promise<void> {
       if (!result.bytes) continue;
       const bytes = new Uint8Array(result.bytes);
       let canvas: HTMLCanvasElement | null = null;
-      if (entry.type === 'PICT' || entry.type === 'PPic') {
-        const pictResult = entry.type === 'PPic' ? packHandleDecompress(bytes) : ok(bytes);
-        const pictBytes = pictResult.match(
+      if (isPictType(entry.type)) {
+        const packedDecodeResult = isPackedPictType(entry.type)
+          ? packHandleDecompress(bytes)
+          : ok(bytes);
+        const pictBytes = packedDecodeResult.match(
           (value) => value,
-          () => null,
+          () => bytes,
         );
         if (!pictBytes) continue;
         canvas = renderPictBytes(pictBytes);
       } else if (entry.type === 'ICN#' || entry.type === 'ics#') {
-        canvas = renderIconBytes(bytes);
+        canvas = renderIconBytes(bytes, entry.type);
       } else if (entry.type === 'icl8') {
         canvas = renderIcl8Bytes(bytes);
       } else if (entry.type === 'ics8') {

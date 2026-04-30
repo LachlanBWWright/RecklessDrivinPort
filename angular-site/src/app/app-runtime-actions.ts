@@ -24,6 +24,7 @@ import {
   setupEmscriptenModule as setupEmscriptenModuleHelper,
   syncGameLoopWithActiveTab as syncGameLoopWithActiveTabHelper,
   restartIntoEditorTestDrive as restartIntoEditorTestDriveHelper,
+  restartWithStartupOptions as restartWithStartupOptionsHelper,
 } from './app-platform';
 import { bindAppAction } from './bind-app-action';
 
@@ -51,6 +52,7 @@ export function createRuntimeActions(app: App): {
   onCustomResourcesFileSelected(event: Event): Promise<void>;
   restartGameWithCustomResources(): void;
   restartIntoEditorTestDrive(): void;
+  restartWithStartupOptions(useCustomResources: boolean, useEditorTestDrive: boolean): void;
   clearCustomResources(): void;
   mountCustomResourcesFs(bytes: Uint8Array): void;
 } {
@@ -99,6 +101,8 @@ export function createRuntimeActions(app: App): {
     onCustomResourcesFileSelected: bindAppAction(app, onCustomResourcesFileSelectedHelper),
     restartGameWithCustomResources: bindAppAction(app, restartGameWithCustomResourcesHelper),
     restartIntoEditorTestDrive: bindAppAction(app, restartIntoEditorTestDriveHelper),
+    restartWithStartupOptions: (useCustomResources: boolean, useEditorTestDrive: boolean) =>
+      restartWithStartupOptionsHelper(app, useCustomResources, useEditorTestDrive),
     clearCustomResources: bindAppAction(app, clearCustomResourcesHelper),
     mountCustomResourcesFs: bindAppAction(app, mountCustomResourcesFsHelper),
   };

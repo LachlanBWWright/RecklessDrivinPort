@@ -107,44 +107,72 @@ function getMac8bitLut(): Map<number, number> {
   return lut;
 }
 
-export function renderIconBytes(bytes: Uint8Array): HTMLCanvasElement | null {
+function renderMonoIcon(
+  bytes: Uint8Array,
+  width: number,
+  height: number,
+): HTMLCanvasElement | null {
   const canvas = document.createElement('canvas');
-  canvas.width = 32;
-  canvas.height = 32;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  const imgData = ctx.createImageData(32, 32);
-  for (let row = 0; row < 32; row += 1) {
-    const rowByte = Math.floor(row * 4);
-    for (let col = 0; col < 32; col += 1) {
+  const bytesPerRow = Math.ceil(width / 8);
+  const planeSize = bytesPerRow * height;
+  const hasMaskPlane = bytes.length >= planeSize * 2;
+  const bitmapPlane = bytes.subarray(0, planeSize);
+  const maskPlane = hasMaskPlane ? bytes.subarray(planeSize, planeSize * 2) : null;
+
+  const imgData = ctx.createImageData(width, height);
+  for (let row = 0; row < height; row += 1) {
+    const rowByte = row * bytesPerRow;
+    for (let col = 0; col < width; col += 1) {
       const byteIdx = rowByte + Math.floor(col / 8);
       const bitIdx = 7 - (col % 8);
-      const bit = byteIdx < bytes.length ? (bytes[byteIdx] >> bitIdx) & 1 : 0;
-      const i = (row * 32 + col) * 4;
+      const bit = byteIdx < bitmapPlane.length ? (bitmapPlane[byteIdx] >> bitIdx) & 1 : 0;
+      const maskBit =
+        maskPlane && byteIdx < maskPlane.length ? (maskPlane[byteIdx] >> bitIdx) & 1 : 1;
+      const i = (row * width + col) * 4;
       imgData.data[i] = bit ? 0 : 255;
       imgData.data[i + 1] = bit ? 0 : 255;
       imgData.data[i + 2] = bit ? 0 : 255;
-      imgData.data[i + 3] = 255;
+      imgData.data[i + 3] = maskBit ? 255 : 0;
     }
   }
   ctx.putImageData(imgData, 0, 0);
   return canvas;
 }
 
-export function imageDataToIconHash(rgba: Uint8ClampedArray): Uint8Array {
-  const out = new Uint8Array(256);
-  for (let row = 0; row < 32; row += 1) {
-    for (let byteInRow = 0; byteInRow < 4; byteInRow += 1) {
+export function renderIconBytes(
+  bytes: Uint8Array,
+  iconType: string = 'ICN#',
+): HTMLCanvasElement | null {
+  const normalizedType = iconType.trim().toUpperCase();
+  if (normalizedType === 'ICS#') {
+    return renderMonoIcon(bytes, 16, 16);
+  }
+  return renderMonoIcon(bytes, 32, 32);
+}
+
+export function imageDataToIconHash(rgba: Uint8ClampedArray, width = 32, height = 32): Uint8Array {
+  const bytesPerRow = Math.ceil(width / 8);
+  const planeSize = bytesPerRow * height;
+  const out = new Uint8Array(planeSize * 2);
+  for (let row = 0; row < height; row += 1) {
+    for (let byteInRow = 0; byteInRow < bytesPerRow; byteInRow += 1) {
       let b = 0;
       let mask = 0xff;
       for (let bit = 0; bit < 8; bit += 1) {
         const col = byteInRow * 8 + bit;
-        const i = (row * 32 + col) * 4;
+        if (col >= width) {
+          continue;
+        }
+        const i = (row * width + col) * 4;
         const lum = rgba[i] * 0.299 + rgba[i + 1] * 0.587 + rgba[i + 2] * 0.114;
         if (lum < 128) b |= 1 << (7 - bit);
       }
-      out[row * 4 + byteInRow] = b;
-      out[128 + row * 4 + byteInRow] = mask;
+      out[row * bytesPerRow + byteInRow] = b;
+      out[planeSize + row * bytesPerRow + byteInRow] = mask;
     }
   }
   return out;
@@ -307,6 +335,18 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
       case 0x001f:
         pos += 6;
         break;
+      case 0x00a0:
+        // ShortComment: 2-byte kind (no data)
+        pos += 2;
+        break;
+      case 0x00a1: {
+        // LongComment: 2-byte kind + 2-byte size + size bytes of data
+        pos += 2; // skip kind
+        if (pos + 2 > bytes.length) break outer;
+        const commentSize = view.getUint16(pos, false);
+        pos += 2 + commentSize;
+        break;
+      }
       case 0x0c00:
         pos += 24;
         break;
@@ -408,7 +448,10 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
           const bytesPerRow = rowBytes;
           if (isPacked) {
             if (pos + (bytesPerRow > 250 ? 2 : 1) > bytes.length) break outer;
-            const compLen = bytesPerRow > 250 ? view.getUint16(pos, false) + ((pos += 2), 0) : view.getUint8(pos++) + 0;
+            const compLen =
+              bytesPerRow > 250
+                ? view.getUint16(pos, false) + ((pos += 2), 0)
+                : view.getUint8(pos++) + 0;
             if (pos + compLen > bytes.length) break outer;
             rowData = decodePackBits(bytes.subarray(pos, pos + compLen), bytesPerRow);
             pos += compLen;

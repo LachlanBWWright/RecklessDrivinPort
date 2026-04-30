@@ -169,6 +169,11 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   selectedObjectGroupSlotIndex: number | null = null;
   showGeneratedObjectGroupPreviews = true;
   previewStartY = DEFAULT_OBJECT_GROUP_PREVIEW_START_Y;
+  readonly groupsTabHelpTooltip =
+    'Level Object Groups: each non-empty slot references a Pack 130 group and has a max spawn count. ' +
+    'Spawn Y is sampled from Preview Y start to levelEnd. Entries with dir = -1 are auto track-aligned and ignore minOffs/maxOffs. ' +
+    'Entries with explicit dir use a chosen road border; minOffs/maxOffs are signed offsets from that border (+ inward, - outward). ' +
+    'Enable generated samples to preview native weighted spawn candidates for each slot on the canvas.';
   private enabledGeneratedPreviewSlotIndices = new Set<number>();
   private generatedPreviewSeeds = new Map<number, number>();
   private generatedObjectGroupPreviewObjects: ObjectGroupSpawnPreviewObject[] = [];
@@ -220,7 +225,7 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   }
 
   selectObjectGroupSlot(index: number): void {
-    this.selectedObjectGroupSlotIndex = index;
+    this.selectedObjectGroupSlotIndex = this.selectedObjectGroupSlotIndex === index ? null : index;
     this.emitCurrentObjectGroupPreview();
   }
 
@@ -359,6 +364,22 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
     }
     this.recomputeGeneratedObjectGroupPreview();
     this.focusGeneratedPreview();
+  }
+
+  enableAllGeneratedPreviews(): void {
+    for (const slot of this.visibleObjectGroupSlots) {
+      if (this.canPreviewObjectGroupSlot(slot.slotIndex)) {
+        this.enabledGeneratedPreviewSlotIndices.add(slot.slotIndex);
+        this.ensureGeneratedPreviewSeed(slot.slotIndex);
+      }
+    }
+    this.showGeneratedObjectGroupPreviews = true;
+    this.recomputeGeneratedObjectGroupPreview();
+  }
+
+  disableAllGeneratedPreviews(): void {
+    this.enabledGeneratedPreviewSlotIndices.clear();
+    this.recomputeGeneratedObjectGroupPreview();
   }
 
   canPreviewObjectGroupSlot(index: number): boolean {

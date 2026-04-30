@@ -86,7 +86,7 @@ export function createMediaActions(app: App): {
   playSndResource(): Promise<void>;
   getResHexDump(bytes: Uint8Array): string;
   iconLabel(type: string, id: number): string;
-  } {
+} {
   return {
     loadResourceList: bindAppAction(app, loadResourceListHelper),
     selectResource: bindAppAction(app, selectResourceHelper),

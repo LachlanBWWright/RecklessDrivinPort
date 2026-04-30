@@ -51,6 +51,12 @@ export class EditorObjectGroupsSectionComponent implements OnChanges {
   }>();
   @Output() saveObjectGroups = new EventEmitter<void>();
 
+  readonly groupsHelpTooltip =
+    'Pack 130 object groups: each row is a weighted spawn candidate. probility controls weight within the group. ' +
+    'The level slot numObjs controls how many candidates spawn from that group. ' +
+    'dir = -1 uses auto track alignment and ignores minOffs/maxOffs. Explicit dir values use a chosen road border with signed offsets (+ inward, - outward). ' +
+    'Spawn Y range is level-scoped and configured in Objects > Groups.';
+
   readonly entryForms = new FormArray<EntryForm>([]);
   private syncedGroupId: number | null = null;
 

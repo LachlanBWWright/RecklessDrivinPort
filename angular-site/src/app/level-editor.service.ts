@@ -22,7 +22,6 @@ import type {
   ObjectGroupRef,
   ObjectGroupDefinition,
   ObjectGroupEntryData,
-  ObjectGroupSpawnPreviewObject,
   TrackSeg,
   ObjectPos,
   RoadSeg,

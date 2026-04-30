@@ -1,11 +1,20 @@
-import type { EditableSpriteAsset, ObjectGroupDefinition, ObjectTypeDefinition, RoadInfoData, ParsedLevel } from './level-editor.service';
+import type {
+  EditableSpriteAsset,
+  ObjectGroupDefinition,
+  ObjectTypeDefinition,
+  RoadInfoData,
+  ParsedLevel,
+} from './level-editor.service';
 import { buildRoadInfoPreviewCanvas, getCanvasDataUrl, getTileDimensions } from './app-helpers';
 import { DEFAULT_ROAD_THEME, ROAD_THEMES } from './object-canvas';
 import { renderSpritePixels } from './app-helpers';
 import { resultFromPromise, resultFromThrowable } from './result-helpers';
 import type { App } from './app';
 
-const encodeCanvasDataUrl = resultFromThrowable((canvas: HTMLCanvasElement) => canvas.toDataURL(), 'Failed to encode canvas');
+const encodeCanvasDataUrl = resultFromThrowable(
+  (canvas: HTMLCanvasElement) => canvas.toDataURL(),
+  'Failed to encode canvas',
+);
 
 const dispatchWorkerResult = <T>(
   app: App,
@@ -106,6 +115,7 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
   void app.media.loadResourceList();
   void app.media.loadAudioEntries();
   void app.media.loadIconEntries();
+  void app.media.selectResource('STR#', 128);
   app.workerBusy.set(false);
 }
 
@@ -167,7 +177,11 @@ export async function decodeRoadTexturesInBackground(app: App) {
 
   const [result, allTilesResult] = textureResults;
   app._roadTextureDataUrls.clear();
-  const buildCanvas = (width: number, height: number, pixels: ArrayBuffer): HTMLCanvasElement | null => {
+  const buildCanvas = (
+    width: number,
+    height: number,
+    pixels: ArrayBuffer,
+  ): HTMLCanvasElement | null => {
     const clamped = new Uint8ClampedArray(pixels);
     const tc = document.createElement('canvas');
     tc.width = width;

@@ -39,6 +39,7 @@
     (customResourcesFileSelected)="runtime.onCustomResourcesFileSelected($event)"
     (restartGameWithCustomResources)="runtime.restartGameWithCustomResources()"
     (restartIntoEditorTestDrive)="runtime.restartIntoEditorTestDrive()"
+    (restartWithStartupOptions)="runtime.restartWithStartupOptions($event.useCustomResources, $event.useEditorTestDrive)"
     (clearCustomResources)="runtime.clearCustomResources()"
     (editorTestDriveLevelNumberInput)="setEditorTestDriveLevelNumber($event)"
     (editorTestDriveUseStartYChange)="setEditorTestDriveUseStartY($event)"
@@ -313,6 +314,18 @@
             (iconPngUpload)="media.onIconPngUpload($event)"
             (addIconEntry)="media.addIconEntry()"
           ></app-editor-screens-section>
+        }
+
+        @if (editorSection() === 'strings') {
+          <app-editor-strings-section
+            [strings]="selectedResStrings()"
+            [busy]="resBrowserBusy()"
+            [dirty]="strListDirty()"
+            (stringChange)="media.updateResString($event.index, $event.value)"
+            (addString)="media.addResString()"
+            (removeString)="media.removeResString($event)"
+            (save)="media.saveStrList()"
+          ></app-editor-strings-section>
         }
       }
     </section>

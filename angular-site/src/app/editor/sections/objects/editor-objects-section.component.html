@@ -133,23 +133,19 @@
           } @else {
             <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
               <div class="rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] px-3.5 py-3">
-                <div class="text-[0.84rem] font-semibold text-[var(--on-surface)]">Level Object Groups</div>
-                <p class="mt-1 text-[0.72rem] leading-[1.45] text-[var(--muted)]">
-                  Click a configured slot to inspect its weighted entries, change the whole-slot preview Y start,
-                  and generate a source-based in-game sample on the canvas.
-                </p>
-                <p class="mt-2 text-[0.72rem] leading-[1.5] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
-                  Native spawn Y is random from <code>{{ previewStartY }}</code> to <code>{{ levelEnd }}</code>.
-                  When <code>dir = -1</code>, the game first picks a track line at that Y: usually the up-track or down-track at random,
-                  and if there is no down-track it always uses the up-track. In the native spawn code, that auto-track path snaps to the chosen line and does
-                  not use <code>minOffs</code> or <code>maxOffs</code> at all.
-                </p>
-                <p class="mt-2 text-[0.72rem] leading-[1.5] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
-                  When the entry uses an explicit direction, the game does not use the track lines. It picks a road border instead.
-                  <code>minOffs</code>/<code>maxOffs</code> are signed X offsets from that chosen border, not absolute world X values: positive values move inward from the chosen border into that road segment,
-                  negative values move outward away from it. Because the chosen border may be on the left or right, the same sign can move world X either left or right.
-                  On split roads, outward from an inner border means toward the center gap.
-                </p>
+                <div class="flex items-center gap-2 text-[0.84rem] font-semibold text-[var(--on-surface)]">
+                  <span>Level Object Groups</span>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    class="!flex !h-6 !w-6 !min-h-6 !min-w-6 items-center justify-center"
+                    [matTooltip]="groupsTabHelpTooltip"
+                    matTooltipPosition="above"
+                  >
+                    <mat-icon class="!flex !h-[16px] !w-[16px] !text-[16px] items-center justify-center !leading-none">info</mat-icon>
+                  </button>
+                </div>
+                <p class="mt-1 text-[0.72rem] leading-[1.45] text-[var(--muted)]">Use the info tooltip for full spawn and offset behavior details.</p>
 
                 <div class="mt-3 grid grid-cols-1 gap-3">
                   <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
@@ -173,6 +169,27 @@
                     >
                       Show generated samples
                     </mat-checkbox>
+
+                    <button
+                      mat-stroked-button
+                      color="primary"
+                      type="button"
+                      (click)="enableAllGeneratedPreviews()"
+                      [disabled]="visibleObjectGroupSlots.length === 0"
+                      matTooltip="Enable sample preview for all slots"
+                    >
+                      <mat-icon>done_all</mat-icon> Enable All
+                    </button>
+
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="disableAllGeneratedPreviews()"
+                      [disabled]="enabledGeneratedObjectGroupPreviewCount === 0"
+                      matTooltip="Disable sample preview for all slots"
+                    >
+                      <mat-icon>remove_done</mat-icon> Disable All
+                    </button>
 
                     <button
                       mat-stroked-button
@@ -260,7 +277,15 @@
                         >
                           <mat-icon>refresh</mat-icon>
                         </button>
-                        <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)]">{{ selectedObjectGroupSlotIndex === slot.slotIndex ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                        <button
+                          mat-icon-button
+                          type="button"
+                          class="!flex !h-8 !w-8 items-center justify-center"
+                          (click)="selectObjectGroupSlot(slot.slotIndex)"
+                          [matTooltip]="selectedObjectGroupSlotIndex === slot.slotIndex ? 'Collapse' : 'Expand'"
+                        >
+                          <mat-icon class="!flex !h-[18px] !w-[18px] !text-[18px] items-center justify-center !leading-none text-[var(--muted)] transition-transform duration-200" [style.transform]="selectedObjectGroupSlotIndex === slot.slotIndex ? 'rotate(90deg)' : 'rotate(0deg)'">chevron_right</mat-icon>
+                        </button>
                       </div>
                     </div>
 
@@ -271,12 +296,6 @@
                             <div class="flex flex-wrap items-start justify-between gap-3">
                               <div class="min-w-0 flex-1">
                                 <span>Weighted entries</span>
-                                <p class="mt-1 text-[0.68rem] leading-[1.45] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
-                                  Track-aligned entries (<code>dir = -1</code>) randomly pick the up-track or down-track at that Y first, and if there is no down-track they use the up-track.
-                                  In the native spawn path that auto-track mode ignores <code>minOffs</code>/<code>maxOffs</code>. Explicit-direction entries pick a road border instead.
-                                  Their offsets are signed relative to that chosen border: <code>+</code> moves inward into the road segment, <code>-</code> moves outward away from that border.
-                                  Y is sampled separately from {{ previewStartY }} to {{ levelEnd }}.
-                                </p>
                               </div>
                               <div class="shrink-0 text-right">
                                 <span class="font-semibold text-[var(--on-surface)]">{{ group.entries.length }} total</span>

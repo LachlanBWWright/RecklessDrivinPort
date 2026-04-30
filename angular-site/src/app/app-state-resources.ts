@@ -70,6 +70,8 @@ export class AppStateResources extends AppStateBase {
   selectedResBytes = signal<Uint8Array | null>(null);
   /** If the selected resource is STR#, holds the decoded string list for editing. */
   selectedResStrings = signal<string[] | null>(null);
+  /** True when selectedResStrings has unsaved edits relative to the loaded version. */
+  strListDirty = signal(false);
   /** If the selected resource is STR or TEXT, holds the decoded text for editing. */
   selectedResText = signal<string | null>(null);
   /** If the selected resource is a Pack, holds its entry list. */

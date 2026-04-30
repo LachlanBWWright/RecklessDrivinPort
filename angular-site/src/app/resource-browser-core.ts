@@ -42,13 +42,9 @@ const finishBusy = (app: App) => {
 };
 
 export async function loadResourceList(app: App) {
-  const listResult = await dispatchResult<{ entries: { type: string; id: number; size: number }[] }>(
-    app,
-    'LIST_RESOURCES',
-    undefined,
-    undefined,
-    'Failed to list resources',
-  );
+  const listResult = await dispatchResult<{
+    entries: { type: string; id: number; size: number }[];
+  }>(app, 'LIST_RESOURCES', undefined, undefined, 'Failed to list resources');
   listResult.match(
     (result) => app.allResourceEntries.set(result.entries),
     (error) => console.warn('[App] loadResourceList failed:', error),
@@ -98,6 +94,7 @@ export async function selectResource(app: App, type: string, id: number) {
     stringResults.match(
       ([strResult, rawResult]) => {
         app.selectedResStrings.set(strResult.strings);
+        app.strListDirty.set(false);
         if (rawResult.bytes) app.selectedResBytes.set(new Uint8Array(rawResult.bytes));
       },
       (error) => app.resBrowserStatus.set(error),
@@ -169,7 +166,10 @@ export function triggerUploadResource(app: App) {
 
     app.resBrowserBusy.set(true);
 
-    const fileBytesResult = await resultFromPromise(file.arrayBuffer(), `Upload failed for ${type}#${id}`);
+    const fileBytesResult = await resultFromPromise(
+      file.arrayBuffer(),
+      `Upload failed for ${type}#${id}`,
+    );
     const bytes = fileBytesResult.match(
       (buffer) => new Uint8Array(buffer),
       (error) => {
@@ -221,7 +221,10 @@ export function triggerUploadPackEntry(app: App) {
 
     app.resBrowserBusy.set(true);
 
-    const fileBytesResult = await resultFromPromise(file.arrayBuffer(), `Upload failed for Pack#${packId} entry #${entryId}`);
+    const fileBytesResult = await resultFromPromise(
+      file.arrayBuffer(),
+      `Upload failed for Pack#${packId} entry #${entryId}`,
+    );
     const bytes = fileBytesResult.match(
       (buffer) => new Uint8Array(buffer),
       (error) => {
@@ -293,7 +296,13 @@ export async function saveStrList(app: App) {
   if (id === null || strings === null) return;
 
   app.resBrowserBusy.set(true);
-  const saveResult = await dispatchResult(app, 'PUT_STR_LIST', { id, strings }, undefined, `Save failed for STR#${id}`);
+  const saveResult = await dispatchResult(
+    app,
+    'PUT_STR_LIST',
+    { id, strings },
+    undefined,
+    `Save failed for STR#${id}`,
+  );
   const saveError = saveResult.match(
     () => null,
     (error) => error,
@@ -307,6 +316,7 @@ export async function saveStrList(app: App) {
   await loadResourceList(app);
   const updatedBytes = await loadRawResource(app, 'STR#', id);
   if (updatedBytes) app.selectedResBytes.set(updatedBytes);
+  app.strListDirty.set(false);
   app.snackBar.open(`✓ Saved STR#${id}`, 'OK', { duration: 3000 });
   finishBusy(app);
 }
@@ -317,18 +327,21 @@ export function updateResString(app: App, index: number, value: string) {
   const updated = strings.slice();
   updated[index] = value;
   app.selectedResStrings.set(updated);
+  app.strListDirty.set(true);
 }
 
 export function addResString(app: App) {
   const strings = app.selectedResStrings();
   if (!strings) return;
   app.selectedResStrings.set([...strings, '']);
+  app.strListDirty.set(true);
 }
 
 export function removeResString(app: App, index: number) {
   const strings = app.selectedResStrings();
   if (!strings) return;
   app.selectedResStrings.set(strings.filter((_: string, i: number) => i !== index));
+  app.strListDirty.set(true);
 }
 
 export async function saveResText(app: App) {

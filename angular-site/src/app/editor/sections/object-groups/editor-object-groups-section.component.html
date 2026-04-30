@@ -5,7 +5,18 @@
         <aside class="custom-scrollbar flex min-h-0 min-w-0 basis-80 flex-col gap-3 rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] max-[1100px]:basis-auto">
           <div class="flex items-start justify-between gap-3 pb-1">
             <div class="min-w-0 flex-1">
-              <div class="text-base font-bold text-[var(--text)]" matTooltip="Pack 130 (kPackOgrp) - shared spawn tables referenced by level object-group slots">Object Group Editor</div>
+              <div class="flex items-center gap-2 text-base font-bold text-[var(--text)]">
+                <span>Object Group Editor</span>
+                <button
+                  mat-icon-button
+                  type="button"
+                  class="!flex !h-6 !w-6 !min-h-6 !min-w-6 items-center justify-center"
+                  [matTooltip]="groupsHelpTooltip"
+                  matTooltipPosition="above"
+                >
+                  <mat-icon class="!flex !h-[16px] !w-[16px] !text-[16px] items-center justify-center !leading-none">info</mat-icon>
+                </button>
+              </div>
               <div class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">{{ objectGroups.length }} definitions</div>
             </div>
             <button mat-icon-button color="primary" (click)="addGroup.emit()" [disabled]="workerBusy" matTooltip="Create a new group">
@@ -35,25 +46,7 @@
             <div class="flex items-start justify-between gap-[18px] max-[1100px]:flex-col">
               <div class="min-w-0 flex-1">
                 <h4 class="text-base font-bold text-[var(--on-surface)]">Group #{{ group.id }}</h4>
-                <p class="text-[0.85rem] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
-                  Each row is one spawn candidate. The game picks an entry using the <code>probility</code> weights,
-                  then spawns up to the level slot's <code>numObjs</code> objects from that group.
-                </p>
-                <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
-                  Native spawn Y is chosen separately at random from <code>500</code> to the level's <code>levelEnd</code>.
-                  When <code>dir = -1</code>, the game first picks the up-track or down-track at that Y, and if there is no down-track it uses the up-track.
-                  In the native spawn code, that auto-track path snaps to the chosen line and does not use <code>minOffs</code> or <code>maxOffs</code>.
-                </p>
-                <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">
-                  When the road diverges and the entry uses an explicit direction, the game does not use the track lines at all.
-                  It picks a road border instead: on a single road that means the outer left or right edge, and on a split road it can be any of the four borders.
-                  <code>minOffs</code>/<code>maxOffs</code> are signed X offsets from whichever border was picked for that spawn, not absolute world X values.
-                  Positive values move inward from that border into its road segment; negative values move outward away from that border.
-                  Because the chosen border may be on the left or right, the same sign can move world X either left or right. On split roads, outward from an inner border means toward the center gap.
-                </p>
-                <p class="mt-2 text-[0.78rem] leading-[1.55] text-[var(--muted)]">
-                  The whole-group preview Y start is level-scoped, so it is edited from the Objects &gt; Groups panel rather than inside Pack 130.
-                </p>
+                <p class="mt-1 text-[0.85rem] text-[var(--muted)]">Use the info tooltip for full group spawn semantics and offset rules.</p>
               </div>
               <div class="flex flex-wrap justify-end gap-2 max-[1100px]:justify-start">
                 <button mat-raised-button color="primary" (click)="addEntry.emit(group.id)" [disabled]="workerBusy">

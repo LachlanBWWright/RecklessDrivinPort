@@ -45,6 +45,10 @@ export class GamePanelComponent {
   @Output() customResourcesFileSelected = new EventEmitter<Event>();
   @Output() restartGameWithCustomResources = new EventEmitter<void>();
   @Output() restartIntoEditorTestDrive = new EventEmitter<void>();
+  @Output() restartWithStartupOptions = new EventEmitter<{
+    useCustomResources: boolean;
+    useEditorTestDrive: boolean;
+  }>();
   @Output() clearCustomResources = new EventEmitter<void>();
   @Output() editorTestDriveLevelNumberInput = new EventEmitter<string>();
   @Output() editorTestDriveUseStartYChange = new EventEmitter<boolean>();
