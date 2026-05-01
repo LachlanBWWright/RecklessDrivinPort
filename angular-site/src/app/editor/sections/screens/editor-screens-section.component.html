@@ -49,8 +49,17 @@
           <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden py-1">
             <h4 class="text-base font-bold text-[var(--on-surface)]">{{ selectedIconLabel }}</h4>
             @if (iconPreviewDataUrl; as url) {
-              <img [src]="url" class="h-32 w-32 rounded border-2 border-white/20 [image-rendering:pixelated]"
-                [style.imageRendering]="'pixelated'" alt="icon preview">
+              @if (isPictureResourceType(selectedIconType)) {
+                <div class="w-full overflow-auto rounded border border-white/20 bg-black/30 p-2">
+                  <img
+                    [src]="url"
+                    class="mx-auto block max-h-[70vh] w-auto max-w-full rounded border border-white/10 object-contain"
+                    alt="icon preview" />
+                </div>
+              } @else {
+                <img [src]="url" class="h-32 w-32 rounded border-2 border-white/20 [image-rendering:pixelated]"
+                  [style.imageRendering]="'pixelated'" alt="icon preview">
+              }
             } @else {
               <div class="flex h-32 w-32 items-center justify-center">
                 <mat-spinner diameter="32"></mat-spinner>
@@ -82,8 +91,20 @@
               </p>
             } @else {
               <div class="flex flex-wrap gap-2">
+                <input #iconPictureInput type="file" accept="image/png,image/jpeg,image/webp,image/*" style="display:none"
+                  (change)="iconPngUpload.emit($event)" />
+                <button mat-stroked-button (click)="iconPictureInput.click()" [disabled]="workerBusy"
+                  matTooltip="Replace this picture resource using a conventional image file">
+                  <mat-icon>image</mat-icon> Replace Image
+                </button>
                 <button mat-stroked-button (click)="exportIconRaw.emit()">
                   <mat-icon>download</mat-icon> Export Raw
+                </button>
+                <input #iconRawInput type="file" accept=".bin,.raw,.pict,.ppic,application/octet-stream" style="display:none"
+                  (change)="iconRawUpload.emit($event)" />
+                <button mat-stroked-button (click)="iconRawInput.click()" [disabled]="workerBusy"
+                  matTooltip="Replace this picture resource with a raw PICT/PPIC binary blob">
+                  <mat-icon>upload</mat-icon> Replace Raw
                 </button>
               </div>
             }

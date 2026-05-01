@@ -12,6 +12,10 @@ export function decodePackBits(src: Uint8Array, expectedSize: number): Uint8Arra
   while (si < src.length && di < expectedSize) {
     const flag = src[si++];
     if (flag === undefined) break;
+    if (flag === 128) {
+      // PackBits no-op marker.
+      continue;
+    }
     if (flag > 127) {
       const count = 257 - flag;
       const val = si < src.length ? src[si++] : 0;
@@ -26,6 +30,37 @@ export function decodePackBits(src: Uint8Array, expectedSize: number): Uint8Arra
   return out;
 }
 
+function decodePackBits16(src: Uint8Array, expectedSize: number): Uint8Array {
+  const out = new Uint8Array(expectedSize);
+  let si = 0;
+  let di = 0;
+  while (si < src.length && di + 1 < expectedSize) {
+    const flagByte = src[si++];
+    if (flagByte === undefined) break;
+    const flag = flagByte > 127 ? flagByte - 256 : flagByte;
+    if (flag >= 0) {
+      let n = flag + 1;
+      while (n > 0 && si + 1 < src.length && di + 1 < expectedSize) {
+        out[di++] = src[si++] ?? 0;
+        out[di++] = src[si++] ?? 0;
+        n -= 1;
+      }
+    } else if (flag !== -128) {
+      let n = -flag + 1;
+      if (si + 1 >= src.length) break;
+      const b0 = src[si++] ?? 0;
+      const b1 = src[si++] ?? 0;
+      while (n > 0 && di + 1 < expectedSize) {
+        out[di++] = b0;
+        out[di++] = b1;
+        n -= 1;
+      }
+    }
+  }
+  return out;
+}
+
+/** Decode Mac PackBits where tokens expand 16-bit words (packType=3 rows). */
 /** Standard Macintosh 8-bit system colour table (clut id=8). */
 // prettier-ignore
 export const MAC_8BIT_PALETTE: readonly number[] = [
@@ -222,6 +257,144 @@ export function imageDataToIcl8(rgba: Uint8ClampedArray): Uint8Array {
   return out;
 }
 
+function encodePackBitsRow8(row: Uint8Array): Uint8Array {
+  const out: number[] = [];
+  let pos = 0;
+  while (pos < row.length) {
+    const chunk = Math.min(128, row.length - pos);
+    out.push(chunk - 1);
+    for (let i = 0; i < chunk; i += 1) out.push(row[pos + i] ?? 0);
+    pos += chunk;
+  }
+  return new Uint8Array(out);
+}
+
+function encodePackBitsRow16(row: Uint8Array): Uint8Array {
+  const out: number[] = [];
+  let pos = 0;
+  const totalWords = Math.floor(row.length / 2);
+  while (pos < totalWords) {
+    const chunkWords = Math.min(128, totalWords - pos);
+    out.push(chunkWords - 1);
+    for (let i = 0; i < chunkWords; i += 1) {
+      const off = (pos + i) * 2;
+      out.push(row[off] ?? 0, row[off + 1] ?? 0);
+    }
+    pos += chunkWords;
+  }
+  return new Uint8Array(out);
+}
+
+function writeU16BE(dst: number[], value: number): void {
+  dst.push((value >>> 8) & 0xff, value & 0xff);
+}
+
+function writeS16BE(dst: number[], value: number): void {
+  const v = value & 0xffff;
+  dst.push((v >>> 8) & 0xff, v & 0xff);
+}
+
+function writeU32BE(dst: number[], value: number): void {
+  dst.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+}
+
+function rgbaToRgb15Rows(rgba: Uint8ClampedArray, width: number, height: number): Uint8Array[] {
+  const rows: Uint8Array[] = [];
+  for (let y = 0; y < height; y += 1) {
+    const row = new Uint8Array(width * 2);
+    for (let x = 0; x < width; x += 1) {
+      const si = (y * width + x) * 4;
+      const r5 = (rgba[si] ?? 0) >> 3;
+      const g5 = (rgba[si + 1] ?? 0) >> 3;
+      const b5 = (rgba[si + 2] ?? 0) >> 3;
+      const pixel = (r5 << 10) | (g5 << 5) | b5;
+      row[x * 2] = (pixel >>> 8) & 0xff;
+      row[x * 2 + 1] = pixel & 0xff;
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+/**
+ * Encode RGBA pixels as a QuickDraw PICT v2 DirectBitsRect stream (16-bit x5R5G5B).
+ * This form is accepted by both the editor decoder and the game's runtime decoder.
+ */
+export function encodeRgbaToPictV2(
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8Array {
+  const out: number[] = [];
+
+  // picSize (legacy, can be 0) + picFrame
+  writeU16BE(out, 0);
+  writeS16BE(out, 0);
+  writeS16BE(out, 0);
+  writeS16BE(out, height);
+  writeS16BE(out, width);
+
+  // VersionOp + Version2
+  writeU16BE(out, 0x0011);
+  writeU16BE(out, 0x02ff);
+
+  // HeaderOp (24 bytes payload)
+  writeU16BE(out, 0x0c00);
+  for (let i = 0; i < 24; i += 1) out.push(0);
+
+  // DirectBitsRect
+  writeU16BE(out, 0x009a);
+  writeU32BE(out, 0x000000ff); // baseAddr placeholder
+
+  const rowBytes = width * 2;
+  writeU16BE(out, 0x8000 | rowBytes); // PixMap flag + rowBytes
+
+  // bounds
+  writeS16BE(out, 0);
+  writeS16BE(out, 0);
+  writeS16BE(out, height);
+  writeS16BE(out, width);
+
+  // Remaining PixMap fields
+  writeU16BE(out, 0); // pmVersion
+  writeU16BE(out, 3); // packType (PackBits 16-bit words)
+  writeU32BE(out, 0); // packSize
+  writeU32BE(out, 72 << 16); // hRes (72 dpi fixed)
+  writeU32BE(out, 72 << 16); // vRes (72 dpi fixed)
+  writeU16BE(out, 16); // pixelType (direct)
+  writeU16BE(out, 16); // pixelSize
+  writeU16BE(out, 3); // cmpCount
+  writeU16BE(out, 5); // cmpSize
+  writeU32BE(out, 0); // planeBytes
+  writeU32BE(out, 0); // pmTable
+  writeU32BE(out, 0); // pmReserved
+
+  // srcRect + dstRect + mode
+  writeS16BE(out, 0);
+  writeS16BE(out, 0);
+  writeS16BE(out, height);
+  writeS16BE(out, width);
+  writeS16BE(out, 0);
+  writeS16BE(out, 0);
+  writeS16BE(out, height);
+  writeS16BE(out, width);
+  writeU16BE(out, 0); // srcCopy
+
+  const rows = rgbaToRgb15Rows(rgba, width, height);
+  for (const row of rows) {
+    const packed = encodePackBitsRow16(row);
+    if (rowBytes > 250) {
+      writeU16BE(out, packed.length);
+    } else {
+      out.push(packed.length & 0xff);
+    }
+    for (let i = 0; i < packed.length; i += 1) out.push(packed[i] ?? 0);
+  }
+
+  writeU16BE(out, 0x00ff); // EndPicture
+  return new Uint8Array(out);
+}
+
 export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
   if (typeof document === 'undefined' || bytes.length < 14) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -386,11 +559,6 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
           pos += 2;
           if (pos + 2 > bytes.length) break outer;
           packType = view.getUint16(pos, false);
-          pos += 2;
-          if (pos + 4 > bytes.length) break outer;
-          pos += 4;
-          if (pos + 8 > bytes.length) break outer;
-          pos += 8;
           if (pos + 2 > bytes.length) break outer;
           pos += 2;
           if (pos + 2 > bytes.length) break outer;
@@ -405,6 +573,11 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
           pos += 4;
           if (pos + 4 > bytes.length) break outer;
           pos += 4;
+          // QuickDraw pixel opcodes store a 50-byte PixMap record for DirectBits
+          // (or 46-byte without baseAddr for PackBitsRect/Rgn). Account for the
+          // final 2-byte field to keep subsequent parsing aligned.
+          if (pos + 2 > bytes.length) break outer;
+          pos += 2;
           if (pos + 4 > bytes.length) break outer;
           pos += 4;
 
@@ -530,5 +703,93 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
     }
   }
 
-  return rendered ? canvas : null;
+  if (rendered) return canvas;
+
+  // Fallback: scan common packed-row offsets used by this game's PICT assets.
+  const OFFSETS = [
+    122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150, 152, 154, 156, 106,
+    108, 110, 112, 114, 116, 118, 120, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 158,
+    160,
+  ];
+
+  let bestOffset = -1;
+  let bestBpp: 1 | 2 = 2;
+
+  for (const bpp of [2, 1] as const) {
+    const rowBytes = picW * bpp;
+    const bcBytes = rowBytes > 250 ? 2 : 1;
+    for (const startOff of OFFSETS) {
+      let off = startOff;
+      let consumed = 0;
+      let ok = true;
+      for (let row = 0; row < picH; row += 1) {
+        if (off + bcBytes > bytes.length) {
+          ok = false;
+          break;
+        }
+        const bc =
+          bcBytes === 2 ? ((bytes[off] ?? 0) << 8) | (bytes[off + 1] ?? 0) : (bytes[off] ?? 0);
+        if (bc <= 0 || bc > Math.floor((rowBytes * 3) / 2) + 128) {
+          ok = false;
+          break;
+        }
+        off += bcBytes;
+        if (off + bc > bytes.length) {
+          ok = false;
+          break;
+        }
+        off += bc;
+        consumed += bcBytes + bc;
+      }
+      if (ok && consumed > Math.floor((rowBytes * picH) / 8)) {
+        bestOffset = startOff;
+        bestBpp = bpp;
+        break;
+      }
+    }
+    if (bestOffset >= 0) break;
+  }
+
+  if (bestOffset < 0) return null;
+
+  const rowBytes = picW * bestBpp;
+  const bcBytes = rowBytes > 250 ? 2 : 1;
+  const fallback = ctx.createImageData(picW, picH);
+  let pos2 = bestOffset;
+
+  for (let row = 0; row < picH; row += 1) {
+    if (pos2 + bcBytes > bytes.length) return null;
+    const bc =
+      bcBytes === 2 ? ((bytes[pos2] ?? 0) << 8) | (bytes[pos2 + 1] ?? 0) : (bytes[pos2] ?? 0);
+    pos2 += bcBytes;
+    if (bc < 0 || pos2 + bc > bytes.length) return null;
+
+    const rowCompressed = bytes.subarray(pos2, pos2 + bc);
+    pos2 += bc;
+    const rowData =
+      bestBpp === 2
+        ? decodePackBits16(rowCompressed, rowBytes)
+        : decodePackBits(rowCompressed, rowBytes);
+
+    for (let col = 0; col < picW; col += 1) {
+      const di = (row * picW + col) * 4;
+      if (bestBpp === 2) {
+        const off = col * 2;
+        const pixel = ((rowData[off] ?? 0) << 8) | (rowData[off + 1] ?? 0);
+        fallback.data[di] = (((pixel >> 10) & 0x1f) * 255) / 31;
+        fallback.data[di + 1] = (((pixel >> 5) & 0x1f) * 255) / 31;
+        fallback.data[di + 2] = ((pixel & 0x1f) * 255) / 31;
+      } else {
+        const idx = rowData[col] ?? 0;
+        const pi = idx * 3;
+        fallback.data[di] = MAC_8BIT_PALETTE[pi] ?? idx;
+        fallback.data[di + 1] = MAC_8BIT_PALETTE[pi + 1] ?? idx;
+        fallback.data[di + 2] = MAC_8BIT_PALETTE[pi + 2] ?? idx;
+      }
+      fallback.data[di + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(fallback, 0, 0);
+  return canvas;
 }

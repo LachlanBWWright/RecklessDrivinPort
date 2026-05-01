@@ -1,6 +1,7 @@
 import { ok } from 'neverthrow';
-import { packHandleDecompress } from './lzrw.service';
+import { packHandleCompress, packHandleDecompress } from './lzrw.service';
 import {
+  encodeRgbaToPictV2,
   imageDataToIconHash,
   imageDataToIcl8,
   renderIconBytes,
@@ -93,10 +94,14 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
           const cacheKey = `${type}:${id}`;
           host.iconCanvasMap.set(cacheKey, canvas);
           host._iconDataUrls.delete(cacheKey);
+        } else {
+          host.editorError.set(`Failed to decode ${type} #${id}`);
         }
       }
-    } catch {
-      /* non-fatal */
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : `Failed to decode ${type} #${id}`;
+      host.editorError.set(msg);
+      console.error('[screens] picture decode failed', { type, id, error: msg });
     }
     return;
   }
@@ -164,6 +169,41 @@ export function exportIconRaw(host: App): void {
   })();
 }
 
+export async function onIconRawUpload(host: App, event: Event): Promise<void> {
+  const input = event.target instanceof HTMLInputElement ? event.target : null;
+  if (!input) return;
+  const file = input.files?.[0];
+  if (!file) return;
+  input.value = '';
+
+  const id = host.selectedIconId();
+  const type = host.selectedIconType();
+  if (id === null || !isPictType(type)) return;
+
+  try {
+    host.workerBusy.set(true);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const uploadBytes = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    await host.runtime.dispatchWorker('PUT_RESOURCE_RAW', {
+      type,
+      id,
+      bytes: uploadBytes,
+    });
+    await selectIconEntry(host, type, id);
+    host.resourcesStatus.set(`${type} #${id} replaced.`);
+    host.snackBar.open(`\u2713 ${type} #${id} replaced`, 'OK', {
+      duration: 3000,
+      panelClass: 'snack-success',
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Raw resource upload failed';
+    host.editorError.set(msg);
+    host.snackBar.open(`\u2717 ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+  } finally {
+    host.workerBusy.set(false);
+  }
+}
+
 export async function onIconPngUpload(host: App, event: Event): Promise<void> {
   const input = event.target instanceof HTMLInputElement ? event.target : null;
   if (!input) return;
@@ -183,6 +223,46 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
       i.src = url;
     });
     URL.revokeObjectURL(url);
+
+    if (isPictType(type)) {
+      const existingPreview = host.iconPreviewCanvas();
+      const targetW = Math.max(1, existingPreview?.width ?? img.naturalWidth ?? 640);
+      const targetH = Math.max(1, existingPreview?.height ?? img.naturalHeight ?? 480);
+
+      const offscreen = document.createElement('canvas');
+      offscreen.width = targetW;
+      offscreen.height = targetH;
+      const ctx = offscreen.getContext('2d');
+      if (!ctx) {
+        failEditor(host, 'Failed to get 2D context');
+        return;
+      }
+      ctx.clearRect(0, 0, targetW, targetH);
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+
+      const pictBytes = encodeRgbaToPictV2(
+        ctx.getImageData(0, 0, targetW, targetH).data,
+        targetW,
+        targetH,
+      );
+      const storageBytes = isPackedPictType(type) ? packHandleCompress(pictBytes) : pictBytes;
+      const writeBytes = storageBytes.buffer.slice(
+        storageBytes.byteOffset,
+        storageBytes.byteOffset + storageBytes.byteLength,
+      );
+      await host.runtime.dispatchWorker('PUT_RESOURCE_RAW', {
+        type,
+        id,
+        bytes: writeBytes,
+      });
+      await selectIconEntry(host, type, id);
+      host.resourcesStatus.set(`${type} #${id} replaced from image.`);
+      host.snackBar.open(`\u2713 ${type} #${id} replaced`, 'OK', {
+        duration: 3000,
+        panelClass: 'snack-success',
+      });
+      return;
+    }
 
     let iconBytes: Uint8Array;
     if (type === 'icl8') {
