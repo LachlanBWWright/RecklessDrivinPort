@@ -231,15 +231,15 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
         'Failed to persist resources to game storage',
       ).map(() => name);
     })
-      .match(
+    .match(
       (name) => {
         app.customResourcesName.set(name);
         app.customResourcesLoaded.set(true);
         app.customResourcesPreset.set('uploaded');
         app.customOptionsPreset.set('manual');
-        app.resourcesStatus.set('Saved to game. Restart the game to apply changes.');
+        app.resourcesStatus.set('Saved to game. Restart the game runtime to apply changes.');
         app.snackBar
-          .open('✓ Saved to game – click Restart Game to apply', 'Restart', {
+          .open('✓ Saved to game – click Restart With Customisations to apply', 'Restart', {
             duration: 8000,
             panelClass: 'snack-success',
           })

@@ -200,6 +200,8 @@ interface EmscriptenModuleInterface {
   postRun: (() => void)[];
   _set_wasm_master_volume?: (vol: number) => void;
   _rd_set_editor_launch_options?: (
+    enabled: number,
+    autoStart: number,
     levelID: number,
     hasStartY: number,
     startY: number,

@@ -9,8 +9,8 @@ import {
 describe('object direction utils', () => {
   it('keeps canvas and Konva rotation conversions in sync', () => {
     const dir = Math.PI / 3;
-    expect(worldDirToCanvasRotationRad(dir)).toBeCloseTo(-Math.PI / 3);
-    expect(worldDirToKonvaRotationDeg(dir)).toBeCloseTo(-60);
+    expect(worldDirToCanvasRotationRad(dir)).toBeCloseTo(Math.PI / 3);
+    expect(worldDirToKonvaRotationDeg(dir)).toBeCloseTo(60);
   });
 
   it('maps dir=0 to an upward editor arrow', () => {

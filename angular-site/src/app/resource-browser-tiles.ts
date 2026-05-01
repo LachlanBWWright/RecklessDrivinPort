@@ -5,7 +5,10 @@ import { resultFromPromise, resultFromThrowable } from './result-helpers';
 import type { DecodedSpriteFrame } from './level-editor.service';
 import type { App } from './app';
 
-const canvasToPngUrl = resultFromThrowable((canvas: HTMLCanvasElement) => canvas.toDataURL('image/png'), 'Failed to encode PNG');
+const canvasToPngUrl = resultFromThrowable(
+  (canvas: HTMLCanvasElement) => canvas.toDataURL('image/png'),
+  'Failed to encode PNG',
+);
 
 const loadImageFromUrl = (url: string) =>
   resultFromPromise(
@@ -114,7 +117,10 @@ export async function onTilePngUpload(app: App, event: Event, texId: number) {
   await applyTilePixels(app, texId, new Uint8ClampedArray(imageData.data));
 }
 
-export async function onTileEditorSaved(app: App, event: { frameId: number; pixels: Uint8ClampedArray }) {
+export async function onTileEditorSaved(
+  app: App,
+  event: { frameId: number; pixels: Uint8ClampedArray },
+) {
   app.spriteEditorOpen.set(false);
   await applyTilePixels(app, event.frameId, event.pixels);
 }
@@ -183,7 +189,10 @@ export async function addTileImage(app: App) {
     await decodeRoadTexturesInBackground(app);
     app.selectedTileId.set(nextId);
     app.resourcesStatus.set(`New tile #${nextId} created.`);
-    app.snackBar.open(`✓ Tile #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+    app.snackBar.open(`✓ Tile #${nextId} added`, 'OK', {
+      duration: 3000,
+      panelClass: 'snack-success',
+    });
     finishWorkerBusy(app);
   };
   input.click();
@@ -226,7 +235,10 @@ export async function deleteTileImage(app: App, texId: number) {
     app.selectedTileId.set(app.tileTileEntries()[0]?.texId ?? null);
   }
   app.resourcesStatus.set(`Deleted tile #${texId}.`);
-  app.snackBar.open(`✓ Tile #${texId} deleted`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+  app.snackBar.open(`✓ Tile #${texId} deleted`, 'OK', {
+    duration: 3000,
+    panelClass: 'snack-success',
+  });
   finishWorkerBusy(app);
 }
 
@@ -236,7 +248,10 @@ export async function onCustomResourcesFileSelected(app: App, event: Event) {
   const file = input.files?.[0];
   if (!file) return;
 
-  const bytesResult = await resultFromPromise(file.arrayBuffer(), 'Failed to read custom resources.dat');
+  const bytesResult = await resultFromPromise(
+    file.arrayBuffer(),
+    'Failed to read custom resources.dat',
+  );
   bytesResult.match(
     (buffer) => {
       const bytes = new Uint8Array(buffer);
@@ -258,8 +273,8 @@ export async function onCustomResourcesFileSelected(app: App, event: Event) {
 
 export function restartGameWithCustomResources(app: App) {
   app.gameRestarting.set(true);
-  app.statusText.set('Reloading page to apply custom resources.dat…');
-  setTimeout(() => window.location.reload(), 150);
+  app.statusText.set('Restarting game runtime to apply custom resources.dat…');
+  app.runtime.restartWasmGame();
 }
 
 export function clearCustomResources(app: App) {
@@ -269,5 +284,7 @@ export function clearCustomResources(app: App) {
   app.customResourcesLoaded.set(false);
   app.customResourcesName.set(null);
   app.customResourcesPreset.set('default');
-  app.statusText.set('Custom resources.dat cleared — game will use default resources on next reload.');
+  app.statusText.set(
+    'Custom resources.dat cleared — game will use default resources on next runtime restart.',
+  );
 }

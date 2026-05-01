@@ -560,8 +560,8 @@ describe('App', () => {
     const app = TestBed.createComponent(App).componentInstance;
     app.customResourcesLoaded.set(true);
 
-    // restartGameWithCustomResources calls window.location.reload() after a setTimeout.
-    // In jsdom that setTimeout is async; we only check that gameRestarting flips synchronously.
+    // restartGameWithCustomResources now restarts the isolated game runtime iframe.
+    // We only check that gameRestarting flips synchronously.
     app.runtime.restartGameWithCustomResources();
 
     expect(app.gameRestarting()).toBe(true);

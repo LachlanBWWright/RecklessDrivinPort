@@ -50,7 +50,7 @@ int gPlayerCarID;
 float gPlayerSlide[4]={0,0,0,0};
 float gSpikeFrame;
 int gLCheat;
-tEditorLaunchOptions gEditorLaunchOptions={0,0,0,0,0,0,0,0};
+tEditorLaunchOptions gEditorLaunchOptions={0,0,0,0,0,0,0,0,0};
 
 static int ClampEditorLaunchStartY(int startY,int levelEnd)
 {
@@ -75,16 +75,18 @@ void SetEditorLaunchOptions(const tEditorLaunchOptions *options)
 	}
 	gEditorLaunchOptions=*options;
 	gEditorLaunchOptions.enabled=options->enabled?true:false;
+	gEditorLaunchOptions.autoStart=options->autoStart?true:false;
 	gEditorLaunchOptions.hasStartY=options->hasStartY?true:false;
 	gEditorLaunchOptions.hasObjectGroupStartY=options->hasObjectGroupStartY?true:false;
 }
 
-void rd_set_editor_launch_options(int levelID,int hasStartY,int startY,
+void rd_set_editor_launch_options(int enabled,int autoStart,int levelID,int hasStartY,int startY,
 	int hasObjectGroupStartY,int objectGroupStartY,
 	UInt32 forcedAddOns,UInt32 disabledBonusRollMask)
 {
 	tEditorLaunchOptions options={
-		true,
+		enabled,
+		autoStart,
 		levelID,
 		hasStartY,
 		startY,
@@ -264,6 +266,7 @@ void GetLevelNumber()
 void StartGame(int lcheat)
 {
 	int editorLaunchActive=gEditorLaunchOptions.enabled;
+	int editorLaunchAutoStart=gEditorLaunchOptions.autoStart;
 	tEditorLaunchOptions launchOptions=gEditorLaunchOptions;
 	LOG_DEBUG("LOG: StartGame called (lcheat=%d)\n", lcheat);
 #ifdef __EMSCRIPTEN__
@@ -278,7 +281,9 @@ void StartGame(int lcheat)
 			ResetEditorLaunchOptions();
 			return;
 		}
-		LOG_DEBUG("LOG: Editor test drive options level=%d hasStartY=%d startY=%d hasObjectGroupStartY=%d objectGroupStartY=%d forcedAddOns=0x%08x disabledBonusRollMask=0x%08x\n",
+		LOG_DEBUG("LOG: Editor test drive options enabled=%d autoStart=%d level=%d hasStartY=%d startY=%d hasObjectGroupStartY=%d objectGroupStartY=%d forcedAddOns=0x%08x disabledBonusRollMask=0x%08x\n",
+			launchOptions.enabled,
+			launchOptions.autoStart,
 			launchOptions.levelID+1,
 			launchOptions.hasStartY,
 			launchOptions.startY,
@@ -288,14 +293,18 @@ void StartGame(int lcheat)
 			(unsigned int)launchOptions.disabledBonusRollMask);
 #ifdef __EMSCRIPTEN__
 		EM_ASM({
-			console.log('[WASM] Editor test drive options level=' + ($0 + 1) +
-				' hasStartY=' + $1 +
-				' startY=' + $2 +
-				' hasObjectGroupStartY=' + $3 +
-				' objectGroupStartY=' + $4 +
-				' forcedAddOns=0x' + ($5 >>> 0).toString(16) +
-				' disabledBonusRollMask=0x' + ($6 >>> 0).toString(16));
+			console.log('[WASM] Editor test drive options enabled=' + $0 +
+				' autoStart=' + $1 +
+				' level=' + ($2 + 1) +
+				' hasStartY=' + $3 +
+				' startY=' + $4 +
+				' hasObjectGroupStartY=' + $5 +
+				' objectGroupStartY=' + $6 +
+				' forcedAddOns=0x' + ($7 >>> 0).toString(16) +
+				' disabledBonusRollMask=0x' + ($8 >>> 0).toString(16));
 		},
+		launchOptions.enabled,
+		launchOptions.autoStart,
 		launchOptions.levelID,
 		launchOptions.hasStartY,
 		launchOptions.startY,
@@ -312,7 +321,7 @@ void StartGame(int lcheat)
 	gPlayerDeathDelay=0;
 	gFinishDelay=0;
 	gPlayerScore=0;
-	gLevelID=editorLaunchActive?launchOptions.levelID:0;
+	gLevelID=(editorLaunchActive&&editorLaunchAutoStart)?launchOptions.levelID:0;
 	gPlayerCarID=kNormalPlayerCarID;
 	gNumMissiles=0;
 	gNumMines=0;
@@ -341,7 +350,7 @@ void StartGame(int lcheat)
 			LOG_DEBUG("LOG: Level skip cheat – starting at level %d\n",gLevelID+1);
 		}
 	}
-	else
+	else if(editorLaunchAutoStart)
 	{
 		lcheat=1;
 		LOG_DEBUG("LOG: Editor test drive launch – starting at level %d\n",gLevelID+1);
@@ -369,7 +378,7 @@ void StartGame(int lcheat)
 
 void rd_start_editor_test_drive(void)
 {
-	if(gGameOn||!gEditorLaunchOptions.enabled)
+	if(gGameOn||!gEditorLaunchOptions.enabled||!gEditorLaunchOptions.autoStart)
 		return;
 	StartGame(1);
 }

@@ -7,14 +7,14 @@ import {
   type CustomResourcesPresetId,
 } from './game/game-customisation-presets';
 
-type EventListenerLike = EventListenerOrEventListenerObject;
-
 interface EmscriptenModuleLike {
   canvas?: HTMLCanvasElement;
   pauseMainLoop?: () => void;
   resumeMainLoop?: () => void;
   _set_wasm_master_volume?: (vol: number) => void;
   _rd_set_editor_launch_options?: (
+    enabled: number,
+    autoStart: number,
     levelID: number,
     hasStartY: number,
     startY: number,
@@ -27,6 +27,8 @@ interface EmscriptenModuleLike {
 }
 
 interface PendingEditorTestDriveLaunch {
+  enabled: boolean;
+  autoStart: boolean;
   levelNumber: number;
   hasStartY: boolean;
   startY: number;
@@ -43,27 +45,35 @@ interface PendingGameRestartOptions {
 
 const EDITOR_TEST_DRIVE_STORAGE_KEY = 'reckless-drivin-editor-test-drive';
 const RESTART_OPTIONS_STORAGE_KEY = 'reckless-drivin-restart-options';
+const GAME_FRAME_ID = 'game-frame';
+const GAME_FRAME_SRCDOC = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+    #canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="640" height="480"></canvas>
+</body>
+</html>`;
 
-let keyboardGateInstalled = false;
-let xhrOpenPatched = false;
-let activeTabGetter: (() => 'game' | 'editor') | null = null;
 let pendingRestartOptions: PendingGameRestartOptions | null = null;
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement
-  ) {
-    return true;
-  }
-  return (
-    target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]') !==
-    null
-  );
-}
 
 function clampNonNegativeInteger(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
@@ -82,9 +92,22 @@ function validateLevelNumber(value: number, maxLevel: number): number | null {
   return rounded;
 }
 
-function buildPendingEditorTestDriveLaunch(app: App): PendingEditorTestDriveLaunch {
+function buildPendingEditorTestDriveLaunch(
+  app: App,
+  autoStart: boolean,
+): PendingEditorTestDriveLaunch | null {
   const maxLevel = Math.max(1, app.parsedLevels().length || 10);
+  const hasSettings =
+    app.editorTestDriveUseStartY() ||
+    app.editorTestDriveUseObjectGroupStartY() ||
+    app.editorTestDriveForcedAddOns() !== 0 ||
+    app.editorTestDriveDisabledBonusRollMask() !== 0;
+  if (!autoStart && !hasSettings) {
+    return null;
+  }
   return {
+    enabled: autoStart || hasSettings,
+    autoStart,
     levelNumber: clampLevelNumber(app.editorTestDriveLevelNumber(), maxLevel),
     hasStartY: app.editorTestDriveUseStartY(),
     startY: clampNonNegativeInteger(app.editorTestDriveStartY(), 500),
@@ -105,6 +128,14 @@ function savePendingEditorTestDriveLaunch(launch: PendingEditorTestDriveLaunch):
   }
 }
 
+function clearPendingEditorTestDriveLaunch(): void {
+  try {
+    sessionStorage.removeItem(EDITOR_TEST_DRIVE_STORAGE_KEY);
+  } catch (error) {
+    console.warn('[Angular] Failed to clear pending editor test drive launch', error);
+  }
+}
+
 function consumePendingEditorTestDriveLaunch(): PendingEditorTestDriveLaunch | null {
   try {
     const raw = sessionStorage.getItem(EDITOR_TEST_DRIVE_STORAGE_KEY);
@@ -115,6 +146,8 @@ function consumePendingEditorTestDriveLaunch(): PendingEditorTestDriveLaunch | n
       return null;
     }
     return {
+      enabled: parsed.enabled !== false,
+      autoStart: parsed.autoStart === true,
       levelNumber: parsed.levelNumber,
       hasStartY: parsed.hasStartY === true,
       startY: clampNonNegativeInteger(parsed.startY ?? 500, 500),
@@ -136,7 +169,7 @@ function tryStartPendingEditorTestDrive(
   const launch = pendingLaunch ?? consumePendingEditorTestDriveLaunch();
   if (!launch) return;
 
-  const mod = window.Module as EmscriptenModuleLike | undefined;
+  const mod = getGameModule(app);
   if (!mod || typeof mod._rd_set_editor_launch_options !== 'function') {
     console.warn('[Angular] Editor test drive launch requested but WASM export is unavailable');
     return;
@@ -157,8 +190,15 @@ function tryStartPendingEditorTestDrive(
     );
     return;
   }
-  console.log('[Angular] Setting editor test drive launch options for level', launch.levelNumber);
-  mod._rd_set_editor_launch_options(
+  console.log('[Angular] Setting editor launch options', {
+    enabled: launch.enabled,
+    autoStart: launch.autoStart,
+    level: launch.levelNumber,
+  });
+  const setLaunchOptions = mod._rd_set_editor_launch_options;
+  setLaunchOptions(
+    launch.enabled ? 1 : 0,
+    launch.autoStart ? 1 : 0,
     launchLevel - 1,
     launch.hasStartY ? 1 : 0,
     launch.startY,
@@ -190,6 +230,8 @@ function consumePendingRestartOptions(): PendingGameRestartOptions | null {
       launch:
         parsed.launch && typeof parsed.launch.levelNumber === 'number'
           ? {
+              enabled: parsed.launch.enabled !== false,
+              autoStart: parsed.launch.autoStart === true,
               levelNumber: parsed.launch.levelNumber,
               hasStartY: parsed.launch.hasStartY === true,
               startY: clampNonNegativeInteger(parsed.launch.startY ?? 500, 500),
@@ -212,6 +254,57 @@ function consumePendingRestartOptions(): PendingGameRestartOptions | null {
   }
 }
 
+function getGameFrameElement(app: App): HTMLIFrameElement | null {
+  const frame = document.getElementById(GAME_FRAME_ID);
+  if (!(frame instanceof HTMLIFrameElement)) {
+    app.gameFrame = null;
+    return null;
+  }
+  app.gameFrame = frame;
+  return frame;
+}
+
+function getGameWindow(app: App): Window | null {
+  const frame = getGameFrameElement(app);
+  if (!(frame instanceof HTMLIFrameElement)) {
+    return null;
+  }
+  return frame.contentWindow;
+}
+
+function getGameModule(app: App): EmscriptenModuleLike | null {
+  const gameWindow = getGameWindow(app);
+  if (!gameWindow) {
+    return null;
+  }
+  const module = gameWindow.Module;
+  if (!module) {
+    return null;
+  }
+  return module;
+}
+
+export function restartWasmGame(app: App): void {
+  const frame = getGameFrameElement(app);
+  if (!(frame instanceof HTMLIFrameElement)) {
+    app.statusText.set('Game host frame not found. Refresh the page to recover.');
+    return;
+  }
+
+  if (app.wasmScript?.parentNode) {
+    app.wasmScript.parentNode.removeChild(app.wasmScript);
+  }
+  app.wasmScript = null;
+  app.overlayVisible.set(true);
+  app.progressPct.set(0);
+
+  frame.onload = () => {
+    setupEmscriptenModule(app);
+    loadWasmScript(app);
+  };
+  frame.srcdoc = GAME_FRAME_SRCDOC;
+}
+
 function scheduleGameRestart(app: App, options: PendingGameRestartOptions): void {
   if (!savePendingRestartOptions(options)) {
     app.snackBar.open('Could not persist restart options.', 'Dismiss', {
@@ -221,7 +314,8 @@ function scheduleGameRestart(app: App, options: PendingGameRestartOptions): void
     return;
   }
   app.gameRestarting.set(true);
-  window.location.reload();
+  app.statusText.set('Restarting game runtime…');
+  restartWasmGame(app);
 }
 
 export function initPackWorker(app: App): void {
@@ -278,12 +372,13 @@ export function dispatchWorker<T>(
 }
 
 export function setupEmscriptenModule(app: App): void {
-  const canvasEl = document.getElementById('canvas');
-  if (!(canvasEl instanceof HTMLCanvasElement)) return;
-  const canvas = canvasEl;
-  activeTabGetter = () => app.activeTab();
-  installKeyboardGate(canvas);
-  patchXmlHttpRequestProgress(app);
+  const gameWindow = getGameWindow(app);
+  if (!gameWindow) {
+    return;
+  }
+
+  const canvas = gameWindow.document.querySelector<HTMLCanvasElement>('#canvas');
+  if (!canvas) return;
   pendingRestartOptions = consumePendingRestartOptions();
 
   if (typeof window.crossOriginIsolated !== 'undefined' && !window.crossOriginIsolated) {
@@ -298,7 +393,7 @@ export function setupEmscriptenModule(app: App): void {
     );
   }
 
-  window.Module = {
+  gameWindow.Module = {
     locateFile: (path: string) => assetUrl(app, path),
     canvas,
     print: (t: string) => console.log('[WASM]', t),
@@ -320,6 +415,7 @@ export function setupEmscriptenModule(app: App): void {
     onRuntimeInitialized: () => {
       app.statusText.set('Running');
       app.overlayVisible.set(false);
+      app.gameRestarting.set(false);
       console.log('[Angular] WASM runtime initialized');
       applyVolumeToWasm(app, app.masterVolume());
       syncGameLoopWithActiveTab(app);
@@ -332,18 +428,18 @@ export function setupEmscriptenModule(app: App): void {
     },
     preRun: [
       () => {
-        const mod = window.Module;
+        const mod = gameWindow.Module;
         if (!mod?.addRunDependency || typeof indexedDB === 'undefined') return;
         mod.addRunDependency('customResourcesDat');
         const shouldInjectCustomResources = pendingRestartOptions?.useCustomResources ?? false;
         if (!shouldInjectCustomResources) {
-          window.Module?.removeRunDependency?.('customResourcesDat');
+          gameWindow.Module?.removeRunDependency?.('customResourcesDat');
           return;
         }
         AppStateResources._loadCustomResourcesDb()
           .then((entry: { bytes: Uint8Array; name: string } | null) => {
             if (entry) {
-              const FS = (window as unknown as Record<string, unknown>)['FS'] as
+              const FS = (gameWindow as unknown as Record<string, unknown>)['FS'] as
                 | { writeFile: (path: string, data: Uint8Array) => void }
                 | undefined;
               if (FS) {
@@ -362,7 +458,7 @@ export function setupEmscriptenModule(app: App): void {
             console.warn('[Angular] Failed to read custom resources.dat from IndexedDB', err);
           })
           .finally(() => {
-            window.Module?.removeRunDependency?.('customResourcesDat');
+            gameWindow.Module?.removeRunDependency?.('customResourcesDat');
           });
       },
     ],
@@ -370,82 +466,24 @@ export function setupEmscriptenModule(app: App): void {
   };
 }
 
-function patchXmlHttpRequestProgress(app: App): void {
-  if (xhrOpenPatched) return;
-  const origOpen = XMLHttpRequest.prototype.open;
-  const self = app;
-  XMLHttpRequest.prototype.open = function (
-    this: XMLHttpRequest,
-    method: string,
-    url: string,
-    asyncFlag: boolean = true,
-    user?: string,
-    password?: string,
-  ): void {
-    if (url && url.indexOf('.data') !== -1) {
-      this.addEventListener('progress', (e: ProgressEvent) => {
-        if (e.lengthComputable) self.progressPct.set(Math.round((e.loaded / e.total) * 100));
-      });
-    }
-    origOpen.call(this, method, url, asyncFlag, user, password);
-  } as typeof XMLHttpRequest.prototype.open;
-  xhrOpenPatched = true;
-}
-
-function installKeyboardGate(canvas: HTMLCanvasElement): void {
-  if (keyboardGateInstalled || typeof EventTarget === 'undefined') return;
-  const origAddEventListener = EventTarget.prototype.addEventListener;
-
-  EventTarget.prototype.addEventListener = function (
-    this: EventTarget,
-    type: string,
-    listener: EventListenerLike | null,
-    options?: boolean | AddEventListenerOptions,
-  ): void {
-    const isKeyEvent = type === 'keydown' || type === 'keyup' || type === 'keypress';
-    const targetIsGameSurface = this === document || this === window || this === canvas;
-    if (isKeyEvent && targetIsGameSurface) {
-      if (listener === null) {
-        origAddEventListener.call(this, type, listener, options);
-        return;
-      }
-      if (typeof listener === 'function') {
-        const wrapped: EventListener = function (this: EventTarget, event: Event): unknown {
-          if (activeTabGetter?.() !== 'game') return undefined;
-          if (isEditableTarget(event.target)) return undefined;
-          return listener.call(this, event);
-        };
-        origAddEventListener.call(this, type, wrapped, options);
-        return;
-      }
-      const wrappedListener: EventListenerObject = {
-        handleEvent(event: Event): void {
-          if (activeTabGetter?.() !== 'game') return;
-          if (isEditableTarget(event.target)) return;
-          listener.handleEvent(event);
-        },
-      };
-      origAddEventListener.call(this, type, wrappedListener, options);
-      return;
-    }
-    origAddEventListener.call(this, type, listener, options);
-  } as typeof EventTarget.prototype.addEventListener;
-
-  keyboardGateInstalled = true;
-}
-
 export function loadWasmScript(app: App): void {
   if (app.wasmScript) return;
-  app.wasmScript = document.createElement('script');
+  const gameWindow = getGameWindow(app);
+  const gameDocument = gameWindow?.document;
+  if (!gameDocument?.body) {
+    return;
+  }
+  app.wasmScript = gameDocument.createElement('script');
   app.wasmScript.src = assetUrl(app, 'reckless_drivin.js');
   app.wasmScript.async = true;
   app.wasmScript.onerror = () => {
+    app.gameRestarting.set(false);
     app.statusText.set(
       'WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).',
     );
     console.error('[Angular] Failed to load WASM JS module');
   };
-  document.body.appendChild(app.wasmScript);
+  gameDocument.body.appendChild(app.wasmScript);
 }
 
 export function assetUrl(app: App, path: string): string {
@@ -475,14 +513,14 @@ export function looksLikeHtml(bytes: Uint8Array): boolean {
 }
 
 export function applyVolumeToWasm(app: App, pct: number): void {
-  const mod = window.Module;
+  const mod = getGameModule(app);
   if (mod && typeof mod._set_wasm_master_volume === 'function') {
     mod._set_wasm_master_volume(pct / 100.0);
   }
 }
 
 export function syncGameLoopWithActiveTab(app: App): void {
-  const mod = window.Module as EmscriptenModuleLike | undefined;
+  const mod = getGameModule(app);
   if (!mod) return;
   try {
     if (app.activeTab() === 'editor') mod.pauseMainLoop?.();
@@ -548,6 +586,7 @@ export async function applyCustomResourcesPreset(
 }
 
 export function restartGameWithCustomResources(app: App): void {
+  clearPendingEditorTestDriveLaunch();
   scheduleGameRestart(app, {
     useCustomResources: true,
     launch: null,
@@ -555,7 +594,10 @@ export function restartGameWithCustomResources(app: App): void {
 }
 
 export function restartIntoEditorTestDrive(app: App): void {
-  const launch = buildPendingEditorTestDriveLaunch(app);
+  const launch = buildPendingEditorTestDriveLaunch(app, true);
+  if (!launch) {
+    return;
+  }
   if (!savePendingEditorTestDriveLaunch(launch)) {
     app.snackBar.open('Could not persist test drive options for restart.', 'Dismiss', {
       duration: 5000,
@@ -569,11 +611,11 @@ export function restartIntoEditorTestDrive(app: App): void {
   });
 }
 
-export function restartWithStartupOptions(
-  app: App,
-  useLevel: boolean,
-): void {
-  const launch = useLevel ? buildPendingEditorTestDriveLaunch(app) : null;
+export function restartWithStartupOptions(app: App, useLevel: boolean): void {
+  const launch = buildPendingEditorTestDriveLaunch(app, useLevel);
+  if (!launch) {
+    clearPendingEditorTestDriveLaunch();
+  }
   if (launch && !savePendingEditorTestDriveLaunch(launch)) {
     app.snackBar.open('Could not persist test drive options for restart.', 'Dismiss', {
       duration: 5000,
@@ -596,12 +638,13 @@ export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {
   }
 
   try {
-    const FS = (window as unknown as Record<string, unknown>)['FS'] as
+    const gameWindow = getGameWindow(app);
+    const FS = (gameWindow as unknown as Record<string, unknown> | null)?.['FS'] as
       | { writeFile: (path: string, data: Uint8Array) => void }
       | undefined;
     if (!FS) {
       console.warn(
-        '[Angular] Emscripten FS not available yet – bytes will be injected on next page load via IndexedDB',
+        '[Angular] Emscripten FS not available yet – bytes will be injected on next game runtime restart via IndexedDB',
       );
       app._pendingCustomResources = bytes;
       return;
@@ -610,7 +653,7 @@ export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {
     console.log('[Angular] Custom resources.dat written to MEMFS at /resources.dat');
   } catch (e) {
     console.warn(
-      '[Angular] Could not write custom resources.dat to live MEMFS (will take effect on page reload)',
+      '[Angular] Could not write custom resources.dat to live MEMFS (will take effect on next game runtime restart)',
       e,
     );
   }
@@ -618,7 +661,7 @@ export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {
   app.customResourcesLoaded.set(true);
   app.statusText.set(
     `Custom resources.dat loaded (${Math.round(bytes.length / 1024)} KB). ` +
-      'Click "Restart Game" to reload the page with the new resources.',
+      'Click "Restart With Customisations" to restart the game runtime with the new resources.',
   );
 }
 

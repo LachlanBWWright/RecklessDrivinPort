@@ -1,5 +1,5 @@
 export function worldDirToCanvasRotationRad(dir: number): number {
-  return -dir;
+  return dir;
 }
 
 export function worldDirToKonvaRotationDeg(dir: number): number {

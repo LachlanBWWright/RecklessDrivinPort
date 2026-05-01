@@ -525,8 +525,7 @@ export function onInit(app: App): void {
 }
 
 export function onAfterViewInit(app: App): void {
-  app.runtime.setupEmscriptenModule();
-  app.runtime.loadWasmScript();
+  app.runtime.restartWasmGame();
 }
 
 export function formatTime(seconds: number): string {
@@ -547,7 +546,12 @@ export function setEditorSectionIndex(app: App, idx: number): void {
 }
 
 export function toggleFullscreen(): void {
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+  const frame = document.getElementById('game-frame');
+  const frameWindow = frame instanceof HTMLIFrameElement ? frame.contentWindow : null;
+  const canvas = frameWindow?.document.querySelector<HTMLCanvasElement>('#canvas');
+  if (!canvas) {
+    return;
+  }
   if (document.fullscreenElement) {
     document.exitFullscreen();
   } else {

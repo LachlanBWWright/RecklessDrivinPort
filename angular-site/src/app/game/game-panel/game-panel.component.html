@@ -29,7 +29,12 @@
     </mat-card-header>
     <mat-card-content class="!block !px-4 !pb-4 !pt-0">
       <div class="relative mx-auto flex aspect-[4/3] h-[clamp(300px,calc(100dvh-360px),720px)] w-[min(100%,calc(clamp(300px,calc(100dvh-360px),720px)*4/3))] max-w-full flex-[0_0_auto] justify-center overflow-hidden rounded border border-[var(--border)] bg-black">
-        <canvas id="canvas" class="block h-full w-full [image-rendering:pixelated]" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
+        <iframe
+          id="game-frame"
+          title="Reckless Drivin game runtime"
+          class="block h-full w-full border-0"
+          aria-label="Reckless Drivin game runtime"
+        ></iframe>
         <div class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/85" [class.hidden]="!overlayVisible">
           <mat-spinner diameter="48"></mat-spinner>
           <p class="text-[0.9rem] text-[var(--muted)]">{{ statusText }}</p>

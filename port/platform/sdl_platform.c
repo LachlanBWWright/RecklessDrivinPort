@@ -1960,7 +1960,7 @@ static void emscripten_main_loop(void) {
      * fires before main()/Init() has finished. */
     if (!s_editorLaunchChecked) {
         s_editorLaunchChecked = 1;
-        if (!gGameOn && gEditorLaunchOptions.enabled) {
+        if (!gGameOn && gEditorLaunchOptions.enabled && gEditorLaunchOptions.autoStart) {
             EM_ASM({ console.log('[WASM] Editor test-drive auto-start on first tick'); });
             StartGame(1);
             return; /* StartGame → LoadLevel sets gGameOn; next tick will run GameFrame */
@@ -2062,7 +2062,7 @@ static UInt32 parse_bonus_roll_mask(const char *name)
 
 static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOptions *out_options)
 {
-    tEditorLaunchOptions options = {0, 0, 0, 0, 0, 0, 0, 0};
+    tEditorLaunchOptions options = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     int has_any = 0;
     int i;
 
@@ -2077,6 +2077,7 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
             }
             options.levelID = parsed_value - 1;
             options.enabled = 1;
+            options.autoStart = 1;
             has_any = 1;
             i++;
             continue;

@@ -24,6 +24,7 @@ import {
   DEFAULT_OBJECT_GROUP_PREVIEW_START_Y,
   generateObjectGroupSpawnPreview,
 } from '../../../object-group-spawn-preview';
+import { worldDirToKonvaRotationDeg } from '../../../object-direction-utils';
 
 interface VisibleObjectGroupSlot {
   slotIndex: number;
@@ -243,6 +244,10 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
 
   getPreviewRotationDegrees(dir: number): number {
     return Number.isFinite(dir) && dir >= 0 ? (dir * 180) / Math.PI : 0;
+  }
+
+  getPreviewSpriteRotationDegrees(dir: number): number {
+    return Number.isFinite(dir) && dir >= 0 ? worldDirToKonvaRotationDeg(dir) : 0;
   }
 
   getPreviewEntries(group: ObjectGroupDefinition | null, limit = 3): ObjectGroupEntryData[] {

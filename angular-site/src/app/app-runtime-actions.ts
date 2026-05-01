@@ -21,6 +21,7 @@ import {
   onCustomResourcesFileSelected as onCustomResourcesFileSelectedHelper,
   mountCustomResourcesFs as mountCustomResourcesFsHelper,
   readAssetBytes as readAssetBytesHelper,
+  restartWasmGame as restartWasmGameHelper,
   restartGameWithCustomResources as restartGameWithCustomResourcesHelper,
   setupEmscriptenModule as setupEmscriptenModuleHelper,
   syncGameLoopWithActiveTab as syncGameLoopWithActiveTabHelper,
@@ -53,6 +54,7 @@ export function createRuntimeActions(app: App): {
   syncGameLoopWithActiveTab(): void;
   onCustomResourcesFileSelected(event: Event): Promise<void>;
   applyCustomResourcesPreset(preset: CustomResourcesPresetId): Promise<void>;
+  restartWasmGame(): void;
   restartGameWithCustomResources(): void;
   restartIntoEditorTestDrive(): void;
   restartWithStartupOptions(useLevel: boolean): void;
@@ -104,6 +106,7 @@ export function createRuntimeActions(app: App): {
     onCustomResourcesFileSelected: bindAppAction(app, onCustomResourcesFileSelectedHelper),
     applyCustomResourcesPreset: (preset: CustomResourcesPresetId) =>
       applyCustomResourcesPresetHelper(app, preset),
+    restartWasmGame: bindAppAction(app, restartWasmGameHelper),
     restartGameWithCustomResources: bindAppAction(app, restartGameWithCustomResourcesHelper),
     restartIntoEditorTestDrive: bindAppAction(app, restartIntoEditorTestDriveHelper),
     restartWithStartupOptions: (useLevel: boolean) =>

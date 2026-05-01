@@ -173,6 +173,7 @@ export class AppStateResources extends AppStateBase {
     );
   });
 
+  gameFrame: HTMLIFrameElement | null = null;
   wasmScript: HTMLScriptElement | null = null;
   /** Custom resources.dat loaded via the game tab upload; queued until WASM inits if needed. */
   _pendingCustomResources: Uint8Array | null = null;
@@ -184,10 +185,10 @@ export class AppStateResources extends AppStateBase {
   gameRestarting = signal(false);
 
   // ── IndexedDB persistence for custom resources.dat ─────────────────────────
-  // The game is compiled with Emscripten ASYNCIFY, which makes calling callMain()
-  // a second time unsafe (the ASYNCIFY state machine is not designed to be re-entered).
-  // We therefore restart by reloading the page, persisting the custom bytes in IndexedDB
-  // so the preRun hook can inject them into MEMFS before the game's main() runs.
+  // The game runs in an isolated iframe runtime. Restarting the game recreates
+  // that iframe and reboots only WASM, while Angular editor state remains live.
+  // Custom resources.dat bytes persist in IndexedDB so preRun can inject them
+  // into MEMFS before each fresh game startup.
   private static readonly _IDB_NAME = 'reckless-drivin';
   private static readonly _IDB_STORE = 'custom-resources';
   private static readonly _IDB_KEY = 'resources-dat';
