@@ -257,7 +257,7 @@ export function imageDataToIcl8(rgba: Uint8ClampedArray): Uint8Array {
   return out;
 }
 
-function encodePackBitsRow8(row: Uint8Array): Uint8Array {
+/* function encodePackBitsRow8(row: Uint8Array): Uint8Array {
   const out: number[] = [];
   let pos = 0;
   while (pos < row.length) {
@@ -267,7 +267,7 @@ function encodePackBitsRow8(row: Uint8Array): Uint8Array {
     pos += chunk;
   }
   return new Uint8Array(out);
-}
+} */
 
 function encodePackBitsRow16(row: Uint8Array): Uint8Array {
   const out: number[] = [];

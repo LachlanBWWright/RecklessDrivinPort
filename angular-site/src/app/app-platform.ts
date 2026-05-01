@@ -1,6 +1,11 @@
 import { err, ok, type Result } from 'neverthrow';
 import { App } from './app';
 import { AppStateResources } from './app-state-resources';
+import {
+  TERMINATOR_RESOURCE_ASSET_PATH,
+  TERMINATOR_RESOURCE_NAME,
+  type CustomResourcesPresetId,
+} from './game/game-customisation-presets';
 
 type EventListenerLike = EventListenerOrEventListenerObject;
 
@@ -330,7 +335,7 @@ export function setupEmscriptenModule(app: App): void {
         const mod = window.Module;
         if (!mod?.addRunDependency || typeof indexedDB === 'undefined') return;
         mod.addRunDependency('customResourcesDat');
-        const shouldInjectCustomResources = pendingRestartOptions?.useCustomResources ?? true;
+        const shouldInjectCustomResources = pendingRestartOptions?.useCustomResources ?? false;
         if (!shouldInjectCustomResources) {
           window.Module?.removeRunDependency?.('customResourcesDat');
           return;
@@ -494,10 +499,52 @@ export async function onCustomResourcesFileSelected(app: App, event: Event): Pro
   if (!file) return;
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
+    app.customResourcesName.set(file.name);
     mountCustomResourcesFs(app, bytes);
+    app.customResourcesPreset.set('uploaded');
+    app.customOptionsPreset.set('manual');
   } catch (error) {
     app.editorError.set(error instanceof Error ? error.message : 'Failed to load file');
   }
+}
+
+export async function applyCustomResourcesPreset(
+  app: App,
+  preset: CustomResourcesPresetId,
+): Promise<void> {
+  if (preset === 'default') {
+    clearCustomResources(app);
+    app.customResourcesPreset.set('default');
+    return;
+  }
+
+  if (preset === 'uploaded') {
+    if (!app.customResourcesLoaded()) {
+      app.snackBar.open('Load a custom resources.dat first.', 'Dismiss', {
+        duration: 4000,
+      });
+      app.customResourcesPreset.set('default');
+      return;
+    }
+    app.customResourcesPreset.set('uploaded');
+    return;
+  }
+
+  const bytesResult = await readAssetBytes(app, TERMINATOR_RESOURCE_ASSET_PATH);
+  bytesResult.match(
+    (bytes) => {
+      app.customResourcesName.set(TERMINATOR_RESOURCE_NAME);
+      mountCustomResourcesFs(app, bytes);
+      app.customResourcesPreset.set('terminator');
+    },
+    (error) => {
+      app.editorError.set(error);
+      app.snackBar.open('Could not load the Terminator preset resources.dat.', 'Dismiss', {
+        duration: 5000,
+        panelClass: 'snack-error',
+      });
+    },
+  );
 }
 
 export function restartGameWithCustomResources(app: App): void {
@@ -524,10 +571,9 @@ export function restartIntoEditorTestDrive(app: App): void {
 
 export function restartWithStartupOptions(
   app: App,
-  useCustomResources: boolean,
-  useEditorTestDrive: boolean,
+  useLevel: boolean,
 ): void {
-  const launch = useEditorTestDrive ? buildPendingEditorTestDriveLaunch(app) : null;
+  const launch = useLevel ? buildPendingEditorTestDriveLaunch(app) : null;
   if (launch && !savePendingEditorTestDriveLaunch(launch)) {
     app.snackBar.open('Could not persist test drive options for restart.', 'Dismiss', {
       duration: 5000,
@@ -536,7 +582,7 @@ export function restartWithStartupOptions(
     return;
   }
   scheduleGameRestart(app, {
-    useCustomResources,
+    useCustomResources: app.customResourcesPreset() !== 'default',
     launch,
   });
 }
@@ -579,6 +625,8 @@ export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {
 export function clearCustomResources(app: App): void {
   app.customResourcesLoaded.set(false);
   app.customResourcesName.set(null);
+  app.customResourcesPreset.set('default');
+  app.customOptionsPreset.set(app.customSettingsPreset() === 'default' ? 'default' : 'manual');
   if (typeof indexedDB !== 'undefined') {
     AppStateResources._clearCustomResourcesDb().catch((err: unknown) => {
       console.warn('[Angular] Failed to clear custom resources.dat from IndexedDB', err);

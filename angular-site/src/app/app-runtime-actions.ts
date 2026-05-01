@@ -12,6 +12,7 @@ import {
 } from './app-session';
 import {
   applyVolumeToWasm as applyVolumeToWasmHelper,
+  applyCustomResourcesPreset as applyCustomResourcesPresetHelper,
   assetUrl as assetUrlHelper,
   dispatchWorker as dispatchWorkerHelper,
   clearCustomResources as clearCustomResourcesHelper,
@@ -26,6 +27,7 @@ import {
   restartIntoEditorTestDrive as restartIntoEditorTestDriveHelper,
   restartWithStartupOptions as restartWithStartupOptionsHelper,
 } from './app-platform';
+import type { CustomResourcesPresetId } from './game/game-customisation-presets';
 import { bindAppAction } from './bind-app-action';
 
 export function createRuntimeActions(app: App): {
@@ -50,9 +52,10 @@ export function createRuntimeActions(app: App): {
   applyVolumeToWasm(pct: number): void;
   syncGameLoopWithActiveTab(): void;
   onCustomResourcesFileSelected(event: Event): Promise<void>;
+  applyCustomResourcesPreset(preset: CustomResourcesPresetId): Promise<void>;
   restartGameWithCustomResources(): void;
   restartIntoEditorTestDrive(): void;
-  restartWithStartupOptions(useCustomResources: boolean, useEditorTestDrive: boolean): void;
+  restartWithStartupOptions(useLevel: boolean): void;
   clearCustomResources(): void;
   mountCustomResourcesFs(bytes: Uint8Array): void;
 } {
@@ -99,10 +102,12 @@ export function createRuntimeActions(app: App): {
     applyVolumeToWasm: bindAppAction(app, applyVolumeToWasmHelper),
     syncGameLoopWithActiveTab: bindAppAction(app, syncGameLoopWithActiveTabHelper),
     onCustomResourcesFileSelected: bindAppAction(app, onCustomResourcesFileSelectedHelper),
+    applyCustomResourcesPreset: (preset: CustomResourcesPresetId) =>
+      applyCustomResourcesPresetHelper(app, preset),
     restartGameWithCustomResources: bindAppAction(app, restartGameWithCustomResourcesHelper),
     restartIntoEditorTestDrive: bindAppAction(app, restartIntoEditorTestDriveHelper),
-    restartWithStartupOptions: (useCustomResources: boolean, useEditorTestDrive: boolean) =>
-      restartWithStartupOptionsHelper(app, useCustomResources, useEditorTestDrive),
+    restartWithStartupOptions: (useLevel: boolean) =>
+      restartWithStartupOptionsHelper(app, useLevel),
     clearCustomResources: bindAppAction(app, clearCustomResourcesHelper),
     mountCustomResourcesFs: bindAppAction(app, mountCustomResourcesFsHelper),
   };

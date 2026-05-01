@@ -1,18 +1,24 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
-
-const ADDON_LOCK = 1 << 3;
-const ADDON_COP = 1 << 4;
-const ADDON_TURBO = 1 << 5;
-const ADDON_SPIKES = 1 << 6;
-
-const BONUS_ROLL_LOCK = 1 << 0;
-const BONUS_ROLL_MINES = 1 << 1;
-const BONUS_ROLL_MISSILES = 1 << 2;
-const BONUS_ROLL_SPIKES = 1 << 3;
-const BONUS_ROLL_COP = 1 << 4;
-const BONUS_ROLL_TURBO = 1 << 5;
-const BONUS_ROLL_SCORE = 1 << 6;
-const BONUS_ROLL_EXTRA_LIFE = 1 << 7;
+import {
+  ADDON_COP,
+  ADDON_LOCK,
+  ADDON_SPIKES,
+  ADDON_TURBO,
+  BONUS_ROLL_COP,
+  BONUS_ROLL_EXTRA_LIFE,
+  BONUS_ROLL_LOCK,
+  BONUS_ROLL_MINES,
+  BONUS_ROLL_MISSILES,
+  BONUS_ROLL_SCORE,
+  BONUS_ROLL_SPIKES,
+  BONUS_ROLL_TURBO,
+  CUSTOM_OPTIONS_PRESETS,
+  CUSTOM_RESOURCES_PRESETS,
+  CUSTOM_SETTINGS_PRESETS,
+  type CustomOptionsPresetId,
+  type CustomResourcesPresetId,
+  type CustomSettingsPresetId,
+} from '../game-customisation-presets';
 
 @Component({
   selector: 'app-game-panel',
@@ -31,7 +37,11 @@ export class GamePanelComponent {
   @Input() masterVolume = 80;
   @Input() customResourcesLoaded = false;
   @Input() customResourcesName: string | null = null;
+  @Input() customOptionsPreset: CustomOptionsPresetId = 'manual';
+  @Input() customResourcesPreset: CustomResourcesPresetId = 'default';
+  @Input() customSettingsPreset: CustomSettingsPresetId = 'manual';
   @Input() gameRestarting = false;
+  @Input() editorTestDriveLevelEnabled = true;
   @Input() editorTestDriveLevelNumber = 1;
   @Input() editorTestDriveUseStartY = false;
   @Input() editorTestDriveStartY = 500;
@@ -43,13 +53,14 @@ export class GamePanelComponent {
   @Output() toggleFullscreen = new EventEmitter<void>();
   @Output() volumeChange = new EventEmitter<number>();
   @Output() customResourcesFileSelected = new EventEmitter<Event>();
-  @Output() restartGameWithCustomResources = new EventEmitter<void>();
-  @Output() restartIntoEditorTestDrive = new EventEmitter<void>();
+  @Output() customOptionsPresetChange = new EventEmitter<CustomOptionsPresetId>();
+  @Output() customResourcesPresetChange = new EventEmitter<CustomResourcesPresetId>();
+  @Output() customSettingsPresetChange = new EventEmitter<CustomSettingsPresetId>();
   @Output() restartWithStartupOptions = new EventEmitter<{
-    useCustomResources: boolean;
-    useEditorTestDrive: boolean;
+    useLevel: boolean;
   }>();
   @Output() clearCustomResources = new EventEmitter<void>();
+  @Output() editorTestDriveLevelEnabledChange = new EventEmitter<boolean>();
   @Output() editorTestDriveLevelNumberInput = new EventEmitter<string>();
   @Output() editorTestDriveUseStartYChange = new EventEmitter<boolean>();
   @Output() editorTestDriveStartYInput = new EventEmitter<string>();
@@ -63,6 +74,10 @@ export class GamePanelComponent {
     mask: number;
     checked: boolean;
   }>();
+
+  readonly customOptionsPresetOptions = CUSTOM_OPTIONS_PRESETS;
+  readonly customResourcesPresetOptions = CUSTOM_RESOURCES_PRESETS;
+  readonly customSettingsPresetOptions = CUSTOM_SETTINGS_PRESETS;
 
   readonly forcedAddonOptions = [
     { mask: ADDON_LOCK, label: 'Lock', description: 'Start with Addons Locked.' },
@@ -84,5 +99,12 @@ export class GamePanelComponent {
 
   hasMask(value: number, mask: number): boolean {
     return (value & mask) !== 0;
+  }
+
+  get customResourcesSummary(): string {
+    if (this.customResourcesPreset === 'default') {
+      return 'Built-in resources.dat';
+    }
+    return this.customResourcesName ?? 'Custom resources.dat ready';
   }
 }

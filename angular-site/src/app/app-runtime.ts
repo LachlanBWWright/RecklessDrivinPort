@@ -1,6 +1,5 @@
 import { effect } from '@angular/core';
 import { App } from './app';
-import { AppStateResources } from './app-state-resources';
 import type { EditorSection } from './layout/site-toolbar/site-toolbar.component';
 import { MAX_TIME_VALUE } from './app-level';
 import { dist2d, MIN_START_MARKER_HIT_RADIUS, BASE_START_MARKER_HIT_RADIUS } from './object-canvas';
@@ -523,18 +522,6 @@ export function scheduleCanvasRedraw(app: App): void {
 
 export function onInit(app: App): void {
   app.runtime.initPackWorker();
-  if (typeof indexedDB !== 'undefined') {
-    AppStateResources._loadCustomResourcesDb()
-      .then((entry) => {
-        if (entry) {
-          app.customResourcesLoaded.set(true);
-          app.customResourcesName.set(entry.name);
-        }
-      })
-      .catch(() => {
-        /* ignore */
-      });
-  }
 }
 
 export function onAfterViewInit(app: App): void {

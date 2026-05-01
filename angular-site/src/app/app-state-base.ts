@@ -17,6 +17,11 @@ import { parseSndHeader, type SndInfo } from './snd-codec';
 import type { EditorSection } from './layout/site-toolbar/site-toolbar.component';
 import { levelDisplayNum } from './app-helpers';
 import { OBJ_PALETTE } from './object-canvas';
+import type {
+  CustomOptionsPresetId,
+  CustomResourcesPresetId,
+  CustomSettingsPresetId,
+} from './game/game-customisation-presets';
 
 const DEFAULT_EDITOR_TEST_DRIVE_START_Y = 500;
 
@@ -44,6 +49,10 @@ export class AppStateBase {
   progressPct = signal(0);
   overlayVisible = signal(true);
   masterVolume = signal(80);
+  customOptionsPreset = signal<CustomOptionsPresetId>('manual');
+  customResourcesPreset = signal<CustomResourcesPresetId>('default');
+  customSettingsPreset = signal<CustomSettingsPresetId>('manual');
+  editorTestDriveLevelEnabled = signal(false);
   editorTestDriveLevelNumberOverride = signal<number | null>(null);
   readonly editorTestDriveLevelNumber = computed(() => {
     const override = this.editorTestDriveLevelNumberOverride();

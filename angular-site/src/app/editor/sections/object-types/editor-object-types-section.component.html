@@ -70,21 +70,21 @@
                 @if (hasPreviewFrameControls(type)) {
                   <button
                     mat-icon-button
-                    class="!absolute !left-[10px] !top-1/2 !h-[38px] !w-[38px] !-translate-y-1/2 !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !shadow-[0_4px_18px_rgba(0,0,0,0.24)]"
+                    class="!absolute !left-[10px] !top-1/2 !flex !h-[38px] !w-[38px] !min-h-[38px] !min-w-[38px] !-translate-y-1/2 !items-center !justify-center !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !p-0 !shadow-[0_4px_18px_rgba(0,0,0,0.24)]"
                     [disabled]="workerBusy"
                     aria-label="Previous preview frame"
                     matTooltip="Previous frame"
                     (click)="stepPreviewFrame(type.typeRes, -1)">
-                    <mat-icon>chevron_left</mat-icon>
+                    <mat-icon class="!flex !h-[20px] !w-[20px] !items-center !justify-center !text-[20px] !leading-none">chevron_left</mat-icon>
                   </button>
                   <button
                     mat-icon-button
-                    class="!absolute !right-[10px] !top-1/2 !h-[38px] !w-[38px] !-translate-y-1/2 !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !shadow-[0_4px_18px_rgba(0,0,0,0.24)]"
+                    class="!absolute !right-[10px] !top-1/2 !flex !h-[38px] !w-[38px] !min-h-[38px] !min-w-[38px] !-translate-y-1/2 !items-center !justify-center !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !p-0 !shadow-[0_4px_18px_rgba(0,0,0,0.24)]"
                     [disabled]="workerBusy"
                     aria-label="Next preview frame"
                     matTooltip="Next frame"
                     (click)="stepPreviewFrame(type.typeRes, 1)">
-                    <mat-icon>chevron_right</mat-icon>
+                    <mat-icon class="!flex !h-[20px] !w-[20px] !items-center !justify-center !text-[20px] !leading-none">chevron_right</mat-icon>
                   </button>
                 }
               </div>

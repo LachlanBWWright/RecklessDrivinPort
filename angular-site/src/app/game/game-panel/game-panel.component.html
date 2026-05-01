@@ -55,75 +55,129 @@
         </mat-slider>
         <span class="min-w-9 text-[0.82rem] text-[var(--muted)]">{{ masterVolume }}%</span>
       </div>
-      <div class="mt-2 flex flex-wrap items-center gap-2.5 border-t border-t-[var(--border)] px-0 pb-0.5 pt-1.5">
-        <span class="whitespace-nowrap text-[0.82rem] text-[var(--muted)]">Custom resources.dat:</span>
-        <input #customResInput type="file" accept=".dat" style="display:none"
-               (change)="customResourcesFileSelected.emit($event)" />
-        <button mat-stroked-button (click)="customResInput.click()" matTooltip="Load a custom resources.dat to test edited levels">
-          <mat-icon>upload_file</mat-icon> Load Custom resources.dat
-        </button>
-        @if (customResourcesLoaded) {
-          <button mat-stroked-button class="!border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)]"
-            (click)="clearCustomResources.emit()"
-            matTooltip="Remove the custom resources.dat and revert to the built-in defaults">
-            <mat-icon>delete</mat-icon> Clear
-          </button>
-        }
-        @if (customResourcesName) {
-          <span class="inline-flex items-center gap-1 rounded border border-[var(--success)] bg-[rgba(102,187,106,0.12)] px-2 py-0.5 text-[0.8rem] text-[var(--success)]">
-            <mat-icon class="!h-[14px] !w-[14px] !text-[14px]">check_circle</mat-icon>
-            {{ customResourcesName }} loaded
-          </span>
-        }
-      </div>
-
-      <div class="rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] p-3">
+      <div class="mt-2 border-t border-t-[var(--border)] px-0 pb-0.5 pt-3">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
-            <div class="text-[0.9rem] font-semibold text-[var(--on-surface)]">Editor Test Drive</div>
+            <div class="text-[0.9rem] font-semibold text-[var(--on-surface)]">Customisations</div>
             <p class="mt-1 text-[0.78rem] leading-[1.55] text-[var(--muted)]">
-              Configure startup options once, then restart with default resources.dat, custom resources.dat, editor test drive params, or both.
+              Choose a preset, swap in a custom <code>resources.dat</code>, and optionally launch straight into a level on restart.
             </p>
           </div>
-        </div>
-
-        <div class="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-          <mat-checkbox #useCustomResourcesCheckbox [checked]="customResourcesLoaded" [disabled]="!customResourcesLoaded" matTooltip="Use custom resources.dat from IndexedDB for this restart">
-            Use custom resources.dat
-          </mat-checkbox>
-          <mat-checkbox #useEditorLaunchCheckbox checked matTooltip="Apply Editor Test Drive launch parameters on restart">
-            Use editor test drive params
-          </mat-checkbox>
           <button
             mat-raised-button
             class="!bg-[var(--accent2)] !text-white hover:!bg-[#1e88e5] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
             [disabled]="gameRestarting"
-            (click)="restartWithStartupOptions.emit({ useCustomResources: customResourcesLoaded && useCustomResourcesCheckbox.checked, useEditorTestDrive: useEditorLaunchCheckbox.checked })"
-            matTooltip="Restart using the selected startup options; if launch params are invalid the game remains at main menu"
+            (click)="restartWithStartupOptions.emit({ useLevel: editorTestDriveLevelEnabled })"
+            matTooltip="Restart using the current customisations; if level launch is disabled the game starts normally"
           >
             @if (gameRestarting) {
               <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
             } @else {
               <mat-icon>restart_alt</mat-icon>
             }
-            Restart With Selected Options
+            Restart With Customisations
           </button>
         </div>
 
-        <div class="mt-3 grid gap-3 md:grid-cols-3">
+        <div class="mt-3 grid gap-3 xl:grid-cols-3">
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full">
-            <mat-label>Level</mat-label>
-            <input
-              #testDriveLevelInput
-              matInput
-              type="number"
-              min="1"
-              inputmode="numeric"
-              [value]="editorTestDriveLevelNumber"
-              (input)="editorTestDriveLevelNumberInput.emit(testDriveLevelInput.value)"
-            />
-            <mat-hint>1-based level number.</mat-hint>
+            <mat-label>Custom options</mat-label>
+            <mat-select
+              [value]="customOptionsPreset"
+              (selectionChange)="customOptionsPresetChange.emit($event.value)"
+            >
+              @for (preset of customOptionsPresetOptions; track preset.id) {
+                <mat-option [value]="preset.id">{{ preset.label }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>
+              {{
+                customOptionsPresetOptions.find((preset) => preset.id === customOptionsPreset)?.description
+              }}
+            </mat-hint>
           </mat-form-field>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full">
+            <mat-label>Custom resources</mat-label>
+            <mat-select
+              [value]="customResourcesPreset"
+              (selectionChange)="customResourcesPresetChange.emit($event.value)"
+            >
+              @for (preset of customResourcesPresetOptions; track preset.id) {
+                <mat-option
+                  [value]="preset.id"
+                  [disabled]="preset.id === 'uploaded' && !customResourcesLoaded"
+                >
+                  {{ preset.label }}
+                </mat-option>
+              }
+            </mat-select>
+            <mat-hint>{{ customResourcesSummary }}</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full">
+            <mat-label>Custom settings preset</mat-label>
+            <mat-select
+              [value]="customSettingsPreset"
+              (selectionChange)="customSettingsPresetChange.emit($event.value)"
+            >
+              @for (preset of customSettingsPresetOptions; track preset.id) {
+                <mat-option [value]="preset.id">{{ preset.label }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>
+              {{
+                customSettingsPresetOptions.find((preset) => preset.id === customSettingsPreset)?.description
+              }}
+            </mat-hint>
+          </mat-form-field>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <input #customResInput type="file" accept=".dat" style="display:none" (change)="customResourcesFileSelected.emit($event)" />
+          <button mat-stroked-button (click)="customResInput.click()" matTooltip="Load a custom resources.dat and make it selectable in the custom resources dropdown">
+            <mat-icon>upload_file</mat-icon> Upload custom resources.dat
+          </button>
+          @if (customResourcesLoaded) {
+            <button
+              mat-stroked-button
+              class="!border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)]"
+              (click)="clearCustomResources.emit()"
+              matTooltip="Remove the custom resources.dat and revert to the built-in defaults"
+            >
+              <mat-icon>delete</mat-icon> Clear custom resources
+            </button>
+          }
+          @if (customResourcesLoaded || customResourcesPreset === 'default') {
+            <span class="inline-flex items-center gap-1 rounded border border-[var(--success)] bg-[rgba(102,187,106,0.12)] px-2 py-0.5 text-[0.8rem] text-[var(--success)]">
+              <mat-icon class="!h-[14px] !w-[14px] !text-[14px]">check_circle</mat-icon>
+              {{ customResourcesSummary }}
+            </span>
+          }
+        </div>
+
+        <div class="mt-3 grid gap-3 md:grid-cols-3">
+          <div class="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+            <mat-checkbox
+              [checked]="editorTestDriveLevelEnabled"
+              (change)="editorTestDriveLevelEnabledChange.emit($event.checked)"
+            >
+              Level
+            </mat-checkbox>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mt-2 mb-0 w-full">
+              <mat-label>Level number</mat-label>
+              <input
+                #testDriveLevelInput
+                matInput
+                type="number"
+                min="1"
+                inputmode="numeric"
+                [value]="editorTestDriveLevelNumber"
+                (input)="editorTestDriveLevelNumberInput.emit(testDriveLevelInput.value)"
+              />
+              <mat-hint>Unchecked starts the game normally.</mat-hint>
+            </mat-form-field>
+          </div>
 
           <div class="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
             <mat-checkbox

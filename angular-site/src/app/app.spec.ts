@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { App } from './app';
+import { BONUS_ROLL_COP } from './game/game-customisation-presets';
 
 describe('App', () => {
   beforeEach(async () => {
@@ -575,5 +576,36 @@ describe('App', () => {
 
     expect(app.customResourcesLoaded()).toBe(false);
     expect(app.customResourcesName()).toBeNull();
+  });
+
+  it('setCustomSettingsPreset should apply the Terminator settings', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.editorTestDriveUseStartY.set(true);
+    app.editorTestDriveUseObjectGroupStartY.set(true);
+    app.editorTestDriveForcedAddOns.set(7);
+    app.editorTestDriveDisabledBonusRollMask.set(3);
+
+    app.setCustomSettingsPreset('terminator');
+
+    expect(app.customSettingsPreset()).toBe('terminator');
+    expect(app.customOptionsPreset()).toBe('manual');
+    expect(app.editorTestDriveUseStartY()).toBe(false);
+    expect(app.editorTestDriveUseObjectGroupStartY()).toBe(false);
+    expect(app.editorTestDriveForcedAddOns()).toBe(0);
+    expect(app.editorTestDriveDisabledBonusRollMask()).toBe(BONUS_ROLL_COP);
+  });
+
+  it('setCustomOptionsPreset should apply linked Terminator presets', async () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    spyOn(app.runtime, 'applyCustomResourcesPreset').and.callFake(async (preset) => {
+      app.customResourcesPreset.set(preset);
+    });
+
+    await app.setCustomOptionsPreset('terminator');
+
+    expect(app.customOptionsPreset()).toBe('terminator');
+    expect(app.customResourcesPreset()).toBe('terminator');
+    expect(app.customSettingsPreset()).toBe('terminator');
+    expect(app.editorTestDriveDisabledBonusRollMask()).toBe(BONUS_ROLL_COP);
   });
 });

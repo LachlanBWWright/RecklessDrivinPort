@@ -241,6 +241,8 @@ export async function onCustomResourcesFileSelected(app: App, event: Event) {
     (buffer) => {
       const bytes = new Uint8Array(buffer);
       app.customResourcesName.set(file.name);
+      app.customResourcesPreset.set('uploaded');
+      app.customOptionsPreset.set('manual');
       const mod = window.Module;
       if (!mod) {
         app._pendingCustomResources = bytes;
@@ -266,5 +268,6 @@ export function clearCustomResources(app: App) {
     .catch(() => undefined);
   app.customResourcesLoaded.set(false);
   app.customResourcesName.set(null);
+  app.customResourcesPreset.set('default');
   app.statusText.set('Custom resources.dat cleared — game will use default resources on next reload.');
 }

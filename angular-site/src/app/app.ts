@@ -175,6 +175,12 @@ import {
 } from './app-road-editing';
 import { createMediaActions } from './app-media-actions';
 import { createRuntimeActions } from './app-runtime-actions';
+import {
+  BONUS_ROLL_COP,
+  type CustomOptionsPresetId,
+  type CustomResourcesPresetId,
+  type CustomSettingsPresetId,
+} from './game/game-customisation-presets';
 
 /** Worker response envelope sent from pack.worker.ts */
 /**
@@ -350,6 +356,10 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     this.editorTestDriveLevelNumberOverride.set(this.clampEditorTestDriveLevelNumber(parsed));
   }
 
+  setEditorTestDriveLevelEnabled(enabled: boolean): void {
+    this.editorTestDriveLevelEnabled.set(enabled);
+  }
+
   setEditorTestDriveUseStartY(enabled: boolean): void {
     this.editorTestDriveUseStartY.set(enabled);
   }
@@ -390,6 +400,72 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
         ? this.editorTestDriveDisabledBonusRollMask() | mask
         : this.editorTestDriveDisabledBonusRollMask() & ~mask,
     );
+  }
+
+  async setCustomOptionsPreset(preset: CustomOptionsPresetId): Promise<void> {
+    this.customOptionsPreset.set(preset);
+    if (preset === 'manual') return;
+    await this.setCustomResourcesPreset(preset === 'default' ? 'default' : 'terminator', false);
+    this.setCustomSettingsPreset(preset === 'default' ? 'default' : 'terminator', false);
+    this.customOptionsPreset.set(preset);
+  }
+
+  async setCustomResourcesPreset(
+    preset: CustomResourcesPresetId,
+    updateOptionsPreset = true,
+  ): Promise<void> {
+    await this.runtime.applyCustomResourcesPreset(preset);
+    if (updateOptionsPreset) {
+      this.syncCustomOptionsPreset();
+    }
+  }
+
+  setCustomSettingsPreset(
+    preset: CustomSettingsPresetId,
+    updateOptionsPreset = true,
+  ): void {
+    this.customSettingsPreset.set(preset);
+    switch (preset) {
+      case 'default':
+        this.editorTestDriveUseStartY.set(false);
+        this.editorTestDriveStartY.set(500);
+        this.editorTestDriveUseObjectGroupStartY.set(false);
+        this.editorTestDriveObjectGroupStartY.set(500);
+        this.editorTestDriveForcedAddOns.set(0);
+        this.editorTestDriveDisabledBonusRollMask.set(0);
+        break;
+      case 'terminator':
+        this.editorTestDriveUseStartY.set(false);
+        this.editorTestDriveStartY.set(500);
+        this.editorTestDriveUseObjectGroupStartY.set(false);
+        this.editorTestDriveObjectGroupStartY.set(500);
+        this.editorTestDriveForcedAddOns.set(0);
+        this.editorTestDriveDisabledBonusRollMask.set(BONUS_ROLL_COP);
+        break;
+      case 'manual':
+        break;
+    }
+    if (updateOptionsPreset) {
+      this.syncCustomOptionsPreset();
+    }
+  }
+
+  private syncCustomOptionsPreset(): void {
+    if (
+      this.customResourcesPreset() === 'default' &&
+      this.customSettingsPreset() === 'default'
+    ) {
+      this.customOptionsPreset.set('default');
+      return;
+    }
+    if (
+      this.customResourcesPreset() === 'terminator' &&
+      this.customSettingsPreset() === 'terminator'
+    ) {
+      this.customOptionsPreset.set('terminator');
+      return;
+    }
+    this.customOptionsPreset.set('manual');
   }
 
   onPropsInput(field: keyof import('./level-editor.service').LevelProperties, event: Event): void {
