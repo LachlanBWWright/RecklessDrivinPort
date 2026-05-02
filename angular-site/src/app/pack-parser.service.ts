@@ -86,7 +86,11 @@ export function parsePackHandle(handle: Uint8Array, resourceId: number): PackEnt
     cryptPackHandle(blob);
   }
 
-  const decompressed = packHandleDecompress(blob);
+  const decompressed = packHandleDecompress(blob).match(
+    (value) => value,
+    () => null,
+  );
+  if (!decompressed) return [];
   return decompressedPackEntries(decompressed);
 }
 

@@ -15,12 +15,17 @@
  *   LOAD                   payload: ArrayBuffer (raw resources.dat bytes)
  *   DECODE_SPRITE_PREVIEWS payload: { objectTypesArr: [number, ObjectTypeDefinition?][] }
  *   APPLY_PROPS            payload: { resourceId, props }
+ *   APPLY_ROAD_INFO        payload: { roadInfoId, roadInfo }
+ *   REMOVE_ROAD_INFO       payload: { roadInfoId }
  *   APPLY_OBJECTS          payload: { resourceId, objects }
+ *   APPLY_OBJECT_TYPES     payload: { objectTypes }
  *   APPLY_TRACK            payload: { resourceId, trackUp, trackDown }
  *   APPLY_MARKS            payload: { resourceId, marks }
  *   APPLY_ROAD_SEGS        payload: { resourceId, roadSegs }
  *   APPLY_SPRITE_BYTE      payload: { spriteId, offset, value }
- *   APPLY_TILE16_PIXELS  payload: { texId: number; pixels: Uint8ClampedArray }
+ *   APPLY_TILE16_PIXELS   payload: { texId: number; pixels: Uint8ClampedArray }
+ *   REMOVE_TILE16_TEXTURE  payload: { texId: number }
+ *   APPLY_SPRITE_PACK_PIXELS payload: { frameId: number; bitDepth: 8 | 16; pixels: Uint8ClampedArray }
  *   DECODE_ALL_ROAD_TEXTURES (no payload) → { textures: DecodedRoadTexture[] }
  *   GET_SPRITE_BYTES       payload: { spriteId }
  *   SERIALIZE              (no payload)
@@ -40,9 +45,20 @@ import {
   getRawResource, putRawResource, listResources,
   parseStrList, encodeStrList,
   listPackEntries, getPackEntryRaw, putPackEntryRaw,
+  extractObjectGroupDefinitions, applyObjectGroupDefinitions,
+  applyObjectTypeDefinitions,
 } from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
-import type { LevelProperties, ObjectPos, MarkSeg, RoadSeg, ObjectTypeDefinition, DecodedRoadTexture } from './level-editor.service';
+import type {
+  LevelProperties,
+  ObjectPos,
+  MarkSeg,
+  RoadSeg,
+  ObjectTypeDefinition,
+  DecodedRoadTexture,
+  RoadInfoData,
+  ObjectGroupDefinition,
+} from './level-editor.service';
 
 const resourceDatSvc = new ResourceDatService();
 const levelEditorSvc = new LevelEditorService();
@@ -58,12 +74,17 @@ function extractAll(): {
   levels: ReturnType<typeof levelEditorSvc.extractParsedLevels>;
   sprites: ReturnType<typeof levelEditorSvc.extractSpriteAssets>;
   objectTypesArr: [number, ObjectTypeDefinition][];
+  roadInfoArr: [number, RoadInfoData][];
+  objectGroups: ObjectGroupDefinition[];
 } {
   const objectTypesMap = levelEditorSvc.extractObjectTypeDefinitions(resources);
+  const roadInfoMap = levelEditorSvc.extractRoadInfos(resources);
   return {
     levels: levelEditorSvc.extractParsedLevels(resources),
     sprites: levelEditorSvc.extractSpriteAssets(resources),
     objectTypesArr: [...objectTypesMap.entries()],
+    roadInfoArr: [...roadInfoMap.entries()],
+    objectGroups: extractObjectGroupDefinitions(resources),
   };
 }
 
@@ -104,10 +125,23 @@ self.addEventListener('message', (event: MessageEvent) => {
     switch (cmd) {
       case 'LOAD': {
         const bytes = new Uint8Array(payload as ArrayBuffer);
-        resources = resourceDatSvc.parse(bytes);
-        const { levels, sprites, objectTypesArr } = extractAll();
+        const parsedResources = resourceDatSvc.parse(bytes).match(
+          (value) => value,
+          (error) => {
+            self.postMessage({ id, ok: false, cmd, error });
+            return null;
+          },
+        );
+        if (!parsedResources) break;
+        resources = parsedResources;
+        const { levels, sprites, objectTypesArr, roadInfoArr, objectGroups } = extractAll();
         // Reply immediately without sprite pre-decoding (sprites decode separately).
-        self.postMessage({ id, ok: true, cmd, result: { levels, sprites, objectTypesArr } });
+        self.postMessage({
+          id,
+          ok: true,
+          cmd,
+          result: { levels, sprites, objectTypesArr, roadInfoArr, objectGroups },
+        });
         break;
       }
 
@@ -168,6 +202,13 @@ self.addEventListener('message', (event: MessageEvent) => {
         break;
       }
 
+      case 'REMOVE_TILE16_TEXTURE': {
+        const { texId } = payload as { texId: number };
+        resources = levelEditorSvc.removeTile16Texture(resources, texId);
+        self.postMessage({ id, ok: true, cmd, result: {} });
+        break;
+      }
+
       case 'APPLY_PROPS': {
         const { resourceId, props } = payload as { resourceId: number; props: LevelProperties };
         resources = levelEditorSvc.applyLevelProperties(resources, resourceId, props);
@@ -176,11 +217,35 @@ self.addEventListener('message', (event: MessageEvent) => {
         break;
       }
 
+      case 'APPLY_ROAD_INFO': {
+        const { roadInfoId, roadInfo } = payload as { roadInfoId: number; roadInfo: RoadInfoData };
+        resources = levelEditorSvc.applyRoadInfoData(resources, roadInfoId, roadInfo);
+        const { roadInfoArr } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { roadInfoArr } });
+        break;
+      }
+
+      case 'REMOVE_ROAD_INFO': {
+        const { roadInfoId } = payload as { roadInfoId: number };
+        resources = levelEditorSvc.removeRoadInfoData(resources, roadInfoId);
+        const { roadInfoArr } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { roadInfoArr } });
+        break;
+      }
+
       case 'APPLY_OBJECTS': {
         const { resourceId, objects } = payload as { resourceId: number; objects: ObjectPos[] };
         resources = levelEditorSvc.applyLevelObjects(resources, resourceId, objects);
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
+        break;
+      }
+
+      case 'APPLY_OBJECT_TYPES': {
+        const { objectTypes } = payload as { objectTypes: ObjectTypeDefinition[] };
+        resources = applyObjectTypeDefinitions(resources, objectTypes);
+        const { objectTypesArr } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { objectTypesArr } });
         break;
       }
 
@@ -222,11 +287,23 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'APPLY_SPRITE_PACK_PIXELS': {
-        const { frameId, pixels } = payload as { frameId: number; pixels: Uint8ClampedArray };
-        resources = levelEditorSvc.applySpritePack16Pixels(resources, frameId, pixels);
+        const {
+          frameId,
+          bitDepth,
+          pixels,
+        } = payload as { frameId: number; bitDepth: 8 | 16; pixels: Uint8ClampedArray };
+        resources = levelEditorSvc.applySpritePackPixels(resources, frameId, bitDepth, pixels);
         // Return updated levels so canvas previews refresh
         const { levels } = extractAll();
         self.postMessage({ id, ok: true, cmd, result: { levels } });
+        break;
+      }
+
+      case 'APPLY_OBJECT_GROUPS': {
+        const { objectGroups } = payload as { objectGroups: ObjectGroupDefinition[] };
+        resources = applyObjectGroupDefinitions(resources, objectGroups);
+        const { objectGroups: updatedObjectGroups } = extractAll();
+        self.postMessage({ id, ok: true, cmd, result: { objectGroups: updatedObjectGroups } });
         break;
       }
 
@@ -239,9 +316,16 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'SERIALIZE': {
-        const serialized = resourceDatSvc.serialize(resources);
-        const transferBuf = new ArrayBuffer(serialized.byteLength);
-        new Uint8Array(transferBuf).set(serialized);
+        const serializedBytes = resourceDatSvc.serialize(resources).match(
+          (value) => value,
+          (error) => {
+            self.postMessage({ id, ok: false, cmd, error });
+            return null;
+          },
+        );
+        if (!serializedBytes) break;
+        const transferBuf = new ArrayBuffer(serializedBytes.byteLength);
+        new Uint8Array(transferBuf).set(serializedBytes);
         self.postMessage({ id, ok: true, cmd, result: transferBuf }, [transferBuf]);
         break;
       }

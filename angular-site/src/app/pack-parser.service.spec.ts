@@ -56,7 +56,10 @@ describe('encodePackHandle / decompressedPackEntries round-trip', () => {
     ];
     // resourceId 140 = unencrypted level 1
     const handle = encodePackHandle(originalEntries, 140);
-    const decompressed = packHandleDecompress(handle);
+    const decompressedResult = packHandleDecompress(handle);
+    expect(decompressedResult.isOk()).toBe(true);
+    if (decompressedResult.isErr()) return;
+    const decompressed = decompressedResult.value;
     const entries = decompressedPackEntries(decompressed);
     expect(entries.length).toBe(2);
     expect(Array.from(entries[0].data)).toEqual([10, 20, 30]);

@@ -1,0 +1,451 @@
+<mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
+  <mat-card-content class="!flex !min-h-0 !flex-1 !flex-col !p-0">
+    <div class="flex min-h-0 gap-4 max-[1100px]:flex-col">
+      <aside class="custom-scrollbar flex min-h-0 min-w-0 basis-[340px] flex-col gap-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] max-[1100px]:basis-auto">
+        <div class="flex shrink-0 items-start justify-between gap-3 pb-1">
+          <div class="min-w-0 flex-1">
+            <div class="text-base font-bold text-[var(--text)]" matTooltip="Pack 136 (kPackTx16 - 16-bit RGB555) &amp; shared road definitions from Pack 135">Road &amp; Background Tile Editor</div>
+          </div>
+        </div>
+
+        <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+          <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+            <div class="flex shrink-0 items-start justify-between gap-3 pb-1">
+              <div>
+                <div class="text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Road Records</div>
+                <div class="mt-0.5 text-[0.88rem] text-[var(--text)]">{{ roadInfoOptions.length }} roads</div>
+              </div>
+              <button
+                mat-icon-button
+                color="primary"
+                (click)="createRoadInfo.emit()"
+                [disabled]="workerBusy"
+                matTooltip="Create a new road">
+                <mat-icon>add</mat-icon>
+              </button>
+            </div>
+            @if (roadInfoOptions.length > 0) {
+              <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1 pb-1">
+                @for (option of roadInfoOptions; track option.id) {
+                  <div class="flex w-full items-center gap-3 rounded-[10px] border border-transparent bg-[var(--surface2)] px-3 py-2.5 text-left transition duration-100 ease-out hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]"
+                    [ngClass]="selectedRoadInfoId === option.id ? 'border-[color:rgba(66,165,245,0.55)] bg-[color:rgba(66,165,245,0.16)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]' : ''">
+                    <button
+                      type="button"
+                      class="flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-inherit"
+                      (click)="selectedRoadInfoIdChange.emit(option.id)">
+                      @if (option.previewUrl) {
+                        <img class="h-7 w-[54px] shrink-0 rounded-md border border-white/15 object-cover" [src]="option.previewUrl" [alt]="'Road info ' + option.id" />
+                      } @else {
+                        <span class="h-7 w-[54px] shrink-0 rounded-md border border-white/15" [style.background]="option.water ? 'linear-gradient(135deg,#0a7a1e,#354ab5)' : 'linear-gradient(135deg,#555,#2c2c2c)'"></span>
+                      }
+                      <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ option.label }}</span>
+                    </button>
+                    <span class="inline-flex items-center" [matTooltip]="getRoadDeleteTooltip(option.id)">
+                      <button
+                        type="button"
+                        mat-icon-button
+                        color="warn"
+                        [disabled]="!canDeleteRoadInfo(option.id)"
+                        (click)="$event.stopPropagation(); deleteRoadInfo.emit(option.id)"
+                        [attr.aria-label]="'Delete road ' + option.id">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-0 py-2 text-center">
+                <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">route</mat-icon>
+                <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">No shared road records are loaded yet.</p>
+                <button mat-raised-button color="primary" (click)="createRoadInfo.emit()" [disabled]="workerBusy">
+                  <mat-icon>add</mat-icon>
+                  Create First Road
+                </button>
+              </div>
+            }
+          </section>
+
+          <div class="h-px shrink-0 bg-[var(--border)]"></div>
+
+          <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+            <div class="flex shrink-0 items-start justify-between gap-3 pb-1">
+              <div>
+                <div class="text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Tile Images</div>
+                <div class="mt-0.5 text-[0.88rem] text-[var(--text)]">{{ totalTileCount }} tiles</div>
+              </div>
+              <button
+                mat-icon-button
+                color="primary"
+                [disabled]="workerBusy"
+                matTooltip="Upload a PNG to add a new 128×128 tile image"
+                (click)="addTileImage.emit()">
+                <mat-icon>add</mat-icon>
+              </button>
+            </div>
+            @if (tileTileEntries.length > 0) {
+              <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1 pb-1">
+                @for (tile of tileTileEntries; track tile.texId) {
+                  <div class="flex w-full items-center gap-3 rounded-[10px] border border-transparent bg-[var(--surface2)] px-3 py-2.5 text-left transition duration-100 ease-out hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]"
+                    [ngClass]="selectedTileId === tile.texId ? 'border-[color:rgba(66,165,245,0.55)] bg-[color:rgba(66,165,245,0.16)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]' : ''">
+                    <button
+                      type="button"
+                      class="flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-inherit"
+                      (click)="selectedTileIdChange.emit(tile.texId)"
+                      [matTooltip]="'Tile #' + tile.texId + ' · ' + tile.width + '×' + tile.height + ' px'">
+                      @if (getTileDataUrl(tile.texId); as url) {
+                        <img [src]="url" class="h-7 w-[54px] shrink-0 rounded-md border border-white/15 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Tile ' + tile.texId" />
+                      } @else {
+                        <span class="h-7 w-[54px] shrink-0 rounded-md border border-white/15 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                      }
+                      <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.92rem]">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                    </button>
+                    <span class="inline-flex items-center" [matTooltip]="getTileDeleteTooltip(tile.texId)">
+                      <button
+                        type="button"
+                        mat-icon-button
+                        color="warn"
+                        [disabled]="!canDeleteTileImage(tile.texId)"
+                        (click)="$event.stopPropagation(); deleteTileImage.emit(tile.texId)"
+                        [attr.aria-label]="'Delete tile ' + tile.texId">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-0 py-2 text-center">
+                <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">grid_on</mat-icon>
+                <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Tile images will appear here once road textures are loaded.</p>
+              </div>
+            }
+          </section>
+        </div>
+      </aside>
+
+      <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 py-4 pr-1 max-[1100px]:px-3 max-[1100px]:py-3">
+        @if (selectedRoadInfoData) {
+          <h4 class="mb-3 text-[0.88rem] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">Road {{ selectedRoadInfoData.id }}</h4>
+          <p class="text-sm leading-relaxed text-[var(--muted)]">
+            Texture references are stored with the shared road record. Physics fields remain on the Properties tab.
+          </p>
+
+          <form [formGroup]="roadTextureForm">
+            <table class="mb-4 w-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface2)] border-collapse [&_th]:border-b [&_th]:border-[var(--border)] [&_th]:bg-[var(--surface3)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-[0.75rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.05em] [&_th]:text-[var(--muted)] [&_td]:border-b [&_td]:border-[var(--border)] [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-[0.85rem] [&_td]:text-[var(--on-surface)] [&_tbody_tr:hover_td]:bg-[var(--surface3)]">
+              <tbody>
+              <tr><th colspan="2">Road Assets</th></tr>
+              <tr>
+                <td>backgroundTex</td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                    <mat-select formControlName="backgroundTex">
+                      <mat-select-trigger>
+                        @if (getTextureEntry(getRoadValue('backgroundTex')); as selectedTexture) {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(selectedTexture.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                          </span>
+                        } @else {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('backgroundTex') }}</span>
+                          </span>
+                        }
+                      </mat-select-trigger>
+                      @for (tile of tileTileEntries; track tile.texId) {
+                        <mat-option [value]="tile.texId">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(tile.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                          </span>
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>foregroundTex</td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                    <mat-select formControlName="foregroundTex">
+                      <mat-select-trigger>
+                        @if (getTextureEntry(getRoadValue('foregroundTex')); as selectedTexture) {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(selectedTexture.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                          </span>
+                        } @else {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('foregroundTex') }}</span>
+                          </span>
+                        }
+                      </mat-select-trigger>
+                      @for (tile of tileTileEntries; track tile.texId) {
+                        <mat-option [value]="tile.texId">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(tile.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                          </span>
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>roadLeftBorder</td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                    <mat-select formControlName="roadLeftBorder">
+                      <mat-select-trigger>
+                        @if (getTextureEntry(getRoadValue('roadLeftBorder')); as selectedTexture) {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(selectedTexture.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                          </span>
+                        } @else {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('roadLeftBorder') }}</span>
+                          </span>
+                        }
+                      </mat-select-trigger>
+                      @for (tile of tileTileEntries; track tile.texId) {
+                        <mat-option [value]="tile.texId">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(tile.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                          </span>
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>roadRightBorder</td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                    <mat-select formControlName="roadRightBorder">
+                      <mat-select-trigger>
+                        @if (getTextureEntry(getRoadValue('roadRightBorder')); as selectedTexture) {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(selectedTexture.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                          </span>
+                        } @else {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('roadRightBorder') }}</span>
+                          </span>
+                        }
+                      </mat-select-trigger>
+                      @for (tile of tileTileEntries; track tile.texId) {
+                        <mat-option [value]="tile.texId">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(tile.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                          </span>
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>marks</td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                    <mat-select formControlName="marks">
+                      <mat-select-trigger>
+                        @if (getTextureEntry(getRoadValue('marks')); as selectedTexture) {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(selectedTexture.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                          </span>
+                        } @else {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('marks') }}</span>
+                          </span>
+                        }
+                      </mat-select-trigger>
+                      @for (tile of tileTileEntries; track tile.texId) {
+                        <mat-option [value]="tile.texId">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(tile.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                          </span>
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>tracks</td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                    <mat-select formControlName="tracks">
+                      <mat-select-trigger>
+                        @if (getTextureEntry(getRoadValue('tracks')); as selectedTexture) {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(selectedTexture.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + selectedTexture.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getTextureLabel(selectedTexture.texId) }}</span>
+                          </span>
+                        } @else {
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
+                            <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('tracks') }}</span>
+                          </span>
+                        }
+                      </mat-select-trigger>
+                      @for (tile of tileTileEntries; track tile.texId) {
+                        <mat-option [value]="tile.texId">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            @if (getTileDataUrl(tile.texId); as url) {
+                              <img [src]="url" class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover" [style.imageRendering]="'pixelated'" [alt]="'Texture ' + tile.texId" />
+                            } @else {
+                              <span class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"></span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span>
+                          </span>
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </tr>
+              <tr>
+                <td>skidSound</td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                    <mat-select formControlName="skidSound">
+                      <mat-select-trigger>
+                        <span class="inline-flex w-full min-w-0 items-center gap-2">
+                          <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
+                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(getRoadValue('skidSound')) }}</span>
+                        </span>
+                      </mat-select-trigger>
+                      @for (audio of audioEntries; track audio.id) {
+                        <mat-option [value]="audio.id">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(audio.id) }}</span>
+                          </span>
+                        </mat-option>
+                      }
+                      @if (!getAudioEntry(getRoadValue('skidSound'))) {
+                        <mat-option [value]="getRoadValue('skidSound')">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('skidSound') }} (custom)</span>
+                          </span>
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </form>
+        } @else {
+          <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
+            <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">route</mat-icon>
+            <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Select a road record to edit its tile assignments.</p>
+          </div>
+        }
+
+        @if (selectedTileId !== null) {
+          <div class="flex min-w-[220px] flex-1 flex-col items-start gap-2 overflow-y-auto">
+            @if (getTileDataUrl(selectedTileId); as url) {
+              <img [src]="url" class="block max-h-[220px] max-w-[220px] rounded-md border border-[var(--border)] bg-[var(--bg)] p-2 [image-rendering:pixelated]" [style.imageRendering]="'pixelated'" alt="tile preview" />
+            } @else {
+              <div class="flex min-h-[220px] min-w-[220px] items-center justify-center gap-2 text-[var(--muted)]">
+                <mat-icon>grid_view</mat-icon>
+                <span>Preview loading...</span>
+              </div>
+            }
+            <mat-card class="w-full !border !border-[var(--border)] !bg-[var(--surface3)]">
+              <mat-card-content class="!px-3.5 !py-2.5">
+                <p class="m-0 text-[0.82rem] leading-[1.7] text-[var(--on-surface)] [&_strong]:font-semibold [&_strong]:text-[var(--muted)]">
+                  <strong>Tile</strong> #{{ selectedTileId }}<br>
+                  <strong>Size</strong> {{ selectedTileDimensions }}<br>
+                  <strong>Format</strong> RGB555 (16-bit)
+                </p>
+              </mat-card-content>
+            </mat-card>
+            <div class="flex flex-wrap gap-2">
+              <button mat-raised-button color="primary"
+                (click)="openTileEditor.emit(selectedTileId)"
+                [disabled]="workerBusy"
+                matTooltip="Open pixel editor for this tile">
+                <mat-icon>brush</mat-icon> Edit Pixels
+              </button>
+              <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
+                (change)="tilePngUpload.emit({ event: $event, texId: selectedTileId })" />
+              <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy"
+                matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
+                <mat-icon>upload</mat-icon> Upload PNG
+              </button>
+              <button mat-stroked-button (click)="exportTilePng.emit(selectedTileId)">
+                <mat-icon>download</mat-icon> Export PNG
+              </button>
+            </div>
+          </div>
+        } @else {
+          <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
+          </div>
+        }
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>

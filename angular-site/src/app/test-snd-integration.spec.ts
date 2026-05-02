@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'fs';
 import { packHandleDecompress } from './lzrw.service';
@@ -79,7 +81,9 @@ describe('tSound full parsing', () => {
   beforeAll(() => {
     const raw = findPack(134);
     if (!raw) return;
-    const decompressed = packHandleDecompress(raw);
+    const decompressedResult = packHandleDecompress(raw);
+    if (decompressedResult.isErr()) return;
+    const decompressed = decompressedResult.value;
     entries = decompressedPackEntries(decompressed);
   });
 

@@ -16,6 +16,8 @@
  *   packHandleCompress(data)  – encode as FLAG_COPY (uncompressed) handle for round-trip writes
  */
 
+import { err, ok, type Result } from 'neverthrow';
+
 const HASH_TABLE_LEN = 4096;
 const DEPTH_BITS = 3;
 const DEPTH = 1 << DEPTH_BITS; // 8
@@ -152,14 +154,14 @@ export function lzrw3aDecompress(src: Uint8Array): Uint8Array {
  *
  * Handle format: [4-byte BE uint32 uncompressed_size] [FLAG_BYTE…payload]
  */
-export function packHandleDecompress(handle: Uint8Array): Uint8Array {
-  if (handle.length < 5) throw new Error('Pack handle too short');
+export function packHandleDecompress(handle: Uint8Array): Result<Uint8Array, string> {
+  if (handle.length < 5) return err('Pack handle too short');
 
   const view = new DataView(handle.buffer, handle.byteOffset, handle.byteLength);
   const uncompressedSize = view.getUint32(0, false); // big-endian
 
   if (uncompressedSize > 32 * 1024 * 1024) {
-    throw new Error(`Suspicious uncompressed size: ${uncompressedSize}`);
+    return err(`Suspicious uncompressed size: ${uncompressedSize}`);
   }
 
   const payload = handle.slice(4); // [FLAG_BYTE][…]
@@ -172,7 +174,7 @@ export function packHandleDecompress(handle: Uint8Array): Uint8Array {
     );
   }
 
-  return decompressed;
+  return ok(decompressed);
 }
 
 /**
@@ -197,49 +199,139 @@ export function packHandleCompress(data: Uint8Array): Uint8Array {
 }
 
 /**
- * LZRW3-A compressor – emits literal-only compressed stream (FLAG_BYTE=0).
- * Falls back to FLAG_COPY if all-literal output would be larger than the input.
+ * LZRW3-A compressor with hash-table back-reference matching.
  *
- * All items are emitted as literals (control bit = 0). This produces valid
- * LZRW3-A compressed data (no back-references) that any LZRW3-A decompressor
- * can decode. The format uses FLAG_BYTE=0 (matching the original game's
- * resources.dat format) rather than FLAG_COPY (FLAG_BYTE=1).
+ * Maintains the hash table using EXACTLY the same update rules as the decompressor
+ * (lazy literal hashing, copy flush) so that encoded copy-item indices are always valid.
  *
- * Returns FLAG_BYTES + payload where FLAG_BYTES[0]=0 (LZRW3-A compressed).
+ * Falls back to FLAG_COPY if the compressed output is not smaller than the raw input.
+ *
+ * Returns FLAG_BYTES prefix + payload.
  */
 export function lzrw3aCompress(src: Uint8Array): Uint8Array {
   const srcLen = src.length;
   if (srcLen === 0) {
-    // Empty input: use all-literal compressed encoding with no groups
     const out = new Uint8Array(FLAG_BYTES);
-    out[0] = 0; // FLAG_BYTE = 0 (LZRW3-A compressed)
+    out[0] = 0;
     return out;
   }
 
-  // All-literal LZRW3-A stream:
-  // FLAG_BYTES + ceil(srcLen/16) control words (2 bytes each) + srcLen literal bytes
-  const numGroups = Math.ceil(srcLen / 16);
-  const dstSize = FLAG_BYTES + numGroups * 2 + srcLen;
+  // combined buffer: START_STRING (18) + full source copy
+  // This mirrors the decompressor's combined buffer (START_STRING + decoded output).
+  // Since the compressor encodes in order, combined[18+i] == decompressed[i] == src[i].
+  const combinedOff = START_STRING_LEN; // 18
+  const combined = new Uint8Array(combinedOff + srcLen);
+  combined.set(START_STRING, 0);
+  combined.set(src, combinedOff);
+
+  // Hash table and cycle: identical to decompressor state.
+  const hashTable = new Int32Array(HASH_TABLE_LEN); // all 0 initially
+  let cycle = 0;
+  // "Pending literal" counter – mirrors the decompressor's `literals` variable.
+  let pendingLiterals = 0;
+
+  const updateHash = (iBase: number, ptr: number): void => {
+    hashTable[iBase + cycle] = ptr;
+    cycle = (cycle + 1) & DEPTH_MASK;
+  };
+
+  /**
+   * Flush pending literal hashings (up to 2 positions), then update hash at cPos.
+   * This matches the copy-item hash update in the decompressor exactly.
+   */
+  const flushAndUpdateForCopy = (cPos: number): void => {
+    if (pendingLiterals > 0) {
+      const r = cPos - pendingLiterals;
+      updateHash(lzrwHash(combined, r), r);
+      if (pendingLiterals === 2) {
+        updateHash(lzrwHash(combined, r + 1), r + 1);
+      }
+      pendingLiterals = 0;
+    }
+    updateHash(lzrwHash(combined, cPos) & ~DEPTH_MASK, cPos);
+  };
+
+  // Worst-case: all literals → FLAG_BYTES + ceil(n/16)*2 + n bytes.
+  const maxDst = FLAG_BYTES + Math.ceil(srcLen / 16) * 2 + srcLen + 64;
+  const dst = new Uint8Array(maxDst);
+  dst[0] = 0; // FLAG_BYTE = 0 (LZRW3-A)
+
+  let pSrc = 0;
+  let pDst = FLAG_BYTES;
+
+  while (pSrc < srcLen) {
+    const ctrlOff = pDst; // reserve 2 bytes for control word
+    pDst += 2;
+    let ctrl = 0;
+
+    for (let item = 0; item < 16 && pSrc < srcLen; item++) {
+      const cPos = combinedOff + pSrc;
+
+      // Need at least 3 bytes ahead to compute a meaningful hash.
+      if (pSrc + 2 < srcLen) {
+        const iBase = lzrwHash(combined, cPos);
+
+        // Search DEPTH slots for the best match.
+        let bestLen = 2; // minimum useful match = 3; start below threshold
+        let bestIdx = -1;
+        const maxMatchLen = Math.min(18, srcLen - pSrc);
+
+        for (let d = 0; d < DEPTH; d++) {
+          const idx = iBase + d;
+          const pos = hashTable[idx];
+          // Only use positions that are strictly before the current position.
+          // Also skip positions so close that they'd require an overlapping copy
+          // that the decompressor can't faithfully reproduce (match <= distance case).
+          if (pos > 0 && pos < cPos) {
+            const dist = cPos - pos;
+            // Limit match length to avoid overlap beyond what RLE can faithfully reproduce.
+            const safeMax = Math.min(maxMatchLen, dist >= 3 ? maxMatchLen : dist);
+            let mLen = 0;
+            while (mLen < safeMax && combined[pos + mLen] === combined[cPos + mLen]) {
+              mLen++;
+            }
+            if (mLen >= 3 && mLen > bestLen) {
+              bestLen = mLen;
+              bestIdx = idx;
+            }
+          }
+        }
+
+        if (bestIdx >= 0) {
+          // Emit a copy item (control bit = 1).
+          ctrl |= (1 << item);
+          flushAndUpdateForCopy(cPos);
+          const I = bestIdx; // 12-bit hash table index
+          dst[pDst++] = ((I >> 4) & 0xF0) | (bestLen - 3);
+          dst[pDst++] = I & 0xFF;
+          pSrc += bestLen;
+          continue;
+        }
+      }
+
+      // Emit a literal (control bit = 0).
+      dst[pDst++] = src[pSrc++];
+      if (++pendingLiterals === 3) {
+        const r = combinedOff + pSrc - 3;
+        updateHash(lzrwHash(combined, r), r);
+        pendingLiterals = 2;
+      }
+    }
+
+    // Write control word (little-endian).
+    dst[ctrlOff]     = ctrl & 0xFF;
+    dst[ctrlOff + 1] = (ctrl >> 8) & 0xFF;
+  }
+
+  const compressed = dst.slice(0, pDst);
+
+  // Fall back to FLAG_COPY if compression didn't help.
   const copySize = FLAG_BYTES + srcLen;
-  if (dstSize >= copySize) {
+  if (compressed.length >= copySize) {
     const copy = new Uint8Array(copySize);
     copy[0] = FLAG_COPY;
     copy.set(src, FLAG_BYTES);
     return copy;
   }
-  const dst = new Uint8Array(dstSize);
-  dst[0] = 0; // FLAG_BYTE = 0 (LZRW3-A compressed, not FLAG_COPY)
-  // bytes 1-3 remain 0 (FLAG_BYTES padding)
-  let pSrc = 0;
-  let pDst = FLAG_BYTES;
-  for (let g = 0; g < numGroups; g++) {
-    // Control word = 0x0000 (all 16 bits = 0 → all items are literals)
-    dst[pDst++] = 0;
-    dst[pDst++] = 0;
-    const items = Math.min(16, srcLen - pSrc);
-    for (let i = 0; i < items; i++) {
-      dst[pDst++] = src[pSrc++];
-    }
-  }
-  return dst.slice(0, pDst);
+  return compressed;
 }

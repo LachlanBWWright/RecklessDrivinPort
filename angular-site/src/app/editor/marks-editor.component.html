@@ -1,0 +1,55 @@
+<!-- Marks (checkpoint) editor — expansion panel -->
+<mat-expansion-panel class="!rounded-none !border !border-t-0 !border-[#2e2e2e] !bg-[var(--surface)]" [expanded]="false">
+  <mat-expansion-panel-header class="!h-10 !bg-[var(--surface)] !text-[0.82rem]">
+    <mat-panel-title>
+      <span class="flex items-center gap-1 text-[0.82rem] text-[var(--muted)]"><mat-icon class="!h-[18px] !w-[18px] !text-[18px]">edit_location</mat-icon>Checkpoint / Mark Segments</span>
+    </mat-panel-title>
+    <mat-panel-description><span class="ml-1.5 inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 align-middle text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]">{{ marks.length }}</span></mat-panel-description>
+  </mat-expansion-panel-header>
+
+  @if (selectedMark; as mark) {
+    <form class="mb-2.5 grid grid-cols-4 gap-2 max-md:grid-cols-2 max-sm:grid-cols-1" [formGroup]="markForm">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>P1 X</mat-label>
+        <input matInput type="number" formControlName="x1" inputmode="numeric" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>P1 Y</mat-label>
+        <input matInput type="number" formControlName="y1" inputmode="numeric" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>P2 X</mat-label>
+        <input matInput type="number" formControlName="x2" inputmode="numeric" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>P2 Y</mat-label>
+        <input matInput type="number" formControlName="y2" inputmode="numeric" />
+      </mat-form-field>
+    </form>
+  }
+
+  <div class="custom-scrollbar mt-2 max-h-[200px] overflow-y-auto rounded border border-[#2a2a2a]">
+    <!-- Plain HTML table — no mat-table overhead -->
+    <table class="w-full border-collapse bg-[#171717] text-[0.78rem]">
+      <thead>
+        <tr class="[&_th]:border-b [&_th]:border-[#2a2a2a] [&_th]:bg-[var(--surface)] [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:text-[0.7rem] [&_th]:font-semibold [&_th]:text-[#555]"> <th>#</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th></tr>
+      </thead>
+      <tbody>
+        @for (mark of marks; track $index) {
+          <tr class="h-[30px] [&_td]:border-b [&_td]:border-[#1e1e1e] [&_td]:px-2 [&_td]:py-1 [&_td]:text-[#aaa] hover:[&_td]:bg-[#222]"
+              [ngClass]="selectedMarkIndex === $index ? '[&_td]:bg-red-600/15 [&_td]:text-[var(--on-surface)]' : ''"
+              (click)="markSelected.emit($index)" style="cursor:pointer">
+            <td>{{ $index }}</td>
+            <td>{{ mark.x1 }}</td>
+            <td>{{ mark.y1 }}</td>
+            <td>{{ mark.x2 }}</td>
+            <td>{{ mark.y2 }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (marks.length === 0) {
+      <p class="p-3 text-center text-[0.78rem] text-[#555]">No mark segments. Use the toolbar <strong>add_location</strong> button to create one.</p>
+    }
+  </div>
+</mat-expansion-panel>

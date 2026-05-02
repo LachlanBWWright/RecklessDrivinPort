@@ -2,6 +2,7 @@ import {
   clampBarrierPoint,
   generateCentreDashMarkings,
   generateSideMarkings,
+  removeMarkingsInYRange,
   sampleQuadraticBezier,
 } from './road-marking-utils';
 
@@ -32,18 +33,26 @@ describe('sampleQuadraticBezier', () => {
 });
 
 describe('generateSideMarkings', () => {
-  it('creates side markings for a merged single road', () => {
+  it('creates dashed side markings for a merged single road', () => {
     const roadSegs = [
       { v0: -100, v1: 0, v2: 0, v3: 100 },
       { v0: -100, v1: 0, v2: 0, v3: 100 },
       { v0: -100, v1: 0, v2: 0, v3: 100 },
+      { v0: -100, v1: 0, v2: 0, v3: 100 },
+      { v0: -100, v1: 0, v2: 0, v3: 100 },
     ];
-    const marks = generateSideMarkings(roadSegs, { roadSelection: 'single', yStart: 0, yEnd: 4, inset: 10 });
+    const marks = generateSideMarkings(roadSegs, {
+      roadSelection: 'single',
+      yStart: 0,
+      yEnd: 8,
+      inset: 10,
+      yFrequency: 4,
+    });
     expect(marks).toEqual([
       { x1: -90, y1: 0, x2: -90, y2: 2 },
-      { x1: -90, y1: 2, x2: -90, y2: 4 },
+      { x1: -90, y1: 4, x2: -90, y2: 6 },
       { x1: 90, y1: 0, x2: 90, y2: 2 },
-      { x1: 90, y1: 2, x2: 90, y2: 4 },
+      { x1: 90, y1: 4, x2: 90, y2: 6 },
     ]);
   });
 });
@@ -51,9 +60,34 @@ describe('generateSideMarkings', () => {
 describe('generateCentreDashMarkings', () => {
   it('creates dashed center markings for both split roads', () => {
     const roadSegs = Array.from({ length: 8 }, () => ({ v0: -100, v1: -20, v2: 20, v3: 100 }));
-    const marks = generateCentreDashMarkings(roadSegs, { roadSelection: 'both', yStart: 0, yEnd: 14, dashFrequency: 8 });
-    expect(marks.length).toBeGreaterThan(0);
-    expect(marks.some((mark) => mark.x1 === -60 || mark.x2 === -60)).toBe(true);
-    expect(marks.some((mark) => mark.x1 === 60 || mark.x2 === 60)).toBe(true);
+    const marks = generateCentreDashMarkings(roadSegs, {
+      roadSelection: 'both',
+      yStart: 0,
+      yEnd: 14,
+      dashLength: 3,
+      gapLength: 5,
+    });
+    expect(marks).toEqual([
+      { x1: -60, y1: 0, x2: -60, y2: 3 },
+      { x1: -60, y1: 8, x2: -60, y2: 11 },
+      { x1: 60, y1: 0, x2: 60, y2: 3 },
+      { x1: 60, y1: 8, x2: 60, y2: 11 },
+    ]);
+  });
+});
+
+describe('removeMarkingsInYRange', () => {
+  it('removes only segments whose endpoints both fall within the inclusive y range', () => {
+    const marks = [
+      { x1: 0, y1: 10, x2: 10, y2: 20 },
+      { x1: 0, y1: 20, x2: 10, y2: 30 },
+      { x1: 0, y1: 30, x2: 10, y2: 40 },
+      { x1: 0, y1: 35, x2: 10, y2: 55 },
+    ];
+
+    expect(removeMarkingsInYRange(marks, { yStart: 20, yEnd: 40 })).toEqual([
+      { x1: 0, y1: 10, x2: 10, y2: 20 },
+      { x1: 0, y1: 35, x2: 10, y2: 55 },
+    ]);
   });
 });

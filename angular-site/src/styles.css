@@ -1,0 +1,235 @@
+@import '@angular/material/prebuilt-themes/pink-bluegrey.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --accent: #e53935;
+    --accent-light: #ef9a9a;
+    --accent2: #42a5f5;
+    --accent3: #66bb6a;
+    --bg: #0e0e0e;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --surface3: #2a2a2a;
+    --surface4: #333333;
+    --text: #f0f0f0;
+    --on-surface: #f0f0f0;
+    --muted: #8a8a8a;
+    --border: #383838;
+    --success: #66bb6a;
+    --warn: #ffa726;
+    --danger: #ef5350;
+    --track-up: #42a5f5;
+    --track-down: #ef5350;
+    --track-mark: #ffeb3b;
+  }
+}
+
+.mat-mdc-form-field {
+  --mdc-filled-text-field-container-color: var(--surface);
+  --mdc-outlined-text-field-outline-color: var(--border);
+  --mdc-outlined-text-field-hover-outline-color: var(--surface4);
+  --mdc-outlined-text-field-focus-outline-color: var(--accent2);
+  --mdc-outlined-text-field-input-text-color: var(--on-surface);
+  --mdc-outlined-text-field-label-text-color: var(--muted);
+}
+
+.mat-mdc-card {
+  --mdc-elevated-card-container-color: var(--surface);
+  --mat-card-filled-container-color: var(--surface) !important;
+  --mat-card-elevated-container-color: var(--surface) !important;
+  background-color: var(--surface) !important;
+}
+
+.mat-mdc-tab-group,
+.mat-mdc-tab-nav-bar {
+  --mat-tab-header-active-label-text-color: var(--accent);
+  --mat-tab-header-active-indicator-color: var(--accent);
+  --mat-tab-header-inactive-label-text-color: var(--muted);
+  --mdc-tab-indicator-active-indicator-color: var(--accent);
+}
+
+.mat-mdc-table {
+  --mat-table-background-color: var(--surface);
+  --mat-table-header-headline-color: var(--muted);
+  --mat-table-row-item-label-text-color: var(--on-surface);
+}
+
+.mat-expansion-panel {
+  --mat-expansion-container-background-color: var(--surface);
+  --mat-expansion-header-text-color: var(--muted);
+}
+
+.mat-mdc-slider {
+  --mdc-slider-active-track-color: var(--accent);
+  --mdc-slider-inactive-track-color: var(--surface4);
+  --mdc-slider-handle-color: var(--accent);
+  --mdc-slider-hover-handle-color: var(--accent);
+  --mdc-slider-focus-handle-color: var(--accent-light);
+  --mdc-slider-with-tick-marks-active-container-color: var(--accent);
+  --mdc-slider-with-tick-marks-inactive-container-color: var(--surface4);
+}
+
+.mat-mdc-progress-bar {
+  --mdc-linear-progress-active-indicator-color: var(--accent);
+  --mdc-linear-progress-track-color: var(--surface3);
+}
+
+.mat-toolbar {
+  --mat-toolbar-container-background-color: var(--bg);
+  --mat-toolbar-container-text-color: var(--on-surface);
+  background-color: var(--bg) !important;
+  color: var(--on-surface) !important;
+}
+
+.mat-toolbar.mat-primary {
+  --mat-toolbar-container-background-color: var(--bg) !important;
+  --mat-toolbar-container-text-color: var(--on-surface) !important;
+  background-color: var(--bg) !important;
+}
+
+.mat-mdc-raised-button.mat-primary,
+.mat-mdc-unelevated-button.mat-primary {
+  --mat-button-protected-container-color: var(--accent) !important;
+  --mat-button-filled-container-color: var(--accent) !important;
+  --mat-button-protected-label-text-color: #fff !important;
+  --mat-button-filled-label-text-color: #fff !important;
+}
+
+.mat-mdc-raised-button.mat-accent,
+.mat-mdc-unelevated-button.mat-accent {
+  --mat-button-protected-container-color: var(--accent2) !important;
+  --mat-button-filled-container-color: var(--accent2) !important;
+  --mat-button-protected-label-text-color: #fff !important;
+  --mat-button-filled-label-text-color: #fff !important;
+}
+
+.mat-mdc-outlined-button.mat-warn,
+.mat-mdc-outlined-button.mat-primary,
+.mat-mdc-button.mat-primary,
+.mat-mdc-icon-button.mat-primary,
+.mat-mdc-icon-button.mat-warn {
+  --mat-button-outlined-label-text-color: var(--accent) !important;
+  --mat-button-outlined-state-layer-color: var(--accent) !important;
+  --mat-button-outlined-ripple-color: color-mix(in srgb, var(--accent) 12%, transparent) !important;
+}
+
+.mat-mdc-outlined-button.mat-warn,
+.mat-mdc-icon-button.mat-warn {
+  --mat-button-outlined-label-text-color: var(--danger) !important;
+  --mat-button-outlined-state-layer-color: var(--danger) !important;
+  --mat-button-outlined-ripple-color: color-mix(in srgb, var(--danger) 12%, transparent) !important;
+}
+
+.mat-mdc-icon-button.mat-primary {
+  color: var(--accent) !important;
+}
+
+.mat-mdc-icon-button.mat-warn {
+  color: var(--danger) !important;
+}
+
+@layer base {
+  html {
+    height: 100%;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    display: flex;
+    height: 100dvh;
+    width: 100%;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  canvas:focus {
+    outline: none;
+  }
+}
+
+@layer components {
+  .type-id-select-panel {
+    max-width: min(100vw - 32px, 520px);
+  }
+
+  .type-id-select-panel .mat-mdc-option {
+    min-height: 30px;
+    height: 30px;
+    align-items: center;
+  }
+
+  .type-id-select-panel .mat-mdc-option .mdc-list-item__primary-text,
+  .object-group-type-select-panel .mat-mdc-option .mdc-list-item__primary-text {
+    width: 100%;
+    display: block;
+    overflow: hidden;
+  }
+
+  .object-group-type-select-panel.mat-mdc-select-panel {
+    max-height: 360px;
+  }
+
+  .object-group-type-select-panel .mat-mdc-option {
+    min-height: 40px;
+  }
+
+  .object-type-frame-select-panel.mat-mdc-select-panel {
+    max-height: 320px;
+  }
+
+  .object-type-frame-select-panel .mat-mdc-option {
+    min-height: 36px;
+  }
+
+  .snack-success .mdc-snackbar__surface {
+    border: 1px solid #2e6b2e !important;
+    background: #1b3a1b !important;
+    color: #a5d6a7 !important;
+  }
+
+  .snack-error .mdc-snackbar__surface {
+    border: 1px solid #7c2626 !important;
+    background: #3a1b1b !important;
+    color: #ef9a9a !important;
+  }
+}
+
+@layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface4) var(--bg);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--bg);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--surface4);
+    border-radius: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+  }
+}

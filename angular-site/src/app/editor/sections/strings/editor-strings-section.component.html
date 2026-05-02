@@ -1,0 +1,68 @@
+<mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
+  <mat-card-content class="!flex !min-h-0 !flex-1 !flex-col !p-0">
+    @if (strings !== null) {
+      <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div
+              class="text-base font-bold text-[var(--text)]"
+              matTooltip="STR# #128 – 128 Mac keyboard key-name strings used by input mapping. Index matches the Mac virtual key code.">
+              Key Name Strings <span class="ml-2 text-[0.76rem] font-normal text-[var(--muted)]">(STR# #128 · {{ strings.length }} strings)</span>
+            </div>
+            <div class="mt-1 text-[0.72rem] text-[var(--muted)]">Maps Mac virtual key codes (0–127) to display names used for in-game key-binding labels.</div>
+          </div>
+          <button
+            mat-flat-button
+            color="primary"
+            [disabled]="busy || !dirty"
+            (click)="save.emit()">
+            <mat-icon>save</mat-icon>
+            Save
+          </button>
+        </div>
+
+        <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
+          @for (str of strings; track trackByIndex($index)) {
+            <div class="flex items-center gap-3 rounded-lg border border-transparent bg-[var(--surface2)] px-3 py-1.5 hover:border-white/10">
+              <span class="w-8 shrink-0 text-right font-mono text-[0.72rem] text-[var(--muted)]">{{ $index }}</span>
+              <input
+                type="text"
+                class="min-w-0 flex-1 rounded bg-transparent font-mono text-[0.88rem] text-[var(--text)] outline-none focus:ring-1 focus:ring-[color:rgba(66,165,245,0.6)] px-1"
+                [value]="str"
+                [disabled]="busy"
+                (input)="onInput($index, $event)"
+              />
+              <button
+                mat-icon-button
+                class="!flex !h-7 !w-7 !min-w-0 shrink-0 items-center justify-center opacity-50 hover:opacity-100"
+                [disabled]="busy"
+                matTooltip="Remove string at index {{ $index }}"
+                (click)="removeString.emit($index)">
+                <mat-icon class="!flex !h-[16px] !w-[16px] !text-[16px] items-center justify-center !leading-none">close</mat-icon>
+              </button>
+            </div>
+          }
+          <div class="mt-2 flex justify-start">
+            <button
+              mat-stroked-button
+              [disabled]="busy"
+              (click)="addString.emit()">
+              <mat-icon>add</mat-icon>
+              Add string
+            </button>
+          </div>
+        </div>
+      </div>
+    } @else {
+      <div class="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+        @if (busy) {
+          <mat-spinner diameter="32"></mat-spinner>
+          <p class="text-[0.85rem] text-[var(--muted)]">Loading string resources…</p>
+        } @else {
+          <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">text_fields</mat-icon>
+          <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">String resources will appear here once a resources.dat is loaded.</p>
+        }
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

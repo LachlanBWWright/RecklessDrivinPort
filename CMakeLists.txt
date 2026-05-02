@@ -226,7 +226,7 @@ if(EMSCRIPTEN)
         "-s INITIAL_MEMORY=67108864"
         "-s WASM=1"
         "-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap]"
-        "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume]"
+        "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive]"
         "-s ASYNCIFY=1"
         "-s ASYNCIFY_STACK_SIZE=1048576"
         "--preload-file ${CMAKE_SOURCE_DIR}/port/resources/resources.dat@/resources.dat"

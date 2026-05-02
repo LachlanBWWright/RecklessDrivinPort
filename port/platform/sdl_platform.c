@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <time.h>
 
 /* Include Mac compat types */
@@ -926,7 +927,7 @@ void Blit2Screen(void) {
         /* Convert 8-bit indexed → 32-bit ARGB */
         SDL_BlitSurface(s_surface, NULL, s_rgb_surface, NULL);
     } else {
-        /* ---- 16-bit XRGB1555 hi-color path ---- */
+        /* ---- 16-bit RGB555 hi-color path ---- */
         if (SDL_LockSurface(s_rgb_surface) == 0) {
             for (y = 0; y < gYSize; y++) {
                 Uint32 *dst = (Uint32 *)((UInt8 *)s_rgb_surface->pixels
@@ -934,9 +935,9 @@ void Blit2Screen(void) {
                 const UInt16 *src = (const UInt16 *)(s_back_buffer + y * gRowBytes);
                 int x;
                 for (x = 0; x < gXSize; x++) {
-                    /* Mac stored XRGB1555 big-endian; swap to native LE before extracting RGB */
-                    UInt16 p = be16_swap(src[x]);
-                    /* XRGB1555: bits 14-10=R, 9-5=G, 4-0=B */
+                    /* Back buffer stores native RGB555 values. */
+                    UInt16 p = src[x];
+                    /* RGB555: bits 14-10=R, 9-5=G, 4-0=B */
                     Uint8 r = (Uint8)(((p >> 10) & 0x1F) << 3);
                     Uint8 g = (Uint8)(((p >>  5) & 0x1F) << 3);
                     Uint8 b = (Uint8)(( p        & 0x1F) << 3);
@@ -1945,12 +1946,26 @@ void set_wasm_master_volume(float vol) {
 #include "initexit.h"
 
 static int s_initialized = 0;
+static int s_editorLaunchChecked = 0;
 
 /* Called once per frame by Emscripten */
 static void emscripten_main_loop(void) {
     if (!s_initialized) return;
     extern int gGameOn;
     extern int gExit;
+    /* On the very first tick after Init() completes, check if an editor
+     * test-drive launch was requested (set by rd_set_editor_launch_options
+     * from JavaScript in onRuntimeInitialized).  Doing this here – rather
+     * than from JS – avoids the timing race where the JS setTimeout(0)
+     * fires before main()/Init() has finished. */
+    if (!s_editorLaunchChecked) {
+        s_editorLaunchChecked = 1;
+        if (!gGameOn && gEditorLaunchOptions.enabled && gEditorLaunchOptions.autoStart) {
+            EM_ASM({ console.log('[WASM] Editor test-drive auto-start on first tick'); });
+            StartGame(1);
+            return; /* StartGame → LoadLevel sets gGameOn; next tick will run GameFrame */
+        }
+    }
     /* Process pending sound callbacks */
     sdl_audio_process_callbacks();
     if (gExit) {
@@ -2004,9 +2019,134 @@ int main(int argc, char *argv[]) {
 #include "interface.h"
 #include "gameinitexit.h"
 #include "initexit.h"
+#include "objects.h"
+
+static int parse_int_arg(const char *text, int *out_value)
+{
+    char *end_ptr = NULL;
+    long value;
+
+    if (!text || !*text) return 0;
+
+    value = strtol(text, &end_ptr, 10);
+    if (!end_ptr || *end_ptr != '\0') return 0;
+    if (value < INT_MIN || value > INT_MAX) return 0;
+
+    *out_value = (int)value;
+    return 1;
+}
+
+static UInt32 parse_forced_addon_mask(const char *name)
+{
+    if (!name) return 0;
+    if (strcmp(name, "lock") == 0) return kAddOnLock;
+    if (strcmp(name, "cop") == 0 || strcmp(name, "police-jammer") == 0) return kAddOnCop;
+    if (strcmp(name, "turbo") == 0 || strcmp(name, "turbo-engine") == 0) return kAddOnTurbo;
+    if (strcmp(name, "spikes") == 0) return kAddOnSpikes;
+    return 0;
+}
+
+static UInt32 parse_bonus_roll_mask(const char *name)
+{
+    if (!name) return 0;
+    if (strcmp(name, "lock") == 0) return kBonusRollLock;
+    if (strcmp(name, "mines") == 0 || strcmp(name, "mine") == 0) return kBonusRollMines;
+    if (strcmp(name, "missiles") == 0 || strcmp(name, "missile") == 0) return kBonusRollMissiles;
+    if (strcmp(name, "spikes") == 0) return kBonusRollSpikes;
+    if (strcmp(name, "cop") == 0 || strcmp(name, "police-jammer") == 0) return kBonusRollCop;
+    if (strcmp(name, "turbo") == 0 || strcmp(name, "turbo-engine") == 0) return kBonusRollTurbo;
+    if (strcmp(name, "score") == 0 || strcmp(name, "award") == 0) return kBonusRollScore;
+    if (strcmp(name, "extra-life") == 0 || strcmp(name, "life") == 0) return kBonusRollExtraLife;
+    return 0;
+}
+
+static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOptions *out_options)
+{
+    tEditorLaunchOptions options = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    int has_any = 0;
+    int i;
+
+    for (i = 1; i < argc; i++) {
+        int parsed_value;
+        UInt32 parsed_mask;
+
+        if (strcmp(argv[i], "--level") == 0) {
+            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value)) {
+                fprintf(stderr, "[RecklessDrivin] Invalid value for --level\n");
+                return 0;
+            }
+            options.levelID = parsed_value - 1;
+            options.enabled = 1;
+            options.autoStart = 1;
+            has_any = 1;
+            i++;
+            continue;
+        }
+        if (strcmp(argv[i], "--start-y") == 0) {
+            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value)) {
+                fprintf(stderr, "[RecklessDrivin] Invalid value for --start-y\n");
+                return 0;
+            }
+            options.hasStartY = 1;
+            options.startY = parsed_value;
+            options.enabled = 1;
+            has_any = 1;
+            i++;
+            continue;
+        }
+        if (strcmp(argv[i], "--object-group-start-y") == 0) {
+            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value)) {
+                fprintf(stderr, "[RecklessDrivin] Invalid value for --object-group-start-y\n");
+                return 0;
+            }
+            options.hasObjectGroupStartY = 1;
+            options.objectGroupStartY = parsed_value;
+            options.enabled = 1;
+            has_any = 1;
+            i++;
+            continue;
+        }
+        if (strcmp(argv[i], "--force-addon") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "[RecklessDrivin] Missing value for --force-addon\n");
+                return 0;
+            }
+            parsed_mask = parse_forced_addon_mask(argv[i + 1]);
+            if (!parsed_mask) {
+                fprintf(stderr, "[RecklessDrivin] Unknown addon for --force-addon: %s\n", argv[i + 1]);
+                return 0;
+            }
+            options.forcedAddOns |= parsed_mask;
+            options.enabled = 1;
+            has_any = 1;
+            i++;
+            continue;
+        }
+        if (strcmp(argv[i], "--disable-addon") == 0 || strcmp(argv[i], "--disable-roll") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "[RecklessDrivin] Missing value for %s\n", argv[i]);
+                return 0;
+            }
+            parsed_mask = parse_bonus_roll_mask(argv[i + 1]);
+            if (!parsed_mask) {
+                fprintf(stderr, "[RecklessDrivin] Unknown bonus roll for %s: %s\n", argv[i], argv[i + 1]);
+                return 0;
+            }
+            options.disabledBonusRollMask |= parsed_mask;
+            options.enabled = 1;
+            has_any = 1;
+            i++;
+            continue;
+        }
+    }
+
+    if (out_options) *out_options = options;
+    return has_any;
+}
 
 int main(int argc, char *argv[]) {
-    (void)argc; (void)argv;
+    tEditorLaunchOptions editor_launch_options;
+    int auto_start_editor_launch = parse_editor_launch_options(argc, argv, &editor_launch_options);
 #ifdef __ANDROID__
     /* On Android, SDL_main() is called after the Java SDLActivity has set up
      * the JNI environment.  SDL_AndroidGetInternalStoragePath() is available
@@ -2034,6 +2174,10 @@ int main(int argc, char *argv[]) {
     }
 #endif /* __ANDROID__ */
     Init();
+    if (auto_start_editor_launch) {
+        SetEditorLaunchOptions(&editor_launch_options);
+        rd_start_editor_test_drive();
+    }
     while (!gExit) {
         if (gGameOn)
             GameFrame();

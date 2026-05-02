@@ -117,8 +117,11 @@ void Init()
 	if(gPrefs.hiColor)
 	{
 		LoadPack(kPacksR16);
+		PortByteSwapPackRLE16(kPacksR16);
 		LoadPack(kPackcR16);
+		PortByteSwapPackRLE16(kPackcR16);
 		LoadPack(kPackTx16);
+		PortByteSwapPackTx16();
 	}
 	else
 	{

@@ -1,0 +1,124 @@
+@if (open && frame) {
+  <div #overlayEl class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" (click)="close()" (keydown.escape)="close()" tabindex="-1" aria-modal="true" role="dialog" aria-label="Sprite pixel editor">
+    <div class="flex max-h-[94vh] w-[min(96vw,960px)] min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--on-surface)] shadow-[0_12px_48px_rgba(0,0,0,0.8)]" (click)="$event.stopPropagation()">
+
+      <!-- Header -->
+      <mat-toolbar class="!h-12 !min-h-12 shrink-0 gap-2 border-b border-[var(--border)] !bg-[var(--bg)] !px-3" color="primary">
+        <mat-icon class="text-[var(--accent)]">brush</mat-icon>
+        <span class="flex-1 text-[0.88rem] font-semibold text-[var(--on-surface)]">Sprite Editor – Frame #{{ frame.frameId }} ({{ frame.width }}×{{ frame.height }} px · {{ frame.bitDepth }}-bit)</span>
+        <button mat-icon-button class="ml-auto" (click)="close()" aria-label="Close editor" matTooltip="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-toolbar>
+
+      <!-- Body -->
+      <div class="flex min-h-0 flex-1 overflow-hidden max-sm:flex-col">
+
+        <!-- Left: canvas -->
+        <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:border-r sm:border-[var(--border)]">
+          <div class="custom-scrollbar flex-1 overflow-auto bg-[var(--bg)] p-2">
+            <canvas #editorCanvas class="block border border-[var(--border)] [image-rendering:pixelated]"
+              (mousedown)="onMouseDown($event)"
+              (mousemove)="onMouseMove($event)"
+              (mouseup)="onMouseUp()"
+              (mouseleave)="onMouseUp()"
+              (contextmenu)="$event.preventDefault()"
+              [style.cursor]="tool === 'eyedropper' ? 'crosshair' : (tool === 'fill' ? 'cell' : 'default')"
+            ></canvas>
+          </div>
+          <div class="flex shrink-0 items-center gap-2 border-t border-[var(--border)] px-2.5 py-1.5 text-[0.72rem] text-[var(--muted)]">
+            <span>{{ zoom }}× — {{ frame.width }}×{{ frame.height }} px</span>
+            <div class="flex gap-0.5">
+              <button mat-icon-button (click)="zoomOut()" matTooltip="Zoom out"><mat-icon>zoom_out</mat-icon></button>
+              <button mat-icon-button (click)="zoomIn()" matTooltip="Zoom in"><mat-icon>zoom_in</mat-icon></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: tools + palette -->
+        <div class="custom-scrollbar flex w-60 shrink-0 flex-col gap-1.5 overflow-y-auto bg-[var(--surface)] p-3 max-sm:max-h-[40vh] max-sm:w-full max-sm:border-t max-sm:border-[var(--border)] sm:border-l sm:border-transparent">
+
+          <!-- Tools -->
+          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">Tool</div>
+          <div class="flex flex-wrap gap-1">
+            @for (t of tools; track t) {
+              <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !bg-[var(--surface2)] transition"
+                [class.!border-[var(--accent2)]]="tool === t"
+                [class.!bg-[color:rgba(66,165,245,0.12)]]="tool === t"
+                [class.!text-[var(--accent2)]]="tool === t"
+                [class.!border-[var(--border)]]="tool !== t"
+                [class.!text-[var(--on-surface)]]="tool !== t"
+                [class.active]="tool === t"
+                (click)="tool = t"
+                [matTooltip]="t">
+                <mat-icon>{{ toolIcons[t] }}</mat-icon>
+              </button>
+            }
+            <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)]" (click)="undo()" matTooltip="Undo (Ctrl+Z)">
+              <mat-icon>undo</mat-icon>
+            </button>
+            <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)]" (click)="redo()" matTooltip="Redo">
+              <mat-icon>redo</mat-icon>
+            </button>
+          </div>
+
+          <!-- Brush size -->
+          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">Brush size</div>
+          <div class="flex items-center gap-2">
+            <input class="h-2 flex-1 accent-[var(--accent2)]" type="range" min="1" max="12" step="1" [formControl]="brushSize" />
+            <span class="min-w-10 text-right text-[0.72rem] text-[var(--on-surface)]">{{ brushSize.value }} px</span>
+          </div>
+
+          <!-- Current colour -->
+          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">Colour</div>
+          <div class="flex items-center gap-2">
+            <div class="h-8 w-8 rounded border border-[var(--border)]"
+              [style.background]="'rgba(' + color[0] + ',' + color[1] + ',' + color[2] + ',' + (color[3]/255) + ')'"
+            ></div>
+            <input type="color"
+              class="h-8 w-10 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface3)] p-0"
+              [value]="colorHex"
+              (input)="setColorFromHex($any($event.target).value)"
+              title="Pick colour"
+            />
+          </div>
+
+          <!-- Palette from sprite -->
+          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">Sprite palette</div>
+          <div class="custom-scrollbar flex max-h-[140px] flex-wrap gap-0.5 overflow-y-auto">
+            @for (c of palette; track $index) {
+              <div class="h-[18px] w-[18px] cursor-pointer rounded-[2px] border border-[var(--border)] transition hover:scale-[1.3] hover:border-[var(--on-surface)]"
+                [style.background]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
+                [matTooltip]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
+                (click)="selectPaletteColor(c)"
+              ></div>
+            }
+            @if (palette.length === 0) {
+              <p class="m-0 text-[0.72rem] text-[var(--muted)]">No colours extracted.</p>
+            }
+          </div>
+
+          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">Preset colours</div>
+          <div class="flex flex-wrap gap-0.5">
+            @for (c of presetPalette; track $index) {
+              <div class="h-[18px] w-[18px] cursor-pointer rounded-[2px] border border-[var(--border)] transition hover:scale-[1.3] hover:border-[var(--on-surface)]"
+                [style.background]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
+                [matTooltip]="'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'"
+                (click)="selectPaletteColor(c)"
+              ></div>
+            }
+          </div>
+
+          <!-- Actions -->
+          <div class="mt-auto flex flex-col gap-2 pt-3">
+            <button mat-raised-button color="primary" class="justify-start gap-1" (click)="save()">
+              <mat-icon>save</mat-icon> Save to file
+            </button>
+            <button mat-stroked-button (click)="close()">Cancel</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,104 @@
+<mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
+  <mat-card-content class="!flex !min-h-0 !flex-1 !flex-col !p-0">
+    @if (packSpriteFrames.length > 0) {
+      <div class="flex min-h-0 flex-1 items-stretch gap-6 overflow-hidden max-[1100px]:flex-col">
+        <aside class="flex min-h-0 w-[340px] shrink-0 flex-col gap-3 rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] max-[1100px]:w-auto">
+          <div class="flex items-start justify-between gap-3 pb-1">
+            <div class="min-w-0 flex-1">
+              <div class="text-base font-bold text-[var(--text)]">Sprite Viewer &amp; PPic Asset Editor</div>
+              <div class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">{{ packSpriteFrames.length }} frames</div>
+            </div>
+            <button
+              mat-icon-button
+              color="primary"
+              [disabled]="workerBusy"
+              matTooltip="Upload a PNG to add a new 16-bit sprite frame"
+              (click)="addSpriteFrame.emit()">
+              <mat-icon>add</mat-icon>
+            </button>
+          </div>
+
+          <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-4 pr-1 max-[1100px]:px-3 max-[1100px]:py-3">
+            @for (frame of packSpriteFrames; track frame.id) {
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition"
+                [ngClass]="selectedPackSpriteId === frame.id
+                  ? 'border-red-500/60 bg-red-500/15 shadow-[inset_0_0_0_1px_rgba(229,57,53,0.08)]'
+                  : 'border-transparent bg-[var(--surface2)] hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]'"
+                (click)="selectedPackSpriteIdChange.emit(frame.id)">
+                <span class="grid h-[52px] w-[52px] shrink-0 place-items-center overflow-hidden rounded-[10px] border border-white/10 bg-white/5">
+                  @if (getPackSpriteDataUrl(frame.id); as url) {
+                    <img [src]="url" class="block h-full w-full object-contain [image-rendering:pixelated]" alt="" />
+                  } @else {
+                    <span class="text-[0.8rem] font-bold text-[var(--muted)]">#{{ frame.id }}</span>
+                  }
+                </span>
+                <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span class="text-[0.94rem] font-bold">Frame #{{ frame.id }}</span>
+                  <span class="text-[0.76rem] text-[var(--muted)]">{{ frame.bitDepth }}-bit · {{ frame.width }}×{{ frame.height }} px</span>
+                </span>
+                <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)] opacity-85">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        </aside>
+
+        @if (selectedPackSpriteId !== null) {
+          <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col items-start gap-2 overflow-y-auto px-4 py-4">
+            @if (getPackSpriteDataUrl(selectedPackSpriteId); as url) {
+              <img [src]="url" class="block max-h-[220px] max-w-[220px] rounded-md border border-[var(--border)] bg-[var(--bg)] p-2 [image-rendering:pixelated]" alt="sprite preview" />
+            } @else {
+              <div class="flex min-h-[220px] min-w-[220px] items-center justify-center gap-2 text-[var(--muted)]">
+                <mat-icon>image</mat-icon>
+                <span>Preview loading...</span>
+              </div>
+            }
+            @if (selectedPackSpriteFrame; as selectedFrame) {
+              <mat-card class="w-full !border !border-[var(--border)] !bg-[var(--surface3)]">
+                <mat-card-content class="!px-3.5 !py-2.5">
+                  <p class="m-0 text-[0.82rem] leading-[1.7] text-[var(--on-surface)] [&_strong]:font-semibold [&_strong]:text-[var(--muted)]">
+                    <strong>Frame</strong> #{{ selectedPackSpriteId }}<br>
+                    <strong>Depth</strong> {{ selectedFrame.bitDepth }}-bit
+                    ({{ getSpriteFormatLabel(selectedFrame.bitDepth) }})<br>
+                    <strong>Size</strong> {{ selectedFrame.width }}×{{ selectedFrame.height }} px
+                  </p>
+                </mat-card-content>
+              </mat-card>
+              <div class="flex flex-wrap gap-2">
+                @if (selectedFrame.bitDepth === 16) {
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    class="inline-flex items-center gap-1"
+                    (click)="openSpriteEditor.emit(selectedPackSpriteId!)"
+                    [disabled]="workerBusy">
+                    <mat-icon>brush</mat-icon> Edit Pixels
+                  </button>
+                  <input #spritePngInput type="file" accept="image/png,image/*" style="display:none"
+                    (change)="spritePngUpload.emit({ event: $event, spriteId: selectedPackSpriteId! })" />
+                  <button
+                    mat-stroked-button
+                    class="inline-flex items-center gap-1"
+                    (click)="spritePngInput.click()"
+                    [disabled]="workerBusy"
+                    matTooltip="Upload a PNG to replace this sprite (scaled to match dimensions)">
+                    <mat-icon>upload</mat-icon> Upload PNG
+                  </button>
+                }
+                <button mat-stroked-button class="inline-flex items-center gap-1" (click)="exportSpritePng.emit()">
+                  <mat-icon>download</mat-icon> Export PNG
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">image_not_supported</mat-icon>
+        <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Game sprite frames from Pack 129/137 will appear here once decoded. Load a resources.dat to begin.</p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

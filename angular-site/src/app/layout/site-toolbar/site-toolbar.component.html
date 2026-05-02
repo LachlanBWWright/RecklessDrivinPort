@@ -1,0 +1,92 @@
+<mat-toolbar class="sticky top-0 z-[200] !flex !h-auto !min-h-0 !flex-col !items-stretch !gap-0 !overflow-hidden !border-b-2 !border-b-[var(--accent)] !bg-[var(--bg)] !px-0 shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
+  @if (activeTab === 'editor') {
+    <div class="flex min-w-0 flex-wrap items-center gap-2 px-4 py-2">
+      <button mat-button class="!min-h-11 !whitespace-nowrap !rounded-none !border-b-4 !border-b-transparent !px-4 !text-[0.9rem] !font-semibold !tracking-[0.02em] hover:!text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]" style="color: var(--muted);" (click)="tabChange.emit('game')">
+        <mat-icon>arrow_back</mat-icon>
+        <span>Back to Game</span>
+      </button>
+
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
+        @if (!hasEditorData) {
+          <button mat-stroked-button class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="loadDefaultResources.emit()" [disabled]="workerBusy">
+            <mat-icon>cloud_download</mat-icon> <span>Load Default</span>
+          </button>
+          <input #fileInput type="file" accept=".dat" (change)="resourceFileSelected.emit($event)" [disabled]="workerBusy" style="display:none" />
+          <button mat-stroked-button type="button" class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="fileInput.click()" [disabled]="workerBusy">
+            <mat-icon>folder_open</mat-icon> <span>Upload resources.dat</span>
+          </button>
+        } @else {
+          <button mat-stroked-button class="!border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="clearEditorFile.emit()" [disabled]="workerBusy">
+            <mat-icon>delete</mat-icon> <span>Clear File</span>
+          </button>
+          <button mat-raised-button class="!bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="downloadEditedResources.emit()" [disabled]="workerBusy">
+            <mat-icon>download</mat-icon> <span>Download</span>
+          </button>
+        }
+      </div>
+
+      <div class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 max-[980px]:ml-0 max-[980px]:justify-start">
+        <div class="flex items-center gap-2.5 text-[0.82rem]" [ngClass]="editorError ? 'text-[var(--danger)]' : ''">
+        @if (workerBusy) {
+          <mat-spinner diameter="18" class="inline-block"></mat-spinner>
+          <span class="text-[0.85rem] text-[var(--muted)]">Processing…</span>
+        }
+        @if (editorError) {
+          <span class="flex items-center gap-1 text-[var(--danger)]">
+            <mat-icon>warning</mat-icon> {{ editorError }}
+          </span>
+        }
+        </div>
+
+        @if (hasEditorData) {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="!m-0 w-[180px] self-center max-[900px]:w-[150px] [&_.mat-mdc-form-field-subscript-wrapper]:!hidden">
+          <mat-select
+            [value]="selectedLevelId"
+            (valueChange)="selectLevel.emit($event)"
+            [disabled]="workerBusy || parsedLevels.length === 0"
+            aria-label="Level selector"
+          >
+            <mat-select-trigger>
+              @if (selectedLevelId !== null) {
+                <span class="max-[900px]:hidden">Level {{ levelDisplayNum(selectedLevelId) }}</span>
+                <span class="hidden max-[900px]:inline">{{ levelDisplayNum(selectedLevelId) }}</span>
+              }
+            </mat-select-trigger>
+            @for (level of parsedLevels; track level.resourceId) {
+              <mat-option [value]="level.resourceId">
+                <span class="level-option-label">Level </span>{{ levelDisplayNum(level.resourceId) }}
+              </mat-option>
+            }
+          </mat-select>
+          </mat-form-field>
+        }
+      </div>
+    </div>
+
+    <nav class="flex min-w-0 flex-wrap items-stretch gap-1 border-t border-t-[var(--border)] px-4" role="tablist" aria-label="Level editor sections">
+        @for (section of editorSections; track section.id) {
+          <button
+            mat-button
+            class="!min-h-12 !min-w-0 !rounded-none !border-b-4 !px-[14px] !text-[0.9rem] !font-semibold !tracking-[0.02em] hover:!text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]"
+            [style.borderBottomColor]="activeEditorSection === section.id ? 'var(--accent)' : 'transparent'"
+            [style.color]="activeEditorSection === section.id ? 'var(--accent)' : 'var(--muted)'"
+            [attr.aria-selected]="activeEditorSection === section.id"
+            (click)="editorSectionChange.emit(section.id)"
+          >
+            <mat-icon>{{ section.icon }}</mat-icon> <span>{{ section.label }}</span>
+          </button>
+        }
+    </nav>
+  } @else {
+    <div class="flex items-stretch justify-end px-4">
+      <nav class="flex flex-wrap items-stretch gap-1" role="tablist" aria-label="Site sections">
+      <button mat-button class="!min-h-14 !whitespace-nowrap !rounded-none !border-b-4 !px-4 !text-[0.9rem] !font-semibold !tracking-[0.02em] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]" style="border-bottom-color: var(--accent); color: var(--accent);" aria-selected="true" (click)="tabChange.emit('game')">
+        <mat-icon>sports_esports</mat-icon> <span>Play Game</span>
+      </button>
+      <button mat-button class="!min-h-14 !whitespace-nowrap !rounded-none !border-b-4 !border-b-transparent !px-4 !text-[0.9rem] !font-semibold !tracking-[0.02em] hover:!text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]" style="color: var(--muted);" aria-selected="false" (click)="tabChange.emit('editor')">
+        <mat-icon>map</mat-icon> <span>Level Editor</span>
+      </button>
+      </nav>
+    </div>
+  }
+</mat-toolbar>

@@ -2,6 +2,7 @@ import Konva from 'konva';
 import type { ObjectPos } from './level-editor.service';
 import { FALLBACK_CIRCLE_WORLD_R } from './konva-editor.types';
 import type { KonvaWorldNode } from './konva-editor.types';
+import { worldDirToKonvaRotationDeg } from './object-direction-utils';
 
 export function buildObjects(
   worldGroup: Konva.Group | null,
@@ -19,8 +20,11 @@ export function buildObjects(
 ): { nodes: KonvaWorldNode[] } {
   if (!worldGroup || !objectsLayer) return { nodes: [] };
 
+  void cssH;
+  void logicalW;
+  void logicalH;
+  void zoom;
   const PALETTE_LEN = paletteColors.length;
-  const sx = zoom * (cssW / logicalW);
   const nodes: KonvaWorldNode[] = [];
 
   worldGroup.destroyChildren();
@@ -41,18 +45,19 @@ export function buildObjects(
       const group = new Konva.Group({
         x:         obj.x,
         y:         -obj.y,
-        rotation:  (-obj.dir * 180) / Math.PI,
+        rotation:  worldDirToKonvaRotationDeg(obj.dir),
         draggable: !panMode,
         id:        `obj-${i}`,
       });
       group.add(new Konva.Image({ image: img, width: W, height: H, offsetX: W/2, offsetY: H/2, opacity: visible ? 1 : 0.3 }));
-      if (isSel) {
-        group.add(new Konva.Circle({ radius: Math.max(W,H)/2 + 6, stroke: '#ffffff', strokeWidth: 2 / sx, fill: 'transparent' }));
-      }
       node = group;
+      worldGroup.add(node);
+      nodes.push(node);
     } else {
       const color = paletteColors[typeIdx] ?? '#888888';
-      node = new Konva.Circle({ x: obj.x, y: -obj.y, radius: FALLBACK_CIRCLE_WORLD_R, fill: isSel ? '#ffe082' : color, stroke: isSel ? '#fff' : 'rgba(0,0,0,0.3)', strokeWidth: isSel ? 2/sx : 1/sx, opacity: visible ? 1 : 0.3, draggable: !panMode, id: `obj-${i}` });
+      node = new Konva.Circle({ x: obj.x, y: -obj.y, radius: FALLBACK_CIRCLE_WORLD_R, fill: isSel ? '#ffe082' : color, stroke: 'rgba(0,0,0,0.3)', strokeWidth: 1, opacity: visible ? 1 : 0.3, draggable: !panMode, id: `obj-${i}` });
+      worldGroup.add(node);
+      nodes.push(node);
     }
 
     const eventNode = node as Konva.Node;
@@ -63,8 +68,6 @@ export function buildObjects(
     });
     eventNode.on('click', (e: Konva.KonvaEventObject<MouseEvent>) => { e.cancelBubble = true; onObjectClick?.(i); });
 
-    worldGroup.add(node);
-    nodes.push(node);
   });
 
   return { nodes };

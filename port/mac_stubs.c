@@ -1265,6 +1265,13 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
     {
     int dstTop  = dstRect ? dstRect->top  : picTop;
     int dstLeft = dstRect ? dstRect->left : picLeft;
+    int dstBottom = dstRect ? dstRect->bottom : (picTop + picH);
+    int dstRight = dstRect ? dstRect->right : (picLeft + picW);
+    int dstW = dstRight - dstLeft;
+    int dstH = dstBottom - dstTop;
+    if (dstW <= 0 || dstH <= 0) {
+        return;
+    }
     int rowBytes = picW * picBpp;
     int bcBytes  = (rowBytes > 250) ? 2 : 1;
 
@@ -1274,7 +1281,6 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
     {
         const UInt8 *src = pict + pixDataOff;
         for (row = 0; row < picH; row++) {
-            int dstY = dstTop + row;
             int bc;
 
             /* Read byteCount (2 bytes if rowBytes > 250, else 1 byte) */
@@ -1296,26 +1302,41 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
             }
             src += bc;
 
-            /* Skip rows that fall outside the destination port */
-            if (dstY < 0 || dstY >= gYSize) continue;
-
-            if (picBpp == 1) {
-                /* 8-bit indexed: copy palette indices directly */
-                UInt8 *dst = portPix + dstY * portRb + dstLeft;
-                int w = picW;
-                if (dstLeft + w > gXSize) w = gXSize - dstLeft;
-                if (w > 0 && dstLeft < gXSize) memcpy(dst, rowBuf, (size_t)w);
-            } else {
-                /* 16-bit x5R5G5B → 8-bit palette index via lookup table */
+            /* Draw with destination-rect scaling so 320px-wide pause/menu images
+             * correctly expand to 640px when requested by callers. */
+            {
+                int startY = (row * dstH) / picH;
+                int endY = ((row + 1) * dstH) / picH;
+                if (endY <= startY) endY = startY + 1;
+                for (int sy = startY; sy < endY; sy++) {
+                    int dstY = dstTop + sy;
+                    if (dstY < 0 || dstY >= gYSize) continue;
+                    UInt8 *dst = portPix + dstY * portRb;
+                    if (picBpp == 1) {
+                        for (int dx = 0; dx < dstW; dx++) {
+                            int dstX = dstLeft + dx;
+                            if (dstX < 0 || dstX >= gXSize) continue;
+                            int srcX = (dx * picW) / dstW;
+                            if (srcX < 0) srcX = 0;
+                            if (srcX >= picW) srcX = picW - 1;
+                            dst[dstX] = rowBuf[srcX];
+                        }
+                    } else {
+                        /* 16-bit x5R5G5B → 8-bit palette index via lookup table */
 #ifdef PORT_SDL2
-                UInt8 *dst = portPix + dstY * portRb + dstLeft;
-                int x;
-                for (x = 0; x < picW && (dstLeft + x) < gXSize; x++) {
-                    uint16_t px = (uint16_t)(((uint16_t)rowBuf[x*2] << 8)
-                                            | rowBuf[x*2+1]);
-                    dst[x] = rgb15_to_palette8(px, s_palette);
-                }
+                        for (int dx = 0; dx < dstW; dx++) {
+                            int dstX = dstLeft + dx;
+                            if (dstX < 0 || dstX >= gXSize) continue;
+                            int srcX = (dx * picW) / dstW;
+                            if (srcX < 0) srcX = 0;
+                            if (srcX >= picW) srcX = picW - 1;
+                            uint16_t px = (uint16_t)(((uint16_t)rowBuf[srcX*2] << 8)
+                                                    | rowBuf[srcX*2+1]);
+                            dst[dstX] = rgb15_to_palette8(px, s_palette);
+                        }
 #endif
+                    }
+                }
             }
         }
     }

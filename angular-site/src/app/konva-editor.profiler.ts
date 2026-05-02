@@ -1,7 +1,7 @@
 /** Lightweight profiler helpers for KonvaEditorService.
  * Usage: const t = profiler.start('setObjects'); ... t.end();
  */
-let enabled = true;
+let enabled = false;
 
 class ProfilerTimer {
   private name: string;
@@ -12,7 +12,6 @@ class ProfilerTimer {
   }
   end(): number {
     const dur = performance.now() - this.startMs;
-    // eslint-disable-next-line no-console
     console.debug(`[profiler] ${this.name}: ${dur.toFixed(2)}ms`);
     return dur;
   }
