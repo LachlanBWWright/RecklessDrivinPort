@@ -65,7 +65,7 @@
           <div class="min-w-0 flex-1">
             <div class="text-[0.9rem] font-semibold text-[var(--on-surface)]">Customisations</div>
             <p class="mt-1 text-[0.78rem] leading-[1.55] text-[var(--muted)]">
-              Choose a preset, swap in a custom <code>resources.dat</code>, and optionally launch straight into a level on restart.
+              Apply a preset here, or edit the rows below directly for a custom mix or your own <code>resources.dat</code>.
             </p>
           </div>
           <button
@@ -84,24 +84,42 @@
           </button>
         </div>
 
-        <div class="mt-3 grid gap-3 xl:grid-cols-3">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full">
-            <mat-label>Custom options</mat-label>
-            <mat-select
-              [value]="customOptionsPreset"
-              (selectionChange)="customOptionsPresetChange.emit($event.value)"
-            >
-              @for (preset of customOptionsPresetOptions; track preset.id) {
-                <mat-option [value]="preset.id">{{ preset.label }}</mat-option>
-              }
-            </mat-select>
-            <mat-hint>
-              {{
-                customOptionsPresetOptions.find((preset) => preset.id === customOptionsPreset)?.description
-              }}
-            </mat-hint>
-          </mat-form-field>
+        <div class="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="min-w-0 max-w-[36rem]">
+              <div class="text-[0.9rem] font-semibold text-[var(--on-surface)]">Custom options</div>
+              <p class="mt-1 text-[0.78rem] leading-[1.5] text-[var(--muted)]">
+                Choose a preset and apply it to the fields below.
+              </p>
+              <p class="mt-1 text-[0.78rem] leading-[1.5] text-[var(--accent2)]">
+                {{ pendingCustomOptionsPresetDescription }}
+              </p>
+            </div>
+            <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:items-end">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full sm:min-w-[260px] lg:w-[280px]">
+                <mat-label>Preset</mat-label>
+                <mat-select
+                  [value]="pendingCustomOptionsPreset"
+                  (selectionChange)="pendingCustomOptionsPreset = $event.value"
+                >
+                  @for (preset of customOptionsPresetOptions; track preset.id) {
+                    <mat-option [value]="preset.id">{{ preset.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <button
+                mat-raised-button
+                class="!h-[56px] !min-h-[56px] !px-6 !bg-[var(--accent2)] !text-white hover:!bg-[#1e88e5] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+                [disabled]="gameRestarting || pendingCustomOptionsPreset === customOptionsPreset"
+                (click)="customOptionsPresetApply.emit(pendingCustomOptionsPreset)"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
 
+        <div class="mt-3 grid gap-3 xl:grid-cols-2">
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full">
             <mat-label>Custom resources</mat-label>
             <mat-select

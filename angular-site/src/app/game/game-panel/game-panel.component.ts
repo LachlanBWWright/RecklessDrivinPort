@@ -37,7 +37,15 @@ export class GamePanelComponent {
   @Input() masterVolume = 80;
   @Input() customResourcesLoaded = false;
   @Input() customResourcesName: string | null = null;
-  @Input() customOptionsPreset: CustomOptionsPresetId = 'manual';
+  private _customOptionsPreset: CustomOptionsPresetId = 'manual';
+  @Input()
+  set customOptionsPreset(value: CustomOptionsPresetId) {
+    this._customOptionsPreset = value;
+    this.pendingCustomOptionsPreset = value;
+  }
+  get customOptionsPreset(): CustomOptionsPresetId {
+    return this._customOptionsPreset;
+  }
   @Input() customResourcesPreset: CustomResourcesPresetId = 'default';
   @Input() customSettingsPreset: CustomSettingsPresetId = 'manual';
   @Input() gameRestarting = false;
@@ -53,7 +61,7 @@ export class GamePanelComponent {
   @Output() toggleFullscreen = new EventEmitter<void>();
   @Output() volumeChange = new EventEmitter<number>();
   @Output() customResourcesFileSelected = new EventEmitter<Event>();
-  @Output() customOptionsPresetChange = new EventEmitter<CustomOptionsPresetId>();
+  @Output() customOptionsPresetApply = new EventEmitter<CustomOptionsPresetId>();
   @Output() customResourcesPresetChange = new EventEmitter<CustomResourcesPresetId>();
   @Output() customSettingsPresetChange = new EventEmitter<CustomSettingsPresetId>();
   @Output() restartWithStartupOptions = new EventEmitter<{
@@ -78,6 +86,7 @@ export class GamePanelComponent {
   readonly customOptionsPresetOptions = CUSTOM_OPTIONS_PRESETS;
   readonly customResourcesPresetOptions = CUSTOM_RESOURCES_PRESETS;
   readonly customSettingsPresetOptions = CUSTOM_SETTINGS_PRESETS;
+  pendingCustomOptionsPreset: CustomOptionsPresetId = 'manual';
 
   readonly forcedAddonOptions = [
     { mask: ADDON_LOCK, label: 'Lock', description: 'Start with Addons Locked.' },
@@ -99,6 +108,13 @@ export class GamePanelComponent {
 
   hasMask(value: number, mask: number): boolean {
     return (value & mask) !== 0;
+  }
+
+  get pendingCustomOptionsPresetDescription(): string {
+    return (
+      this.customOptionsPresetOptions.find((preset) => preset.id === this.pendingCustomOptionsPreset)
+        ?.description ?? ''
+    );
   }
 
   get customResourcesSummary(): string {

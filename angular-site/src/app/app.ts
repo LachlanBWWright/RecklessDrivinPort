@@ -416,9 +416,17 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     preset: CustomResourcesPresetId,
     updateOptionsPreset = true,
   ): Promise<void> {
-    await this.runtime.applyCustomResourcesPreset(preset);
-    if (updateOptionsPreset) {
-      this.syncCustomOptionsPreset();
+    const load = this.runtime.applyCustomResourcesPreset(preset);
+    this.customResourcesPresetLoad = load;
+    try {
+      await load;
+      if (updateOptionsPreset) {
+        this.syncCustomOptionsPreset();
+      }
+    } finally {
+      if (this.customResourcesPresetLoad === load) {
+        this.customResourcesPresetLoad = null;
+      }
     }
   }
 

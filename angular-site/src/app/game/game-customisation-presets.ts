@@ -25,8 +25,8 @@ export interface PresetOption<T extends string> {
 export const CUSTOM_OPTIONS_PRESETS: PresetOption<CustomOptionsPresetId>[] = [
   {
     id: 'manual',
-    label: 'Manual',
-    description: 'Leave the resource and settings presets as selected below.',
+    label: 'Custom',
+    description: 'Use the resource and settings dropdowns below as-is.',
   },
   {
     id: 'default',
@@ -61,7 +61,7 @@ export const CUSTOM_RESOURCES_PRESETS: PresetOption<CustomResourcesPresetId>[] =
 export const CUSTOM_SETTINGS_PRESETS: PresetOption<CustomSettingsPresetId>[] = [
   {
     id: 'manual',
-    label: 'Manual',
+    label: 'Custom',
     description: 'Keep the custom startup settings configured below.',
   },
   {

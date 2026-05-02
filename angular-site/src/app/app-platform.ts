@@ -439,19 +439,8 @@ export function setupEmscriptenModule(app: App): void {
         AppStateResources._loadCustomResourcesDb()
           .then((entry: { bytes: Uint8Array; name: string } | null) => {
             if (entry) {
-              const FS = (gameWindow as unknown as Record<string, unknown>)['FS'] as
-                | { writeFile: (path: string, data: Uint8Array) => void }
-                | undefined;
-              if (FS) {
-                try {
-                  FS.writeFile('/resources.dat', entry.bytes);
-                  console.log(
-                    `[Angular] Injected custom resources.dat (${Math.round(entry.bytes.length / 1024)} KB) from IndexedDB`,
-                  );
-                } catch (err) {
-                  console.warn('[Angular] Failed to inject custom resources.dat into MEMFS', err);
-                }
-              }
+              app._pendingCustomResources = entry.bytes;
+              app.customResourcesName.set(entry.name);
             }
           })
           .catch((err: unknown) => {
@@ -623,10 +612,17 @@ export function restartWithStartupOptions(app: App, useLevel: boolean): void {
     });
     return;
   }
-  scheduleGameRestart(app, {
-    useCustomResources: app.customResourcesPreset() !== 'default',
-    launch,
-  });
+  void (async () => {
+    try {
+      await app.customResourcesPresetLoad;
+      scheduleGameRestart(app, {
+        useCustomResources: app.customResourcesPreset() !== 'default',
+        launch,
+      });
+    } catch (error) {
+      app.editorError.set(error instanceof Error ? error.message : 'Failed to prepare restart');
+    }
+  })();
 }
 
 export function mountCustomResourcesFs(app: App, bytes: Uint8Array): void {

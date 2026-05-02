@@ -52,6 +52,8 @@ export class AppStateBase {
   customOptionsPreset = signal<CustomOptionsPresetId>('manual');
   customResourcesPreset = signal<CustomResourcesPresetId>('default');
   customSettingsPreset = signal<CustomSettingsPresetId>('manual');
+  /** Pending async load for a custom resource preset, if any. */
+  customResourcesPresetLoad: Promise<void> | null = null;
   editorTestDriveLevelEnabled = signal(false);
   editorTestDriveLevelNumberOverride = signal<number | null>(null);
   readonly editorTestDriveLevelNumber = computed(() => {
