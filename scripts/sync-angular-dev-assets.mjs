@@ -7,14 +7,14 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
 const publicDir = path.join(repoRoot, 'angular-site', 'public');
-const publicPresetsDir = path.join(publicDir, 'presets');
-const resourcesSrc = path.join(repoRoot, 'port', 'resources', 'resources.dat');
-const terminatorResourcesSrc = path.join(repoRoot, 'resources_terminator.dat');
+const resourcesSrcCandidates = [
+  path.join(repoRoot, 'port', 'resources', 'resources.dat'),
+  path.join(repoRoot, 'resources.dat'),
+];
 const wasmBuildDir = path.join(repoRoot, 'build_wasm');
 const wasmFiles = ['reckless_drivin.js', 'reckless_drivin.wasm', 'reckless_drivin.data'];
 
 mkdirSync(publicDir, { recursive: true });
-mkdirSync(publicPresetsDir, { recursive: true });
 
 function copyRequired(src, dest) {
   if (!existsSync(src)) {
@@ -22,6 +22,15 @@ function copyRequired(src, dest) {
   }
   copyFileSync(src, dest);
   console.log(`[sync-angular-dev-assets] copied ${path.relative(repoRoot, src)} -> ${path.relative(repoRoot, dest)}`);
+}
+
+function resolveExisting(candidates) {
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 function copyOptional(src, dest) {
@@ -37,11 +46,15 @@ function copyOptional(src, dest) {
   return false;
 }
 
+const resourcesSrc = resolveExisting(resourcesSrcCandidates);
+if (!resourcesSrc) {
+  throw new Error(
+    `Required asset not found. Checked: ${resourcesSrcCandidates
+      .map((candidate) => path.relative(repoRoot, candidate))
+      .join(', ')}`
+  );
+}
 copyRequired(resourcesSrc, path.join(publicDir, 'resources.dat'));
-copyRequired(
-  terminatorResourcesSrc,
-  path.join(publicPresetsDir, 'resources_cop_trucks_terminator.dat'),
-);
 
 let copiedWasmFiles = 0;
 for (const filename of wasmFiles) {
