@@ -2,6 +2,7 @@ import { App } from './app';
 import { AppStateResources } from './app-state-resources';
 import { failEditor, loadResourcesBytes } from './app-loaders';
 import { resultFromPromise } from './result-helpers';
+import type { ResourceMergeOptions } from './resource-merge';
 
 export function resetEditorData(app: App): void {
   app.hasEditorData.set(false);
@@ -109,6 +110,71 @@ export async function onResourceFileSelected(app: App, event: Event): Promise<vo
         app.workerBusy.set(false);
       },
     );
+}
+
+export async function onResourceMergeSelected(
+  app: App,
+  file: File,
+  options: ResourceMergeOptions,
+): Promise<void> {
+  app.editorError.set('');
+  app.workerBusy.set(true);
+  app.resourcesStatus.set(`Merging ${file.name}…`);
+
+  const fileBufferResult = await resultFromPromise(file.arrayBuffer(), 'Failed to read file');
+  const fileBuffer = fileBufferResult.match(
+    (buffer) => buffer,
+    (error) => {
+      app.editorError.set(error);
+      app.resourcesStatus.set('Failed to read merge file.');
+      app.workerBusy.set(false);
+      return null;
+    },
+  );
+  if (!fileBuffer) return;
+
+  const mergeResult = await resultFromPromise(
+    app.runtime.dispatchWorker<{ overwritten: number; added: number }>(
+      'MERGE_RESOURCES',
+      { bytes: fileBuffer, options },
+      [fileBuffer],
+    ),
+    'Failed to merge uploaded resources',
+  );
+
+  const mergeCounts = mergeResult.match(
+    (result) => result,
+    (error) => {
+      app.editorError.set(error);
+      app.resourcesStatus.set('Failed to merge uploaded resources.');
+      app.workerBusy.set(false);
+      return null;
+    },
+  );
+  if (!mergeCounts) return;
+
+  const serializedResult = await resultFromPromise(
+    app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE'),
+    'Failed to reload merged resources',
+  );
+
+  const serializedBuffer = serializedResult.match(
+    (buffer) => buffer,
+    (error) => {
+      app.editorError.set(error);
+      app.resourcesStatus.set('Failed to reload merged resources.');
+      app.workerBusy.set(false);
+      return null;
+    },
+  );
+  if (!serializedBuffer) return;
+
+  await loadResourcesBytes(app, new Uint8Array(serializedBuffer), `${file.name} (merged)`);
+  app.snackBar.open(
+    `Merged resources: ${mergeCounts.overwritten} overwritten, ${mergeCounts.added} added.`,
+    'OK',
+    { duration: 4500, panelClass: 'snack-success' },
+  );
 }
 
 export function clearEditorResources(app: App): void {

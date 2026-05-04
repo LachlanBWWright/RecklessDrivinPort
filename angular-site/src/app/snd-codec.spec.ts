@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decodeIMA4, decodeIMA4Packet, parseSndHeader, buildWav, IMA4_STEP_TABLE, IMA4_INDEX_TABLE } from './snd-codec';
+import { decodeIMA4, decodeIMA4Packet, parseSndHeader, buildWav, sndToWav, IMA4_STEP_TABLE, IMA4_INDEX_TABLE } from './snd-codec';
 
 describe('IMA4_STEP_TABLE', () => {
   it('has exactly 89 entries', () => {
@@ -212,5 +212,57 @@ describe('buildWav', () => {
     const pcm = new Uint8Array(100);
     const wav = buildWav(pcm, 22050, 1, 8);
     expect(wav.length).toBe(44 + 100);
+  });
+});
+
+describe('sndToWav', () => {
+  it('swaps 16-bit extSH PCM to little-endian WAV samples', () => {
+    const hdrOff = 16;
+    const pcmOffset = hdrOff + 64;
+    const out = new Uint8Array(pcmOffset + 4);
+    const dv = new DataView(out.buffer);
+
+    dv.setUint32(0, 1, false); // numVariants
+    dv.setUint32(12, hdrOff, false); // offsets[0]
+    dv.setUint32(hdrOff + 4, 1, false); // numChannels
+    dv.setUint32(hdrOff + 8, 22050 * 65536, false); // sampleRate
+    dv.setUint8(hdrOff + 20, 0xff); // extSH
+    dv.setUint32(hdrOff + 22, 2, false); // numFrames
+    dv.setUint16(hdrOff + 48, 16, false); // sampleSize
+
+    // Two samples in big-endian order: 0x1234, 0xabcd
+    out[pcmOffset] = 0x12;
+    out[pcmOffset + 1] = 0x34;
+    out[pcmOffset + 2] = 0xab;
+    out[pcmOffset + 3] = 0xcd;
+
+    const wav = sndToWav(out);
+    expect(wav[44]).toBe(0x34);
+    expect(wav[45]).toBe(0x12);
+    expect(wav[46]).toBe(0xcd);
+    expect(wav[47]).toBe(0xab);
+  });
+
+  it('uses declared frame count to trim trailing bytes', () => {
+    const hdrOff = 16;
+    const pcmOffset = hdrOff + 64;
+    const out = new Uint8Array(pcmOffset + 8);
+    const dv = new DataView(out.buffer);
+
+    dv.setUint32(0, 1, false);
+    dv.setUint32(12, hdrOff, false);
+    dv.setUint32(hdrOff + 4, 1, false);
+    dv.setUint32(hdrOff + 8, 22050 * 65536, false);
+    dv.setUint8(hdrOff + 20, 0xff);
+    dv.setUint32(hdrOff + 22, 2, false); // exactly 2 frames
+    dv.setUint16(hdrOff + 48, 16, false);
+
+    // Two valid samples + two trailing garbage samples
+    out.set([0x00, 0x01, 0x00, 0x02, 0xff, 0xff, 0xee, 0xee], pcmOffset);
+
+    const wav = sndToWav(out);
+    const dataSize = new DataView(wav.buffer, wav.byteOffset, wav.byteLength).getUint32(40, true);
+    expect(dataSize).toBe(4);
+    expect(wav.length).toBe(48);
   });
 });

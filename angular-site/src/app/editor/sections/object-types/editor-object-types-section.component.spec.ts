@@ -1,7 +1,16 @@
+import { TestBed } from '@angular/core/testing';
 import { EditorObjectTypesSectionComponent } from './editor-object-types-section.component';
 import type { ObjectTypeDefinition } from '../../../level-editor.service';
 
 describe('EditorObjectTypesSectionComponent', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+  });
+
+  function createComponent(): EditorObjectTypesSectionComponent {
+    return TestBed.runInInjectionContext(() => new EditorObjectTypesSectionComponent());
+  }
+
   function makeType(overrides: Partial<ObjectTypeDefinition> = {}): ObjectTypeDefinition {
     return {
       typeRes: 200,
@@ -31,7 +40,7 @@ describe('EditorObjectTypesSectionComponent', () => {
   }
 
   it('cycles through contiguous sprite frames for the preview', () => {
-    const component = new EditorObjectTypesSectionComponent();
+    const component = createComponent();
     component.objectTypes = [makeType({ frame: 128, numFrames: 3 })];
     component.spriteFrames = [{ id: 128, bitDepth: 8, width: 16, height: 16 }, { id: 129, bitDepth: 8, width: 16, height: 16 }, { id: 130, bitDepth: 8, width: 16, height: 16 }];
     component.selectedObjectTypeId = 200;
@@ -50,7 +59,7 @@ describe('EditorObjectTypesSectionComponent', () => {
   });
 
   it('hides preview controls when there is only one frame', () => {
-    const component = new EditorObjectTypesSectionComponent();
+    const component = createComponent();
     component.objectTypes = [makeType({ frame: 300, numFrames: 1 })];
     component.spriteFrames = [{ id: 300, bitDepth: 16, width: 24, height: 24 }];
     component.selectedObjectTypeId = 200;

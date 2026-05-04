@@ -75,11 +75,27 @@ export function setupAppLifecycle(app: App): void {
 
   effect(() => {
     const mode = app.drawMode();
+    const tab = app.activeTab();
+    const section = app.editorSection();
+
+    if (mode !== 'none') {
+      app.dragTrackWaypoint.set(null);
+      app.hoverTrackWaypoint.set(null);
+      app.hoverTrackMidpoint.set(null);
+      app.isDragging.set(false);
+      app.dragObjIndex.set(null);
+    }
+
     if (mode !== 'curve') {
       app._curveStartPoint = null;
       app._curveEndPoint = null;
       app.konva.clearBarrierDrawPreview();
     }
+
+    if (tab === 'editor' && section === 'objects') {
+      app.runtime.scheduleCanvasRedraw();
+    }
+
     if (typeof document === 'undefined') return;
     const kc = document.getElementById('konva-container');
     if (!kc) return;

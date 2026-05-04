@@ -379,6 +379,22 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     this.editorTestDriveUseObjectGroupStartY.set(enabled);
   }
 
+  async launchSelectedLevelPreview(levelResourceId: number): Promise<void> {
+    const levelNum = this.levelDisplayNum(levelResourceId);
+    this.editorError.set('');
+
+    await this.runtime.saveEditedResourcesToGame();
+    if (this.editorError()) {
+      return;
+    }
+
+    this.editorTestDriveLevelEnabled.set(true);
+    this.editorTestDriveLevelNumberOverride.set(levelNum);
+    this.activeTab.set('game');
+    this.runtime.syncGameLoopWithActiveTab();
+    this.runtime.restartIntoEditorTestDrive();
+  }
+
   setEditorTestDriveObjectGroupStartY(rawValue: string): void {
     const trimmed = rawValue.trim();
     const parsed = trimmed === '' ? 500 : Number.parseInt(trimmed, 10);

@@ -110,3 +110,60 @@ test('PPIC 1006 and 1009 previews decode when present', async ({ page }) => {
     expect(preview!.h).toBeGreaterThan(0);
   }
 });
+
+test('PPIC 1000-1009 previews decode distinctly when present', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /level editor/i }).click();
+  await page.getByRole('button', { name: /load default/i }).click();
+  await expect(page.locator('mat-spinner')).not.toBeVisible({ timeout: 30_000 });
+  await page
+    .getByRole('button', { name: /screens/i })
+    .first()
+    .click();
+
+  const ppicButtons = page
+    .locator('app-editor-screens-section button')
+    .filter({ hasText: /PPic\s+#10\d\d/i });
+  await expect(ppicButtons.first()).toBeVisible({ timeout: 15_000 });
+
+  const fingerprints = new Map<number, string>();
+
+  for (const id of [1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009]) {
+    const button = ppicButtons.filter({ hasText: new RegExp(`#${id}`, 'i') }).first();
+
+    await button.click();
+    await expect(page.locator('app-editor-screens-section mat-spinner')).not.toBeVisible({
+      timeout: 20_000,
+    });
+
+    const preview = await page.evaluate((resourceId) => {
+      const img = document.querySelector(
+        'app-editor-screens-section img[alt="icon preview"]',
+      ) as HTMLImageElement | null;
+      const errorText = document.body.innerText;
+      const failedDecode = errorText.includes(`Failed to decode PPic #${resourceId}`);
+      if (!img) {
+        return { failedDecode, fingerprint: null, width: 0, height: 0 };
+      }
+      const src = img.currentSrc || img.src || '';
+      return {
+        failedDecode,
+        fingerprint: `${img.naturalWidth}x${img.naturalHeight}:${src.length}:${src.slice(-64)}`,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      };
+    }, id);
+
+    expect(preview.failedDecode).toBe(false);
+    expect(preview.fingerprint).not.toBeNull();
+    expect(preview.width).toBeGreaterThan(0);
+    expect(preview.height).toBeGreaterThan(0);
+    if (preview.fingerprint) {
+      fingerprints.set(id, preview.fingerprint);
+    }
+  }
+
+  expect(fingerprints.size).toBeGreaterThanOrEqual(10);
+  const uniqueFingerprints = new Set(Array.from(fingerprints.values()));
+  expect(uniqueFingerprints.size).toBeGreaterThanOrEqual(9);
+});

@@ -399,15 +399,10 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
   if (typeof document === 'undefined' || bytes.length < 14) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
-  let pos = 2;
-  const picTop = view.getInt16(pos, false);
-  pos += 2;
-  const picLeft = view.getInt16(pos, false);
-  pos += 2;
-  const picBottom = view.getInt16(pos, false);
-  pos += 2;
-  const picRight = view.getInt16(pos, false);
-  pos += 2;
+  const picTop = view.getInt16(2, false);
+  const picLeft = view.getInt16(4, false);
+  const picBottom = view.getInt16(6, false);
+  const picRight = view.getInt16(8, false);
   const picW = picRight - picLeft;
   const picH = picBottom - picTop;
   if (picW <= 0 || picH <= 0 || picW > 4096 || picH > 4096) return null;
@@ -417,355 +412,307 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
   canvas.height = picH;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
+  const readU16 = (off: number): number => ((bytes[off] ?? 0) << 8) | (bytes[off + 1] ?? 0);
 
-  let isV2 = false;
-  if (pos + 2 <= bytes.length && view.getUint16(pos, false) === 0x0011) {
-    pos += 2;
-    if (pos + 2 <= bytes.length && view.getUint16(pos, false) === 0x02ff) {
-      isV2 = true;
-      pos += 2;
-    }
-  }
-
-  let rendered = false;
-  outer: while (pos + (isV2 ? 2 : 1) <= bytes.length) {
-    let opcode: number;
-    if (isV2) {
-      if (pos % 2 !== 0) pos += 1;
-      if (pos + 2 > bytes.length) break;
-      opcode = view.getUint16(pos, false);
-      pos += 2;
-    } else {
-      opcode = view.getUint8(pos++);
-    }
-
-    switch (opcode) {
-      case 0x0000:
-        break;
-      case 0x00ff:
-        break outer;
-      case 0x0001: {
-        if (pos + 2 > bytes.length) break outer;
-        const rgnSize = view.getUint16(pos, false);
-        pos += rgnSize;
-        break;
-      }
-      case 0x0003:
-        pos += 2;
-        break;
-      case 0x0004:
-        pos += 2;
-        break;
-      case 0x0005:
-        pos += 2;
-        break;
-      case 0x0006:
-        pos += 4;
-        break;
-      case 0x0007:
-        pos += 4;
-        break;
-      case 0x0008:
-        pos += 2;
-        break;
-      case 0x0009:
-        pos += 8;
-        break;
-      case 0x000a:
-        pos += 8;
-        break;
-      case 0x000b:
-        pos += 4;
-        break;
-      case 0x000c:
-        pos += 4;
-        break;
-      case 0x000d:
-        pos += 2;
-        break;
-      case 0x000e:
-        pos += 4;
-        break;
-      case 0x000f:
-        pos += 4;
-        break;
-      case 0x0010:
-        pos += 8;
-        break;
-      case 0x001a:
-        pos += 6;
-        break;
-      case 0x001b:
-        pos += 6;
-        break;
-      case 0x001c:
-        break;
-      case 0x001d:
-        pos += 6;
-        break;
-      case 0x001e:
-        break;
-      case 0x001f:
-        pos += 6;
-        break;
-      case 0x00a0:
-        // ShortComment: 2-byte kind (no data)
-        pos += 2;
-        break;
-      case 0x00a1: {
-        // LongComment: 2-byte kind + 2-byte size + size bytes of data
-        pos += 2; // skip kind
-        if (pos + 2 > bytes.length) break outer;
-        const commentSize = view.getUint16(pos, false);
-        pos += 2 + commentSize;
-        break;
-      }
-      case 0x0c00:
-        pos += 24;
-        break;
-      case 0x0098:
-      case 0x0099:
-      case 0x009a:
-      case 0x009b: {
-        const isDirect = opcode === 0x009a || opcode === 0x009b;
-        if (isDirect && pos + 4 <= bytes.length) pos += 4;
-
-        if (pos + 2 > bytes.length) break outer;
-        const rowBytesRaw = view.getUint16(pos, false);
-        pos += 2;
-        const rowBytes = rowBytesRaw & 0x3fff;
-        const isPixMap = (rowBytesRaw & 0x8000) !== 0 || isDirect;
-
-        if (pos + 8 > bytes.length) break outer;
-        const bTop = view.getInt16(pos, false);
-        pos += 2;
-        const bLeft = view.getInt16(pos, false);
-        pos += 2;
-        const bBottom = view.getInt16(pos, false);
-        pos += 2;
-        const bRight = view.getInt16(pos, false);
-        pos += 2;
-        const imgW = bRight - bLeft;
-        const imgH = bBottom - bTop;
-        if (imgW <= 0 || imgH <= 0 || imgW > 4096 || imgH > 4096) break outer;
-
-        let pixelSize = 1;
-        let packType = 0;
-        let cmpCount = 1;
-        let colorTable: number[] | null = null;
-
-        if (isPixMap) {
-          if (pos + 2 > bytes.length) break outer;
-          pos += 2;
-          if (pos + 2 > bytes.length) break outer;
-          packType = view.getUint16(pos, false);
-          if (pos + 2 > bytes.length) break outer;
-          pos += 2;
-          if (pos + 2 > bytes.length) break outer;
-          pixelSize = view.getUint16(pos, false);
-          pos += 2;
-          if (pos + 2 > bytes.length) break outer;
-          cmpCount = view.getUint16(pos, false);
-          pos += 2;
-          if (pos + 2 > bytes.length) break outer;
-          pos += 2;
-          if (pos + 4 > bytes.length) break outer;
-          pos += 4;
-          if (pos + 4 > bytes.length) break outer;
-          pos += 4;
-          // QuickDraw pixel opcodes store a 50-byte PixMap record for DirectBits
-          // (or 46-byte without baseAddr for PackBitsRect/Rgn). Account for the
-          // final 2-byte field to keep subsequent parsing aligned.
-          if (pos + 2 > bytes.length) break outer;
-          pos += 2;
-          if (pos + 4 > bytes.length) break outer;
-          pos += 4;
-
-          if (!isDirect && pixelSize <= 8) {
-            if (pos + 8 > bytes.length) break outer;
-            pos += 4;
-            pos += 2;
-            const ctSize = view.getInt16(pos, false) + 1;
-            pos += 2;
-            colorTable = [];
-            for (let ci = 0; ci < ctSize; ci += 1) {
-              if (pos + 8 > bytes.length) break outer;
-              pos += 2;
-              const r = view.getUint16(pos, false) >> 8;
-              pos += 2;
-              const g = view.getUint16(pos, false) >> 8;
-              pos += 2;
-              const b = view.getUint16(pos, false) >> 8;
-              pos += 2;
-              colorTable.push(r, g, b);
-            }
-          }
-        }
-
-        if (pos + 18 > bytes.length) break outer;
-        pos += 8;
-        pos += 8;
-        pos += 2;
-
-        if (opcode === 0x0099 || opcode === 0x009b) {
-          if (pos + 2 > bytes.length) break outer;
-          const rgnSize = view.getUint16(pos, false);
-          pos += rgnSize;
-        }
-
-        const imgData = ctx.createImageData(imgW, imgH);
-        const isPacked = rowBytes > 250 || (packType !== 1 && pixelSize !== 1);
-
-        for (let row = 0; row < imgH; row += 1) {
-          let rowData: Uint8Array;
-          const bytesPerRow = rowBytes;
-          if (isPacked) {
-            if (pos + (bytesPerRow > 250 ? 2 : 1) > bytes.length) break outer;
-            const compLen =
-              bytesPerRow > 250
-                ? view.getUint16(pos, false) + ((pos += 2), 0)
-                : view.getUint8(pos++) + 0;
-            if (pos + compLen > bytes.length) break outer;
-            rowData = decodePackBits(bytes.subarray(pos, pos + compLen), bytesPerRow);
-            pos += compLen;
-          } else {
-            if (pos + bytesPerRow > bytes.length) break outer;
-            rowData = bytes.subarray(pos, pos + bytesPerRow);
-            pos += bytesPerRow;
-          }
-
-          for (let col = 0; col < imgW; col += 1) {
-            const di = (row * imgW + col) * 4;
-            if (pixelSize === 16) {
-              const pixOff = col * 2;
-              if (pixOff + 2 > rowData.length) break;
-              const pixel = ((rowData[pixOff] ?? 0) << 8) | (rowData[pixOff + 1] ?? 0);
-              imgData.data[di] = (((pixel >> 10) & 0x1f) * 255) / 31;
-              imgData.data[di + 1] = (((pixel >> 5) & 0x1f) * 255) / 31;
-              imgData.data[di + 2] = ((pixel & 0x1f) * 255) / 31;
-              imgData.data[di + 3] = 255;
-            } else if (pixelSize === 32) {
-              const planeStride = imgW;
-              if (cmpCount >= 4) {
-                const aOff = col;
-                const rOff = planeStride + col;
-                const gOff = planeStride * 2 + col;
-                const bOff = planeStride * 3 + col;
-                if (bOff >= rowData.length) break;
-                imgData.data[di] = rowData[rOff] ?? 0;
-                imgData.data[di + 1] = rowData[gOff] ?? 0;
-                imgData.data[di + 2] = rowData[bOff] ?? 0;
-                imgData.data[di + 3] = rowData[aOff] || 255;
-              } else {
-                const rOff = col;
-                const gOff = planeStride + col;
-                const bOff = planeStride * 2 + col;
-                if (bOff >= rowData.length) break;
-                imgData.data[di] = rowData[rOff] ?? 0;
-                imgData.data[di + 1] = rowData[gOff] ?? 0;
-                imgData.data[di + 2] = rowData[bOff] ?? 0;
-                imgData.data[di + 3] = 255;
-              }
-            } else if (pixelSize === 8) {
-              const idx = rowData[col] ?? 0;
-              if (colorTable && colorTable.length >= (idx + 1) * 3) {
-                imgData.data[di] = colorTable[idx * 3] ?? 0;
-                imgData.data[di + 1] = colorTable[idx * 3 + 1] ?? 0;
-                imgData.data[di + 2] = colorTable[idx * 3 + 2] ?? 0;
-              } else {
-                imgData.data[di] = imgData.data[di + 1] = imgData.data[di + 2] = idx;
-              }
-              imgData.data[di + 3] = 255;
-            } else {
-              imgData.data[di] = imgData.data[di + 1] = imgData.data[di + 2] = 128;
-              imgData.data[di + 3] = 255;
-            }
-          }
-        }
-        ctx.putImageData(imgData, 0, 0);
-        rendered = true;
-        break outer;
-      }
-      default: {
-        if (isV2 && opcode >= 0x0100 && opcode <= 0x7fff) {
-          pos += (opcode >> 8) * 2;
-        } else if (isV2 && opcode >= 0x8000 && opcode <= 0x80ff) {
-          // no data
-        } else if (isV2 && opcode >= 0x8100) {
-          if (pos + 4 > bytes.length) break outer;
-          const longLen = view.getUint32(pos, false);
-          pos += 4 + longLen;
-        } else {
-          break outer;
-        }
-        break;
-      }
-    }
-  }
-
-  if (rendered) return canvas;
-
-  // Fallback: scan common packed-row offsets used by this game's PICT assets.
-  const OFFSETS = [
-    122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150, 152, 154, 156, 106,
-    108, 110, 112, 114, 116, 118, 120, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 158,
-    160,
-  ];
-
-  let bestOffset = -1;
+  let pixDataOff = -1;
   let bestBpp: 1 | 2 = 2;
 
-  for (const bpp of [2, 1] as const) {
-    const rowBytes = picW * bpp;
-    const bcBytes = rowBytes > 250 ? 2 : 1;
-    for (const startOff of OFFSETS) {
-      let off = startOff;
-      let consumed = 0;
-      let ok = true;
-      for (let row = 0; row < picH; row += 1) {
-        if (off + bcBytes > bytes.length) {
-          ok = false;
+  if (
+    bytes.length >= 40 &&
+    bytes[10] === 0x00 &&
+    bytes[11] === 0x11 &&
+    bytes[12] === 0x02 &&
+    bytes[13] === 0xff &&
+    bytes[14] === 0x0c &&
+    bytes[15] === 0x00
+  ) {
+    let pos = 40;
+    while (pos + 2 <= bytes.length) {
+      const opcode = readU16(pos);
+      pos += 2;
+
+      switch (opcode) {
+        case 0x0000:
+        case 0x001d:
+        case 0x001e:
+          break;
+        case 0x0001: {
+          if (pos + 2 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          const rsize = Math.max(2, readU16(pos));
+          pos += rsize;
           break;
         }
-        const bc =
-          bcBytes === 2 ? ((bytes[off] ?? 0) << 8) | (bytes[off + 1] ?? 0) : (bytes[off] ?? 0);
-        if (bc <= 0 || bc > Math.floor((rowBytes * 3) / 2) + 128) {
-          ok = false;
+        case 0x0003:
+        case 0x0004:
+        case 0x0005:
+        case 0x0008:
+        case 0x000d:
+        case 0x0015:
+        case 0x0016:
+        case 0x00a0:
+          pos += 2;
+          break;
+        case 0x0006:
+        case 0x0007:
+        case 0x000b:
+        case 0x000c:
+        case 0x000e:
+        case 0x000f:
+        case 0x0026:
+        case 0x0027:
+          pos += 4;
+          break;
+        case 0x001a:
+        case 0x001b:
+        case 0x001f:
+        case 0x0022:
+        case 0x0023:
+          pos += 6;
+          break;
+        case 0x0009:
+        case 0x000a:
+        case 0x0010:
+        case 0x0020:
+        case 0x0021:
+        case 0x0028:
+        case 0x0029:
+        case 0x002a:
+        case 0x002b:
+        case 0x002c:
+        case 0x0030:
+        case 0x0031:
+        case 0x0032:
+        case 0x0033:
+        case 0x0034:
+        case 0x0038:
+        case 0x0039:
+        case 0x003a:
+        case 0x003b:
+        case 0x003c:
+          pos += 8;
+          break;
+        case 0x0040:
+        case 0x0041:
+        case 0x0042:
+        case 0x0043:
+        case 0x0044:
+          pos += 12;
+          break;
+        case 0x0050:
+        case 0x0051:
+        case 0x0052:
+        case 0x0053:
+        case 0x0054:
+        case 0x0060:
+        case 0x0061:
+        case 0x0062:
+        case 0x0063:
+        case 0x0064:
+        case 0x0070:
+        case 0x0071:
+        case 0x0072:
+        case 0x0073:
+        case 0x0074: {
+          if (pos + 2 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          pos += readU16(pos);
           break;
         }
-        off += bcBytes;
-        if (off + bc > bytes.length) {
-          ok = false;
+        case 0x00b0: {
+          if (pos + 5 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          pos += 5 + (bytes[pos + 4] ?? 0);
+          if (pos % 2 !== 0) pos += 1;
           break;
         }
-        off += bc;
-        consumed += bcBytes + bc;
+        case 0x00b1:
+        case 0x00b2: {
+          if (pos + 2 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          pos += 2 + (bytes[pos + 1] ?? 0);
+          if (pos % 2 !== 0) pos += 1;
+          break;
+        }
+        case 0x00b3: {
+          if (pos + 3 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          pos += 3 + (bytes[pos + 2] ?? 0);
+          if (pos % 2 !== 0) pos += 1;
+          break;
+        }
+        case 0x00a1: {
+          if (pos + 4 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          const longSize = readU16(pos + 2);
+          pos += 4 + longSize;
+          break;
+        }
+        case 0x0098:
+        case 0x0099: {
+          if (pos + 46 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          const pixelSize = readU16(pos + 28);
+          bestBpp = pixelSize === 16 ? 2 : 1;
+          pos += 46;
+          if (pos + 8 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          const ctSize = readU16(pos + 6);
+          const colorTableBytes = 8 + (ctSize + 1) * 8;
+          if (pos + colorTableBytes > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          pos += colorTableBytes;
+          if (pos + 18 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          pos += 18;
+          if (opcode === 0x0099) {
+            if (pos + 2 > bytes.length) {
+              pos = bytes.length + 1;
+              break;
+            }
+            pos += readU16(pos);
+          }
+          pixDataOff = pos;
+          break;
+        }
+        case 0x009a:
+        case 0x009b: {
+          if (pos + 50 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          const pixelSize = readU16(pos + 32);
+          bestBpp = pixelSize === 16 ? 2 : 1;
+          pos += 50;
+          if (pos + 18 > bytes.length) {
+            pos = bytes.length + 1;
+            break;
+          }
+          pos += 18;
+          if (opcode === 0x009b) {
+            if (pos + 2 > bytes.length) {
+              pos = bytes.length + 1;
+              break;
+            }
+            pos += readU16(pos);
+          }
+          pixDataOff = pos;
+          break;
+        }
+        case 0x00ff:
+          pos = bytes.length + 1;
+          break;
+        default:
+          if (opcode >= 0x0100 && opcode <= 0x7fff) {
+            if (pos + 2 > bytes.length) {
+              pos = bytes.length + 1;
+              break;
+            }
+            pos += 2 + readU16(pos);
+          } else if (opcode >= 0x8000) {
+            if (pos + 4 > bytes.length) {
+              pos = bytes.length + 1;
+              break;
+            }
+            const longLen =
+              ((bytes[pos] ?? 0) << 24) |
+              ((bytes[pos + 1] ?? 0) << 16) |
+              ((bytes[pos + 2] ?? 0) << 8) |
+              (bytes[pos + 3] ?? 0);
+            pos += 4 + longLen;
+          } else {
+            pos = bytes.length + 1;
+          }
+          break;
       }
-      if (ok && consumed > Math.floor((rowBytes * picH) / 8)) {
-        bestOffset = startOff;
-        bestBpp = bpp;
+
+      if (pixDataOff >= 0) {
+        break;
+      }
+      if (pos < 0 || pos > bytes.length) {
         break;
       }
     }
-    if (bestOffset >= 0) break;
   }
 
-  if (bestOffset < 0) return null;
+  // Fallback: scan common packed-row offsets used by this game's PICT assets.
+  if (pixDataOff < 0) {
+    const OFFSETS = [
+      122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150, 152, 154, 156,
+      106, 108, 110, 112, 114, 116, 118, 120, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102,
+      104, 158, 160,
+    ];
+
+    for (const bpp of [2, 1] as const) {
+      const rowBytes = picW * bpp;
+      const bcBytes = rowBytes > 250 ? 2 : 1;
+      for (const startOff of OFFSETS) {
+        let off = startOff;
+        let consumed = 0;
+        let valid = true;
+        for (let row = 0; row < picH; row += 1) {
+          if (off + bcBytes > bytes.length) {
+            valid = false;
+            break;
+          }
+          const bc = bcBytes === 2 ? readU16(off) : (bytes[off] ?? 0);
+          if (bc <= 0 || bc > Math.floor((rowBytes * 3) / 2) + 128) {
+            valid = false;
+            break;
+          }
+          off += bcBytes;
+          if (off + bc > bytes.length) {
+            valid = false;
+            break;
+          }
+          off += bc;
+          consumed += bcBytes + bc;
+        }
+        if (valid && consumed > Math.floor((rowBytes * picH) / 8)) {
+          pixDataOff = startOff;
+          bestBpp = bpp;
+          break;
+        }
+      }
+      if (pixDataOff >= 0) break;
+    }
+  }
+
+  if (pixDataOff < 0) return null;
 
   const rowBytes = picW * bestBpp;
   const bcBytes = rowBytes > 250 ? 2 : 1;
-  const fallback = ctx.createImageData(picW, picH);
-  let pos2 = bestOffset;
+  const image = ctx.createImageData(picW, picH);
+  let pos = pixDataOff;
 
   for (let row = 0; row < picH; row += 1) {
-    if (pos2 + bcBytes > bytes.length) return null;
-    const bc =
-      bcBytes === 2 ? ((bytes[pos2] ?? 0) << 8) | (bytes[pos2 + 1] ?? 0) : (bytes[pos2] ?? 0);
-    pos2 += bcBytes;
-    if (bc < 0 || pos2 + bc > bytes.length) return null;
+    if (pos + bcBytes > bytes.length) return null;
+    const bc = bcBytes === 2 ? readU16(pos) : (bytes[pos] ?? 0);
+    pos += bcBytes;
+    if (bc < 0 || pos + bc > bytes.length) return null;
 
-    const rowCompressed = bytes.subarray(pos2, pos2 + bc);
-    pos2 += bc;
+    const rowCompressed = bytes.subarray(pos, pos + bc);
+    pos += bc;
     const rowData =
       bestBpp === 2
         ? decodePackBits16(rowCompressed, rowBytes)
@@ -776,20 +723,20 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
       if (bestBpp === 2) {
         const off = col * 2;
         const pixel = ((rowData[off] ?? 0) << 8) | (rowData[off + 1] ?? 0);
-        fallback.data[di] = (((pixel >> 10) & 0x1f) * 255) / 31;
-        fallback.data[di + 1] = (((pixel >> 5) & 0x1f) * 255) / 31;
-        fallback.data[di + 2] = ((pixel & 0x1f) * 255) / 31;
+        image.data[di] = (((pixel >> 10) & 0x1f) * 255) / 31;
+        image.data[di + 1] = (((pixel >> 5) & 0x1f) * 255) / 31;
+        image.data[di + 2] = ((pixel & 0x1f) * 255) / 31;
       } else {
         const idx = rowData[col] ?? 0;
         const pi = idx * 3;
-        fallback.data[di] = MAC_8BIT_PALETTE[pi] ?? idx;
-        fallback.data[di + 1] = MAC_8BIT_PALETTE[pi + 1] ?? idx;
-        fallback.data[di + 2] = MAC_8BIT_PALETTE[pi + 2] ?? idx;
+        image.data[di] = MAC_8BIT_PALETTE[pi] ?? idx;
+        image.data[di + 1] = MAC_8BIT_PALETTE[pi + 1] ?? idx;
+        image.data[di + 2] = MAC_8BIT_PALETTE[pi + 2] ?? idx;
       }
-      fallback.data[di + 3] = 255;
+      image.data[di + 3] = 255;
     }
   }
 
-  ctx.putImageData(fallback, 0, 0);
+  ctx.putImageData(image, 0, 0);
   return canvas;
 }

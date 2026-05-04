@@ -227,7 +227,20 @@ export function sndToWav(bytes: Uint8Array): Uint8Array {
     return buildWav(bytes, Math.round(info.sampleRate), 1, 8);
   }
   const pcmStart = Math.min(info.pcmOffset, bytes.length);
-  const pcmData = bytes.slice(pcmStart);
+  const bytesPerSample = Math.max(1, Math.floor(info.sampleSize / 8));
+  const expectedPcmBytes = info.numFrames * info.numChannels * bytesPerSample;
+  const pcmEnd = Math.min(bytes.length, pcmStart + expectedPcmBytes);
+  const pcmData = bytes.slice(pcmStart, pcmEnd);
+  if (info.sampleSize === 16) {
+    // extSH samples are big-endian PCM; WAV requires little-endian samples.
+    const littleEndianPcm = pcmData.slice();
+    for (let i = 0; i + 1 < littleEndianPcm.length; i += 2) {
+      const hi = littleEndianPcm[i];
+      littleEndianPcm[i] = littleEndianPcm[i + 1] ?? 0;
+      littleEndianPcm[i + 1] = hi ?? 0;
+    }
+    return buildWav(littleEndianPcm, Math.round(info.sampleRate), info.numChannels, info.sampleSize);
+  }
   return buildWav(pcmData, Math.round(info.sampleRate), info.numChannels, info.sampleSize);
 }
 

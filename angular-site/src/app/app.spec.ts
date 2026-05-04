@@ -36,18 +36,25 @@ describe('App', () => {
 
   it('should pause the game loop on the editor tab and resume on the game tab', () => {
     const app = TestBed.createComponent(App).componentInstance;
-    const originalModule = window.Module;
+    const frame = document.createElement('iframe');
+    frame.id = 'game-frame';
+    document.body.appendChild(frame);
+    const frameWindow = frame.contentWindow;
     let pauseCount = 0;
     let resumeCount = 0;
 
-    window.Module = {
+    if (!frameWindow) {
+      throw new Error('Expected iframe contentWindow in test environment');
+    }
+
+    frameWindow.Module = {
       pauseMainLoop: () => {
         pauseCount += 1;
       },
       resumeMainLoop: () => {
         resumeCount += 1;
       },
-    } as unknown as NonNullable<typeof window.Module>;
+    } as unknown as NonNullable<typeof frameWindow.Module>;
 
     try {
       app.runtime.setTab('editor');
@@ -57,7 +64,7 @@ describe('App', () => {
       app.runtime.setTab('game');
       expect(resumeCount).toBe(1);
     } finally {
-      window.Module = originalModule;
+      frame.remove();
     }
   });
 
@@ -597,9 +604,9 @@ describe('App', () => {
 
   it('setCustomOptionsPreset should apply linked Terminator presets', async () => {
     const app = TestBed.createComponent(App).componentInstance;
-    spyOn(app.runtime, 'applyCustomResourcesPreset').and.callFake(async (preset) => {
+    app.runtime.applyCustomResourcesPreset = (async (preset) => {
       app.customResourcesPreset.set(preset);
-    });
+    }) as typeof app.runtime.applyCustomResourcesPreset;
 
     await app.setCustomOptionsPreset('terminator');
 

@@ -37,6 +37,7 @@
  *   LIST_PACK_ENTRIES      payload: { packId } → { entries: {id,size}[] | null }
  *   GET_PACK_ENTRY_RAW     payload: { packId, entryId } → { bytes: ArrayBuffer | null }
  *   PUT_PACK_ENTRY_RAW     payload: { packId, entryId, bytes: ArrayBuffer }
+ *   MERGE_RESOURCES        payload: { bytes: ArrayBuffer, options: ResourceMergeOptions }
  */
 
 import { ResourceDatService } from './resource-dat.service';
@@ -59,6 +60,7 @@ import type {
   RoadInfoData,
   ObjectGroupDefinition,
 } from './level-editor.service';
+import { mergeResourceEntries, type ResourceMergeOptions } from './resource-merge';
 
 const resourceDatSvc = new ResourceDatService();
 const levelEditorSvc = new LevelEditorService();
@@ -394,6 +396,36 @@ self.addEventListener('message', (event: MessageEvent) => {
         const { packId, entryId, bytes } = payload as { packId: number; entryId: number; bytes: ArrayBuffer };
         resources = putPackEntryRaw(resources, packId, entryId, new Uint8Array(bytes));
         self.postMessage({ id, ok: true, cmd, result: {} });
+        break;
+      }
+
+      case 'MERGE_RESOURCES': {
+        const {
+          bytes,
+          options,
+        } = payload as { bytes: ArrayBuffer; options: ResourceMergeOptions };
+        const incomingBytes = new Uint8Array(bytes);
+        const incomingResources = resourceDatSvc.parse(incomingBytes).match(
+          (value) => value,
+          (error) => {
+            self.postMessage({ id, ok: false, cmd, error });
+            return null;
+          },
+        );
+        if (!incomingResources) {
+          break;
+        }
+        const mergeResult = mergeResourceEntries(resources, incomingResources, options);
+        resources = mergeResult.entries;
+        self.postMessage({
+          id,
+          ok: true,
+          cmd,
+          result: {
+            overwritten: mergeResult.overwritten,
+            added: mergeResult.added,
+          },
+        });
         break;
       }
 

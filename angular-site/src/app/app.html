@@ -10,9 +10,11 @@
   (editorSectionChange)="runtime.setSection($event)"
   (loadDefaultResources)="runtime.loadDefaultResources()"
   (resourceFileSelected)="runtime.onResourceFileSelected($event)"
+  (resourceMergeSelected)="runtime.onResourceMergeSelected($event.file, $event.options)"
   (downloadEditedResources)="runtime.downloadEditedResources()"
   (clearEditorFile)="runtime.clearEditorResources()"
   (selectLevel)="selectLevel($event)"
+  (previewSelectedLevel)="launchSelectedLevelPreview($event)"
 ></app-site-toolbar>
 
 <main class="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--bg)]">
