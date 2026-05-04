@@ -46,7 +46,7 @@ function lzrwHash(buf: Uint8Array, pos: number): number {
  *
  * @param src – the payload bytes AFTER the 4-byte size header and INCLUDING the FLAG_BYTE.
  */
-export function lzrw3aDecompress(src: Uint8Array): Uint8Array {
+export function lzrw3aDecompress(src: Uint8Array, expectedOutSize?: number): Uint8Array {
   if (src.length === 0) return new Uint8Array(0);
 
   if (src[0] === FLAG_COPY) {
@@ -57,12 +57,25 @@ export function lzrw3aDecompress(src: Uint8Array): Uint8Array {
   // LZRW3-A compressed stream.
   // We work in a "combined" buffer: [startString(18)][output bytes…].
   // Hash-table entries are absolute offsets into combined.
-  // Worst-case expansion: each input byte could become 1 literal (1 byte of output)
-  // plus 1 control bit (1/8 byte overhead) = ~9/8 bytes → multiply by 9 for safety
-  // (matching COMPRESS_MAX_COM / COMPRESS_MAX_ORG = 9× in the original C code).
-  const maxOut = src.length * 9 + COMPRESS_OVERRUN;
-  const combined = new Uint8Array(START_STRING_LEN + maxOut);
+  // Prefer the pack-header uncompressed size when known; fall back to a conservative estimate.
+  let maxOut = src.length * 9 + COMPRESS_OVERRUN;
+  if (typeof expectedOutSize === 'number' && expectedOutSize > 0) {
+    maxOut = Math.max(maxOut, expectedOutSize + COMPRESS_OVERRUN);
+  }
+  let combined = new Uint8Array(START_STRING_LEN + maxOut);
   combined.set(START_STRING, 0);
+
+  const ensureCombinedCapacity = (requiredDstOff: number): void => {
+    const requiredTotal = START_STRING_LEN + requiredDstOff;
+    if (requiredTotal <= combined.length) return;
+    let nextLen = combined.length;
+    while (nextLen < requiredTotal) {
+      nextLen = Math.max(nextLen * 2, requiredTotal + COMPRESS_OVERRUN);
+    }
+    const grown = new Uint8Array(nextLen);
+    grown.set(combined);
+    combined = grown;
+  };
 
   // All hash table slots initialized to 0 (= start of START_STRING).
   const hashTable = new Int32Array(HASH_TABLE_LEN);
@@ -112,6 +125,7 @@ export function lzrw3aDecompress(src: Uint8Array): Uint8Array {
         const srcCopyPos = hashTable[index];
 
         // Byte-by-byte copy supports overlapping (RLE-style repetition).
+        ensureCombinedCapacity(dstOff + copyLen);
         for (let k = 0; k < copyLen; k++) {
           combined[START_STRING_LEN + dstOff + k] = combined[srcCopyPos + k];
         }
@@ -131,6 +145,7 @@ export function lzrw3aDecompress(src: Uint8Array): Uint8Array {
         updateHash(index & ~DEPTH_MASK, pZivCombined);
       } else {
         // ---- Literal item ----
+        ensureCombinedCapacity(dstOff + 1);
         combined[START_STRING_LEN + dstOff] = src[pSrc++];
         dstOff++;
 
@@ -165,7 +180,7 @@ export function packHandleDecompress(handle: Uint8Array): Result<Uint8Array, str
   }
 
   const payload = handle.slice(4); // [FLAG_BYTE][…]
-  const decompressed = lzrw3aDecompress(payload);
+  const decompressed = lzrw3aDecompress(payload, uncompressedSize);
 
   if (decompressed.length !== uncompressedSize) {
     // Use actual length; size mismatch is non-fatal.

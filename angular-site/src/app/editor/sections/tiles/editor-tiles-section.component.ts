@@ -51,6 +51,7 @@ export class EditorTilesSectionComponent implements OnChanges {
   @Output() createRoadInfo = new EventEmitter<void>();
   @Output() deleteRoadInfo = new EventEmitter<number>();
   @Output() roadTextureChange = new EventEmitter<{ field: TextureField; value: number }>();
+  @Output() playRoadSkidSound = new EventEmitter<number>();
   @Output() selectedTileIdChange = new EventEmitter<number | null>();
   @Output() deleteTileImage = new EventEmitter<number>();
   @Output() openTileEditor = new EventEmitter<number>();

@@ -212,7 +212,10 @@ export function getTileDimensions(entries: TextureTileEntry[], texId: number) {
   return `${entry.width}×${entry.height} px`;
 }
 
-export function getObjTypeDimensionLabel(objectTypeDefinitionMap: Map<number, ObjectTypeDefinition>, typeRes: number) {
+export function getObjTypeDimensionLabel(
+  objectTypeDefinitionMap: Map<number, ObjectTypeDefinition>,
+  typeRes: number,
+) {
   const def = objectTypeDefinitionMap.get(typeRes);
   if (!def) return '';
   return `${def.width.toFixed(1)}×${def.length.toFixed(1)} m`;

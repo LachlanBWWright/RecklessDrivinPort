@@ -29,6 +29,7 @@ export class EditorScreensSectionComponent implements OnChanges {
   @Output() selectIconEntry = new EventEmitter<{ type: string; id: number }>();
   @Output() exportIconPng = new EventEmitter<void>();
   @Output() exportIconRaw = new EventEmitter<void>();
+  @Output() openIconImageEditor = new EventEmitter<void>();
   @Output() iconRawUpload = new EventEmitter<Event>();
   @Output() iconPngUpload = new EventEmitter<Event>();
   @Output() addIconEntry = new EventEmitter<void>();

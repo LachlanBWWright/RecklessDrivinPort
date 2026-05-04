@@ -229,7 +229,7 @@ void UpdateButtonLocation()
 	int i,button=kNoButton;
 	HLock((Handle)gButtonList);
 	for(i=0;i<GetHandleSize((Handle)gButtonList)/sizeof(Rect);i++)
-		if(PtInRect(mPos,(*gButtonList)+i))
+		if(i!=kPrefsButton&&PtInRect(mPos,(*gButtonList)+i))
 			button=i;
 	HUnlock((Handle)gButtonList);
 	if(button!=gButtonLocation)
@@ -249,7 +249,7 @@ int GetButtonClick(Point mPos)
 	mPos=GetScreenPos(&mPos);
 	HLock((Handle)gButtonList);
 	for(i=0;i<GetHandleSize((Handle)gButtonList)/sizeof(Rect);i++)
-		if(PtInRect(mPos,(*gButtonList)+i))
+		if(i!=kPrefsButton&&PtInRect(mPos,(*gButtonList)+i))
 			button=i;
 	HUnlock((Handle)gButtonList);
 	if(button!=kNoButton)
@@ -361,7 +361,7 @@ void HandleCommand(int cmd,int modifiers)
 			StartGame(modifiers&optionKey);
 			break;
 		case kPrefsButton:
-			Preferences(); break;
+			return;
 		case kHelpButton:
 			ShowPicScreen(1007);WaitForPress(); 
 			ShowPicScreen(1008);WaitForPress();

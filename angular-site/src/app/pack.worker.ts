@@ -43,10 +43,16 @@
 import { ResourceDatService } from './resource-dat.service';
 import { LevelEditorService } from './level-editor.service';
 import {
-  getRawResource, putRawResource, listResources,
-  parseStrList, encodeStrList,
-  listPackEntries, getPackEntryRaw, putPackEntryRaw,
-  extractObjectGroupDefinitions, applyObjectGroupDefinitions,
+  getRawResource,
+  putRawResource,
+  listResources,
+  parseStrList,
+  encodeStrList,
+  listPackEntries,
+  getPackEntryRaw,
+  putPackEntryRaw,
+  extractObjectGroupDefinitions,
+  applyObjectGroupDefinitions,
   applyObjectTypeDefinitions,
 } from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
@@ -99,11 +105,11 @@ function decodeAllSpritePreviews(
 ): { typeRes: number; pixels: ArrayBuffer; width: number; height: number }[] {
   const result: { typeRes: number; pixels: ArrayBuffer; width: number; height: number }[] = [];
 
-  const frameIds = [...new Set(
-    objectTypesArr
-      .map(([, def]) => def?.frame)
-      .filter((f): f is number => f !== undefined),
-  )];
+  const frameIds = [
+    ...new Set(
+      objectTypesArr.map(([, def]) => def?.frame).filter((f): f is number => f !== undefined),
+    ),
+  ];
 
   if (frameIds.length === 0) return result;
 
@@ -148,7 +154,9 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'DECODE_SPRITE_PREVIEWS': {
-        const { objectTypesArr } = payload as { objectTypesArr: [number, ObjectTypeDefinition | undefined][] };
+        const { objectTypesArr } = payload as {
+          objectTypesArr: [number, ObjectTypeDefinition | undefined][];
+        };
         const decodedSprites = decodeAllSpritePreviews(objectTypesArr);
         const transferables: ArrayBuffer[] = decodedSprites.map((s) => s.pixels);
         self.postMessage({ id, ok: true, cmd, result: { decodedSprites } }, transferables);
@@ -166,10 +174,9 @@ self.addEventListener('message', (event: MessageEvent) => {
           neededTexIds.add(ri.roadLeftBorder);
           neededTexIds.add(ri.roadRightBorder);
         }
-        const textures: DecodedRoadTexture[] = levelEditorSvc.extractRoadTextures(
-          resources,
-          [...neededTexIds],
-        );
+        const textures: DecodedRoadTexture[] = levelEditorSvc.extractRoadTextures(resources, [
+          ...neededTexIds,
+        ]);
         // Transfer pixel ArrayBuffers to avoid copying.
         const transferables2: ArrayBuffer[] = textures.map((t) => t.pixels);
         self.postMessage(
@@ -190,10 +197,7 @@ self.addEventListener('message', (event: MessageEvent) => {
         // Decode every tile in kPackTx16 (not just those referenced by road infos).
         const textures = levelEditorSvc.extractAllRoadTextures(resources);
         const transferables3: ArrayBuffer[] = textures.map((t) => t.pixels);
-        self.postMessage(
-          { id, ok: true, cmd, result: { textures } },
-          transferables3,
-        );
+        self.postMessage({ id, ok: true, cmd, result: { textures } }, transferables3);
         break;
       }
 
@@ -280,7 +284,11 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'APPLY_SPRITE_BYTE': {
-        const { spriteId, offset, value } = payload as { spriteId: number; offset: number; value: number };
+        const { spriteId, offset, value } = payload as {
+          spriteId: number;
+          offset: number;
+          value: number;
+        };
         resources = levelEditorSvc.applySpriteByte(resources, spriteId, offset, value);
         const raw = levelEditorSvc.getSpriteBytes(resources, spriteId);
         const bytes = raw ? raw.slice() : null;
@@ -289,11 +297,11 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'APPLY_SPRITE_PACK_PIXELS': {
-        const {
-          frameId,
-          bitDepth,
-          pixels,
-        } = payload as { frameId: number; bitDepth: 8 | 16; pixels: Uint8ClampedArray };
+        const { frameId, bitDepth, pixels } = payload as {
+          frameId: number;
+          bitDepth: 8 | 16;
+          pixels: Uint8ClampedArray;
+        };
         resources = levelEditorSvc.applySpritePackPixels(resources, frameId, bitDepth, pixels);
         // Return updated levels so canvas previews refresh
         const { levels } = extractAll();
@@ -351,7 +359,11 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'PUT_RESOURCE_RAW': {
-        const { type, id: resId, bytes } = payload as { type: string; id: number; bytes: ArrayBuffer };
+        const {
+          type,
+          id: resId,
+          bytes,
+        } = payload as { type: string; id: number; bytes: ArrayBuffer };
         resources = putRawResource(resources, type, resId, new Uint8Array(bytes));
         self.postMessage({ id, ok: true, cmd, result: {} });
         break;
@@ -393,17 +405,18 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'PUT_PACK_ENTRY_RAW': {
-        const { packId, entryId, bytes } = payload as { packId: number; entryId: number; bytes: ArrayBuffer };
+        const { packId, entryId, bytes } = payload as {
+          packId: number;
+          entryId: number;
+          bytes: ArrayBuffer;
+        };
         resources = putPackEntryRaw(resources, packId, entryId, new Uint8Array(bytes));
         self.postMessage({ id, ok: true, cmd, result: {} });
         break;
       }
 
       case 'MERGE_RESOURCES': {
-        const {
-          bytes,
-          options,
-        } = payload as { bytes: ArrayBuffer; options: ResourceMergeOptions };
+        const { bytes, options } = payload as { bytes: ArrayBuffer; options: ResourceMergeOptions };
         const incomingBytes = new Uint8Array(bytes);
         const incomingResources = resourceDatSvc.parse(incomingBytes).match(
           (value) => value,

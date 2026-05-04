@@ -935,6 +935,14 @@ static UInt8 rgb15_to_palette8(uint16_t px15, const SDL_Color *pal) {
     if (!s_rgb15_cache_valid) rgb15_cache_build(pal);
     return s_rgb15_cache[px15 & 0x7FFF];
 }
+
+static uint16_t palette8_to_rgb555(UInt8 idx, const SDL_Color *pal) {
+    const SDL_Color c = pal[idx];
+    uint16_t r = (uint16_t)(c.r >> 3);
+    uint16_t g = (uint16_t)(c.g >> 3);
+    uint16_t b = (uint16_t)(c.b >> 3);
+    return (uint16_t)((r << 10) | (g << 5) | b);
+}
 #endif
 
 
@@ -1269,6 +1277,7 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
     int dstRight = dstRect ? dstRect->right : (picLeft + picW);
     int dstW = dstRight - dstLeft;
     int dstH = dstBottom - dstTop;
+    int dstIs16 = (portRb >= (short)(gXSize * 2));
     if (dstW <= 0 || dstH <= 0) {
         return;
     }
@@ -1302,8 +1311,8 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
             }
             src += bc;
 
-            /* Draw with destination-rect scaling so 320px-wide pause/menu images
-             * correctly expand to 640px when requested by callers. */
+            /* Draw with destination-rect scaling so callers can place 320px-wide
+             * pause/menu artwork into full-screen 640px destinations. */
             {
                 int startY = (row * dstH) / picH;
                 int endY = ((row + 1) * dstH) / picH;
@@ -1312,29 +1321,67 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
                     int dstY = dstTop + sy;
                     if (dstY < 0 || dstY >= gYSize) continue;
                     UInt8 *dst = portPix + dstY * portRb;
-                    if (picBpp == 1) {
-                        for (int dx = 0; dx < dstW; dx++) {
-                            int dstX = dstLeft + dx;
-                            if (dstX < 0 || dstX >= gXSize) continue;
-                            int srcX = (dx * picW) / dstW;
-                            if (srcX < 0) srcX = 0;
-                            if (srcX >= picW) srcX = picW - 1;
-                            dst[dstX] = rowBuf[srcX];
+                    if (dstIs16) {
+                        uint16_t *dst16 = (uint16_t *)dst;
+                        if (picBpp == 1) {
+                            for (int dx = 0; dx < dstW; dx++) {
+                                int dstX = dstLeft + dx;
+                                int srcX;
+                                if (dstX < 0 || dstX >= gXSize) continue;
+                                srcX = (dx * picW) / dstW;
+                                if (srcX < 0) srcX = 0;
+                                if (srcX >= picW) srcX = picW - 1;
+#ifdef PORT_SDL2
+                                dst16[dstX] = palette8_to_rgb555(rowBuf[srcX], s_palette);
+#else
+                                {
+                                    uint16_t g = (uint16_t)(rowBuf[srcX] >> 3);
+                                    dst16[dstX] = (uint16_t)((g << 10) | (g << 5) | g);
+                                }
+#endif
+                            }
+                        } else {
+                            for (int dx = 0; dx < dstW; dx++) {
+                                int dstX = dstLeft + dx;
+                                int srcX;
+                                uint16_t px;
+                                if (dstX < 0 || dstX >= gXSize) continue;
+                                srcX = (dx * picW) / dstW;
+                                if (srcX < 0) srcX = 0;
+                                if (srcX >= picW) srcX = picW - 1;
+                                px = (uint16_t)(((uint16_t)rowBuf[srcX*2] << 8)
+                                               | rowBuf[srcX*2+1]);
+                                dst16[dstX] = px;
+                            }
                         }
                     } else {
-                        /* 16-bit x5R5G5B → 8-bit palette index via lookup table */
+                        if (picBpp == 1) {
+                            for (int dx = 0; dx < dstW; dx++) {
+                                int dstX = dstLeft + dx;
+                                int srcX;
+                                if (dstX < 0 || dstX >= gXSize) continue;
+                                srcX = (dx * picW) / dstW;
+                                if (srcX < 0) srcX = 0;
+                                if (srcX >= picW) srcX = picW - 1;
+                                dst[dstX] = rowBuf[srcX];
+                            }
+                        } else {
+                            /* 16-bit x5R5G5B → 8-bit palette index via lookup table */
 #ifdef PORT_SDL2
-                        for (int dx = 0; dx < dstW; dx++) {
-                            int dstX = dstLeft + dx;
-                            if (dstX < 0 || dstX >= gXSize) continue;
-                            int srcX = (dx * picW) / dstW;
-                            if (srcX < 0) srcX = 0;
-                            if (srcX >= picW) srcX = picW - 1;
-                            uint16_t px = (uint16_t)(((uint16_t)rowBuf[srcX*2] << 8)
-                                                    | rowBuf[srcX*2+1]);
-                            dst[dstX] = rgb15_to_palette8(px, s_palette);
-                        }
+                            for (int dx = 0; dx < dstW; dx++) {
+                                int dstX = dstLeft + dx;
+                                int srcX;
+                                uint16_t px;
+                                if (dstX < 0 || dstX >= gXSize) continue;
+                                srcX = (dx * picW) / dstW;
+                                if (srcX < 0) srcX = 0;
+                                if (srcX >= picW) srcX = picW - 1;
+                                px = (uint16_t)(((uint16_t)rowBuf[srcX*2] << 8)
+                                               | rowBuf[srcX*2+1]);
+                                dst[dstX] = rgb15_to_palette8(px, s_palette);
+                            }
 #endif
+                        }
                     }
                 }
             }
@@ -1545,8 +1592,43 @@ void SelectWindow(WindowPtr w) { (void)w; }
 /* Dialog Manager                                                            */
 /*---------------------------------------------------------------------------*/
 
+static Str255 gDialogItemText = { 0 };
+
+static void copy_pascal_string(char *dst, const char *src)
+{
+    unsigned int len = 0;
+    if (src) len = (unsigned char)src[0];
+    if (len > 255) len = 255;
+    dst[0] = (char)len;
+    if (len > 0 && src) {
+        memcpy(&dst[1], &src[1], len);
+    }
+}
+
+static void copy_c_string_to_pascal(Str255 dst, const char *src)
+{
+    size_t n = src ? strlen(src) : 0;
+    if (n > 255) n = 255;
+    dst[0] = (UInt8)n;
+    if (n > 0 && src) {
+        memcpy(&dst[1], src, n);
+    }
+}
+
+static void copy_pascal_to_c_string(const Str255 src, char *dst, size_t dstSize)
+{
+    size_t len = src ? src[0] : 0;
+    if (!dst || dstSize == 0) return;
+    if (len >= dstSize) len = dstSize - 1;
+    if (len > 0) {
+        memcpy(dst, &src[1], len);
+    }
+    dst[len] = '\0';
+}
+
 DialogPtr GetNewDialog(short id, void *wStorage, WindowPtr behind) {
     (void)id; (void)wStorage; (void)behind;
+    gDialogItemText[0] = 0;
     return (DialogPtr)calloc(1, sizeof(OpaqueDialogPtr));
 }
 
@@ -1555,20 +1637,136 @@ void DisposeDialog(DialogPtr dialog) {
 }
 
 void ModalDialog(void *filterProc, short *itemHit) {
+    EventRecord event;
+    int done = 0;
     (void)filterProc;
+
+#ifdef __EMSCRIPTEN__
+        {
+                char defaultName[256];
+                char entered[256];
+                copy_pascal_to_c_string(gDialogItemText, defaultName, sizeof(defaultName));
+                EM_ASM({
+                        var initial = UTF8ToString($0);
+                        if (typeof Module.__rdNameDone === 'undefined') {
+                            Module.__rdNameDone = 0;
+                            Module.__rdNameSubmit = "";
+                        }
+                        Module.__rdNameDone = 0;
+                        Module.__rdNameSubmit = "";
+                        var old = document.getElementById('rd-highscore-overlay');
+                        if (old && old.parentNode) old.parentNode.removeChild(old);
+                        var overlay = document.createElement('div');
+                        overlay.id = 'rd-highscore-overlay';
+                        overlay.style.position = 'fixed';
+                        overlay.style.left = '50%';
+                        overlay.style.top = '50%';
+                        overlay.style.transform = 'translate(-50%, -50%)';
+                        overlay.style.zIndex = '99999';
+                        overlay.style.background = 'rgba(0,0,0,0.9)';
+                        overlay.style.border = '2px solid #ffffff';
+                        overlay.style.padding = '12px';
+                        overlay.style.color = '#fff';
+                        overlay.style.fontFamily = 'monospace';
+                        overlay.innerHTML = '<div style="margin-bottom:8px">NEW HIGH SCORE! ENTER YOUR NAME</div>';
+                        var input = document.createElement('input');
+                        input.type = 'text';
+                        input.maxLength = 15;
+                        input.value = initial;
+                        input.style.width = '240px';
+                        input.style.marginRight = '8px';
+                        var ok = document.createElement('button');
+                        ok.textContent = 'OK';
+                        var submit = function () {
+                            Module.__rdNameSubmit = input.value || "";
+                            Module.__rdNameDone = 1;
+                        };
+                        ok.onclick = submit;
+                        input.addEventListener('keydown', function (e) {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                submit();
+                            }
+                        });
+                        overlay.appendChild(input);
+                        overlay.appendChild(ok);
+                        document.body.appendChild(overlay);
+                        input.focus();
+                        input.select();
+                }, defaultName);
+
+                while (!done) {
+                        if (EM_ASM_INT({ return Module.__rdNameDone ? 1 : 0; })) {
+                                EM_ASM({
+                                        var txt = Module.__rdNameSubmit || "";
+                                        stringToUTF8(txt, $0, 256);
+                                        var overlay = document.getElementById('rd-highscore-overlay');
+                                        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                                }, entered);
+                                copy_c_string_to_pascal(gDialogItemText, entered);
+                                done = 1;
+                                break;
+                        }
+                        WaitNextEvent(everyEvent, &event, 1, nil);
+                }
+                if (itemHit) *itemHit = 1;
+                return;
+        }
+#endif
+
+    while (!done) {
+        if (!WaitNextEvent(everyEvent, &event, 2, nil)) {
+            continue;
+        }
+
+        if (event.what == keyDown || event.what == autoKey) {
+            unsigned char ch = (unsigned char)(event.message & 0xFF);
+            unsigned char len = (unsigned char)gDialogItemText[0];
+
+            if (ch == 0x0D || ch == 0x03) {
+                done = 1;
+                continue;
+            }
+            if (ch == 0x08 || ch == 0x7F) {
+                if (len > 0) {
+                    gDialogItemText[0] = (char)(len - 1);
+                }
+                continue;
+            }
+            if (isprint(ch) && len < 31) {
+                gDialogItemText[len + 1] = (char)ch;
+                gDialogItemText[0] = (char)(len + 1);
+            }
+            continue;
+        }
+
+        if (event.what == mouseDown) {
+            done = 1;
+        }
+    }
+
     if (itemHit) *itemHit = 1;
 }
 
 void GetDialogItem(DialogPtr dialog, short itemNo, short *itemType,
                     Handle *item, Rect *box) {
+    (void)dialog;
+    (void)itemNo;
     if (itemType) *itemType = 0;
     if (item)     *item     = NULL;
     if (box)      memset(box, 0, sizeof(Rect));
 }
 
-void SetDialogItemText(Handle item, const char *text) { }
+void SetDialogItemText(Handle item, const char *text) {
+    (void)item;
+    copy_pascal_string(gDialogItemText, text);
+}
+
 void GetDialogItemText(Handle item, char *text) {
-    if (text) text[0] = 0;
+    (void)item;
+    if (text) {
+        copy_pascal_string(text, gDialogItemText);
+    }
 }
 
 OSErr SetDialogDefaultItem(DialogPtr dialog, short newItem) { return 0; }

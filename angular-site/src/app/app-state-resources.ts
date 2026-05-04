@@ -58,6 +58,8 @@ export class AppStateResources extends AppStateBase {
   spriteEditorFrame = signal<DecodedSpriteFrame | null>(null);
   /** True when the sprite editor is being used to edit a tile (not a sprite). */
   _editingTileId: number | null = null;
+  /** Active screen/icon resource currently being edited in the sprite editor popup. */
+  _editingIconResource: { type: string; id: number } | null = null;
 
   // ---- Raw resource browser ----
   /** Summary list of all resources from resources.dat (type, id, size). Populated on load. */

@@ -64,12 +64,24 @@ void SetHighScoreEntry(int index,UInt32 score)
 	SelectDialogItemText(highDlg,2,0,32767);
 	do ModalDialog(nil,&hit); while(hit!=1);
 	GetDialogItemText(item,text);
+	if(text[0]==0)
+		BlockMove(gPrefs.lastName,text,gPrefs.lastName[0]+1);
+	if(text[0]==0)
+	{
+		text[0]=6;
+		text[1]='P';
+		text[2]='L';
+		text[3]='A';
+		text[4]='Y';
+		text[5]='E';
+		text[6]='R';
+	}
 	BlockMove(text,gPrefs.lastName,text[0]+1);
 	DisposeDialog(highDlg);	
 	if(text[0]>15)
 	{
 		text[0]=15;
-		text[15]='É';
+		text[15]='.';
 	}
 	BlockMove(text,gPrefs.high[index].name,text[0]+1);
 	gPrefs.high[index].score=score;

@@ -115,7 +115,8 @@ export class PropertiesTabComponent implements OnChanges {
   };
 
   readonly objectGroupTooltips: Record<'resID' | 'numObjs', string> = {
-    resID: 'tObjectGroupReference.resID: object-group definition id looked up by InsertObjectGroup().',
+    resID:
+      'tObjectGroupReference.resID: object-group definition id looked up by InsertObjectGroup().',
     numObjs: 'tObjectGroupReference.numObjs: number of objects spawned for this slot.',
   };
 

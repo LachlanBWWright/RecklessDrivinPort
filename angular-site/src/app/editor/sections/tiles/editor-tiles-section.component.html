@@ -366,32 +366,40 @@
               <tr>
                 <td>skidSound</td>
                 <td>
-                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
-                    <mat-select formControlName="skidSound">
-                      <mat-select-trigger>
-                        <span class="inline-flex w-full min-w-0 items-center gap-2">
-                          <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
-                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(getRoadValue('skidSound')) }}</span>
-                        </span>
-                      </mat-select-trigger>
-                      @for (audio of audioEntries; track audio.id) {
-                        <mat-option [value]="audio.id">
-                          <span class="inline-flex min-w-0 items-center gap-2">
+                  <div class="flex w-full items-start gap-2">
+                    <button mat-icon-button type="button"
+                      (click)="playRoadSkidSound.emit(getRoadValue('skidSound'))"
+                      [disabled]="workerBusy || !getAudioEntry(getRoadValue('skidSound'))"
+                      matTooltip="Play selected skid sound">
+                      <mat-icon>play_arrow</mat-icon>
+                    </button>
+                    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                      <mat-select formControlName="skidSound">
+                        <mat-select-trigger>
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
                             <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
-                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(audio.id) }}</span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(getRoadValue('skidSound')) }}</span>
                           </span>
-                        </mat-option>
-                      }
-                      @if (!getAudioEntry(getRoadValue('skidSound'))) {
-                        <mat-option [value]="getRoadValue('skidSound')">
-                          <span class="inline-flex min-w-0 items-center gap-2">
-                            <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
-                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('skidSound') }} (custom)</span>
-                          </span>
-                        </mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
+                        </mat-select-trigger>
+                        @for (audio of audioEntries; track audio.id) {
+                          <mat-option [value]="audio.id">
+                            <span class="inline-flex min-w-0 items-center gap-2">
+                              <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
+                              <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(audio.id) }}</span>
+                            </span>
+                          </mat-option>
+                        }
+                        @if (!getAudioEntry(getRoadValue('skidSound'))) {
+                          <mat-option [value]="getRoadValue('skidSound')">
+                            <span class="inline-flex min-w-0 items-center gap-2">
+                              <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
+                              <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('skidSound') }} (custom)</span>
+                            </span>
+                          </mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
                 </td>
               </tr>
               </tbody>

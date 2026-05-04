@@ -42,7 +42,11 @@ describe('EditorObjectTypesSectionComponent', () => {
   it('cycles through contiguous sprite frames for the preview', () => {
     const component = createComponent();
     component.objectTypes = [makeType({ frame: 128, numFrames: 3 })];
-    component.spriteFrames = [{ id: 128, bitDepth: 8, width: 16, height: 16 }, { id: 129, bitDepth: 8, width: 16, height: 16 }, { id: 130, bitDepth: 8, width: 16, height: 16 }];
+    component.spriteFrames = [
+      { id: 128, bitDepth: 8, width: 16, height: 16 },
+      { id: 129, bitDepth: 8, width: 16, height: 16 },
+      { id: 130, bitDepth: 8, width: 16, height: 16 },
+    ];
     component.selectedObjectTypeId = 200;
 
     expect(component.getPreviewFrameId(component.selectedType!)).toBe(128);

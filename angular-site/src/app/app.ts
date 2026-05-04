@@ -446,10 +446,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     }
   }
 
-  setCustomSettingsPreset(
-    preset: CustomSettingsPresetId,
-    updateOptionsPreset = true,
-  ): void {
+  setCustomSettingsPreset(preset: CustomSettingsPresetId, updateOptionsPreset = true): void {
     this.customSettingsPreset.set(preset);
     switch (preset) {
       case 'default':
@@ -477,10 +474,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   }
 
   private syncCustomOptionsPreset(): void {
-    if (
-      this.customResourcesPreset() === 'default' &&
-      this.customSettingsPreset() === 'default'
-    ) {
+    if (this.customResourcesPreset() === 'default' && this.customSettingsPreset() === 'default') {
       this.customOptionsPreset.set('default');
       return;
     }
@@ -1018,6 +1012,9 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   }
 
   onSpriteEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
+    if (this._editingIconResource) {
+      return this.media.onIconImageEditorSaved(event);
+    }
     return onSpriteEditorSaved(this, event);
   }
 }

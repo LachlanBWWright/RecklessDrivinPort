@@ -67,6 +67,10 @@
             }
             @if (!isPictureResourceType(selectedIconType)) {
               <div class="flex flex-wrap gap-2">
+                <button mat-raised-button color="primary" (click)="openIconImageEditor.emit()" [disabled]="workerBusy"
+                  matTooltip="Open in-browser pixel editor for this icon resource">
+                  <mat-icon>brush</mat-icon> Edit Image
+                </button>
                 <button mat-stroked-button (click)="exportIconPng.emit()">
                   <mat-icon>download</mat-icon> Export PNG
                 </button>
@@ -91,6 +95,10 @@
               </p>
             } @else {
               <div class="flex flex-wrap gap-2">
+                <button mat-raised-button color="primary" (click)="openIconImageEditor.emit()" [disabled]="workerBusy"
+                  matTooltip="Open in-browser pixel editor for this picture resource">
+                  <mat-icon>brush</mat-icon> Edit Image
+                </button>
                 <input #iconPictureInput type="file" accept="image/png,image/jpeg,image/webp,image/*" style="display:none"
                   (change)="iconPngUpload.emit($event)" />
                 <button mat-stroked-button (click)="iconPictureInput.click()" [disabled]="workerBusy"

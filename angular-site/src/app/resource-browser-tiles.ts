@@ -64,6 +64,7 @@ export function openTileEditor(app: App, texId: number) {
     bitDepth: 16,
   };
   app._editingTileId = texId;
+  app._editingIconResource = null;
   app.spriteEditorFrame.set({ ...frame, pixels: pixels.slice() });
   app.spriteEditorOpen.set(true);
 }

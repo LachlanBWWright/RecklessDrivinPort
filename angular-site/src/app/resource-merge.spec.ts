@@ -22,16 +22,8 @@ function entry(type: string, id: number, bytes: number[]): ResourceDatEntry {
 
 describe('mergeResourceEntries', () => {
   it('overrides selected level packs and keeps unselected categories', () => {
-    const base = [
-      entry('Pack', 140, [1]),
-      entry('Pack', 128, [2]),
-      entry('STR#', 128, [3]),
-    ];
-    const incoming = [
-      entry('Pack', 140, [9]),
-      entry('Pack', 128, [8]),
-      entry('STR#', 128, [7]),
-    ];
+    const base = [entry('Pack', 140, [1]), entry('Pack', 128, [2]), entry('STR#', 128, [3])];
+    const incoming = [entry('Pack', 140, [9]), entry('Pack', 128, [8]), entry('STR#', 128, [7])];
 
     const result = mergeResourceEntries(base, incoming, {
       ...allDisabled,

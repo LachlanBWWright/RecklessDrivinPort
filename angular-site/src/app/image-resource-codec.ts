@@ -634,11 +634,21 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
               pos = bytes.length + 1;
               break;
             }
-            const longLen =
-              ((bytes[pos] ?? 0) << 24) |
-              ((bytes[pos + 1] ?? 0) << 16) |
-              ((bytes[pos + 2] ?? 0) << 8) |
+            const longLenBE =
+              (bytes[pos] ?? 0) * 0x1000000 +
+              (bytes[pos + 1] ?? 0) * 0x10000 +
+              (bytes[pos + 2] ?? 0) * 0x100 +
               (bytes[pos + 3] ?? 0);
+            const longLenLE =
+              (bytes[pos + 3] ?? 0) * 0x1000000 +
+              (bytes[pos + 2] ?? 0) * 0x10000 +
+              (bytes[pos + 1] ?? 0) * 0x100 +
+              (bytes[pos] ?? 0);
+
+            let longLen = longLenBE;
+            if (pos + 4 + longLenBE > bytes.length && pos + 4 + longLenLE <= bytes.length) {
+              longLen = longLenLE;
+            }
             pos += 4 + longLen;
           } else {
             pos = bytes.length + 1;
@@ -658,9 +668,9 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
   // Fallback: scan common packed-row offsets used by this game's PICT assets.
   if (pixDataOff < 0) {
     const OFFSETS = [
-      122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150, 152, 154, 156,
-      106, 108, 110, 112, 114, 116, 118, 120, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102,
-      104, 158, 160,
+      122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150, 152, 154, 156, 106,
+      108, 110, 112, 114, 116, 118, 120, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 158,
+      160,
     ];
 
     for (const bpp of [2, 1] as const) {
@@ -688,13 +698,73 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
           off += bc;
           consumed += bcBytes + bc;
         }
-        if (valid && consumed > Math.floor((rowBytes * picH) / 8)) {
+        const minConsumed = Math.max(picH, Math.floor((rowBytes * picH) / 128));
+        if (valid && consumed > minConsumed) {
           pixDataOff = startOff;
           bestBpp = bpp;
           break;
         }
       }
       if (pixDataOff >= 0) break;
+    }
+
+    // Last-resort probe: scan a wider offset window and quickly reject impossible starts.
+    if (pixDataOff < 0) {
+      for (const bpp of [2, 1] as const) {
+        const rowBytes = picW * bpp;
+        const bcBytes = rowBytes > 250 ? 2 : 1;
+        const maxStart = bytes.length - bcBytes;
+
+        for (let startOff = 40; startOff <= maxStart; startOff += 1) {
+          let probeOff = startOff;
+          let quickValid = true;
+
+          for (let row = 0; row < Math.min(8, picH); row += 1) {
+            if (probeOff + bcBytes > bytes.length) {
+              quickValid = false;
+              break;
+            }
+            const bc = bcBytes === 2 ? readU16(probeOff) : (bytes[probeOff] ?? 0);
+            if (bc <= 0 || bc > Math.floor((rowBytes * 3) / 2) + 128) {
+              quickValid = false;
+              break;
+            }
+            probeOff += bcBytes + bc;
+          }
+          if (!quickValid) continue;
+
+          let off = startOff;
+          let consumed = 0;
+          let valid = true;
+          for (let row = 0; row < picH; row += 1) {
+            if (off + bcBytes > bytes.length) {
+              valid = false;
+              break;
+            }
+            const bc = bcBytes === 2 ? readU16(off) : (bytes[off] ?? 0);
+            if (bc <= 0 || bc > Math.floor((rowBytes * 3) / 2) + 128) {
+              valid = false;
+              break;
+            }
+            off += bcBytes;
+            if (off + bc > bytes.length) {
+              valid = false;
+              break;
+            }
+            off += bc;
+            consumed += bcBytes + bc;
+          }
+
+          const minConsumed = Math.max(picH, Math.floor((rowBytes * picH) / 128));
+          if (valid && consumed > minConsumed) {
+            pixDataOff = startOff;
+            bestBpp = bpp;
+            break;
+          }
+        }
+
+        if (pixDataOff >= 0) break;
+      }
     }
   }
 
