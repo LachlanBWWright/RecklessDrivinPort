@@ -192,9 +192,12 @@ void InitInterface()
 		GDHandle oldGD;
 		Handle pic;
 		SetRect(&gwSize,0,0,640,480);
-		DoError(NewGWorld(&gMainScreenGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
-		DoError(NewGWorld(&gHilitGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
-		DoError(NewGWorld(&gSelectedGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
+		/* Interface GWorlds are always 8-bit: the menu is always shown in
+		 * 8-bit mode (gGameOn=false) and CopyBits does a raw byte-for-byte
+		 * copy, so the GWorld depth must match the 8-bit screen buffer. */
+		DoError(NewGWorld(&gMainScreenGW,8,&gwSize,nil,nil,0));
+		DoError(NewGWorld(&gHilitGW,8,&gwSize,nil,nil,0));
+		DoError(NewGWorld(&gSelectedGW,8,&gwSize,nil,nil,0));
 		LockPixels(GetGWorldPixMap(gMainScreenGW));
 		LockPixels(GetGWorldPixMap(gHilitGW));
 		LockPixels(GetGWorldPixMap(gSelectedGW));
