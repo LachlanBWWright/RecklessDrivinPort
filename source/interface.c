@@ -41,6 +41,14 @@ void ShowPicScreen(int id)
 	GDHandle oldGD;
 	Handle pic;
 	Rect r={0,0,480,640};
+	/* Force 8-bit mode so DrawPicture and Blit2Screen use the 8-bit path.
+	 * In hi-color gameplay (gGameOn=true) the back buffer is 16-bit, which
+	 * can cause the pause/picture screen to appear at half-width. Temporarily
+	 * clearing gGameOn causes ScreenMode(kScreenRunning) to set up an 8-bit
+	 * buffer, draw the picture correctly, and present it.  After presenting,
+	 * we restore gGameOn and switch back to 16-bit if gameplay was active. */
+	int savedGameOn = gGameOn;
+	gGameOn = false;
 	FadeScreen(1);
 	ScreenMode(kScreenRunning);
 	screenGW=GetScreenGW();
@@ -52,6 +60,8 @@ void ShowPicScreen(int id)
 	DisposeHandle(pic);	
 	SetGWorld(oldGW,oldGD);
 	FadeScreen(0);
+	gGameOn = savedGameOn;
+	if (gGameOn) ScreenMode(kScreenRunning); /* restore 16-bit for gameplay */
 }
 
 void ShowPicScreenNoFade(int id)
@@ -61,6 +71,8 @@ void ShowPicScreenNoFade(int id)
 	GDHandle oldGD;
 	Handle pic;
 	Rect r={0,0,480,640};
+	int savedGameOn = gGameOn;
+	gGameOn = false;
 	ScreenMode(kScreenRunning);
 	screenGW=GetScreenGW();
 	GetGWorld(&oldGW,&oldGD);
@@ -70,6 +82,9 @@ void ShowPicScreenNoFade(int id)
 	DrawPicture((PicHandle)pic,&r);
 	DisposeHandle(pic);	
 	SetGWorld(oldGW,oldGD);
+	FadeScreen(0);
+	gGameOn = savedGameOn;
+	if (gGameOn) ScreenMode(kScreenRunning);
 }
 
 void UpdateButtonRgn()
@@ -177,9 +192,12 @@ void InitInterface()
 		GDHandle oldGD;
 		Handle pic;
 		SetRect(&gwSize,0,0,640,480);
-		DoError(NewGWorld(&gMainScreenGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
-		DoError(NewGWorld(&gHilitGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
-		DoError(NewGWorld(&gSelectedGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
+		/* Interface GWorlds are always 8-bit: the menu is always shown in
+		 * 8-bit mode (gGameOn=false) and CopyBits does a raw byte-for-byte
+		 * copy, so the GWorld depth must match the 8-bit screen buffer. */
+		DoError(NewGWorld(&gMainScreenGW,8,&gwSize,nil,nil,0));
+		DoError(NewGWorld(&gHilitGW,8,&gwSize,nil,nil,0));
+		DoError(NewGWorld(&gSelectedGW,8,&gwSize,nil,nil,0));
 		LockPixels(GetGWorldPixMap(gMainScreenGW));
 		LockPixels(GetGWorldPixMap(gHilitGW));
 		LockPixels(GetGWorldPixMap(gSelectedGW));
@@ -285,8 +303,7 @@ int GetKeyClick(long key)
 		case 's':
 		case 'n':
 			return kStartGameButton;
-		case 'p':
-			return kPrefsButton;
+		/* 'p' previously opened Preferences which is disabled in this port */
 		case 'c':
 		case 'o':
 			return kScoreButton;

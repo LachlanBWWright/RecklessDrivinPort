@@ -1656,6 +1656,11 @@ void ModalDialog(void *filterProc, short *itemHit) {
                         Module.__rdNameSubmit = "";
                         var old = document.getElementById('rd-highscore-overlay');
                         if (old && old.parentNode) old.parentNode.removeChild(old);
+
+                        /* Blur the SDL canvas so it stops capturing keyboard events */
+                        var canvas = document.getElementById('canvas');
+                        if (canvas) canvas.blur();
+
                         var overlay = document.createElement('div');
                         overlay.id = 'rd-highscore-overlay';
                         overlay.style.position = 'fixed';
@@ -1682,17 +1687,21 @@ void ModalDialog(void *filterProc, short *itemHit) {
                             Module.__rdNameDone = 1;
                         };
                         ok.onclick = submit;
+                        /* Stop all key events from propagating to SDL canvas listeners */
                         input.addEventListener('keydown', function (e) {
+                            e.stopPropagation();
                             if (e.key === 'Enter') {
                                 e.preventDefault();
                                 submit();
                             }
                         });
+                        input.addEventListener('keyup',    function (e) { e.stopPropagation(); });
+                        input.addEventListener('keypress', function (e) { e.stopPropagation(); });
                         overlay.appendChild(input);
                         overlay.appendChild(ok);
                         document.body.appendChild(overlay);
-                        input.focus();
-                        input.select();
+                        /* Short timeout so the DOM settles before focusing */
+                        setTimeout(function() { input.focus(); input.select(); }, 50);
                 }, defaultName);
 
                 while (!done) {
@@ -1702,6 +1711,9 @@ void ModalDialog(void *filterProc, short *itemHit) {
                                         stringToUTF8(txt, $0, 256);
                                         var overlay = document.getElementById('rd-highscore-overlay');
                                         if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                                        /* Restore focus to the SDL canvas */
+                                        var canvas = document.getElementById('canvas');
+                                        if (canvas) canvas.focus();
                                 }, entered);
                                 copy_c_string_to_pascal(gDialogItemText, entered);
                                 done = 1;
