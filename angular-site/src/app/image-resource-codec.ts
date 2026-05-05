@@ -418,17 +418,12 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
   type PictTextState = {
     anchorX: number;
     anchorY: number;
-    cursorX: number;
-    cursorY: number;
     fontName: string;
     fontSize: number;
     textColor: [number, number, number];
   };
 
-  const readS8 = (off: number): number => {
-    const value = bytes[off] ?? 0;
-    return value > 127 ? value - 256 : value;
-  };
+  const readTextOffset = (off: number): number => bytes[off] ?? 0;
   const readRect = (off: number): PictRect => ({
     top: view.getInt16(off, false),
     left: view.getInt16(off + 2, false),
@@ -440,9 +435,10 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
   const color16To8 = (value: number): number => (value >>> 8) & 0xff;
   const isLightColor = (rgb: readonly [number, number, number]): boolean =>
     rgb[0] + rgb[1] + rgb[2] >= 384;
+  let originX = 0;
+  let originY = 0;
   const applyTextStyle = (state: PictTextState): void => {
-    const quickDrawTextScale = 0.55;
-    ctx.font = `${Math.max(1, Math.round(state.fontSize * quickDrawTextScale))}px "${state.fontName}", serif`;
+    ctx.font = `${Math.max(1, state.fontSize)}px "${state.fontName}", serif`;
     ctx.fillStyle = `rgb(${state.textColor[0]}, ${state.textColor[1]}, ${state.textColor[2]})`;
     ctx.textBaseline = 'alphabetic';
   };
@@ -505,13 +501,11 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
     }
 
     applyTextStyle(state);
-    const canvasX = x - picLeft;
-    const canvasY = y - picTop;
+    const canvasX = x - picLeft - originX;
+    const canvasY = y - picTop - originY;
     ctx.fillText(text, canvasX, canvasY);
     state.anchorX = x;
     state.anchorY = y;
-    state.cursorX = x + ctx.measureText(text).width;
-    state.cursorY = y;
     return backdropFilled;
   };
   const drawPackedPixmap = (opcode: number, startOff: number): { nextOff: number } | null => {
@@ -616,8 +610,8 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
     const drawRect = rectWidth(dstRect) > 0 && rectHeight(dstRect) > 0 ? dstRect : srcRect;
     ctx.drawImage(
       tempCanvas,
-      drawRect.left - picLeft,
-      drawRect.top - picTop,
+      drawRect.left - picLeft - originX,
+      drawRect.top - picTop - originY,
       rectWidth(drawRect),
       rectHeight(drawRect),
     );
@@ -633,8 +627,6 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
   const textState: PictTextState = {
     anchorX: picLeft,
     anchorY: picTop,
-    cursorX: picLeft,
-    cursorY: picTop,
     fontName: 'Times',
     fontSize: 12,
     textColor: [0, 0, 0],
@@ -684,12 +676,16 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
         case 0x0006:
         case 0x0007:
         case 0x000b:
-        case 0x000c:
         case 0x000e:
         case 0x000f:
         case 0x0026:
         case 0x0027:
         case 0x002e:
+          pos += 4;
+          break;
+        case 0x000c:
+          originX += view.getInt16(pos, false);
+          originY += view.getInt16(pos + 2, false);
           pos += 4;
           break;
         case 0x001a:
@@ -736,12 +732,12 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
             break;
           }
           const text = String.fromCharCode(...bytes.subarray(pos + 2, pos + 2 + textLen));
-          const x = textState.cursorX + readS8(pos);
+          const x = textState.anchorX + readTextOffset(pos);
           textBackdropFilled = drawText(
             textState,
             text,
             x,
-            textState.cursorY,
+            textState.anchorY,
             textBackdropFilled,
             drewAnything,
           );
@@ -761,11 +757,11 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
             break;
           }
           const text = String.fromCharCode(...bytes.subarray(pos + 2, pos + 2 + textLen));
-          const y = textState.cursorY + readS8(pos);
+          const y = textState.anchorY + readTextOffset(pos);
           textBackdropFilled = drawText(
             textState,
             text,
-            textState.cursorX,
+            textState.anchorX,
             y,
             textBackdropFilled,
             drewAnything,
@@ -786,8 +782,8 @@ export function renderPictBytes(bytes: Uint8Array): HTMLCanvasElement | null {
             break;
           }
           const text = String.fromCharCode(...bytes.subarray(pos + 3, pos + 3 + textLen));
-          const x = textState.anchorX + readS8(pos);
-          const y = textState.anchorY + readS8(pos + 1);
+          const x = textState.anchorX + readTextOffset(pos);
+          const y = textState.anchorY + readTextOffset(pos + 1);
           textBackdropFilled = drawText(textState, text, x, y, textBackdropFilled, drewAnything);
           drewAnything = true;
           pos += 3 + textLen;

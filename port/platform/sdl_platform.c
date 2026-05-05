@@ -627,9 +627,18 @@ static const char *sdl_modal_title(short dialogID)
 static const char *sdl_modal_subtitle(short dialogID)
 {
     switch (dialogID) {
-        case 130: return "ENTER YOUR NAME";
+        case 130: return "TYPE YOUR NAME";
         case 129: return "PRESS ENTER TO APPLY";
         default: return "PRESS ENTER TO ACCEPT";
+    }
+}
+
+static const char *sdl_modal_footer(short dialogID)
+{
+    switch (dialogID) {
+        case 130: return "PRESS ENTER TO SUBMIT SCORE";
+        case 129: return "PRESS ENTER TO APPLY";
+        default: return "ENTER TO ACCEPT";
     }
 }
 
@@ -641,10 +650,12 @@ static void sdl_render_modal_overlay(short dialogID, const char *text, int blink
     SDL_Rect input;
     const char *title = sdl_modal_title(dialogID);
     const char *subtitle = sdl_modal_subtitle(dialogID);
+    const char *footer = sdl_modal_footer(dialogID);
     int titleScale;
     int bodyScale;
     int titleWidth;
     int subtitleWidth;
+    int footerWidth;
     int maxChars;
     int textLen;
     int startIndex;
@@ -658,18 +669,20 @@ static void sdl_render_modal_overlay(short dialogID, const char *text, int blink
     output.y = 0;
 
     panel.w = game.w * 3 / 4;
+    if (dialogID == 130) panel.w = game.w * 5 / 6;
     if (panel.w < 320) panel.w = 320;
     if (panel.w > game.w - 24) panel.w = game.w - 24;
     panel.h = game.h / 3;
+    if (dialogID == 130) panel.h = game.h * 2 / 5;
     if (panel.h < 150) panel.h = 150;
     if (panel.h > game.h - 24) panel.h = game.h - 24;
     panel.x = game.x + (game.w - panel.w) / 2;
     panel.y = game.y + (game.h - panel.h) / 2;
 
     input.x = panel.x + 18;
-    input.y = panel.y + panel.h - 48;
+    input.y = panel.y + panel.h - (dialogID == 130 ? 72 : 48);
     input.w = panel.w - 36;
-    input.h = 24;
+    input.h = dialogID == 130 ? 40 : 24;
 
     SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(s_renderer, 0, 0, 0, 170);
@@ -684,9 +697,11 @@ static void sdl_render_modal_overlay(short dialogID, const char *text, int blink
     if (titleScale < 2) titleScale = 2;
     if (titleScale > 4) titleScale = 4;
     bodyScale = titleScale > 2 ? titleScale - 1 : 2;
+    if (dialogID == 130 && bodyScale < 3) bodyScale = 3;
 
     titleWidth = sdl_modal_text_width(title, titleScale);
     subtitleWidth = sdl_modal_text_width(subtitle, bodyScale);
+    footerWidth = sdl_modal_text_width(footer, 1);
     sdl_modal_draw_text(title, panel.x + (panel.w - titleWidth) / 2, panel.y + 20,
                         titleScale, 255, 239, 160, 255);
     sdl_modal_draw_text(subtitle, panel.x + (panel.w - subtitleWidth) / 2, panel.y + 20 + titleScale * 10,
@@ -717,7 +732,7 @@ static void sdl_render_modal_overlay(short dialogID, const char *text, int blink
         SDL_RenderDrawLine(s_renderer, cursorX, input.y + 4, cursorX, input.y + input.h - 5);
     }
 
-    sdl_modal_draw_text("ENTER TO ACCEPT", panel.x + 18, panel.y + panel.h - 25,
+    sdl_modal_draw_text(footer, panel.x + (panel.w - footerWidth) / 2, panel.y + panel.h - 25,
                         1, 190, 200, 220, 255);
     SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_NONE);
 }
@@ -1307,6 +1322,9 @@ int SDL_Platform_RunModalTextEntry(short dialogID, char *text, size_t textCapaci
 
                 case SDL_MOUSEBUTTONDOWN:
                 case SDL_FINGERDOWN:
+                    if (dialogID == 130) {
+                        break;
+                    }
                     SDL_StopTextInput();
                     return 1;
 

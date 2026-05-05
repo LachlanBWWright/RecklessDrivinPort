@@ -120,30 +120,18 @@ void DrawScreen(int button,GWorldPtr src)
 	else{
 		Rect r={0,0,480,640};
 		CopyBits(GetPortBitMapForCopyBits(src),GetPortBitMapForCopyBits(screenGW),&r,&r,srcCopy,nil);
-		ForeColor(whiteColor);
-		TextSize(12);
-		TextFont(3);
-		TextMode(srcOr);
-		TextFace(0);
-		MoveTo(630,475);
-		if(gRegistered)
-		{
-			Move(-StringWidth("\x0fRegistered To: "),0);
-			Move(-StringWidth(gPrefs.name),0);
-			DrawString("\x0fRegistered To: ");
-			DrawString(gPrefs.name);
-		}
-		else{
-			Move(-StringWidth("\x24\xA0\xA0\xA0 This Copy is not Registered! \xA0\xA0\xA0"),0);
-			DrawString("\x24\xA0\xA0\xA0 This Copy is not Registered! \xA0\xA0\xA0");
-		}		
 		MoveTo(10,15);
 		if(gLevelResFile)
 		{
+			ForeColor(whiteColor);
+			TextSize(12);
+			TextFont(3);
+			TextMode(srcOr);
+			TextFace(0);
 			DrawString("\x13" "Custom Level File: ");
 			DrawString(gLevelFileName);
+			ForeColor(blackColor);
 		}
-		ForeColor(blackColor);
 	}		
 	SetGWorld(oldGW,oldGD);
 	/* Flush to display after drawing to screen GWorld */
@@ -263,7 +251,8 @@ void UpdateButtonLocation()
 
 int GetButtonClick(Point mPos)
 {	
-	int i,clicked=false,oldclicked=false,button=kNoButton;
+	int i,clicked=false,oldclicked=false,button=kNoButton,tracking=false;
+	EventRecord event;
 	mPos=GetScreenPos(&mPos);
 	HLock((Handle)gButtonList);
 	for(i=0;i<GetHandleSize((Handle)gButtonList)/sizeof(Rect);i++)
@@ -273,16 +262,35 @@ int GetButtonClick(Point mPos)
 	if(button!=kNoButton)
 	{
 		SimplePlaySound(147);
-		while(StillDown())
+		clicked=true;
+		oldclicked=true;
+		tracking=true;
+		DrawScreen(button,gSelectedGW);
+		while(tracking)
 		{
-			mPos=GetScreenPos(nil);
-			if(clicked=PtInRect(mPos,(*gButtonList)+button))
+			if(WaitNextEvent(mUpMask+osMask,&event,1,nil))
 			{
-				if(clicked!=oldclicked)
-					DrawScreen(button,gSelectedGW);
-			}else
-				DrawScreen(button,gMainScreenGW);
-			oldclicked=clicked;
+				switch(event.what)
+				{
+					case mouseUp:
+						mPos=GetScreenPos(&event.where);
+						clicked=PtInRect(mPos,(*gButtonList)+button);
+						tracking=false;
+						break;
+					case osEvt:
+						if((event.message>>24)==mouseMovedMessage)
+						{
+							mPos=GetScreenPos(nil);
+							clicked=PtInRect(mPos,(*gButtonList)+button);
+							if(clicked!=oldclicked)
+								DrawScreen(button,clicked?gSelectedGW:gMainScreenGW);
+							oldclicked=clicked;
+						}
+						break;
+				}
+			}
+			else if(!Button())
+				tracking=false;
 #ifdef __EMSCRIPTEN__
 			emscripten_sleep(16); /* yield to browser event loop (~60fps) */
 #endif

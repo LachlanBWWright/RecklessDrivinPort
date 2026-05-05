@@ -1992,7 +1992,7 @@ void ModalDialog(void *filterProc, short *itemHit) {
             continue;
         }
 
-        if (event.what == mouseDown) {
+        if (event.what == mouseDown && gLastDialogID != 130) {
             done = 1;
         }
     }
