@@ -52,7 +52,7 @@
         <mat-label>Type ID</mat-label>
         <mat-select
           formControlName="typeRes"
-          panelClass="type-id-select-panel">
+          panelClass="max-w-[min(calc(100vw-32px),520px)] [&_.mat-mdc-option_.mdc-list-item__primary-text]:block [&_.mat-mdc-option_.mdc-list-item__primary-text]:w-full [&_.mat-mdc-option_.mdc-list-item__primary-text]:overflow-hidden [&_.mat-mdc-option]:!h-[30px] [&_.mat-mdc-option]:!min-h-[30px] [&_.mat-mdc-option]:items-center">
           <mat-select-trigger>
             <span class="flex h-[1.375rem] max-h-[1.375rem] w-full min-w-0 items-center justify-start gap-3 overflow-hidden">
               <span>{{ inspectorForm.controls.typeRes.value ?? editTypeRes }}</span>

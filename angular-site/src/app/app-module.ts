@@ -51,6 +51,7 @@ import { PropertiesTabComponent } from './editor/properties-tab.component';
 import { SpriteEditorComponent } from './editor/sprite-editor.component';
 import { MarkingPopupComponent } from './editor/canvas-toolbar/marking-popup.component';
 import { CanvasInfoPopupComponent } from './editor/canvas-toolbar/canvas-info-popup.component';
+import { ImagePreviewComponent } from './editor/image-preview/image-preview.component';
 
 const MATERIAL_MODULES = [
   MatButtonModule,
@@ -104,6 +105,7 @@ const MATERIAL_MODULES = [
     SpriteEditorComponent,
     MarkingPopupComponent,
     CanvasInfoPopupComponent,
+    ImagePreviewComponent,
   ],
   imports: [
     BrowserModule,

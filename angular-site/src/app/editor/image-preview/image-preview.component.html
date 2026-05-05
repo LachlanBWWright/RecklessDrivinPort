@@ -1,0 +1,54 @@
+<div class="image-preview">
+  <div class="image-preview__toolbar">
+    <button type="button" mat-icon-button matTooltip="Zoom out" (click)="zoomOut()" [disabled]="!src">
+      <mat-icon>remove</mat-icon>
+    </button>
+    <input
+      class="image-preview__slider"
+      type="range"
+      min="10"
+      max="1600"
+      step="5"
+      [value]="zoomPercent"
+      [disabled]="!src"
+      (input)="onZoomSliderInput($event)"
+      aria-label="Preview zoom" />
+    <button type="button" mat-icon-button matTooltip="Zoom in" (click)="zoomIn()" [disabled]="!src">
+      <mat-icon>add</mat-icon>
+    </button>
+    <span class="image-preview__zoom">{{ zoomPercent }}%</span>
+    <button type="button" mat-icon-button matTooltip="Fit image" (click)="fitToViewport()" [disabled]="!src">
+      <mat-icon>fit_screen</mat-icon>
+    </button>
+    <button type="button" mat-icon-button matTooltip="Reset pan and zoom" (click)="resetView()" [disabled]="!src">
+      <mat-icon>center_focus_strong</mat-icon>
+    </button>
+  </div>
+
+  <div
+    #viewport
+    class="image-preview__viewport"
+    [class.image-preview__viewport--pannable]="src"
+    (wheel)="onWheel($event)"
+    (pointerdown)="onPointerDown($event)"
+    (pointermove)="onPointerMove($event)"
+    (pointerup)="onPointerUp($event)"
+    (pointercancel)="onPointerUp($event)">
+    @if (src; as previewSrc) {
+      <img
+        #imageElement
+        [src]="previewSrc"
+        [alt]="alt"
+        class="image-preview__image"
+        [class.image-preview__image--pixelated]="pixelated"
+        [style.transform]="imageTransform"
+        (load)="onImageLoad(imageElement)"
+        draggable="false" />
+    } @else {
+      <div class="image-preview__empty">
+        <mat-icon>{{ loadingIcon }}</mat-icon>
+        <span>Preview loading...</span>
+      </div>
+    }
+  </div>
+</div>

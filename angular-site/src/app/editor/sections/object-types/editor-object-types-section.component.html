@@ -106,7 +106,7 @@
                 <mat-form-field appearance="outline" class="w-full max-w-[520px]" [matTooltip]="fieldTooltips.frame">
                   <mat-label>Sprite Frame</mat-label>
                   <mat-select
-                    panelClass="object-type-frame-select-panel"
+                    panelClass="max-h-[320px] [&_.mat-mdc-option]:!min-h-9"
                     formControlName="frame">
                     <mat-select-trigger>
                       {{ getFrameLabel(typeForm.controls.frame.value ?? type.frame) }}

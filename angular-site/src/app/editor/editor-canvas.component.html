@@ -82,7 +82,7 @@
     }
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Draw mode selector: 'none' = select/pan; other values enable barrier drawing -->
-    <mat-button-toggle-group class="canvas-toolbar-toggle-group" [value]="drawMode" (change)="drawModeChange.emit($event.value)"
+    <mat-button-toggle-group class="h-10 min-h-10 [&_.mat-button-toggle-button]:h-10 [&_.mat-button-toggle-label-content]:inline-flex [&_.mat-button-toggle-label-content]:h-10 [&_.mat-button-toggle-label-content]:items-center [&_.mat-button-toggle-label-content]:px-3 [&_.mat-button-toggle-label-content]:leading-10 [&_.mat-button-toggle]:h-10 [&_.mat-icon]:!h-[18px] [&_.mat-icon]:!w-[18px] [&_.mat-icon]:!text-[18px] [&_.mat-icon]:!leading-[18px]" [value]="drawMode" (change)="drawModeChange.emit($event.value)"
                              matTooltip="Select draw mode">
       <mat-button-toggle value="none" matTooltip="Select / pan (no drawing)">
         <mat-icon>pan_tool</mat-icon>
@@ -98,7 +98,7 @@
       </mat-button-toggle>
     </mat-button-toggle-group>
     @if (drawMode !== 'none') {
-      <mat-button-toggle-group class="canvas-toolbar-toggle-group" [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
+      <mat-button-toggle-group class="h-10 min-h-10 [&_.mat-button-toggle-button]:h-10 [&_.mat-button-toggle-label-content]:inline-flex [&_.mat-button-toggle-label-content]:h-10 [&_.mat-button-toggle-label-content]:items-center [&_.mat-button-toggle-label-content]:px-3 [&_.mat-button-toggle-label-content]:leading-10 [&_.mat-button-toggle]:h-10 [&_.mat-icon]:!h-[18px] [&_.mat-icon]:!w-[18px] [&_.mat-icon]:!text-[18px] [&_.mat-icon]:!leading-[18px]" [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
                                matTooltip="Select which barrier side to draw">
         <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
         <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
