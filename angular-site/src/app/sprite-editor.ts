@@ -75,6 +75,7 @@ export function openSpriteEditor(app: App, frameId: number): void {
   const frame: DecodedSpriteFrame | null = app.packSpriteDecodedFrames.get(frameId) ?? null;
   if (!frame) return;
   app._editingTileId = null;
+  app._editingIconResource = null;
   app.spriteEditorFrame.set({ ...frame, pixels: frame.pixels.slice() });
   app.spriteEditorOpen.set(true);
 }

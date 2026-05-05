@@ -48,16 +48,17 @@ import { err, ok, type Result } from 'neverthrow';
 
 /** IMA ADPCM step table (89 entries). */
 export const IMA4_STEP_TABLE: readonly number[] = [
-  7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45,
-  50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230,
-  253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963,
-  1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327,
-  3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442,
-  11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767,
+  7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73,
+  80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494,
+  544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499,
+  2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487,
+  12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767,
 ];
 
 /** IMA ADPCM index adjustment table (indexed by low 4 bits of each nibble). */
-export const IMA4_INDEX_TABLE: readonly number[] = [-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8];
+export const IMA4_INDEX_TABLE: readonly number[] = [
+  -1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8,
+];
 
 /**
  * Decode one 34-byte Apple IMA4 packet into 64 Float32 samples.
@@ -66,24 +67,29 @@ export const IMA4_INDEX_TABLE: readonly number[] = [-1, -1, -1, -1, 2, 4, 6, 8, 
  * Header bits 6-0  = initial step table index (0-88).
  * Data nibbles: high nibble first within each byte.
  */
-export function decodeIMA4Packet(packet: Uint8Array, pktOff: number, out: Float32Array, outOff: number): void {
-  const headerWord = ((packet[pktOff] & 0xFF) << 8) | (packet[pktOff + 1] & 0xFF);
+export function decodeIMA4Packet(
+  packet: Uint8Array,
+  pktOff: number,
+  out: Float32Array,
+  outOff: number,
+): void {
+  const headerWord = ((packet[pktOff] & 0xff) << 8) | (packet[pktOff + 1] & 0xff);
   // Recover 16-bit predictor: top 9 bits stored in bits 15..7, bottom 7 bits always 0.
-  let predictor = headerWord & 0xFF80;
+  let predictor = headerWord & 0xff80;
   if (predictor & 0x8000) predictor = predictor - 0x10000; // sign-extend to int16 range
-  let index = headerWord & 0x7F;
+  let index = headerWord & 0x7f;
   index = Math.max(0, Math.min(88, index));
 
   let pos = outOff;
   for (let bi = 0; bi < 32; bi++) {
-    const byte = packet[pktOff + 2 + bi] & 0xFF;
+    const byte = packet[pktOff + 2 + bi] & 0xff;
     // Process high nibble then low nibble (Apple IMA4 byte order)
     for (let shift = 4; shift >= 0; shift -= 4) {
-      const nibble = (byte >> shift) & 0x0F;
+      const nibble = (byte >> shift) & 0x0f;
       const step = IMA4_STEP_TABLE[index] ?? 0;
-      let diff = (step >> 3);
-      if (nibble & 1) diff += (step >> 2);
-      if (nibble & 2) diff += (step >> 1);
+      let diff = step >> 3;
+      if (nibble & 1) diff += step >> 2;
+      if (nibble & 2) diff += step >> 1;
       if (nibble & 4) diff += step;
       if (nibble & 8) diff = -diff;
       predictor = Math.max(-32768, Math.min(32767, predictor + diff));
@@ -149,8 +155,8 @@ export function parseSndHeader(bytes: Uint8Array): SndInfo | null {
 
   // SoundHeader fields (big-endian):
   const sampleRateFixed = view.getUint32(hdrOff + 8, false); // 16.16 fixed-point Hz
-  const sampleRate      = sampleRateFixed / 65536;
-  const encode          = view.getUint8(hdrOff + 20);
+  const sampleRate = sampleRateFixed / 65536;
+  const encode = view.getUint8(hdrOff + 20);
 
   if (encode === 0x00) {
     // stdSH: 8-bit unsigned mono PCM immediately after the 22-byte header
@@ -158,15 +164,15 @@ export function parseSndHeader(bytes: Uint8Array): SndInfo | null {
     return { encode, sampleRate, numFrames, numChannels: 1, sampleSize: 8, pcmOffset: hdrOff + 22 };
   }
 
-  if (encode === 0xFF) {
+  if (encode === 0xff) {
     // extSH: 16-bit big-endian PCM, additional header fields at +22..+63
     // numChannels is stored at hdrOff+4 (the stdSH "length" slot repurposed)
     // numFrames (true frame count) is at hdrOff+22
     // sampleSize (bits per sample) is at hdrOff+48
     if (hdrOff + 64 > bytes.length) return null;
     const numChannels = Math.max(1, view.getUint32(hdrOff + 4, false)) || 1;
-    const numFrames   = view.getUint32(hdrOff + 22, false);
-    const sampleSize  = view.getUint16(hdrOff + 48, false) || 16;
+    const numFrames = view.getUint32(hdrOff + 22, false);
+    const sampleSize = view.getUint16(hdrOff + 48, false) || 16;
     return { encode, sampleRate, numFrames, numChannels, sampleSize, pcmOffset: hdrOff + 64 };
   }
 
@@ -176,27 +182,32 @@ export function parseSndHeader(bytes: Uint8Array): SndInfo | null {
 // ─── WAV builder ─────────────────────────────────────────────────────────────
 
 /** Build a minimal RIFF/WAV file wrapping raw PCM data. */
-export function buildWav(pcm: Uint8Array, sampleRate: number, numChannels: number, bitsPerSample: number): Uint8Array {
-  const dataSize   = pcm.length;
-  const byteRate   = sampleRate * numChannels * (bitsPerSample / 8);
+export function buildWav(
+  pcm: Uint8Array,
+  sampleRate: number,
+  numChannels: number,
+  bitsPerSample: number,
+): Uint8Array {
+  const dataSize = pcm.length;
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
   const blockAlign = numChannels * (bitsPerSample / 8);
-  const out        = new Uint8Array(44 + dataSize);
-  const dv         = new DataView(out.buffer);
+  const out = new Uint8Array(44 + dataSize);
+  const dv = new DataView(out.buffer);
   // RIFF chunk
-  out.set([82, 73, 70, 70], 0);              // 'RIFF'
-  dv.setUint32(4, 36 + dataSize, true);      // file size - 8
-  out.set([87, 65, 86, 69], 8);              // 'WAVE'
+  out.set([82, 73, 70, 70], 0); // 'RIFF'
+  dv.setUint32(4, 36 + dataSize, true); // file size - 8
+  out.set([87, 65, 86, 69], 8); // 'WAVE'
   // fmt  sub-chunk
-  out.set([102, 109, 116, 32], 12);          // 'fmt '
-  dv.setUint32(16, 16, true);                // sub-chunk size = 16
-  dv.setUint16(20, 1, true);                 // PCM format = 1
+  out.set([102, 109, 116, 32], 12); // 'fmt '
+  dv.setUint32(16, 16, true); // sub-chunk size = 16
+  dv.setUint16(20, 1, true); // PCM format = 1
   dv.setUint16(22, numChannels, true);
   dv.setUint32(24, sampleRate, true);
   dv.setUint32(28, byteRate, true);
   dv.setUint16(32, blockAlign, true);
   dv.setUint16(34, bitsPerSample, true);
   // data sub-chunk
-  out.set([100, 97, 116, 97], 36);           // 'data'
+  out.set([100, 97, 116, 97], 36); // 'data'
   dv.setUint32(40, dataSize, true);
   out.set(pcm, 44);
   return out;
@@ -227,7 +238,25 @@ export function sndToWav(bytes: Uint8Array): Uint8Array {
     return buildWav(bytes, Math.round(info.sampleRate), 1, 8);
   }
   const pcmStart = Math.min(info.pcmOffset, bytes.length);
-  const pcmData = bytes.slice(pcmStart);
+  const bytesPerSample = Math.max(1, Math.floor(info.sampleSize / 8));
+  const expectedPcmBytes = info.numFrames * info.numChannels * bytesPerSample;
+  const pcmEnd = Math.min(bytes.length, pcmStart + expectedPcmBytes);
+  const pcmData = bytes.slice(pcmStart, pcmEnd);
+  if (info.sampleSize === 16) {
+    // extSH samples are big-endian PCM; WAV requires little-endian samples.
+    const littleEndianPcm = pcmData.slice();
+    for (let i = 0; i + 1 < littleEndianPcm.length; i += 2) {
+      const hi = littleEndianPcm[i];
+      littleEndianPcm[i] = littleEndianPcm[i + 1] ?? 0;
+      littleEndianPcm[i + 1] = hi ?? 0;
+    }
+    return buildWav(
+      littleEndianPcm,
+      Math.round(info.sampleRate),
+      info.numChannels,
+      info.sampleSize,
+    );
+  }
   return buildWav(pcmData, Math.round(info.sampleRate), info.numChannels, info.sampleSize);
 }
 

@@ -260,6 +260,7 @@ int GetElement(int element)
 			case kBackward: if(sdl_keys[SDL_SCANCODE_DOWN]  || sdl_keys[SDL_SCANCODE_S]) return true; break;
 			case kLeft:     if(sdl_keys[SDL_SCANCODE_LEFT]  || sdl_keys[SDL_SCANCODE_A]) return true; break;
 			case kRight:    if(sdl_keys[SDL_SCANCODE_RIGHT] || sdl_keys[SDL_SCANCODE_D]) return true; break;
+				case kPause:    if(sdl_keys[SDL_SCANCODE_P]     || sdl_keys[SDL_SCANCODE_R]) return true; break;
 			case kAbort:    if(sdl_keys[SDL_SCANCODE_ESCAPE]) return true; break;
 			default: break;
 		}

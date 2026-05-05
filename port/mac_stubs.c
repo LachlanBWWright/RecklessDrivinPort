@@ -14,9 +14,17 @@
 #include <emscripten.h>
 #endif
 
+#ifdef PORT_SDL2
+extern int SDL_Platform_RunModalTextEntry(short dialogID, char *text, size_t textCapacity);
+#endif
+
 /* Forward declarations for QuickDraw helpers used by DrawPicture */
 static UInt8 *current_port_pixels(void);
 static short  current_port_rowbytes(void);
+static short  current_port_pixel_size(void);
+static CTabHandle current_port_ctable(void);
+static UInt8 qdraw_palette_index_for_rgb(const RGBColor *color);
+static UInt16 qdraw_rgb_to_1555(const RGBColor *color);
 
 /* QuickDraw state: suppress drawing while OpenRgn() / CloseRgn() is active */
 static int gQDOpenRgn = 0;
@@ -701,12 +709,14 @@ static short gw_rowbytes(GWorldPtr gw) {
 void CopyBits(const BitMap *srcBits, const BitMap *dstBits,
                const Rect *srcRect, const Rect *dstRect,
                short mode, void *maskRgn) {
-    /* Simple 8-bit/pixel copy between Mac BitMaps (no scaling, no mode effects) */
-    int srcX, srcY, dstX, dstY, w, h;
-    int srcRB, dstRB;
+    int srcRB, dstRB, srcBpp, dstBpp;
     const UInt8 *src;
     UInt8 *dst;
+    int srcW, srcH, dstW, dstH;
+    int clipLeft, clipTop, clipRight, clipBottom;
     int y;
+    (void)mode;
+    (void)maskRgn;
 
     if (!srcBits || !dstBits || !srcRect || !dstRect) return;
 
@@ -716,16 +726,52 @@ void CopyBits(const BitMap *srcBits, const BitMap *dstBits,
     dst = (UInt8 *)dstBits->baseAddr;
     if (!src || !dst || !srcRB || !dstRB) return;
 
-    srcX = srcRect->left; srcY = srcRect->top;
-    dstX = dstRect->left; dstY = dstRect->top;
-    w = srcRect->right - srcRect->left;
-    h = srcRect->bottom - srcRect->top;
-    if (w <= 0 || h <= 0) return;
+    srcW = srcRect->right - srcRect->left;
+    srcH = srcRect->bottom - srcRect->top;
+    dstW = dstRect->right - dstRect->left;
+    dstH = dstRect->bottom - dstRect->top;
+    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return;
 
-    for (y = 0; y < h; y++) {
-        const UInt8 *srow = src + (srcY + y) * srcRB + srcX;
-        UInt8 *drow = dst + (dstY + y) * dstRB + dstX;
-        memcpy(drow, srow, (size_t)w);
+    srcBpp = srcRB / (((srcBits->bounds.right - srcBits->bounds.left) > 0)
+        ? (srcBits->bounds.right - srcBits->bounds.left)
+        : srcW);
+    dstBpp = dstRB / (((dstBits->bounds.right - dstBits->bounds.left) > 0)
+        ? (dstBits->bounds.right - dstBits->bounds.left)
+        : dstW);
+    if (srcBpp <= 0) srcBpp = 1;
+    if (dstBpp <= 0) dstBpp = 1;
+    if (srcBpp != dstBpp) return;
+
+    clipLeft = dstRect->left;
+    if (clipLeft < dstBits->bounds.left) clipLeft = dstBits->bounds.left;
+    clipTop = dstRect->top;
+    if (clipTop < dstBits->bounds.top) clipTop = dstBits->bounds.top;
+    clipRight = dstRect->right;
+    if (clipRight > dstBits->bounds.right) clipRight = dstBits->bounds.right;
+    clipBottom = dstRect->bottom;
+    if (clipBottom > dstBits->bounds.bottom) clipBottom = dstBits->bounds.bottom;
+    if (clipLeft >= clipRight || clipTop >= clipBottom) return;
+
+    for (y = clipTop; y < clipBottom; y++) {
+        int sy = srcRect->top + ((y - dstRect->top) * srcH) / dstH;
+        const UInt8 *srow;
+        UInt8 *drow;
+        int x;
+
+        if (sy < srcBits->bounds.top || sy >= srcBits->bounds.bottom) continue;
+
+        srow = src + (sy - srcBits->bounds.top) * srcRB;
+        drow = dst + (y - dstBits->bounds.top) * dstRB;
+
+        for (x = clipLeft; x < clipRight; x++) {
+            int sx = srcRect->left + ((x - dstRect->left) * srcW) / dstW;
+            const UInt8 *sp;
+            UInt8 *dp;
+            if (sx < srcBits->bounds.left || sx >= srcBits->bounds.right) continue;
+            sp = srow + (sx - srcBits->bounds.left) * srcBpp;
+            dp = drow + (x - dstBits->bounds.left) * dstBpp;
+            memcpy(dp, sp, (size_t)dstBpp);
+        }
     }
 }
 
@@ -935,6 +981,14 @@ static UInt8 rgb15_to_palette8(uint16_t px15, const SDL_Color *pal) {
     if (!s_rgb15_cache_valid) rgb15_cache_build(pal);
     return s_rgb15_cache[px15 & 0x7FFF];
 }
+
+static uint16_t palette8_to_rgb555(UInt8 idx, const SDL_Color *pal) {
+    const SDL_Color c = pal[idx];
+    uint16_t r = (uint16_t)(c.r >> 3);
+    uint16_t g = (uint16_t)(c.g >> 3);
+    uint16_t b = (uint16_t)(c.b >> 3);
+    return (uint16_t)((r << 10) | (g << 5) | b);
+}
 #endif
 
 
@@ -1028,7 +1082,6 @@ static int pict_find_pixdata(const UInt8 *pict, int picSize,
                 pos += 6; break;
             case 0x0009: case 0x000A: case 0x0010:
             case 0x0020: case 0x0021:
-            case 0x0028: case 0x0029: case 0x002A: case 0x002B: case 0x002C:
             case 0x0030: case 0x0031: case 0x0032: case 0x0033: case 0x0034:
             case 0x0038: case 0x0039: case 0x003A: case 0x003B: case 0x003C:
                 pos += 8; break;
@@ -1046,24 +1099,31 @@ static int pict_find_pixdata(const UInt8 *pict, int picSize,
             }
 
             /* --- Text drawing opcodes ------------------------------------- */
-            case 0x00B0: {  /* LongText: point(4) + count(1) + text */
+            case 0x0028: {  /* LongText: point(4) + count(1) + text */
                 if (pos + 5 > picSize) return -1;
                 int cnt = (int)pict[pos+4];
                 pos += 5 + cnt;
                 if (pos & 1) pos++;  /* word-align */
                 break;
             }
-            case 0x00B1: case 0x00B2: {  /* DhText / DvText: dh/dv(1) + count(1) + text */
+            case 0x0029:
+            case 0x002A: {  /* DhText / DvText: dh/dv(1) + count(1) + text */
                 if (pos + 2 > picSize) return -1;
                 int cnt = (int)pict[pos+1];
                 pos += 2 + cnt;
                 if (pos & 1) pos++;
                 break;
             }
-            case 0x00B3: {  /* DhDvText: dh(1) + dv(1) + count(1) + text */
+            case 0x002B: {  /* DhDvText: dh(1) + dv(1) + count(1) + text */
                 if (pos + 3 > picSize) return -1;
                 int cnt = (int)pict[pos+2];
                 pos += 3 + cnt;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x002C: {  /* fontName: dataLen(2) + oldFontID(2) + nameLen(1) + name */
+                if (pos + 2 > picSize) return -1;
+                pos += 2 + (int)((pict[pos] << 8) | pict[pos+1]);
                 if (pos & 1) pos++;
                 break;
             }
@@ -1165,6 +1225,641 @@ static int pict_find_pixdata(const UInt8 *pict, int picSize,
     return -1;
 }
 
+typedef struct {
+    int top;
+    int left;
+    int bottom;
+    int right;
+} PictRect;
+
+typedef struct {
+    int anchorX;
+    int anchorY;
+    short fontID;
+    short fontSize;
+    short textFace;
+    short textMode;
+    RGBColor textColor;
+} PictTextState;
+
+static UInt16 pict_read_u16(const UInt8 *pict, int off) {
+    return (UInt16)(((UInt16)pict[off] << 8) | pict[off + 1]);
+}
+
+static SInt16 pict_read_s16(const UInt8 *pict, int off) {
+    return (SInt16)pict_read_u16(pict, off);
+}
+
+static PictRect pict_read_rect(const UInt8 *pict, int off) {
+    PictRect rect;
+    rect.top = pict_read_s16(pict, off);
+    rect.left = pict_read_s16(pict, off + 2);
+    rect.bottom = pict_read_s16(pict, off + 4);
+    rect.right = pict_read_s16(pict, off + 6);
+    return rect;
+}
+
+static int pict_rect_width(const PictRect *rect) {
+    return rect->right - rect->left;
+}
+
+static int pict_rect_height(const PictRect *rect) {
+    return rect->bottom - rect->top;
+}
+
+static void current_port_bounds_rect(Rect *bounds) {
+    extern short gXSize, gYSize;
+    if (!bounds) return;
+    if (gCurrentGWorld) {
+        bounds->left = ((GWorldImpl *)gCurrentGWorld)->pixmap.bounds.left;
+        bounds->top = ((GWorldImpl *)gCurrentGWorld)->pixmap.bounds.top;
+        bounds->right = ((GWorldImpl *)gCurrentGWorld)->pixmap.bounds.right;
+        bounds->bottom = ((GWorldImpl *)gCurrentGWorld)->pixmap.bounds.bottom;
+        return;
+    }
+    bounds->left = 0;
+    bounds->top = 0;
+    bounds->right = gXSize;
+    bounds->bottom = gYSize;
+}
+
+static int pict_map_x(int x, int picLeft, int picW, const Rect *dstRect) {
+    if (!dstRect || picW <= 0) return x;
+    return dstRect->left + (int)(((long)(x - picLeft) * (dstRect->right - dstRect->left)) / picW);
+}
+
+static int pict_map_y(int y, int picTop, int picH, const Rect *dstRect) {
+    if (!dstRect || picH <= 0) return y;
+    return dstRect->top + (int)(((long)(y - picTop) * (dstRect->bottom - dstRect->top)) / picH);
+}
+
+static void pict_fill_default_palette(RGBColor palette[256]) {
+    CTabHandle ctab = current_port_ctable();
+    int i;
+    for (i = 0; i < 256; i++) {
+        if (ctab && *ctab && i <= (*ctab)->ctSize) {
+            palette[i] = (*ctab)->ctTable[i].rgb;
+            continue;
+        }
+#ifdef PORT_SDL2
+        palette[i].red = (UInt16)(s_palette[i].r * 257u);
+        palette[i].green = (UInt16)(s_palette[i].g * 257u);
+        palette[i].blue = (UInt16)(s_palette[i].b * 257u);
+#else
+        palette[i].red = (UInt16)(i * 257u);
+        palette[i].green = (UInt16)(i * 257u);
+        palette[i].blue = (UInt16)(i * 257u);
+#endif
+    }
+}
+
+static int pict_parse_color_table(const UInt8 *pict, int picSize, int off,
+                                  RGBColor palette[256], int *nextOff) {
+    int flags;
+    int ctSize;
+    int entryCount;
+    int endOff;
+    int index;
+    if (off + 8 > picSize) return 0;
+    pict_fill_default_palette(palette);
+    flags = pict_read_u16(pict, off + 4);
+    ctSize = pict_read_u16(pict, off + 6);
+    entryCount = ctSize + 1;
+    endOff = off + 8 + entryCount * 8;
+    if (endOff > picSize) return 0;
+    for (index = 0; index < entryCount; index++) {
+        int entryOff = off + 8 + index * 8;
+        int paletteIndex = (flags & 0x8000) ? index : (pict_read_u16(pict, entryOff) & 0xFF);
+        if (paletteIndex < 0 || paletteIndex >= 256) continue;
+        palette[paletteIndex].red = pict_read_u16(pict, entryOff + 2);
+        palette[paletteIndex].green = pict_read_u16(pict, entryOff + 4);
+        palette[paletteIndex].blue = pict_read_u16(pict, entryOff + 6);
+    }
+    if (nextOff) *nextOff = endOff;
+    return 1;
+}
+
+static void pict_expand_indexed_row(const UInt8 *rowData, int width, int pixelSize, UInt8 *out) {
+    int col;
+    if (pixelSize >= 8) {
+        memcpy(out, rowData, (size_t)width);
+        return;
+    }
+    for (col = 0; col < width; col++) {
+        UInt8 byte = rowData[(col * pixelSize) / 8];
+        UInt8 value = 0;
+        if (pixelSize == 4) {
+            value = (UInt8)((byte >> ((col % 2 == 0) ? 4 : 0)) & 0x0F);
+        } else if (pixelSize == 2) {
+            int shift = 6 - (col % 4) * 2;
+            value = (UInt8)((byte >> shift) & 0x03);
+        } else if (pixelSize == 1) {
+            value = (UInt8)((byte >> (7 - (col % 8))) & 0x01);
+        }
+        out[col] = value;
+    }
+}
+
+static RGBColor pict_rgb_from_1555(UInt16 pixel) {
+    RGBColor rgb;
+    UInt16 red = (UInt16)((pixel >> 10) & 0x1F);
+    UInt16 green = (UInt16)((pixel >> 5) & 0x1F);
+    UInt16 blue = (UInt16)(pixel & 0x1F);
+    rgb.red = (UInt16)((red * 65535u + 15u) / 31u);
+    rgb.green = (UInt16)((green * 65535u + 15u) / 31u);
+    rgb.blue = (UInt16)((blue * 65535u + 15u) / 31u);
+    return rgb;
+}
+
+static UInt32 pict_rgb_to_8888(const RGBColor *color) {
+    return 0xFF000000u |
+        ((UInt32)(color->red >> 8) << 16) |
+        ((UInt32)(color->green >> 8) << 8) |
+        (UInt32)(color->blue >> 8);
+}
+
+static void pict_apply_text_state(const PictTextState *state, int picH, const Rect *dstRect) {
+    int scaledTextSize = state->fontSize;
+    if (dstRect && picH > 0) {
+        int dstH = dstRect->bottom - dstRect->top;
+        scaledTextSize = (int)(((long)state->fontSize * dstH + picH / 2) / picH);
+    }
+    if (scaledTextSize <= 0) scaledTextSize = 1;
+    TextFont(state->fontID);
+    TextSize((short)scaledTextSize);
+    TextFace(state->textFace);
+    TextMode(state->textMode);
+    RGBForeColor(&state->textColor);
+}
+
+static void pict_draw_text(const UInt8 *textBytes, int textLen,
+                           PictTextState *state,
+                           int x, int y,
+                           int originX, int originY,
+                           int picLeft, int picTop, int picW, int picH,
+                           const Rect *dstRect) {
+    unsigned char pascalText[256];
+    int drawX;
+    int drawY;
+    if (textLen <= 0) {
+        state->anchorX = x;
+        state->anchorY = y;
+        return;
+    }
+    if (textLen > 255) textLen = 255;
+    pascalText[0] = (unsigned char)textLen;
+    memcpy(pascalText + 1, textBytes, (size_t)textLen);
+    drawX = pict_map_x(x - originX, picLeft, picW, dstRect);
+    drawY = pict_map_y(y - originY, picTop, picH, dstRect);
+    pict_apply_text_state(state, picH, dstRect);
+    MoveTo((short)drawX, (short)drawY);
+    DrawString((char *)pascalText);
+    state->anchorX = x;
+    state->anchorY = y;
+}
+
+static int pict_draw_packed_pixmap(const UInt8 *pict, int picSize,
+                                   UInt16 opcode, int startOff,
+                                   int originX, int originY,
+                                   int picLeft, int picTop, int picW, int picH,
+                                   const Rect *pictureDstRect,
+                                   int *nextOff) {
+    int indexed = (opcode == 0x0098 || opcode == 0x0099);
+    int hasRegion = (opcode == 0x0099 || opcode == 0x009B);
+    int rowBytesOff = indexed ? startOff : startOff + 4;
+    int boundsOff = indexed ? startOff + 2 : startOff + 6;
+    int pixelSizeOff = indexed ? startOff + 28 : startOff + 32;
+    int cmpCountOff = indexed ? startOff + 30 : startOff + 34;
+    int cmpSizeOff = indexed ? startOff + 32 : startOff + 36;
+    int cursor = indexed ? startOff + 46 : startOff + 50;
+    int rowBytes;
+    PictRect bounds;
+    int srcWidth;
+    int srcHeight;
+    int pixelSize;
+    int cmpCount;
+    int cmpSize;
+    PictRect srcRect;
+    PictRect dstRect;
+    PictRect drawRect;
+    int drawLeft;
+    int drawTop;
+    int drawRight;
+    int drawBottom;
+    int drawW;
+    int drawH;
+    int bcBytes;
+    int directPixels;
+    int dataOff;
+    int row;
+    UInt8 *portPix;
+    int portRb;
+    int portDepth;
+    Rect portBounds;
+    int portLeft;
+    int portTop;
+    int portRight;
+    int portBottom;
+    UInt8 *rowBuf = NULL;
+    UInt8 *expandedRow = NULL;
+    RGBColor palette[256];
+
+    if (cursor > picSize) return 0;
+    rowBytes = pict_read_u16(pict, rowBytesOff) & 0x7FFF;
+    bounds = pict_read_rect(pict, boundsOff);
+    srcWidth = pict_rect_width(&bounds);
+    srcHeight = pict_rect_height(&bounds);
+    if (rowBytes <= 0 || srcWidth <= 0 || srcHeight <= 0) return 0;
+
+    pixelSize = pict_read_u16(pict, pixelSizeOff);
+    cmpCount = pict_read_u16(pict, cmpCountOff);
+    cmpSize = pict_read_u16(pict, cmpSizeOff);
+
+    if (indexed) {
+        if (!pict_parse_color_table(pict, picSize, cursor, palette, &cursor)) return 0;
+    } else {
+        pict_fill_default_palette(palette);
+    }
+
+    if (cursor + 18 > picSize) return 0;
+    srcRect = pict_read_rect(pict, cursor);
+    dstRect = pict_read_rect(pict, cursor + 8);
+    cursor += 18;
+    if (hasRegion) {
+        int regionSize;
+        if (cursor + 2 > picSize) return 0;
+        regionSize = pict_read_u16(pict, cursor);
+        if (regionSize < 2 || cursor + regionSize > picSize) return 0;
+        cursor += regionSize;
+    }
+
+    drawRect = (pict_rect_width(&dstRect) > 0 && pict_rect_height(&dstRect) > 0) ? dstRect : srcRect;
+    drawLeft = pict_map_x(drawRect.left - originX, picLeft, picW, pictureDstRect);
+    drawTop = pict_map_y(drawRect.top - originY, picTop, picH, pictureDstRect);
+    drawRight = pict_map_x(drawRect.right - originX, picLeft, picW, pictureDstRect);
+    drawBottom = pict_map_y(drawRect.bottom - originY, picTop, picH, pictureDstRect);
+    if (drawRight <= drawLeft) drawRight = drawLeft + 1;
+    if (drawBottom <= drawTop) drawBottom = drawTop + 1;
+    drawW = drawRight - drawLeft;
+    drawH = drawBottom - drawTop;
+    if (drawW <= 0 || drawH <= 0) return 0;
+
+    portPix = current_port_pixels();
+    portRb = current_port_rowbytes();
+    portDepth = current_port_pixel_size();
+    current_port_bounds_rect(&portBounds);
+    portLeft = portBounds.left;
+    portTop = portBounds.top;
+    portRight = portBounds.right;
+    portBottom = portBounds.bottom;
+    if (!portPix || portRb <= 0) return 0;
+
+    rowBuf = (UInt8 *)malloc((size_t)rowBytes);
+    if (!rowBuf) return 0;
+    if (indexed) {
+        expandedRow = (UInt8 *)malloc((size_t)srcWidth);
+        if (!expandedRow) {
+            free(rowBuf);
+            return 0;
+        }
+    }
+
+    bcBytes = (rowBytes > 250) ? 2 : 1;
+    directPixels = (pixelSize == 16) || (cmpCount == 3 && cmpSize == 5);
+    dataOff = cursor;
+
+    for (row = 0; row < srcHeight; row++) {
+        int bc;
+        int startY;
+        int endY;
+        if (dataOff + bcBytes > picSize) break;
+        bc = (bcBytes == 2) ? pict_read_u16(pict, dataOff) : (int)pict[dataOff];
+        dataOff += bcBytes;
+        if (bc < 0 || dataOff + bc > picSize) break;
+
+        memset(rowBuf, 0, (size_t)rowBytes);
+        if (bc > 0) {
+            if (directPixels)
+                unpack_bits16(pict + dataOff, bc, rowBuf, rowBytes);
+            else
+                unpack_bits(pict + dataOff, bc, rowBuf, rowBytes);
+        }
+        dataOff += bc;
+        if (!directPixels) pict_expand_indexed_row(rowBuf, srcWidth, pixelSize, expandedRow);
+
+        startY = (row * drawH) / srcHeight;
+        endY = ((row + 1) * drawH) / srcHeight;
+        if (endY <= startY) endY = startY + 1;
+        for (int sy = startY; sy < endY; sy++) {
+            int dstY = drawTop + sy;
+            UInt8 *dstRow;
+            if (dstY < portTop || dstY >= portBottom) continue;
+            dstRow = portPix + (dstY - portTop) * portRb;
+            for (int dx = 0; dx < drawW; dx++) {
+                int dstX = drawLeft + dx;
+                int srcX;
+                if (dstX < portLeft || dstX >= portRight) continue;
+                srcX = (dx * srcWidth) / drawW;
+                if (srcX < 0) srcX = 0;
+                if (srcX >= srcWidth) srcX = srcWidth - 1;
+
+                if (directPixels) {
+                    UInt16 pixel = (UInt16)(((UInt16)rowBuf[srcX * 2] << 8) | rowBuf[srcX * 2 + 1]);
+                    if (portDepth >= 24) {
+                        UInt32 *dst32 = (UInt32 *)dstRow;
+                        RGBColor rgb = pict_rgb_from_1555(pixel);
+                        dst32[dstX - portLeft] = pict_rgb_to_8888(&rgb);
+                    } else if (portDepth >= 16) {
+                        UInt16 *dst16 = (UInt16 *)dstRow;
+                        dst16[dstX - portLeft] = pixel;
+                    } else {
+#ifdef PORT_SDL2
+                        dstRow[dstX - portLeft] = rgb15_to_palette8(pixel, s_palette);
+#else
+                        RGBColor rgb = pict_rgb_from_1555(pixel);
+                        dstRow[dstX - portLeft] = qdraw_palette_index_for_rgb(&rgb);
+#endif
+                    }
+                    continue;
+                }
+
+                {
+                    RGBColor rgb = palette[expandedRow[srcX]];
+                    if (portDepth >= 24) {
+                        UInt32 *dst32 = (UInt32 *)dstRow;
+                        dst32[dstX - portLeft] = pict_rgb_to_8888(&rgb);
+                    } else if (portDepth >= 16) {
+                        UInt16 *dst16 = (UInt16 *)dstRow;
+                        dst16[dstX - portLeft] = qdraw_rgb_to_1555(&rgb);
+                    } else {
+                        dstRow[dstX - portLeft] = qdraw_palette_index_for_rgb(&rgb);
+                    }
+                }
+            }
+        }
+    }
+
+    free(expandedRow);
+    free(rowBuf);
+    if (nextOff) *nextOff = dataOff;
+    return 1;
+}
+
+static int pict_render_picture(const UInt8 *pict, int picSize, const Rect *dstRect) {
+    int picTop;
+    int picLeft;
+    int picBottom;
+    int picRight;
+    int picW;
+    int picH;
+    int pos;
+    int originX = 0;
+    int originY = 0;
+    int drewAnything = 0;
+    PictTextState textState;
+
+    if (picSize < 40) return 0;
+    if (pict[10] != 0x00 || pict[11] != 0x11) return 0;
+    if (pict[12] != 0x02 || pict[13] != 0xFF) return 0;
+    if (pict[14] != 0x0C || pict[15] != 0x00) return 0;
+
+    picTop = pict_read_s16(pict, 2);
+    picLeft = pict_read_s16(pict, 4);
+    picBottom = pict_read_s16(pict, 6);
+    picRight = pict_read_s16(pict, 8);
+    picW = picRight - picLeft;
+    picH = picBottom - picTop;
+    if (picW <= 0 || picH <= 0) return 0;
+
+    textState.anchorX = picLeft;
+    textState.anchorY = picTop;
+    textState.fontID = 0;
+    textState.fontSize = 12;
+    textState.textFace = 0;
+    textState.textMode = srcCopy;
+    textState.textColor.red = 0;
+    textState.textColor.green = 0;
+    textState.textColor.blue = 0;
+
+    pos = 40;
+    while (pos + 2 <= picSize) {
+        UInt16 op = pict_read_u16(pict, pos);
+        pos += 2;
+        switch (op) {
+            case 0x0000:
+            case 0x001D:
+            case 0x001E:
+                break;
+            case 0x0001: {
+                int rsize;
+                if (pos + 2 > picSize) return drewAnything;
+                rsize = pict_read_u16(pict, pos);
+                if (rsize < 2) rsize = 2;
+                pos += rsize;
+                break;
+            }
+            case 0x0003:
+                if (pos + 2 > picSize) return drewAnything;
+                textState.fontID = (short)pict_read_u16(pict, pos);
+                pos += 2;
+                break;
+            case 0x0004:
+                if (pos + 2 > picSize) return drewAnything;
+                textState.textFace = (short)pict[pos];
+                pos += 2;
+                break;
+            case 0x0005:
+                if (pos + 2 > picSize) return drewAnything;
+                textState.textMode = (short)pict_read_u16(pict, pos);
+                pos += 2;
+                break;
+            case 0x000D:
+                if (pos + 2 > picSize) return drewAnything;
+                textState.fontSize = (short)pict_read_u16(pict, pos);
+                pos += 2;
+                break;
+            case 0x0006:
+            case 0x0007:
+            case 0x000B:
+            case 0x000E:
+            case 0x000F:
+            case 0x0026:
+            case 0x0027:
+            case 0x002E:
+                pos += 4;
+                break;
+            case 0x000C:
+                if (pos + 4 > picSize) return drewAnything;
+                originX += pict_read_s16(pict, pos);
+                originY += pict_read_s16(pict, pos + 2);
+                pos += 4;
+                break;
+            case 0x001A:
+                if (pos + 6 > picSize) return drewAnything;
+                textState.textColor.red = pict_read_u16(pict, pos);
+                textState.textColor.green = pict_read_u16(pict, pos + 2);
+                textState.textColor.blue = pict_read_u16(pict, pos + 4);
+                pos += 6;
+                break;
+            case 0x001B:
+            case 0x001F:
+            case 0x0022:
+            case 0x0023:
+                pos += 6;
+                break;
+            case 0x0028: {
+                int x;
+                int y;
+                int textLen;
+                if (pos + 5 > picSize) return drewAnything;
+                y = pict_read_s16(pict, pos);
+                x = pict_read_s16(pict, pos + 2);
+                textLen = (int)pict[pos + 4];
+                if (pos + 5 + textLen > picSize) return drewAnything;
+                pict_draw_text(pict + pos + 5, textLen, &textState, x, y, originX, originY, picLeft, picTop, picW, picH, dstRect);
+                drewAnything = 1;
+                pos += 5 + textLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x0029: {
+                int textLen;
+                int x;
+                if (pos + 2 > picSize) return drewAnything;
+                textLen = (int)pict[pos + 1];
+                if (pos + 2 + textLen > picSize) return drewAnything;
+                x = textState.anchorX + (int)pict[pos];
+                pict_draw_text(pict + pos + 2, textLen, &textState, x, textState.anchorY, originX, originY, picLeft, picTop, picW, picH, dstRect);
+                drewAnything = 1;
+                pos += 2 + textLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x002A: {
+                int textLen;
+                int y;
+                if (pos + 2 > picSize) return drewAnything;
+                textLen = (int)pict[pos + 1];
+                if (pos + 2 + textLen > picSize) return drewAnything;
+                y = textState.anchorY + (int)pict[pos];
+                pict_draw_text(pict + pos + 2, textLen, &textState, textState.anchorX, y, originX, originY, picLeft, picTop, picW, picH, dstRect);
+                drewAnything = 1;
+                pos += 2 + textLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x002B: {
+                int textLen;
+                int x;
+                int y;
+                if (pos + 3 > picSize) return drewAnything;
+                textLen = (int)pict[pos + 2];
+                if (pos + 3 + textLen > picSize) return drewAnything;
+                x = textState.anchorX + (int)pict[pos];
+                y = textState.anchorY + (int)pict[pos + 1];
+                pict_draw_text(pict + pos + 3, textLen, &textState, x, y, originX, originY, picLeft, picTop, picW, picH, dstRect);
+                drewAnything = 1;
+                pos += 3 + textLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x002C: {
+                int dataLen;
+                if (pos + 2 > picSize) return drewAnything;
+                dataLen = pict_read_u16(pict, pos);
+                pos += 2 + dataLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x0030:
+            case 0x0031:
+            case 0x0032:
+            case 0x0033:
+            case 0x0034:
+            case 0x0038:
+            case 0x0039:
+            case 0x003A:
+            case 0x003B:
+            case 0x003C:
+            case 0x0009:
+            case 0x000A:
+            case 0x0010:
+            case 0x0020:
+            case 0x0021:
+                pos += 8;
+                break;
+            case 0x0040:
+            case 0x0041:
+            case 0x0042:
+            case 0x0043:
+            case 0x0044:
+                pos += 12;
+                break;
+            case 0x0050:
+            case 0x0051:
+            case 0x0052:
+            case 0x0053:
+            case 0x0054:
+            case 0x0060:
+            case 0x0061:
+            case 0x0062:
+            case 0x0063:
+            case 0x0064:
+            case 0x0070:
+            case 0x0071:
+            case 0x0072:
+            case 0x0073:
+            case 0x0074: {
+                if (pos + 2 > picSize) return drewAnything;
+                pos += pict_read_u16(pict, pos);
+                break;
+            }
+            case 0x00A0:
+                pos += 2;
+                break;
+            case 0x00A1: {
+                int longSize;
+                if (pos + 4 > picSize) return drewAnything;
+                longSize = pict_read_u16(pict, pos + 2);
+                pos += 4 + longSize;
+                break;
+            }
+            case 0x0098:
+            case 0x0099:
+            case 0x009A:
+            case 0x009B: {
+                int nextPos = pos;
+                if (!pict_draw_packed_pixmap(pict, picSize, op, pos, originX, originY, picLeft, picTop, picW, picH, dstRect, &nextPos)) {
+                    return drewAnything;
+                }
+                drewAnything = 1;
+                pos = nextPos;
+                break;
+            }
+            case 0x00FF:
+                return drewAnything;
+            default:
+                if (op >= 0x0100 && op <= 0x7FFF) {
+                    if (pos + 2 > picSize) return drewAnything;
+                    pos += 2 + pict_read_u16(pict, pos);
+                    break;
+                }
+                if (op >= 0x8000) {
+                    int dataSize;
+                    if (pos + 4 > picSize) return drewAnything;
+                    dataSize = ((int)pict[pos] << 24) |
+                        ((int)pict[pos + 1] << 16) |
+                        ((int)pict[pos + 2] << 8) |
+                        (int)pict[pos + 3];
+                    pos += 4 + dataSize;
+                    break;
+                }
+                return drewAnything;
+        }
+    }
+    return drewAnything;
+}
+
 /*
  * DrawPicture - decode a Mac PICT v2 (PPic resource) into the current GWorld.
  *
@@ -1195,6 +1890,10 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
 
     pict = (const UInt8 *)(*myPicture);
     int picSize = (int)GetHandleSize((Handle)myPicture);
+
+    if (pict_render_picture(pict, picSize, dstRect)) {
+        return;
+    }
 
     /* Parse PICT bounds rect (big-endian SInt16: top, left, bottom, right) */
     picTop    = (int16_t)(((uint16_t)pict[2] << 8) | pict[3]);
@@ -1269,6 +1968,7 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
     int dstRight = dstRect ? dstRect->right : (picLeft + picW);
     int dstW = dstRight - dstLeft;
     int dstH = dstBottom - dstTop;
+    int dstIs16 = (portRb >= (short)(gXSize * 2));
     if (dstW <= 0 || dstH <= 0) {
         return;
     }
@@ -1302,8 +2002,8 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
             }
             src += bc;
 
-            /* Draw with destination-rect scaling so 320px-wide pause/menu images
-             * correctly expand to 640px when requested by callers. */
+            /* Draw with destination-rect scaling so callers can place 320px-wide
+             * pause/menu artwork into full-screen 640px destinations. */
             {
                 int startY = (row * dstH) / picH;
                 int endY = ((row + 1) * dstH) / picH;
@@ -1312,29 +2012,67 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
                     int dstY = dstTop + sy;
                     if (dstY < 0 || dstY >= gYSize) continue;
                     UInt8 *dst = portPix + dstY * portRb;
-                    if (picBpp == 1) {
-                        for (int dx = 0; dx < dstW; dx++) {
-                            int dstX = dstLeft + dx;
-                            if (dstX < 0 || dstX >= gXSize) continue;
-                            int srcX = (dx * picW) / dstW;
-                            if (srcX < 0) srcX = 0;
-                            if (srcX >= picW) srcX = picW - 1;
-                            dst[dstX] = rowBuf[srcX];
+                    if (dstIs16) {
+                        uint16_t *dst16 = (uint16_t *)dst;
+                        if (picBpp == 1) {
+                            for (int dx = 0; dx < dstW; dx++) {
+                                int dstX = dstLeft + dx;
+                                int srcX;
+                                if (dstX < 0 || dstX >= gXSize) continue;
+                                srcX = (dx * picW) / dstW;
+                                if (srcX < 0) srcX = 0;
+                                if (srcX >= picW) srcX = picW - 1;
+#ifdef PORT_SDL2
+                                dst16[dstX] = palette8_to_rgb555(rowBuf[srcX], s_palette);
+#else
+                                {
+                                    uint16_t g = (uint16_t)(rowBuf[srcX] >> 3);
+                                    dst16[dstX] = (uint16_t)((g << 10) | (g << 5) | g);
+                                }
+#endif
+                            }
+                        } else {
+                            for (int dx = 0; dx < dstW; dx++) {
+                                int dstX = dstLeft + dx;
+                                int srcX;
+                                uint16_t px;
+                                if (dstX < 0 || dstX >= gXSize) continue;
+                                srcX = (dx * picW) / dstW;
+                                if (srcX < 0) srcX = 0;
+                                if (srcX >= picW) srcX = picW - 1;
+                                px = (uint16_t)(((uint16_t)rowBuf[srcX*2] << 8)
+                                               | rowBuf[srcX*2+1]);
+                                dst16[dstX] = px;
+                            }
                         }
                     } else {
-                        /* 16-bit x5R5G5B → 8-bit palette index via lookup table */
+                        if (picBpp == 1) {
+                            for (int dx = 0; dx < dstW; dx++) {
+                                int dstX = dstLeft + dx;
+                                int srcX;
+                                if (dstX < 0 || dstX >= gXSize) continue;
+                                srcX = (dx * picW) / dstW;
+                                if (srcX < 0) srcX = 0;
+                                if (srcX >= picW) srcX = picW - 1;
+                                dst[dstX] = rowBuf[srcX];
+                            }
+                        } else {
+                            /* 16-bit x5R5G5B → 8-bit palette index via lookup table */
 #ifdef PORT_SDL2
-                        for (int dx = 0; dx < dstW; dx++) {
-                            int dstX = dstLeft + dx;
-                            if (dstX < 0 || dstX >= gXSize) continue;
-                            int srcX = (dx * picW) / dstW;
-                            if (srcX < 0) srcX = 0;
-                            if (srcX >= picW) srcX = picW - 1;
-                            uint16_t px = (uint16_t)(((uint16_t)rowBuf[srcX*2] << 8)
-                                                    | rowBuf[srcX*2+1]);
-                            dst[dstX] = rgb15_to_palette8(px, s_palette);
-                        }
+                            for (int dx = 0; dx < dstW; dx++) {
+                                int dstX = dstLeft + dx;
+                                int srcX;
+                                uint16_t px;
+                                if (dstX < 0 || dstX >= gXSize) continue;
+                                srcX = (dx * picW) / dstW;
+                                if (srcX < 0) srcX = 0;
+                                if (srcX >= picW) srcX = picW - 1;
+                                px = (uint16_t)(((uint16_t)rowBuf[srcX*2] << 8)
+                                               | rowBuf[srcX*2+1]);
+                                dst[dstX] = rgb15_to_palette8(px, s_palette);
+                            }
 #endif
+                        }
                     }
                 }
             }
@@ -1361,25 +2099,267 @@ static short current_port_rowbytes(void) {
     return gRowBytes;
 }
 
+static short current_port_pixel_size(void) {
+    extern short gRowBytes;
+    extern short gXSize;
+    if (gCurrentGWorld) return ((GWorldImpl *)gCurrentGWorld)->pixmap.pixelSize;
+    return gRowBytes >= gXSize * 2 ? 16 : 8;
+}
+
+static CTabHandle current_port_ctable(void) {
+    if (!gCurrentGWorld) return NULL;
+    return (CTabHandle)((GWorldImpl *)gCurrentGWorld)->pixmap.pmTable;
+}
+
 /* Current QuickDraw pen color (index into 8-bit palette) */
 static UInt8 gQDForeColor = 0;   /* black = 0 */
 static UInt8 gQDBackColor = 255; /* white = 255 */
+static RGBColor gQDForeRGB = { 0, 0, 0 };
+static RGBColor gQDBackRGB = { 0xFFFF, 0xFFFF, 0xFFFF };
+static short gQDPenH = 0;
+static short gQDPenV = 0;
+static short gQDTextFont = 0;
+static short gQDTextSize = 12;
+static short gQDTextMode = srcCopy;
+static short gQDTextFace = 0;
+
+#define QD_GLYPH(name, a, b, c, d, e, f, g) \
+    static const UInt8 name[7] = { a, b, c, d, e, f, g }
+
+QD_GLYPH(s_qd_glyph_space, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+QD_GLYPH(s_qd_glyph_dash, 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00);
+QD_GLYPH(s_qd_glyph_dot, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C);
+QD_GLYPH(s_qd_glyph_comma, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C, 0x08);
+QD_GLYPH(s_qd_glyph_bang, 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04);
+QD_GLYPH(s_qd_glyph_colon, 0x00, 0x04, 0x04, 0x00, 0x04, 0x04, 0x00);
+QD_GLYPH(s_qd_glyph_quote, 0x0A, 0x0A, 0x04, 0x00, 0x00, 0x00, 0x00);
+QD_GLYPH(s_qd_glyph_slash, 0x01, 0x02, 0x02, 0x04, 0x08, 0x08, 0x10);
+QD_GLYPH(s_qd_glyph_question, 0x0E, 0x11, 0x01, 0x02, 0x04, 0x00, 0x04);
+QD_GLYPH(s_qd_glyph_lparen, 0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02);
+QD_GLYPH(s_qd_glyph_rparen, 0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08);
+QD_GLYPH(s_qd_glyph_plus, 0x00, 0x04, 0x04, 0x1F, 0x04, 0x04, 0x00);
+QD_GLYPH(s_qd_glyph_0, 0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_1, 0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E);
+QD_GLYPH(s_qd_glyph_2, 0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F);
+QD_GLYPH(s_qd_glyph_3, 0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E);
+QD_GLYPH(s_qd_glyph_4, 0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02);
+QD_GLYPH(s_qd_glyph_5, 0x1F, 0x10, 0x10, 0x1E, 0x01, 0x01, 0x1E);
+QD_GLYPH(s_qd_glyph_6, 0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_7, 0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08);
+QD_GLYPH(s_qd_glyph_8, 0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_9, 0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x1C);
+QD_GLYPH(s_qd_glyph_A, 0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_B, 0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E);
+QD_GLYPH(s_qd_glyph_C, 0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_D, 0x1C, 0x12, 0x11, 0x11, 0x11, 0x12, 0x1C);
+QD_GLYPH(s_qd_glyph_E, 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F);
+QD_GLYPH(s_qd_glyph_F, 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10);
+QD_GLYPH(s_qd_glyph_G, 0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0F);
+QD_GLYPH(s_qd_glyph_H, 0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_I, 0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E);
+QD_GLYPH(s_qd_glyph_J, 0x01, 0x01, 0x01, 0x01, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_K, 0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11);
+QD_GLYPH(s_qd_glyph_L, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F);
+QD_GLYPH(s_qd_glyph_M, 0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_N, 0x11, 0x11, 0x19, 0x15, 0x13, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_O, 0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_P, 0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10);
+QD_GLYPH(s_qd_glyph_Q, 0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D);
+QD_GLYPH(s_qd_glyph_R, 0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11);
+QD_GLYPH(s_qd_glyph_S, 0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E);
+QD_GLYPH(s_qd_glyph_T, 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04);
+QD_GLYPH(s_qd_glyph_U, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_V, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04);
+QD_GLYPH(s_qd_glyph_W, 0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A);
+QD_GLYPH(s_qd_glyph_X, 0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_Y, 0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04);
+QD_GLYPH(s_qd_glyph_Z, 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F);
+
+static RGBColor qdraw_named_rgb(long color) {
+    switch (color) {
+        case whiteColor: return (RGBColor){ 0xFFFF, 0xFFFF, 0xFFFF };
+        case yellowColor: return (RGBColor){ 0xFFFF, 0xFFFF, 0x0000 };
+        case magentaColor: return (RGBColor){ 0xFFFF, 0x0000, 0xFFFF };
+        case redColor: return (RGBColor){ 0xFFFF, 0x0000, 0x0000 };
+        case cyanColor: return (RGBColor){ 0x0000, 0xFFFF, 0xFFFF };
+        case greenColor: return (RGBColor){ 0x0000, 0xFFFF, 0x0000 };
+        case blueColor: return (RGBColor){ 0x0000, 0x0000, 0xFFFF };
+        case blackColor:
+        default:
+            return (RGBColor){ 0x0000, 0x0000, 0x0000 };
+    }
+}
+
+static UInt8 qdraw_palette_index_for_rgb(const RGBColor *color) {
+    CTabHandle ctab = current_port_ctable();
+    int bestIndex = color->green >> 8;
+    unsigned long bestDistance = ~0UL;
+    if (!ctab || !*ctab) {
+#ifdef PORT_SDL2
+        if (current_port_pixel_size() < 16) {
+            for (int i = 0; i < 256; i++) {
+                long dr = (long)s_palette[i].r - (long)(color->red >> 8);
+                long dg = (long)s_palette[i].g - (long)(color->green >> 8);
+                long db = (long)s_palette[i].b - (long)(color->blue >> 8);
+                unsigned long distance = (unsigned long)(dr * dr + dg * dg + db * db);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+            return (UInt8)bestIndex;
+        }
+#endif
+        unsigned long red = color->red >> 8;
+        unsigned long green = color->green >> 8;
+        unsigned long blue = color->blue >> 8;
+        return (UInt8)((red * 30u + green * 59u + blue * 11u) / 100u);
+    }
+    for (int i = 0; i <= (*ctab)->ctSize && i < 256; i++) {
+        long dr = ((long)(*ctab)->ctTable[i].rgb.red - (long)color->red) >> 8;
+        long dg = ((long)(*ctab)->ctTable[i].rgb.green - (long)color->green) >> 8;
+        long db = ((long)(*ctab)->ctTable[i].rgb.blue - (long)color->blue) >> 8;
+        unsigned long distance = (unsigned long)(dr * dr + dg * dg + db * db);
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = i;
+        }
+    }
+    return (UInt8)bestIndex;
+}
+
+static UInt16 qdraw_rgb_to_1555(const RGBColor *color) {
+    UInt16 red = (UInt16)((color->red >> 11) & 0x1F);
+    UInt16 green = (UInt16)((color->green >> 11) & 0x1F);
+    UInt16 blue = (UInt16)((color->blue >> 11) & 0x1F);
+    return (UInt16)((red << 10) | (green << 5) | blue);
+}
+
+static const UInt8 *qdraw_glyph_rows(unsigned char ch) {
+    switch (ch) {
+        case 0xA0:
+        case ' ': return s_qd_glyph_space;
+        case '-':
+        case '_': return s_qd_glyph_dash;
+        case '.': return s_qd_glyph_dot;
+        case ',': return s_qd_glyph_comma;
+        case '!': return s_qd_glyph_bang;
+        case ':': return s_qd_glyph_colon;
+        case '\'': return s_qd_glyph_quote;
+        case '/': return s_qd_glyph_slash;
+        case '?': return s_qd_glyph_question;
+        case '(': return s_qd_glyph_lparen;
+        case ')': return s_qd_glyph_rparen;
+        case '+': return s_qd_glyph_plus;
+        case '0': return s_qd_glyph_0;
+        case '1': return s_qd_glyph_1;
+        case '2': return s_qd_glyph_2;
+        case '3': return s_qd_glyph_3;
+        case '4': return s_qd_glyph_4;
+        case '5': return s_qd_glyph_5;
+        case '6': return s_qd_glyph_6;
+        case '7': return s_qd_glyph_7;
+        case '8': return s_qd_glyph_8;
+        case '9': return s_qd_glyph_9;
+        case 'A': return s_qd_glyph_A;
+        case 'B': return s_qd_glyph_B;
+        case 'C': return s_qd_glyph_C;
+        case 'D': return s_qd_glyph_D;
+        case 'E': return s_qd_glyph_E;
+        case 'F': return s_qd_glyph_F;
+        case 'G': return s_qd_glyph_G;
+        case 'H': return s_qd_glyph_H;
+        case 'I': return s_qd_glyph_I;
+        case 'J': return s_qd_glyph_J;
+        case 'K': return s_qd_glyph_K;
+        case 'L': return s_qd_glyph_L;
+        case 'M': return s_qd_glyph_M;
+        case 'N': return s_qd_glyph_N;
+        case 'O': return s_qd_glyph_O;
+        case 'P': return s_qd_glyph_P;
+        case 'Q': return s_qd_glyph_Q;
+        case 'R': return s_qd_glyph_R;
+        case 'S': return s_qd_glyph_S;
+        case 'T': return s_qd_glyph_T;
+        case 'U': return s_qd_glyph_U;
+        case 'V': return s_qd_glyph_V;
+        case 'W': return s_qd_glyph_W;
+        case 'X': return s_qd_glyph_X;
+        case 'Y': return s_qd_glyph_Y;
+        case 'Z': return s_qd_glyph_Z;
+        default: return s_qd_glyph_space;
+    }
+}
+
+static int qdraw_text_scale(void) {
+    int scale = (gQDTextSize + 5) / 8;
+    return scale > 0 ? scale : 1;
+}
+
+static int qdraw_string_width_bytes(int length) {
+    int scale = qdraw_text_scale();
+    if (length <= 0) return 0;
+    return length * (6 * scale) - scale;
+}
+
+static void qdraw_plot_pixel(int x, int y, UInt8 paletteIndex, UInt16 pixel1555, UInt32 pixel8888) {
+    UInt8 *pix = current_port_pixels();
+    int rb = current_port_rowbytes();
+    int depth = current_port_pixel_size();
+    Rect bounds;
+    current_port_bounds_rect(&bounds);
+    if (!pix || !rb || x < bounds.left || y < bounds.top || x >= bounds.right || y >= bounds.bottom) return;
+    if (depth >= 24) {
+        UInt32 *row = (UInt32 *)(pix + (y - bounds.top) * rb);
+        row[x - bounds.left] = pixel8888;
+    } else if (depth >= 16) {
+        UInt16 *row = (UInt16 *)(pix + (y - bounds.top) * rb);
+        row[x - bounds.left] = pixel1555;
+    } else {
+        pix[(y - bounds.top) * rb + (x - bounds.left)] = paletteIndex;
+    }
+}
+
+static void qdraw_draw_hline(int x, int y, int width, UInt8 paletteIndex, UInt16 pixel1555, UInt32 pixel8888) {
+    for (int i = 0; i < width; i++) qdraw_plot_pixel(x + i, y, paletteIndex, pixel1555, pixel8888);
+}
+
+static void qdraw_draw_scaled_glyph(const UInt8 *rows, int x, int y, int scale,
+                                    UInt8 paletteIndex, UInt16 pixel1555, UInt32 pixel8888) {
+    for (int row = 0; row < 7; row++) {
+        for (int col = 0; col < 5; col++) {
+            if ((rows[row] & (1 << (4 - col))) == 0) continue;
+            for (int py = 0; py < scale; py++) {
+                for (int px = 0; px < scale; px++) {
+                    qdraw_plot_pixel(
+                        x + col * scale + px,
+                        y + row * scale + py,
+                        paletteIndex,
+                        pixel1555,
+                        pixel8888
+                    );
+                }
+            }
+        }
+    }
+}
 
 static void fill_rect_color(const Rect *r, UInt8 color) {
     int x, y, x1, y1, x2, y2, rb;
     UInt8 *pix;
-    extern short gXSize, gYSize;
+    Rect bounds;
     if (!r || gQDOpenRgn) return;
     pix = current_port_pixels();
     rb  = current_port_rowbytes();
     if (!pix || !rb) return;
+    current_port_bounds_rect(&bounds);
     x1 = r->left; y1 = r->top; x2 = r->right; y2 = r->bottom;
     /* Clamp to pixel buffer bounds */
-    if (x1 < 0) x1 = 0; if (y1 < 0) y1 = 0;
-    if (x2 > gXSize) x2 = gXSize; if (y2 > gYSize) y2 = gYSize;
+    if (x1 < bounds.left) x1 = bounds.left; if (y1 < bounds.top) y1 = bounds.top;
+    if (x2 > bounds.right) x2 = bounds.right; if (y2 > bounds.bottom) y2 = bounds.bottom;
     if (x1 >= x2 || y1 >= y2) return;
     for (y = y1; y < y2; y++) {
-        UInt8 *row = pix + y * rb + x1;
+        UInt8 *row = pix + (y - bounds.top) * rb + (x1 - bounds.left);
         for (x = x1; x < x2; x++) *row++ = color;
     }
 }
@@ -1415,24 +2395,26 @@ void InvertRect(const Rect *r) {
 static void draw_hline(UInt8 *pix, int rb, int x1, int x2, int y, UInt8 color) {
     UInt8 *row;
     int x;
-    extern short gXSize, gYSize;
+    Rect bounds;
+    current_port_bounds_rect(&bounds);
     /* Bounds check */
-    if (y < 0 || y >= gYSize) return;
-    if (x1 < 0) x1 = 0;
-    if (x2 > gXSize) x2 = gXSize;
+    if (y < bounds.top || y >= bounds.bottom) return;
+    if (x1 < bounds.left) x1 = bounds.left;
+    if (x2 > bounds.right) x2 = bounds.right;
     if (x1 >= x2) return;
-    row = pix + y * rb + x1;
+    row = pix + (y - bounds.top) * rb + (x1 - bounds.left);
     for (x = x1; x < x2; x++) *row++ = color;
 }
 
 static void draw_vline(UInt8 *pix, int rb, int x, int y1, int y2, UInt8 color) {
     int y;
-    extern short gXSize, gYSize;
+    Rect bounds;
+    current_port_bounds_rect(&bounds);
     /* Bounds check */
-    if (x < 0 || x >= gXSize) return;
-    if (y1 < 0) y1 = 0;
-    if (y2 > gYSize) y2 = gYSize;
-    for (y = y1; y < y2; y++) pix[y * rb + x] = color;
+    if (x < bounds.left || x >= bounds.right) return;
+    if (y1 < bounds.top) y1 = bounds.top;
+    if (y2 > bounds.bottom) y2 = bounds.bottom;
+    for (y = y1; y < y2; y++) pix[(y - bounds.top) * rb + (x - bounds.left)] = color;
 }
 
 void FrameRect(const Rect *r) {
@@ -1450,21 +2432,65 @@ void FrameRect(const Rect *r) {
     draw_vline(pix, rb, x1, y1, y2+1, gQDForeColor);
     draw_vline(pix, rb, x2, y1, y2+1, gQDForeColor);
 }
-void MoveTo(short h, short v)                       { }
+void MoveTo(short h, short v)                       { gQDPenH = h; gQDPenV = v; }
 void LineTo(short h, short v)                       { }
 void Line(short dh, short dv)                       { }
-void DrawString(const char *s)                      { (void)s; /* text rendering not implemented */ }
-void TextFont(short font)                           { }
-void TextSize(short size)                           { }
-void TextMode(short mode)                           { }
-void TextFace(short face)                           { }
-void ForeColor(long color)                          { }
-void BackColor(long color)                          { }
-void RGBForeColor(const RGBColor *color)            { }
-void RGBBackColor(const RGBColor *color)            { }
+void DrawString(const char *s) {
+    int scale;
+    int baseline;
+    int cursorX;
+    int length;
+    UInt8 paletteIndex;
+    UInt16 pixel1555;
+    UInt32 pixel8888;
+    if (!s) return;
+    length = (unsigned char)s[0];
+    if (length <= 0) return;
+
+    scale = qdraw_text_scale();
+    baseline = gQDPenV - 7 * scale;
+    cursorX = gQDPenH;
+    paletteIndex = qdraw_palette_index_for_rgb(&gQDForeRGB);
+    pixel1555 = qdraw_rgb_to_1555(&gQDForeRGB);
+    pixel8888 = 0xFF000000u |
+        ((UInt32)(gQDForeRGB.red >> 8) << 16) |
+        ((UInt32)(gQDForeRGB.green >> 8) << 8) |
+        (UInt32)(gQDForeRGB.blue >> 8);
+
+    for (int i = 0; i < length; i++) {
+        unsigned char ch = (unsigned char)s[i + 1];
+        const UInt8 *rows = qdraw_glyph_rows((unsigned char)toupper(ch));
+        qdraw_draw_scaled_glyph(rows, cursorX, baseline, scale, paletteIndex, pixel1555, pixel8888);
+        if (gQDTextFace & bold) {
+            qdraw_draw_scaled_glyph(rows, cursorX + 1, baseline, scale, paletteIndex, pixel1555, pixel8888);
+        }
+        cursorX += 6 * scale;
+    }
+
+    if (gQDTextFace & underline) {
+        qdraw_draw_hline(
+            gQDPenH,
+            gQDPenV + (scale > 1 ? 1 : 0),
+            qdraw_string_width_bytes(length),
+            paletteIndex,
+            pixel1555,
+            pixel8888
+        );
+    }
+
+    gQDPenH = cursorX - scale;
+}
+void TextFont(short font)                           { gQDTextFont = font; }
+void TextSize(short size)                           { gQDTextSize = size > 0 ? size : 12; }
+void TextMode(short mode)                           { gQDTextMode = mode; }
+void TextFace(short face)                           { gQDTextFace = face; }
+void ForeColor(long color)                          { gQDForeRGB = qdraw_named_rgb(color); gQDForeColor = qdraw_palette_index_for_rgb(&gQDForeRGB); }
+void BackColor(long color)                          { gQDBackRGB = qdraw_named_rgb(color); gQDBackColor = qdraw_palette_index_for_rgb(&gQDBackRGB); }
+void RGBForeColor(const RGBColor *color)            { if (color) { gQDForeRGB = *color; gQDForeColor = qdraw_palette_index_for_rgb(&gQDForeRGB); } }
+void RGBBackColor(const RGBColor *color)            { if (color) { gQDBackRGB = *color; gQDBackColor = qdraw_palette_index_for_rgb(&gQDBackRGB); } }
 short GetPixelSize(PixMapHandle pm)                 { return 8; }
-short StringWidth(const char *s)                    { return s ? (unsigned char)s[0] * 7 : 0; /* approx */ }
-void  Move(short dh, short dv)                      { }
+short StringWidth(const char *s)                    { return s ? (short)qdraw_string_width_bytes((unsigned char)s[0]) : 0; }
+void  Move(short dh, short dv)                      { gQDPenH += dh; gQDPenV += dv; }
 
 void NumToString(long theNum, char *theString) {
     if (!theString) return;
@@ -1545,8 +2571,45 @@ void SelectWindow(WindowPtr w) { (void)w; }
 /* Dialog Manager                                                            */
 /*---------------------------------------------------------------------------*/
 
+static Str255 gDialogItemText = { 0 };
+static short gLastDialogID = 0;
+
+static void copy_pascal_string(char *dst, const char *src)
+{
+    unsigned int len = 0;
+    if (src) len = (unsigned char)src[0];
+    if (len > 255) len = 255;
+    dst[0] = (char)len;
+    if (len > 0 && src) {
+        memcpy(&dst[1], &src[1], len);
+    }
+}
+
+static void copy_c_string_to_pascal(Str255 dst, const char *src)
+{
+    size_t n = src ? strlen(src) : 0;
+    if (n > 255) n = 255;
+    dst[0] = (UInt8)n;
+    if (n > 0 && src) {
+        memcpy(&dst[1], src, n);
+    }
+}
+
+static void copy_pascal_to_c_string(const Str255 src, char *dst, size_t dstSize)
+{
+    size_t len = src ? src[0] : 0;
+    if (!dst || dstSize == 0) return;
+    if (len >= dstSize) len = dstSize - 1;
+    if (len > 0) {
+        memcpy(dst, &src[1], len);
+    }
+    dst[len] = '\0';
+}
+
 DialogPtr GetNewDialog(short id, void *wStorage, WindowPtr behind) {
     (void)id; (void)wStorage; (void)behind;
+    gDialogItemText[0] = 0;
+    gLastDialogID = id;
     return (DialogPtr)calloc(1, sizeof(OpaqueDialogPtr));
 }
 
@@ -1555,20 +2618,75 @@ void DisposeDialog(DialogPtr dialog) {
 }
 
 void ModalDialog(void *filterProc, short *itemHit) {
+    EventRecord event;
+    int done = 0;
     (void)filterProc;
+
+#ifdef PORT_SDL2
+    {
+        char entered[256];
+        copy_pascal_to_c_string(gDialogItemText, entered, sizeof(entered));
+        if (SDL_Platform_RunModalTextEntry(gLastDialogID, entered, sizeof(entered))) {
+            copy_c_string_to_pascal(gDialogItemText, entered);
+        }
+        if (itemHit) *itemHit = 1;
+        return;
+    }
+#endif
+
+    while (!done) {
+        if (!WaitNextEvent(everyEvent, &event, 2, nil)) {
+            continue;
+        }
+
+        if (event.what == keyDown || event.what == autoKey) {
+            unsigned char ch = (unsigned char)(event.message & 0xFF);
+            unsigned char len = (unsigned char)gDialogItemText[0];
+
+            if (ch == 0x0D || ch == 0x03) {
+                done = 1;
+                continue;
+            }
+            if (ch == 0x08 || ch == 0x7F) {
+                if (len > 0) {
+                    gDialogItemText[0] = (char)(len - 1);
+                }
+                continue;
+            }
+            if (isprint(ch) && len < 31) {
+                gDialogItemText[len + 1] = (char)ch;
+                gDialogItemText[0] = (char)(len + 1);
+            }
+            continue;
+        }
+
+        if (event.what == mouseDown && gLastDialogID != 130) {
+            done = 1;
+        }
+    }
+
     if (itemHit) *itemHit = 1;
 }
 
 void GetDialogItem(DialogPtr dialog, short itemNo, short *itemType,
                     Handle *item, Rect *box) {
+    (void)dialog;
+    (void)itemNo;
     if (itemType) *itemType = 0;
     if (item)     *item     = NULL;
     if (box)      memset(box, 0, sizeof(Rect));
 }
 
-void SetDialogItemText(Handle item, const char *text) { }
+void SetDialogItemText(Handle item, const char *text) {
+    (void)item;
+    copy_pascal_string(gDialogItemText, text);
+}
+
 void GetDialogItemText(Handle item, char *text) {
-    if (text) text[0] = 0;
+    (void)item;
+    if (text) {
+        copy_pascal_string(text, gDialogItemText);
+    }
 }
 
 OSErr SetDialogDefaultItem(DialogPtr dialog, short newItem) { return 0; }

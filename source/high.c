@@ -34,6 +34,13 @@ void ShowHighScores(int hilite)
 	}
 	ForeColor(blackColor);
 	SetGWorld(oldGW,oldGD);
+	Blit2Screen();
+	{
+		EventRecord event;
+		while(Button()||ContinuePress())
+			WaitNextEvent(everyEvent,&event,0,nil);
+	}
+	SaveFlushEvents();
 	WaitForPress(); 
 	FadeScreen(1); 		
 	ScreenUpdate(nil);
@@ -60,16 +67,26 @@ void SetHighScoreEntry(int index,UInt32 score)
 	highDlg=GetNewDialog(130,nil,(WindowPtr)-1);
 	DoError(SetDialogDefaultItem(highDlg,1));
 	GetDialogItem(highDlg,2,&type,&item,&box);
-	SetDialogItemText(item,gPrefs.lastName);
+	SetDialogItemText(item,"");
 	SelectDialogItemText(highDlg,2,0,32767);
 	do ModalDialog(nil,&hit); while(hit!=1);
 	GetDialogItemText(item,text);
+	if(text[0]==0)
+	{
+		text[0]=6;
+		text[1]='P';
+		text[2]='L';
+		text[3]='A';
+		text[4]='Y';
+		text[5]='E';
+		text[6]='R';
+	}
 	BlockMove(text,gPrefs.lastName,text[0]+1);
 	DisposeDialog(highDlg);	
 	if(text[0]>15)
 	{
 		text[0]=15;
-		text[15]='É';
+		text[15]='.';
 	}
 	BlockMove(text,gPrefs.high[index].name,text[0]+1);
 	gPrefs.high[index].score=score;

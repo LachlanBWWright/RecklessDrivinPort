@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { decodeIMA4, decodeIMA4Packet, parseSndHeader, buildWav, IMA4_STEP_TABLE, IMA4_INDEX_TABLE } from './snd-codec';
+import {
+  decodeIMA4,
+  decodeIMA4Packet,
+  parseSndHeader,
+  buildWav,
+  sndToWav,
+  IMA4_STEP_TABLE,
+  IMA4_INDEX_TABLE,
+} from './snd-codec';
 
 describe('IMA4_STEP_TABLE', () => {
   it('has exactly 89 entries', () => {
@@ -54,7 +62,7 @@ describe('decodeIMA4Packet', () => {
     // Packet with all nibbles = 7 (max positive step), high predictor
     const packet = new Uint8Array(34);
     // Set header to max predictor (0x7F80 = predictor=0x7F80 which is positive)
-    packet[0] = 0x7F;
+    packet[0] = 0x7f;
     packet[1] = 0x00; // step index = 0
     // Fill data with 0x77 = nibble 7 for both high and low → max positive
     for (let i = 2; i < 34; i++) packet[i] = 0x77;
@@ -97,7 +105,7 @@ describe('decodeIMA4', () => {
   it('produces values in [-1, 1] for various inputs', () => {
     const data = new Uint8Array(34 * 5);
     // Fill with pseudo-random-ish bytes
-    for (let i = 0; i < data.length; i++) data[i] = (i * 37 + 13) & 0xFF;
+    for (let i = 0; i < data.length; i++) data[i] = (i * 37 + 13) & 0xff;
     const result = decodeIMA4(data, 5);
     expect(result.length).toBe(320);
     for (let i = 0; i < result.length; i++) {
@@ -135,22 +143,22 @@ describe('parseSndHeader', () => {
     sampleRateHz: number,
     pcm?: Uint8Array,
   ): Uint8Array {
-    const hdrOff    = 16; // tSound header = 16 bytes
+    const hdrOff = 16; // tSound header = 16 bytes
     const dataStart = hdrOff + 22;
-    const data      = pcm ?? new Uint8Array(sampleCount);
-    const out       = new Uint8Array(dataStart + data.length);
-    const dv        = new DataView(out.buffer);
-    dv.setUint32(0,  1,   false); // numVariants=1
-    dv.setUint32(4,  0,   false); // priority=0
-    dv.setUint32(8,  0,   false); // flags=0
+    const data = pcm ?? new Uint8Array(sampleCount);
+    const out = new Uint8Array(dataStart + data.length);
+    const dv = new DataView(out.buffer);
+    dv.setUint32(0, 1, false); // numVariants=1
+    dv.setUint32(4, 0, false); // priority=0
+    dv.setUint32(8, 0, false); // flags=0
     dv.setUint32(12, hdrOff, false); // offsets[0]=hdrOff
-    dv.setUint32(hdrOff + 0, 0,              false); // samplePtr=0
-    dv.setUint32(hdrOff + 4, sampleCount,    false); // numFrames
+    dv.setUint32(hdrOff + 0, 0, false); // samplePtr=0
+    dv.setUint32(hdrOff + 4, sampleCount, false); // numFrames
     dv.setUint32(hdrOff + 8, sampleRateHz * 65536, false); // sampleRate (16.16 fixed)
-    dv.setUint32(hdrOff + 12, 0, false);             // loopStart
-    dv.setUint32(hdrOff + 16, 0, false);             // loopEnd
-    dv.setUint8(hdrOff + 20, 0);                     // encode=0 (stdSH)
-    dv.setUint8(hdrOff + 21, 60);                    // baseFreq=middle-C
+    dv.setUint32(hdrOff + 12, 0, false); // loopStart
+    dv.setUint32(hdrOff + 16, 0, false); // loopEnd
+    dv.setUint8(hdrOff + 20, 0); // encode=0 (stdSH)
+    dv.setUint8(hdrOff + 21, 60); // baseFreq=middle-C
     out.set(data, dataStart);
     return out;
   }
@@ -185,7 +193,7 @@ describe('parseSndHeader', () => {
     // numVariants=1 but hdrOff is out of range
     const bytes = new Uint8Array(16);
     const dv = new DataView(bytes.buffer);
-    dv.setUint32(0,  1,   false); // numVariants=1
+    dv.setUint32(0, 1, false); // numVariants=1
     dv.setUint32(12, 999, false); // hdrOff way past end
     expect(parseSndHeader(bytes)).toBeNull();
   });
@@ -212,5 +220,57 @@ describe('buildWav', () => {
     const pcm = new Uint8Array(100);
     const wav = buildWav(pcm, 22050, 1, 8);
     expect(wav.length).toBe(44 + 100);
+  });
+});
+
+describe('sndToWav', () => {
+  it('swaps 16-bit extSH PCM to little-endian WAV samples', () => {
+    const hdrOff = 16;
+    const pcmOffset = hdrOff + 64;
+    const out = new Uint8Array(pcmOffset + 4);
+    const dv = new DataView(out.buffer);
+
+    dv.setUint32(0, 1, false); // numVariants
+    dv.setUint32(12, hdrOff, false); // offsets[0]
+    dv.setUint32(hdrOff + 4, 1, false); // numChannels
+    dv.setUint32(hdrOff + 8, 22050 * 65536, false); // sampleRate
+    dv.setUint8(hdrOff + 20, 0xff); // extSH
+    dv.setUint32(hdrOff + 22, 2, false); // numFrames
+    dv.setUint16(hdrOff + 48, 16, false); // sampleSize
+
+    // Two samples in big-endian order: 0x1234, 0xabcd
+    out[pcmOffset] = 0x12;
+    out[pcmOffset + 1] = 0x34;
+    out[pcmOffset + 2] = 0xab;
+    out[pcmOffset + 3] = 0xcd;
+
+    const wav = sndToWav(out);
+    expect(wav[44]).toBe(0x34);
+    expect(wav[45]).toBe(0x12);
+    expect(wav[46]).toBe(0xcd);
+    expect(wav[47]).toBe(0xab);
+  });
+
+  it('uses declared frame count to trim trailing bytes', () => {
+    const hdrOff = 16;
+    const pcmOffset = hdrOff + 64;
+    const out = new Uint8Array(pcmOffset + 8);
+    const dv = new DataView(out.buffer);
+
+    dv.setUint32(0, 1, false);
+    dv.setUint32(12, hdrOff, false);
+    dv.setUint32(hdrOff + 4, 1, false);
+    dv.setUint32(hdrOff + 8, 22050 * 65536, false);
+    dv.setUint8(hdrOff + 20, 0xff);
+    dv.setUint32(hdrOff + 22, 2, false); // exactly 2 frames
+    dv.setUint16(hdrOff + 48, 16, false);
+
+    // Two valid samples + two trailing garbage samples
+    out.set([0x00, 0x01, 0x00, 0x02, 0xff, 0xff, 0xee, 0xee], pcmOffset);
+
+    const wav = sndToWav(out);
+    const dataSize = new DataView(wav.buffer, wav.byteOffset, wav.byteLength).getUint32(40, true);
+    expect(dataSize).toBe(4);
+    expect(wav.length).toBe(48);
   });
 });

@@ -82,6 +82,7 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   @Input() levelEnd = 0;
   @Input() editObjDirDeg = 0;
   @Input() editObjTypeRes = 128;
+  @Input() placementObjTypeRes = 128;
   @Input() availableTypeIds: number[] = [];
   @Input() spriteUrl: string | null = null;
   @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
@@ -165,6 +166,7 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   @Output() hideAll = new EventEmitter<void>();
   @Output() removeSelected = new EventEmitter<void>();
   @Output() deselect = new EventEmitter<void>();
+  @Output() addObjectTypeChange = new EventEmitter<number>();
 
   sidebarTab: 'objects' | 'groups' = 'objects';
   selectedObjectGroupSlotIndex: number | null = null;

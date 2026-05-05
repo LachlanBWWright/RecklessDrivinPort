@@ -37,6 +37,10 @@
           [hasMarkingPreview]="hasMarkingPreview"
           [markCreateMode]="markCreateMode"
           [pendingMarkPointCount]="pendingMarkPointCount"
+          [placementObjTypeRes]="placementObjTypeRes"
+          [availableTypeIds]="availableTypeIds"
+          [getSpriteUrl]="getSpriteUrl"
+          [getFallbackColor]="getFallbackColor"
           (canvasMouseDown)="canvasMouseDown.emit($event)"
           (canvasMouseMove)="canvasMouseMove.emit($event)"
           (canvasMouseUp)="canvasMouseUp.emit($event)"
@@ -74,6 +78,7 @@
           (previewRange)="previewRange.emit($event)"
           (removeMarks)="removeMarks.emit($event)"
           (clearMarkingPreview)="clearMarkingPreview.emit()"
+          (addObjectTypeChange)="addObjectTypeChange.emit($event)"
         ></app-editor-canvas>
 
         <div class="flex min-h-0 w-[320px] min-w-[300px] shrink-0 flex-col gap-3 overflow-hidden border-l border-l-[var(--border)] bg-[var(--surface2)] p-4 max-[1024px]:max-h-[42vh] max-[1024px]:w-full max-[1024px]:min-w-0 max-[1024px]:flex-[0_0_auto] max-[1024px]:border-l-0 max-[1024px]:border-t max-[1024px]:border-t-[var(--border)] max-[1024px]:p-3">

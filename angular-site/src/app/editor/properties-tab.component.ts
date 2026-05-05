@@ -95,6 +95,31 @@ export class PropertiesTabComponent implements OnChanges {
   readonly objectGroupNumObjsForm = new FormArray<FormControl<number>>([]);
   private syncingObjectGroupNumObjsForm = false;
 
+  readonly roadFieldTooltips: Record<string, string> = {
+    friction: 'tRoadInfo.friction: base road grip, multiplied with object friction in physics.',
+    airResistance: 'tRoadInfo.airResistance: velocity-proportional drag term in CalcWheelForce().',
+    backResistance: 'tRoadInfo.backResistance: marked obsolete in headers/roads.h.',
+    tolerance: 'tRoadInfo.tolerance: off-road threshold in CalcBackCollision().',
+    deathOffs: 'tRoadInfo.deathOffs: offset added to deathObj/sink death variants.',
+    water: 'tRoadInfo.water: enables water handling paths (boat behavior, drift, sounds).',
+    xDrift: 'tRoadInfo.xDrift: global lateral drift accumulator per frame.',
+    yDrift: 'tRoadInfo.yDrift: global longitudinal drift accumulator per frame.',
+    xFrontDrift: 'tRoadInfo.xFrontDrift: front-wheel lateral drift component.',
+    yFrontDrift: 'tRoadInfo.yFrontDrift: front-wheel longitudinal drift component.',
+    trackSlide: 'tRoadInfo.trackSlide: slide multiplier for track-surface behavior.',
+    dustSlide: 'tRoadInfo.dustSlide: slide multiplier for dust/off-road behavior.',
+    dustColor: 'tRoadInfo.dustColor: palette color index for dust effects.',
+    filler: 'tRoadInfo.filler: compatibility filler field kept in struct layout.',
+    filler2: 'tRoadInfo.filler2: compatibility filler field kept in struct layout.',
+    slideFriction: 'tRoadInfo.slideFriction: scales grip loss while sliding.',
+  };
+
+  readonly objectGroupTooltips: Record<'resID' | 'numObjs', string> = {
+    resID:
+      'tObjectGroupReference.resID: object-group definition id looked up by InsertObjectGroup().',
+    numObjs: 'tObjectGroupReference.numObjs: number of objects spawned for this slot.',
+  };
+
   constructor() {
     this.roadInfoForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
       this.emitRoadInfoChanges();

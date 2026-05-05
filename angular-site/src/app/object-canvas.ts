@@ -370,7 +370,7 @@ export function addObject(app: App): void {
     x: Math.round(app.canvasPanX()),
     y: Math.round(app.canvasPanY()),
     dir: 0,
-    typeRes: 128,
+    typeRes: app.placementObjTypeRes(),
   });
   app.objects.set(objs);
   selectObject(app, objs.length - 1);
@@ -535,6 +535,10 @@ export function onCanvasMouseDown(app: App, event: MouseEvent): void {
   }
 
   const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
+  if (app.drawMode() !== 'none') {
+    app.selectedObjIndex.set(null);
+    return;
+  }
   const objs = app.objects();
   const hitRadius = Math.max(MIN_HIT_RADIUS, BASE_HIT_RADIUS / app.canvasZoom());
 
@@ -640,6 +644,11 @@ export function onCanvasMouseMove(app: App, event: MouseEvent): void {
   }
 
   if (!app.isDragging()) {
+    if (app.drawMode() !== 'none') {
+      app.hoverTrackWaypoint.set(null);
+      app.hoverTrackMidpoint.set(null);
+      return;
+    }
     if (app.showTrackOverlay() && !app._hoverRafPending) {
       app._hoverRafPending = true;
       const evX = event.offsetX;
@@ -734,6 +743,7 @@ export function onCanvasMouseUp(app: App): void {
     app._draggingFinishLine = false;
     app._startMarkerDragUndoCaptured = false;
     app._finishLineDragUndoCaptured = false;
+    app._objectRotateDragUndoCaptured = false;
     return;
   }
 
@@ -747,12 +757,13 @@ export function onCanvasDoubleClick(app: App, event: MouseEvent): void {
   const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
   const objs = [...app.objects()];
   app._pushUndo('objects');
-  objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: 128 });
+  objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: app.placementObjTypeRes() });
   app.objects.set(objs);
   selectObject(app, objs.length - 1);
 }
 
 export function onCanvasContextMenu(app: App, event: MouseEvent): void {
+  if (app.drawMode() !== 'none') return;
   if (!app.showTrackOverlay()) return;
   const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
   const trackUp = app.editTrackUp();
@@ -974,6 +985,7 @@ export function redrawObjectCanvas(app: App): void {
   const selIdx = app.selectedObjIndex();
   const visibleTypes = app.visibleTypeFilter();
   const level = app.selectedLevel();
+  const barrierDrawLock = app.drawMode() !== 'none';
 
   ctx.clearRect(0, 0, width, height);
 
@@ -1045,6 +1057,7 @@ export function redrawObjectCanvas(app: App): void {
       ctx,
       (x, y) => worldToCanvas(app, x, y),
       zoom,
+      barrierDrawLock,
       app.dragTrackWaypoint(),
       app.hoverTrackWaypoint(),
       app.hoverTrackMidpoint(),
@@ -1059,8 +1072,9 @@ export function redrawObjectCanvas(app: App): void {
       (x, y) => worldToCanvas(app, x, y),
       app.marks(),
       app.selectedMarkIndex(),
-      app._konvaInitialized,
+      app._konvaInitialized && !barrierDrawLock,
       app.markCreateMode(),
+      barrierDrawLock,
       app._pendingMarkPoints,
       app._markCreateHoverPoint,
     );
@@ -1243,7 +1257,7 @@ export function redrawObjectCanvas(app: App): void {
   app.initKonvaIfNeeded();
   app.konva.setTransform(zoom, panX, panY);
   app.konva.setObjects(
-    objsVisible ? objs : [],
+    objsVisible && !barrierDrawLock ? objs : [],
     selIdx,
     visibleTypes,
     OBJ_PALETTE,
@@ -1252,19 +1266,19 @@ export function redrawObjectCanvas(app: App): void {
     panX,
     panY,
   );
-  if (level && app.showTrackOverlay()) {
+  if (level && app.showTrackOverlay() && !barrierDrawLock) {
     const up = app.showTrackUp() ? app.editTrackUp() : [];
     const down = app.showTrackDown() ? app.editTrackDown() : [];
     app.konva.setTrackWaypoints(up, down, zoom, panX, panY);
   } else {
     app.konva.clearTrackWaypoints();
   }
-  if (level && app.showMarks()) {
+  if (level && app.showMarks() && !barrierDrawLock) {
     app.konva.setMarks(app.marks(), app.selectedMarkIndex(), zoom, panX, panY);
   } else {
     app.konva.clearMarks();
   }
-  if (level) {
+  if (level && !barrierDrawLock) {
     app.konva.setFinishLine(liveFinishY, zoom, panX, panY);
   } else {
     app.konva.clearFinishLine();

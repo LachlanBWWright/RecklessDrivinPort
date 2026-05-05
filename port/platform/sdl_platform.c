@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <limits.h>
 #include <time.h>
 
@@ -63,6 +64,7 @@ static UInt8 *s_back_buffer = NULL;
 
 /* Declared in gameinitexit.c - true while the game level is active */
 extern int gGameOn;
+extern int gExit;
 
 /* ============================================================
  * On-screen touch controls (Android / touch-screen devices)
@@ -478,6 +480,263 @@ static void sdl_render_touch_overlay(void)
     SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_NONE);
 }
 
+#define MODAL_GLYPH(name, a, b, c, d, e, f, g) static const UInt8 name[7] = { a, b, c, d, e, f, g }
+MODAL_GLYPH(s_modal_glyph_space, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+MODAL_GLYPH(s_modal_glyph_dash, 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00);
+MODAL_GLYPH(s_modal_glyph_dot, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C);
+MODAL_GLYPH(s_modal_glyph_bang, 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04);
+MODAL_GLYPH(s_modal_glyph_colon, 0x00, 0x04, 0x04, 0x00, 0x04, 0x04, 0x00);
+MODAL_GLYPH(s_modal_glyph_quote, 0x0A, 0x0A, 0x04, 0x00, 0x00, 0x00, 0x00);
+MODAL_GLYPH(s_modal_glyph_0, 0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E);
+MODAL_GLYPH(s_modal_glyph_1, 0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E);
+MODAL_GLYPH(s_modal_glyph_2, 0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F);
+MODAL_GLYPH(s_modal_glyph_3, 0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E);
+MODAL_GLYPH(s_modal_glyph_4, 0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02);
+MODAL_GLYPH(s_modal_glyph_5, 0x1F, 0x10, 0x10, 0x1E, 0x01, 0x01, 0x1E);
+MODAL_GLYPH(s_modal_glyph_6, 0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E);
+MODAL_GLYPH(s_modal_glyph_7, 0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08);
+MODAL_GLYPH(s_modal_glyph_8, 0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E);
+MODAL_GLYPH(s_modal_glyph_9, 0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x1C);
+MODAL_GLYPH(s_modal_glyph_A, 0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11);
+MODAL_GLYPH(s_modal_glyph_B, 0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E);
+MODAL_GLYPH(s_modal_glyph_C, 0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E);
+MODAL_GLYPH(s_modal_glyph_D, 0x1C, 0x12, 0x11, 0x11, 0x11, 0x12, 0x1C);
+MODAL_GLYPH(s_modal_glyph_E, 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F);
+MODAL_GLYPH(s_modal_glyph_F, 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10);
+MODAL_GLYPH(s_modal_glyph_G, 0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0F);
+MODAL_GLYPH(s_modal_glyph_H, 0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11);
+MODAL_GLYPH(s_modal_glyph_I, 0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E);
+MODAL_GLYPH(s_modal_glyph_J, 0x01, 0x01, 0x01, 0x01, 0x11, 0x11, 0x0E);
+MODAL_GLYPH(s_modal_glyph_K, 0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11);
+MODAL_GLYPH(s_modal_glyph_L, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F);
+MODAL_GLYPH(s_modal_glyph_M, 0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11);
+MODAL_GLYPH(s_modal_glyph_N, 0x11, 0x11, 0x19, 0x15, 0x13, 0x11, 0x11);
+MODAL_GLYPH(s_modal_glyph_O, 0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E);
+MODAL_GLYPH(s_modal_glyph_P, 0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10);
+MODAL_GLYPH(s_modal_glyph_Q, 0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D);
+MODAL_GLYPH(s_modal_glyph_R, 0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11);
+MODAL_GLYPH(s_modal_glyph_S, 0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E);
+MODAL_GLYPH(s_modal_glyph_T, 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04);
+MODAL_GLYPH(s_modal_glyph_U, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E);
+MODAL_GLYPH(s_modal_glyph_V, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04);
+MODAL_GLYPH(s_modal_glyph_W, 0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A);
+MODAL_GLYPH(s_modal_glyph_X, 0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11);
+MODAL_GLYPH(s_modal_glyph_Y, 0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04);
+MODAL_GLYPH(s_modal_glyph_Z, 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F);
+#undef MODAL_GLYPH
+
+static const UInt8 *sdl_modal_glyph_rows(char ch)
+{
+    switch (toupper((unsigned char)ch)) {
+        case ' ': return s_modal_glyph_space;
+        case '-': return s_modal_glyph_dash;
+        case '.': return s_modal_glyph_dot;
+        case '!': return s_modal_glyph_bang;
+        case ':': return s_modal_glyph_colon;
+        case '\'': return s_modal_glyph_quote;
+        case '0': return s_modal_glyph_0;
+        case '1': return s_modal_glyph_1;
+        case '2': return s_modal_glyph_2;
+        case '3': return s_modal_glyph_3;
+        case '4': return s_modal_glyph_4;
+        case '5': return s_modal_glyph_5;
+        case '6': return s_modal_glyph_6;
+        case '7': return s_modal_glyph_7;
+        case '8': return s_modal_glyph_8;
+        case '9': return s_modal_glyph_9;
+        case 'A': return s_modal_glyph_A;
+        case 'B': return s_modal_glyph_B;
+        case 'C': return s_modal_glyph_C;
+        case 'D': return s_modal_glyph_D;
+        case 'E': return s_modal_glyph_E;
+        case 'F': return s_modal_glyph_F;
+        case 'G': return s_modal_glyph_G;
+        case 'H': return s_modal_glyph_H;
+        case 'I': return s_modal_glyph_I;
+        case 'J': return s_modal_glyph_J;
+        case 'K': return s_modal_glyph_K;
+        case 'L': return s_modal_glyph_L;
+        case 'M': return s_modal_glyph_M;
+        case 'N': return s_modal_glyph_N;
+        case 'O': return s_modal_glyph_O;
+        case 'P': return s_modal_glyph_P;
+        case 'Q': return s_modal_glyph_Q;
+        case 'R': return s_modal_glyph_R;
+        case 'S': return s_modal_glyph_S;
+        case 'T': return s_modal_glyph_T;
+        case 'U': return s_modal_glyph_U;
+        case 'V': return s_modal_glyph_V;
+        case 'W': return s_modal_glyph_W;
+        case 'X': return s_modal_glyph_X;
+        case 'Y': return s_modal_glyph_Y;
+        case 'Z': return s_modal_glyph_Z;
+        default: return s_modal_glyph_dash;
+    }
+}
+
+static int sdl_modal_text_width(const char *text, int scale)
+{
+    int width = 0;
+    if (!text || scale <= 0) return 0;
+    while (*text) {
+        width += 6 * scale;
+        text++;
+    }
+    return width > 0 ? width - scale : 0;
+}
+
+static void sdl_modal_draw_text(const char *text, int x, int y, int scale,
+                                Uint8 red, Uint8 green, Uint8 blue, Uint8 alpha)
+{
+    SDL_Rect pixel;
+    if (!text || scale <= 0 || !s_renderer) return;
+    SDL_SetRenderDrawColor(s_renderer, red, green, blue, alpha);
+    pixel.w = scale;
+    pixel.h = scale;
+    while (*text) {
+        const UInt8 *rows = sdl_modal_glyph_rows(*text);
+        int row;
+        for (row = 0; row < 7; row++) {
+            int col;
+            UInt8 bits = rows[row];
+            for (col = 0; col < 5; col++) {
+                if ((bits & (1 << (4 - col))) == 0) continue;
+                pixel.x = x + col * scale;
+                pixel.y = y + row * scale;
+                SDL_RenderFillRect(s_renderer, &pixel);
+            }
+        }
+        x += 6 * scale;
+        text++;
+    }
+}
+
+static const char *sdl_modal_title(short dialogID)
+{
+    switch (dialogID) {
+        case 129: return "ENTER CHEAT CODE";
+        case 130: return "NEW HIGH SCORE";
+        case 132:
+        case 133: return "REGISTRATION";
+        case 134:
+        case 135: return "KEY CONFIG";
+        default: return "ENTER TEXT";
+    }
+}
+
+static const char *sdl_modal_subtitle(short dialogID)
+{
+    switch (dialogID) {
+        case 130: return "TYPE YOUR NAME";
+        case 129: return "PRESS ENTER TO APPLY";
+        default: return "PRESS ENTER TO ACCEPT";
+    }
+}
+
+static const char *sdl_modal_footer(short dialogID)
+{
+    switch (dialogID) {
+        case 130: return "PRESS ENTER TO SUBMIT SCORE";
+        case 129: return "PRESS ENTER TO APPLY";
+        default: return "ENTER TO ACCEPT";
+    }
+}
+
+static void sdl_render_modal_overlay(short dialogID, const char *text, int blinkCursor)
+{
+    SDL_Rect output;
+    SDL_Rect game;
+    SDL_Rect panel;
+    SDL_Rect input;
+    const char *title = sdl_modal_title(dialogID);
+    const char *subtitle = sdl_modal_subtitle(dialogID);
+    const char *footer = sdl_modal_footer(dialogID);
+    int titleScale;
+    int bodyScale;
+    int titleWidth;
+    int subtitleWidth;
+    int footerWidth;
+    int maxChars;
+    int textLen;
+    int startIndex;
+    char visibleText[64];
+    int i;
+    int cursorX;
+
+    if (!s_renderer) return;
+    sdl_get_game_dst_rect(&game, &output.w, &output.h);
+    output.x = 0;
+    output.y = 0;
+
+    panel.w = game.w * 3 / 4;
+    if (dialogID == 130) panel.w = game.w * 5 / 6;
+    if (panel.w < 320) panel.w = 320;
+    if (panel.w > game.w - 24) panel.w = game.w - 24;
+    panel.h = game.h / 3;
+    if (dialogID == 130) panel.h = game.h * 2 / 5;
+    if (panel.h < 150) panel.h = 150;
+    if (panel.h > game.h - 24) panel.h = game.h - 24;
+    panel.x = game.x + (game.w - panel.w) / 2;
+    panel.y = game.y + (game.h - panel.h) / 2;
+
+    input.x = panel.x + 18;
+    input.y = panel.y + panel.h - (dialogID == 130 ? 72 : 48);
+    input.w = panel.w - 36;
+    input.h = dialogID == 130 ? 40 : 24;
+
+    SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(s_renderer, 0, 0, 0, 170);
+    SDL_RenderFillRect(s_renderer, &output);
+
+    SDL_SetRenderDrawColor(s_renderer, 18, 20, 28, 232);
+    SDL_RenderFillRect(s_renderer, &panel);
+    SDL_SetRenderDrawColor(s_renderer, 255, 255, 255, 200);
+    SDL_RenderDrawRect(s_renderer, &panel);
+
+    titleScale = panel.w / 190;
+    if (titleScale < 2) titleScale = 2;
+    if (titleScale > 4) titleScale = 4;
+    bodyScale = titleScale > 2 ? titleScale - 1 : 2;
+    if (dialogID == 130 && bodyScale < 3) bodyScale = 3;
+
+    titleWidth = sdl_modal_text_width(title, titleScale);
+    subtitleWidth = sdl_modal_text_width(subtitle, bodyScale);
+    footerWidth = sdl_modal_text_width(footer, 1);
+    sdl_modal_draw_text(title, panel.x + (panel.w - titleWidth) / 2, panel.y + 20,
+                        titleScale, 255, 239, 160, 255);
+    sdl_modal_draw_text(subtitle, panel.x + (panel.w - subtitleWidth) / 2, panel.y + 20 + titleScale * 10,
+                        bodyScale, 214, 224, 255, 255);
+
+    SDL_SetRenderDrawColor(s_renderer, 8, 10, 16, 255);
+    SDL_RenderFillRect(s_renderer, &input);
+    SDL_SetRenderDrawColor(s_renderer, 255, 255, 255, 180);
+    SDL_RenderDrawRect(s_renderer, &input);
+
+    maxChars = (input.w - 16) / (6 * bodyScale);
+    if (maxChars < 1) maxChars = 1;
+    textLen = text ? (int)strlen(text) : 0;
+    startIndex = textLen > maxChars ? textLen - maxChars : 0;
+    for (i = 0; i < maxChars && text && text[startIndex + i]; i++) {
+        visibleText[i] = text[startIndex + i];
+    }
+    visibleText[i] = '\0';
+    sdl_modal_draw_text(visibleText, input.x + 8, input.y + 5, bodyScale,
+                        255, 255, 255, 255);
+
+    if (blinkCursor) {
+        cursorX = input.x + 8 + sdl_modal_text_width(visibleText, bodyScale) + bodyScale;
+        if (cursorX > input.x + input.w - bodyScale * 2) {
+            cursorX = input.x + input.w - bodyScale * 2;
+        }
+        SDL_SetRenderDrawColor(s_renderer, 255, 239, 160, 255);
+        SDL_RenderDrawLine(s_renderer, cursorX, input.y + 4, cursorX, input.y + input.h - 5);
+    }
+
+    sdl_modal_draw_text(footer, panel.x + (panel.w - footerWidth) / 2, panel.y + panel.h - 25,
+                        1, 190, 200, 220, 255);
+    SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_NONE);
+}
+
 /* Helper: (re)allocate the back-buffer with the given bytes-per-pixel.
  * No-ops if the buffer is already at the correct size. */
 static void sdl_set_depth(int bpp)
@@ -865,6 +1124,69 @@ GWorldPtr GetScreenGW(void) {
     return (GWorldPtr)&s_screen_gworld;
 }
 
+static void sdl_upload_back_buffer_to_texture(void)
+{
+    int y;
+    if (!s_renderer || !s_texture || !s_rgb_surface || !s_back_buffer)
+        return;
+
+    {
+        static int s_first_blit = 1;
+        if (s_first_blit) {
+            LOG_DEBUG("LOG: first Blit2Screen – gRowBytes=%d gXSize=%d gYSize=%d\n",
+                   gRowBytes, gXSize, gYSize);
+            s_first_blit = 0;
+        }
+    }
+
+    if (gRowBytes == gXSize) {
+        if (!s_surface) return;
+        if (s_palette_set) {
+            SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
+        }
+        if (SDL_LockSurface(s_surface) == 0) {
+            for (y = 0; y < gYSize; y++) {
+                UInt8 *dst = (UInt8 *)s_surface->pixels + y * s_surface->pitch;
+                const UInt8 *src = s_back_buffer + y * gXSize;
+                memcpy(dst, src, (size_t)gXSize);
+            }
+            SDL_UnlockSurface(s_surface);
+        }
+        SDL_BlitSurface(s_surface, NULL, s_rgb_surface, NULL);
+    } else {
+        if (SDL_LockSurface(s_rgb_surface) == 0) {
+            for (y = 0; y < gYSize; y++) {
+                Uint32 *dst = (Uint32 *)((UInt8 *)s_rgb_surface->pixels
+                                         + y * s_rgb_surface->pitch);
+                const UInt16 *src = (const UInt16 *)(s_back_buffer + y * gRowBytes);
+                int x;
+                for (x = 0; x < gXSize; x++) {
+                    UInt16 p = src[x];
+                    Uint8 r = (Uint8)(((p >> 10) & 0x1F) << 3);
+                    Uint8 g = (Uint8)(((p >>  5) & 0x1F) << 3);
+                    Uint8 b = (Uint8)(( p        & 0x1F) << 3);
+                    dst[x] = (Uint32)(0xFF000000u | ((Uint32)r << 16)
+                                      | ((Uint32)g << 8) | b);
+                }
+            }
+            SDL_UnlockSurface(s_rgb_surface);
+        }
+    }
+
+    SDL_UpdateTexture(s_texture, NULL, s_rgb_surface->pixels, s_rgb_surface->pitch);
+}
+
+static void sdl_render_base_frame(int renderTouchOverlay)
+{
+    SDL_Rect dst;
+    if (!s_renderer || !s_texture) return;
+    SDL_RenderClear(s_renderer);
+    sdl_get_game_dst_rect(&dst, NULL, NULL);
+    SDL_RenderCopy(s_renderer, s_texture, NULL, &dst);
+    if (renderTouchOverlay && s_touch_controls_active)
+        sdl_render_touch_overlay();
+}
+
 void FadeScreen(int out) {
     /* On fade-in (out=0): present whatever is in the back buffer */
     if (!out) Blit2Screen();
@@ -877,7 +1199,6 @@ void FadeScreen(int out) {
  *  - 16-bit XRGB1555 (gRowBytes == gXSize*2):  convert XRGB1555 pixels → ARGB8888
  */
 void Blit2Screen(void) {
-    int y;
     if (!s_renderer || !s_texture || !s_rgb_surface || !s_back_buffer)
         return;
 
@@ -888,7 +1209,7 @@ void Blit2Screen(void) {
     {
         static Uint32 s_last_blit_ms = 0;
         Uint32 now_ms = SDL_GetTicks();
-        if (s_last_blit_ms && (now_ms - s_last_blit_ms) < BLIT2SCREEN_MIN_MS) {
+        if (gGameOn && s_last_blit_ms && (now_ms - s_last_blit_ms) < BLIT2SCREEN_MIN_MS) {
             /* Too soon – skip this present to stay within 144 fps */
             return;
         }
@@ -896,78 +1217,8 @@ void Blit2Screen(void) {
     }
 #undef BLIT2SCREEN_MIN_MS
 
-    /* Log first render frame */
-    {
-        static int s_first_blit = 1;
-        if (s_first_blit) {
-            LOG_DEBUG("LOG: first Blit2Screen – gRowBytes=%d gXSize=%d gYSize=%d\n",
-                   gRowBytes, gXSize, gYSize);
-            s_first_blit = 0;
-        }
-    }
-    if (gRowBytes == gXSize) {
-        /* ---- 8-bit indexed path ---- */
-        if (!s_surface) return;
-
-        /* Make sure the palette is current on the surface */
-        if (s_palette_set) {
-            SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
-        }
-
-        /* Copy our back buffer into the SDL paletted surface */
-        if (SDL_LockSurface(s_surface) == 0) {
-            for (y = 0; y < gYSize; y++) {
-                UInt8 *dst = (UInt8 *)s_surface->pixels + y * s_surface->pitch;
-                const UInt8 *src = s_back_buffer + y * gXSize;
-                memcpy(dst, src, (size_t)gXSize);
-            }
-            SDL_UnlockSurface(s_surface);
-        }
-
-        /* Convert 8-bit indexed → 32-bit ARGB */
-        SDL_BlitSurface(s_surface, NULL, s_rgb_surface, NULL);
-    } else {
-        /* ---- 16-bit RGB555 hi-color path ---- */
-        if (SDL_LockSurface(s_rgb_surface) == 0) {
-            for (y = 0; y < gYSize; y++) {
-                Uint32 *dst = (Uint32 *)((UInt8 *)s_rgb_surface->pixels
-                                         + y * s_rgb_surface->pitch);
-                const UInt16 *src = (const UInt16 *)(s_back_buffer + y * gRowBytes);
-                int x;
-                for (x = 0; x < gXSize; x++) {
-                    /* Back buffer stores native RGB555 values. */
-                    UInt16 p = src[x];
-                    /* RGB555: bits 14-10=R, 9-5=G, 4-0=B */
-                    Uint8 r = (Uint8)(((p >> 10) & 0x1F) << 3);
-                    Uint8 g = (Uint8)(((p >>  5) & 0x1F) << 3);
-                    Uint8 b = (Uint8)(( p        & 0x1F) << 3);
-                    /* ARGB8888 */
-                    dst[x] = (Uint32)(0xFF000000u | ((Uint32)r << 16)
-                                      | ((Uint32)g << 8) | b);
-                }
-            }
-            SDL_UnlockSurface(s_rgb_surface);
-        }
-    }
-
-    /* Upload to texture */
-    SDL_UpdateTexture(s_texture, NULL, s_rgb_surface->pixels, s_rgb_surface->pitch);
-
-    /* Render game frame with letterboxing to maintain 4:3 aspect ratio.
-     * The game renders at 640×480 (4:3).  On wide-screen or non-4:3 displays
-     * (e.g. an Android phone in landscape, or a maximised desktop window) we
-     * scale the game to fill the full output height, centring it horizontally
-     * with black bars on each side rather than stretching to fill the width. */
-    SDL_RenderClear(s_renderer);
-    {
-        SDL_Rect dst;
-        sdl_get_game_dst_rect(&dst, NULL, NULL);
-        SDL_RenderCopy(s_renderer, s_texture, NULL, &dst);
-    }
-
-    /* Render on-screen touch controls overlay (if touch active) */
-    if (s_touch_controls_active)
-        sdl_render_touch_overlay();
+    sdl_upload_back_buffer_to_texture();
+    sdl_render_base_frame(1);
 
     SDL_RenderPresent(s_renderer);
 
@@ -1019,6 +1270,83 @@ void Blit2Screen(void) {
         }
     }
 #undef SCREENSHOT_WARMUP_FRAMES
+}
+
+int SDL_Platform_RunModalTextEntry(short dialogID, char *text, size_t textCapacity)
+{
+    size_t len;
+    size_t maxLen;
+
+    if (!text || textCapacity == 0 || !s_renderer || !s_texture) return 0;
+
+    len = strlen(text);
+    if (len >= textCapacity) len = textCapacity - 1;
+    text[len] = '\0';
+    maxLen = textCapacity - 1;
+    if (maxLen > 31) maxLen = 31;
+
+    SDL_StartTextInput();
+    while (!gExit) {
+        SDL_Event ev;
+        while (SDL_PollEvent(&ev)) {
+            switch (ev.type) {
+                case SDL_QUIT:
+                    gExit = 1;
+                    break;
+
+                case SDL_TEXTINPUT:
+                    {
+                        const char *incoming = ev.text.text;
+                        while (*incoming && len < maxLen) {
+                            unsigned char ch = (unsigned char)*incoming++;
+                            if (!isprint(ch)) continue;
+                            text[len++] = (char)ch;
+                        }
+                        text[len] = '\0';
+                    }
+                    break;
+
+                case SDL_KEYDOWN:
+                    if (ev.key.keysym.sym == SDLK_BACKSPACE) {
+                        if (len > 0) {
+                            len--;
+                            text[len] = '\0';
+                        }
+                    } else if (ev.key.keysym.sym == SDLK_RETURN ||
+                               ev.key.keysym.sym == SDLK_KP_ENTER ||
+                               ev.key.keysym.sym == SDLK_ESCAPE) {
+                        SDL_StopTextInput();
+                        return 1;
+                    }
+                    break;
+
+                case SDL_MOUSEBUTTONDOWN:
+                case SDL_FINGERDOWN:
+                    if (dialogID == 130) {
+                        break;
+                    }
+                    SDL_StopTextInput();
+                    return 1;
+
+                default:
+                    break;
+            }
+        }
+
+        sdl_audio_process_callbacks();
+        sdl_upload_back_buffer_to_texture();
+        sdl_render_base_frame(0);
+        sdl_render_modal_overlay(dialogID, text, ((SDL_GetTicks() / 400) & 1) == 0);
+        SDL_RenderPresent(s_renderer);
+#ifdef __EMSCRIPTEN__
+        emscripten_sleep(16);
+#else
+        SDL_Delay(16);
+#endif
+    }
+
+    SDL_StopTextInput();
+    return 1;
 }
 
 /* SetScreenClut - set palette from color table resource */

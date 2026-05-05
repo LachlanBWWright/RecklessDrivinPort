@@ -2,7 +2,10 @@ import Konva from 'konva';
 import type { ObjectPos } from './level-editor.service';
 import { FALLBACK_CIRCLE_WORLD_R } from './konva-editor.types';
 import type { KonvaWorldNode } from './konva-editor.types';
-import { worldDirToKonvaRotationDeg } from './object-direction-utils';
+import {
+  worldDirToKonvaRotationDeg,
+  worldVectorToDir,
+} from './object-direction-utils';
 
 export function buildObjects(
   worldGroup: Konva.Group | null,
@@ -17,13 +20,15 @@ export function buildObjects(
   zoom: number,
   onObjectDragEnd?: (index: number, wx: number, wy: number) => void,
   onObjectClick?: (index: number) => void,
+  onObjectRotateStart?: (index: number) => void,
+  onObjectRotateMove?: (index: number, worldDir: number) => void,
+  onObjectRotateEnd?: (index: number, worldDir: number) => void,
 ): { nodes: KonvaWorldNode[] } {
   if (!worldGroup || !objectsLayer) return { nodes: [] };
 
-  void cssH;
   void logicalW;
-  void logicalH;
-  void zoom;
+  const sy = zoom * (cssH / logicalH);
+  const screenToWorld = 1 / Math.max(0.0001, sy);
   const PALETTE_LEN = paletteColors.length;
   const nodes: KonvaWorldNode[] = [];
 
@@ -36,6 +41,9 @@ export function buildObjects(
 
     const isSel = i === selectedIndex;
     const img   = getImageForType(obj.typeRes);
+    const objectRadius = img instanceof HTMLCanvasElement || img instanceof HTMLImageElement
+      ? Math.max(img.width, img.height) / 2
+      : FALLBACK_CIRCLE_WORLD_R;
 
     let node: KonvaWorldNode;
 
@@ -67,6 +75,77 @@ export function buildObjects(
       onObjectDragEnd?.(i, Math.round(wx), Math.round(wy));
     });
     eventNode.on('click', (e: Konva.KonvaEventObject<MouseEvent>) => { e.cancelBubble = true; onObjectClick?.(i); });
+
+    if (isSel) {
+      const handleOffset = objectRadius + 34 * screenToWorld;
+      const handleRadius = 7 * screenToWorld;
+      const strokeWidth = Math.max(1, 1.5 * screenToWorld);
+      const hitStrokeWidth = 14 * screenToWorld;
+      const adornment = new Konva.Group({
+        x: obj.x,
+        y: -obj.y,
+        rotation: worldDirToKonvaRotationDeg(obj.dir),
+        listening: true,
+        id: `obj-${i}-rotate-handle`,
+      });
+      const stick = new Konva.Line({
+        points: [0, -objectRadius, 0, -handleOffset],
+        stroke: '#ffffff',
+        strokeWidth,
+        hitStrokeWidth,
+        shadowColor: 'rgba(0,0,0,0.55)',
+        shadowBlur: 2 * screenToWorld,
+        shadowOffset: { x: 0, y: 1 * screenToWorld },
+        listening: false,
+      });
+      const nub = new Konva.Circle({
+        x: 0,
+        y: -handleOffset,
+        radius: handleRadius,
+        fill: '#f9a825',
+        stroke: '#ffffff',
+        strokeWidth,
+        hitStrokeWidth,
+        draggable: !panMode,
+      });
+      let currentDir = obj.dir;
+      const emitRotation = () => {
+        const absolute = nub.getAbsolutePosition();
+        const transform = worldGroup.getAbsoluteTransform().copy().invert();
+        const pointer = transform.point(absolute);
+        const worldDir = worldVectorToDir(pointer.x - obj.x, pointer.y - (-obj.y));
+        currentDir = worldDir;
+        onObjectRotateMove?.(i, worldDir);
+        eventNode.rotation(worldDirToKonvaRotationDeg(worldDir));
+        adornment.rotation(worldDirToKonvaRotationDeg(worldDir));
+        nub.position({ x: 0, y: -handleOffset });
+      };
+      nub.dragBoundFunc((pos) => pos);
+      nub.on('dragstart', (e) => {
+        e.cancelBubble = true;
+        document.body.style.cursor = 'grabbing';
+        onObjectRotateStart?.(i);
+      });
+      nub.on('dragmove', (e) => {
+        e.cancelBubble = true;
+        emitRotation();
+      });
+      nub.on('dragend', (e) => {
+        e.cancelBubble = true;
+        document.body.style.cursor = '';
+        emitRotation();
+        onObjectRotateEnd?.(i, currentDir);
+        nub.position({ x: 0, y: -handleOffset });
+      });
+      nub.on('mouseenter', () => { document.body.style.cursor = 'grab'; });
+      nub.on('mouseleave', () => { if (!nub.isDragging()) document.body.style.cursor = ''; });
+      nub.on('click', (e: Konva.KonvaEventObject<MouseEvent>) => { e.cancelBubble = true; });
+      adornment.add(stick, nub);
+      worldGroup.add(adornment);
+      eventNode.on('dragmove', () => {
+        adornment.position({ x: node.x(), y: node.y() });
+      });
+    }
 
   });
 

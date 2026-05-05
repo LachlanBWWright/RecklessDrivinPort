@@ -193,6 +193,7 @@ export function resetObjectHistory(app: App): void {
   app._objectDragUndoCaptured = false;
   app._startMarkerDragUndoCaptured = false;
   app._finishLineDragUndoCaptured = false;
+  app._objectRotateDragUndoCaptured = false;
 }
 
 export function undo(app: App): void {

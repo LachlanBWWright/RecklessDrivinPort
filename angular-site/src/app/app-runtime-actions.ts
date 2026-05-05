@@ -7,9 +7,11 @@ import {
   clearEditorResources as clearEditorResourcesHelper,
   downloadEditedResources as downloadEditedResourcesHelper,
   loadDefaultResources as loadDefaultResourcesHelper,
+  onResourceMergeSelected as onResourceMergeSelectedHelper,
   onResourceFileSelected as onResourceFileSelectedHelper,
   saveEditedResourcesToGame as saveEditedResourcesToGameHelper,
 } from './app-session';
+import type { ResourceMergeOptions } from './resource-merge';
 import {
   applyVolumeToWasm as applyVolumeToWasmHelper,
   applyCustomResourcesPreset as applyCustomResourcesPresetHelper,
@@ -41,6 +43,7 @@ export function createRuntimeActions(app: App): {
   applyVolume(): void;
   loadDefaultResources(): Promise<void>;
   onResourceFileSelected(event: Event): Promise<void>;
+  onResourceMergeSelected(file: File, options: ResourceMergeOptions): Promise<void>;
   clearEditorResources(): void;
   downloadEditedResources(): Promise<void>;
   saveEditedResourcesToGame(): Promise<void>;
@@ -91,6 +94,7 @@ export function createRuntimeActions(app: App): {
     },
     loadDefaultResources: bindAppAction(app, loadDefaultResourcesHelper),
     onResourceFileSelected: bindAppAction(app, onResourceFileSelectedHelper),
+    onResourceMergeSelected: bindAppAction(app, onResourceMergeSelectedHelper),
     clearEditorResources: bindAppAction(app, clearEditorResourcesHelper),
     downloadEditedResources: bindAppAction(app, downloadEditedResourcesHelper),
     saveEditedResourcesToGame: bindAppAction(app, saveEditedResourcesToGameHelper),

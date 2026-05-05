@@ -97,45 +97,171 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
 
   readonly flagOptions: Record<'flags' | 'flags2', FlagOption[]> = {
     flags: [
-      { bit: 1 << 0, label: 'Wheel', hint: 'Uses wheel physics' },
-      { bit: 1 << 1, label: 'Solid friction', hint: 'Applies solid-surface friction' },
-      { bit: 1 << 2, label: 'Back collision', hint: 'Uses back-collision handling' },
-      { bit: 1 << 3, label: 'Random frame', hint: 'Starts on a random animation frame' },
+      {
+        bit: 1 << 0,
+        label: 'Wheel',
+        hint: 'kObjectWheelFlag: enables wheel-force vehicle physics.',
+      },
+      {
+        bit: 1 << 1,
+        label: 'Solid friction',
+        hint: 'kObjectSolidFrictionFlag: uses solid-surface friction path.',
+      },
+      {
+        bit: 1 << 2,
+        label: 'Back collision',
+        hint: 'kObjectBackCollFlag: enables rear-collision checks.',
+      },
+      {
+        bit: 1 << 3,
+        label: 'Random frame',
+        hint: 'kObjectRandomFrameFlag: spawn frame randomized in NewObject().',
+      },
       {
         bit: 1 << 4,
         label: 'Die when anim ends',
-        hint: 'Kills the object at the end of animation',
+        hint: 'kObjectDieWhenAnimEndsFlag: remove object when animation reaches last frame.',
       },
-      { bit: 1 << 5, label: 'Default death', hint: 'Spawns the default explosion on death' },
-      { bit: 1 << 6, label: 'Follow marks', hint: 'Uses mark-following behavior' },
-      { bit: 1 << 7, label: 'Overtake', hint: 'Allows overtaking behavior' },
-      { bit: 1 << 8, label: 'Slow', hint: 'Marked as slow-moving' },
-      { bit: 1 << 9, label: 'Long', hint: 'Marked as long' },
-      { bit: 1 << 10, label: 'Killed by cars', hint: 'Can be destroyed by cars' },
-      { bit: 1 << 11, label: 'Kills cars', hint: 'Can destroy cars on contact' },
-      { bit: 1 << 12, label: 'Bounce', hint: 'Bouncy collision response' },
-      { bit: 1 << 13, label: 'Cop', hint: 'Uses cop control logic' },
-      { bit: 1 << 14, label: 'Heli', hint: 'Helicopter-style movement' },
-      { bit: 1 << 15, label: 'Bonus', hint: 'Counts as a bonus object' },
+      {
+        bit: 1 << 5,
+        label: 'Default death',
+        hint: 'kObjectDefaultDeath: use Explosion() default death path.',
+      },
+      {
+        bit: 1 << 6,
+        label: 'Follow marks',
+        hint: 'kObjectFollowMarks: controller follows generated marks/track guidance.',
+      },
+      {
+        bit: 1 << 7,
+        label: 'Overtake',
+        hint: 'kObjectOvertake: enables overtake target offset in AI.',
+      },
+      { bit: 1 << 8, label: 'Slow', hint: 'kObjectSlow: lowers AI target speed multiplier.' },
+      { bit: 1 << 9, label: 'Long', hint: 'kObjectLong: marks long-body collision behavior.' },
+      {
+        bit: 1 << 10,
+        label: 'Killed by cars',
+        hint: 'kObjectKilledByCars: allows destruction from vehicle hits.',
+      },
+      {
+        bit: 1 << 11,
+        label: 'Kills cars',
+        hint: 'kObjectKillsCars: object can kill colliding cars.',
+      },
+      {
+        bit: 1 << 12,
+        label: 'Bounce',
+        hint: 'kObjectBounce: enables bounce response on collisions.',
+      },
+      {
+        bit: 1 << 13,
+        label: 'Cop',
+        hint: 'kObjectCop: object participates in cop behavior/systems.',
+      },
+      {
+        bit: 1 << 14,
+        label: 'Heli',
+        hint: 'kObjectHeliFlag: helicopter movement/control handling.',
+      },
+      {
+        bit: 1 << 15,
+        label: 'Bonus',
+        hint: 'kObjectBonusFlag: object is treated as a bonus/add-on pickup.',
+      },
     ],
     flags2: [
-      { bit: 1 << 0, label: 'Add-on', hint: 'Treat as an add-on object' },
-      { bit: 1 << 1, label: 'Front collision', hint: 'Uses front collision handling' },
-      { bit: 1 << 2, label: 'Oil', hint: 'Drops oil' },
-      { bit: 1 << 3, label: 'Missile', hint: 'Behaves like a missile' },
-      { bit: 1 << 4, label: 'Road kill', hint: 'Uses road-kill movement' },
-      { bit: 1 << 5, label: 'Layer 1', hint: 'Draw on layer 1' },
-      { bit: 1 << 6, label: 'Layer 2', hint: 'Draw on layer 2' },
-      { bit: 1 << 7, label: 'Engine sound', hint: 'Route sound through engine playback' },
-      { bit: 1 << 8, label: 'Ramp', hint: 'Ramp behavior' },
-      { bit: 1 << 9, label: 'Sink', hint: 'Can sink in water' },
-      { bit: 1 << 10, label: 'Damageable', hint: 'Tracks and applies damage' },
-      { bit: 1 << 11, label: 'Die when off-screen', hint: 'Remove when off-screen' },
-      { bit: 1 << 12, label: 'Rear drive', hint: 'Drive from rear wheels' },
-      { bit: 1 << 13, label: 'Rear steer', hint: 'Steer from rear wheels' },
-      { bit: 1 << 14, label: 'Floating', hint: 'Float in water' },
-      { bit: 1 << 15, label: 'Bump', hint: 'Bump behavior' },
+      {
+        bit: 1 << 0,
+        label: 'Add-on',
+        hint: 'kObjectAddOnFlag: marks object as an add-on pickup/effect.',
+      },
+      {
+        bit: 1 << 1,
+        label: 'Front collision',
+        hint: 'kObjectFrontCollFlag: enables front-collision behavior.',
+      },
+      { bit: 1 << 2, label: 'Oil', hint: 'kObjectOil: marks oil-type hazard behavior.' },
+      {
+        bit: 1 << 3,
+        label: 'Missile',
+        hint: 'kObjectMissile: projectile logic treats object as missile.',
+      },
+      {
+        bit: 1 << 4,
+        label: 'Road kill',
+        hint: 'kObjectRoadKill: road-kill movement path in object control.',
+      },
+      {
+        bit: 1 << 5,
+        label: 'Layer 1',
+        hint: 'kObjectLayerFlag1: contributes to render layer bits.',
+      },
+      {
+        bit: 1 << 6,
+        label: 'Layer 2',
+        hint: 'kObjectLayerFlag2: contributes to render layer bits.',
+      },
+      {
+        bit: 1 << 7,
+        label: 'Engine sound',
+        hint: 'kObjectEngineSound: object uses looping engine sound logic.',
+      },
+      {
+        bit: 1 << 8,
+        label: 'Ramp',
+        hint: 'kObjectRamp: object behaves as ramp-type collision surface.',
+      },
+      { bit: 1 << 9, label: 'Sink', hint: 'kObjectSink: allows sink/deathOffs behavior in water.' },
+      {
+        bit: 1 << 10,
+        label: 'Damageable',
+        hint: 'kObjectDamageble: object takes and tracks damage.',
+      },
+      {
+        bit: 1 << 11,
+        label: 'Die when off-screen',
+        hint: 'kObjectDieWhenOutOfScreen: despawn when out of view.',
+      },
+      {
+        bit: 1 << 12,
+        label: 'Rear drive',
+        hint: 'kObjectRearDrive: rear wheels receive engine force.',
+      },
+      {
+        bit: 1 << 13,
+        label: 'Rear steer',
+        hint: 'kObjectRearSteer: steering applied to rear wheels.',
+      },
+      {
+        bit: 1 << 14,
+        label: 'Floating',
+        hint: 'kObjectFloating: receives water drift/tide float behavior.',
+      },
+      { bit: 1 << 15, label: 'Bump', hint: 'kObjectBump: bump interaction behavior flag.' },
     ],
+  };
+
+  readonly fieldTooltips: Record<ScalarField | ReferenceField, string> = {
+    frame: 'tObjectType.frame: base sprite frame id (Pack 129/137).',
+    numFrames: 'tObjectType.numFrames: low byte = animation frames, high byte = repeat count.',
+    frameDuration: 'tObjectType.frameDuration: seconds between animation frame advances.',
+    mass: 'tObjectType.mass: used in force/acceleration calculations in objectPhysics.c.',
+    maxEngineForce: 'tObjectType.maxEngineForce: forward drive force cap.',
+    maxNegEngineForce: 'tObjectType.maxNegEngineForce: reverse/brake drive force cap.',
+    friction: 'tObjectType.friction: multiplied with road friction in wheel-force math.',
+    steering: 'tObjectType.steering: steering angle influence for wheel vectors.',
+    wheelWidth: 'tObjectType.wheelWidth: lateral wheel offset from center.',
+    wheelLength: 'tObjectType.wheelLength: longitudinal wheel offset from center.',
+    width: 'tObjectType.width: collision half-width.',
+    length: 'tObjectType.length: collision half-length.',
+    score: 'tObjectType.score: points awarded for this object.',
+    maxDamage: 'tObjectType.maxDamage: threshold before kill path triggers.',
+    weaponInfo: 'tObjectType.weaponInfo: projectile launch speed offset in FireWeapon().',
+    deathObj: 'tObjectType.deathObj: replacement type on death (-1 disables replacement).',
+    creationSound: 'tObjectType.creationSound: sound id played on spawn.',
+    otherSound: 'tObjectType.otherSound: secondary sound id used by object logic.',
+    weaponObj: 'tObjectType.weaponObj: spawned projectile/object id (0 = none).',
   };
 
   readonly typeForm = new FormGroup({
@@ -268,6 +394,12 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     const type = this.objectTypes.find((item) => item.typeRes === typeRes);
     if (!type) return `#${typeRes}`;
     return `Type #${type.typeRes} · ${this.getFrameLabel(type.frame)}`;
+  }
+
+  getObjectTypePreviewUrl(typeRes: number): string | null {
+    if (typeRes === -1) return null;
+    const type = this.objectTypes.find((item) => item.typeRes === typeRes);
+    return type ? this.getSpriteUrl(type.frame) : null;
   }
 
   getSoundLabel(soundId: number): string {

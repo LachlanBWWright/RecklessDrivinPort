@@ -11,9 +11,12 @@ import {
   loadAudioEntries as loadAudioEntriesHelper,
   loadIconEntries as loadIconEntriesHelper,
   loadSelectedAudioBytes as loadSelectedAudioBytesHelper,
+  onIconImageEditorSaved as onIconImageEditorSavedHelper,
   onIconRawUpload as onIconRawUploadHelper,
   onIconPngUpload as onIconPngUploadHelper,
+  openIconImageEditor as openIconImageEditorHelper,
   onAudioWavUpload as onAudioWavUploadHelper,
+  previewAudioEntryById as previewAudioEntryByIdHelper,
   selectIconEntry as selectIconEntryHelper,
   selectAudioEntry as selectAudioEntryHelper,
   playAudioEntry as playAudioEntryHelper,
@@ -58,8 +61,11 @@ export function createMediaActions(app: App): {
   selectIconEntry(type: string, id: number): Promise<void>;
   exportIconPng(): void;
   exportIconRaw(): void;
+  openIconImageEditor(): void;
+  onIconImageEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void>;
   onIconRawUpload(event: Event): Promise<void>;
   onIconPngUpload(event: Event): Promise<void>;
+  previewAudioEntryById(id: number): Promise<void>;
   addIconEntry(): Promise<void>;
   exportAudioWav(): void;
   onAudioWavUpload(event: Event): Promise<void>;
@@ -100,8 +106,11 @@ export function createMediaActions(app: App): {
     selectIconEntry: bindAppAction(app, selectIconEntryHelper),
     exportIconPng: bindAppAction(app, exportIconPngHelper),
     exportIconRaw: bindAppAction(app, exportIconRawHelper),
+    openIconImageEditor: bindAppAction(app, openIconImageEditorHelper),
+    onIconImageEditorSaved: bindAppAction(app, onIconImageEditorSavedHelper),
     onIconRawUpload: bindAppAction(app, onIconRawUploadHelper),
     onIconPngUpload: bindAppAction(app, onIconPngUploadHelper),
+    previewAudioEntryById: bindAppAction(app, previewAudioEntryByIdHelper),
     addIconEntry: bindAppAction(app, addIconEntryHelper),
     exportAudioWav: bindAppAction(app, exportAudioWavHelper),
     onAudioWavUpload: bindAppAction(app, onAudioWavUploadHelper),

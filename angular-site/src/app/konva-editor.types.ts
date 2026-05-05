@@ -30,6 +30,10 @@ export interface KonvaObjectRotateEvent {
   worldDir: number;
 }
 
+export interface KonvaObjectRotateStartEvent {
+  index: number;
+}
+
 export type KonvaWorldNode = Konva.Group | Konva.Circle;
 
 export const WAYPOINT_WORLD_R = 10;

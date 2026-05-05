@@ -41,6 +41,14 @@ void ShowPicScreen(int id)
 	GDHandle oldGD;
 	Handle pic;
 	Rect r={0,0,480,640};
+	/* Force 8-bit mode so DrawPicture and Blit2Screen use the 8-bit path.
+	 * In hi-color gameplay (gGameOn=true) the back buffer is 16-bit, which
+	 * can cause the pause/picture screen to appear at half-width. Temporarily
+	 * clearing gGameOn causes ScreenMode(kScreenRunning) to set up an 8-bit
+	 * buffer, draw the picture correctly, and present it.  After presenting,
+	 * we restore gGameOn and switch back to 16-bit if gameplay was active. */
+	int savedGameOn = gGameOn;
+	gGameOn = false;
 	FadeScreen(1);
 	ScreenMode(kScreenRunning);
 	screenGW=GetScreenGW();
@@ -52,6 +60,8 @@ void ShowPicScreen(int id)
 	DisposeHandle(pic);	
 	SetGWorld(oldGW,oldGD);
 	FadeScreen(0);
+	gGameOn = savedGameOn;
+	if (gGameOn) ScreenMode(kScreenRunning); /* restore 16-bit for gameplay */
 }
 
 void ShowPicScreenNoFade(int id)
@@ -61,6 +71,8 @@ void ShowPicScreenNoFade(int id)
 	GDHandle oldGD;
 	Handle pic;
 	Rect r={0,0,480,640};
+	int savedGameOn = gGameOn;
+	gGameOn = false;
 	ScreenMode(kScreenRunning);
 	screenGW=GetScreenGW();
 	GetGWorld(&oldGW,&oldGD);
@@ -70,6 +82,9 @@ void ShowPicScreenNoFade(int id)
 	DrawPicture((PicHandle)pic,&r);
 	DisposeHandle(pic);	
 	SetGWorld(oldGW,oldGD);
+	FadeScreen(0);
+	gGameOn = savedGameOn;
+	if (gGameOn) ScreenMode(kScreenRunning);
 }
 
 void UpdateButtonRgn()
@@ -105,30 +120,18 @@ void DrawScreen(int button,GWorldPtr src)
 	else{
 		Rect r={0,0,480,640};
 		CopyBits(GetPortBitMapForCopyBits(src),GetPortBitMapForCopyBits(screenGW),&r,&r,srcCopy,nil);
-		ForeColor(whiteColor);
-		TextSize(12);
-		TextFont(3);
-		TextMode(srcOr);
-		TextFace(0);
-		MoveTo(630,475);
-		if(gRegistered)
-		{
-			Move(-StringWidth("\x0fRegistered To: "),0);
-			Move(-StringWidth(gPrefs.name),0);
-			DrawString("\x0fRegistered To: ");
-			DrawString(gPrefs.name);
-		}
-		else{
-			Move(-StringWidth("\x24\xA0\xA0\xA0 This Copy is not Registered! \xA0\xA0\xA0"),0);
-			DrawString("\x24\xA0\xA0\xA0 This Copy is not Registered! \xA0\xA0\xA0");
-		}		
 		MoveTo(10,15);
 		if(gLevelResFile)
 		{
+			ForeColor(whiteColor);
+			TextSize(12);
+			TextFont(3);
+			TextMode(srcOr);
+			TextFace(0);
 			DrawString("\x13" "Custom Level File: ");
 			DrawString(gLevelFileName);
+			ForeColor(blackColor);
 		}
-		ForeColor(blackColor);
 	}		
 	SetGWorld(oldGW,oldGD);
 	/* Flush to display after drawing to screen GWorld */
@@ -177,9 +180,12 @@ void InitInterface()
 		GDHandle oldGD;
 		Handle pic;
 		SetRect(&gwSize,0,0,640,480);
-		DoError(NewGWorld(&gMainScreenGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
-		DoError(NewGWorld(&gHilitGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
-		DoError(NewGWorld(&gSelectedGW,gPrefs.hiColor?16:8,&gwSize,nil,nil,0));
+		/* Interface GWorlds are always 8-bit: the menu is always shown in
+		 * 8-bit mode (gGameOn=false) and CopyBits does a raw byte-for-byte
+		 * copy, so the GWorld depth must match the 8-bit screen buffer. */
+		DoError(NewGWorld(&gMainScreenGW,8,&gwSize,nil,nil,0));
+		DoError(NewGWorld(&gHilitGW,8,&gwSize,nil,nil,0));
+		DoError(NewGWorld(&gSelectedGW,8,&gwSize,nil,nil,0));
 		LockPixels(GetGWorldPixMap(gMainScreenGW));
 		LockPixels(GetGWorldPixMap(gHilitGW));
 		LockPixels(GetGWorldPixMap(gSelectedGW));
@@ -229,7 +235,7 @@ void UpdateButtonLocation()
 	int i,button=kNoButton;
 	HLock((Handle)gButtonList);
 	for(i=0;i<GetHandleSize((Handle)gButtonList)/sizeof(Rect);i++)
-		if(PtInRect(mPos,(*gButtonList)+i))
+		if(i!=kPrefsButton&&PtInRect(mPos,(*gButtonList)+i))
 			button=i;
 	HUnlock((Handle)gButtonList);
 	if(button!=gButtonLocation)
@@ -245,26 +251,46 @@ void UpdateButtonLocation()
 
 int GetButtonClick(Point mPos)
 {	
-	int i,clicked=false,oldclicked=false,button=kNoButton;
+	int i,clicked=false,oldclicked=false,button=kNoButton,tracking=false;
+	EventRecord event;
 	mPos=GetScreenPos(&mPos);
 	HLock((Handle)gButtonList);
 	for(i=0;i<GetHandleSize((Handle)gButtonList)/sizeof(Rect);i++)
-		if(PtInRect(mPos,(*gButtonList)+i))
+		if(i!=kPrefsButton&&PtInRect(mPos,(*gButtonList)+i))
 			button=i;
 	HUnlock((Handle)gButtonList);
 	if(button!=kNoButton)
 	{
 		SimplePlaySound(147);
-		while(StillDown())
+		clicked=true;
+		oldclicked=true;
+		tracking=true;
+		DrawScreen(button,gSelectedGW);
+		while(tracking)
 		{
-			mPos=GetScreenPos(nil);
-			if(clicked=PtInRect(mPos,(*gButtonList)+button))
+			if(WaitNextEvent(mUpMask+osMask,&event,1,nil))
 			{
-				if(clicked!=oldclicked)
-					DrawScreen(button,gSelectedGW);
-			}else
-				DrawScreen(button,gMainScreenGW);
-			oldclicked=clicked;
+				switch(event.what)
+				{
+					case mouseUp:
+						mPos=GetScreenPos(&event.where);
+						clicked=PtInRect(mPos,(*gButtonList)+button);
+						tracking=false;
+						break;
+					case osEvt:
+						if((event.message>>24)==mouseMovedMessage)
+						{
+							mPos=GetScreenPos(nil);
+							clicked=PtInRect(mPos,(*gButtonList)+button);
+							if(clicked!=oldclicked)
+								DrawScreen(button,clicked?gSelectedGW:gMainScreenGW);
+							oldclicked=clicked;
+						}
+						break;
+				}
+			}
+			else if(!Button())
+				tracking=false;
 #ifdef __EMSCRIPTEN__
 			emscripten_sleep(16); /* yield to browser event loop (~60fps) */
 #endif
@@ -285,8 +311,7 @@ int GetKeyClick(long key)
 		case 's':
 		case 'n':
 			return kStartGameButton;
-		case 'p':
-			return kPrefsButton;
+		/* 'p' previously opened Preferences which is disabled in this port */
 		case 'c':
 		case 'o':
 			return kScoreButton;
@@ -361,7 +386,7 @@ void HandleCommand(int cmd,int modifiers)
 			StartGame(modifiers&optionKey);
 			break;
 		case kPrefsButton:
-			Preferences(); break;
+			return;
 		case kHelpButton:
 			ShowPicScreen(1007);WaitForPress(); 
 			ShowPicScreen(1008);WaitForPress();

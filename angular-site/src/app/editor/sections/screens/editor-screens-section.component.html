@@ -47,26 +47,28 @@
 
         @if (selectedIconId !== null) {
           <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden py-1">
-            <h4 class="text-base font-bold text-[var(--on-surface)]">{{ selectedIconLabel }}</h4>
+            <h4 class="shrink-0 text-base font-bold text-[var(--on-surface)]">{{ selectedIconLabel }}</h4>
             @if (iconPreviewDataUrl; as url) {
-              @if (isPictureResourceType(selectedIconType)) {
-                <div class="w-full overflow-auto rounded border border-white/20 bg-black/30 p-2">
-                  <img
-                    [src]="url"
-                    class="mx-auto block max-h-[70vh] w-auto max-w-full rounded border border-white/10 object-contain"
-                    alt="icon preview" />
-                </div>
-              } @else {
-                <img [src]="url" class="h-32 w-32 rounded border-2 border-white/20 [image-rendering:pixelated]"
-                  [style.imageRendering]="'pixelated'" alt="icon preview">
-              }
+              <app-image-preview
+                [src]="url"
+                alt="icon preview"
+                [pixelated]="!isPictureResourceType(selectedIconType)"
+                [loadingIcon]="isPictureResourceType(selectedIconType) ? 'wallpaper' : 'image'">
+              </app-image-preview>
             } @else {
-              <div class="flex h-32 w-32 items-center justify-center">
-                <mat-spinner diameter="32"></mat-spinner>
-              </div>
+              <app-image-preview
+                [src]="null"
+                alt="icon preview"
+                [pixelated]="!isPictureResourceType(selectedIconType)"
+                [loadingIcon]="isPictureResourceType(selectedIconType) ? 'wallpaper' : 'image'">
+              </app-image-preview>
             }
             @if (!isPictureResourceType(selectedIconType)) {
-              <div class="flex flex-wrap gap-2">
+              <div class="flex shrink-0 flex-wrap gap-2">
+                <button mat-raised-button color="primary" (click)="openIconImageEditor.emit()" [disabled]="workerBusy"
+                  matTooltip="Open in-browser pixel editor for this icon resource">
+                  <mat-icon>brush</mat-icon> Edit Image
+                </button>
                 <button mat-stroked-button (click)="exportIconPng.emit()">
                   <mat-icon>download</mat-icon> Export PNG
                 </button>
@@ -80,7 +82,7 @@
                   <mat-icon>upload</mat-icon> Replace PNG
                 </button>
               </div>
-              <p class="mt-3 text-[0.85em] text-[var(--muted)]">
+              <p class="mt-3 shrink-0 text-[0.85em] text-[var(--muted)]">
                 @if (selectedIconType === 'ICN#' || selectedIconType === 'ics#') {
                   ICN# / ics# resources are 32×32 1-bit black-and-white bitmaps.
                 } @else if (selectedIconType === 'icl8') {
@@ -90,7 +92,11 @@
                 }
               </p>
             } @else {
-              <div class="flex flex-wrap gap-2">
+              <div class="flex shrink-0 flex-wrap gap-2">
+                <button mat-raised-button color="primary" (click)="openIconImageEditor.emit()" [disabled]="workerBusy"
+                  matTooltip="Open in-browser pixel editor for this picture resource">
+                  <mat-icon>brush</mat-icon> Edit Image
+                </button>
                 <input #iconPictureInput type="file" accept="image/png,image/jpeg,image/webp,image/*" style="display:none"
                   (change)="iconPngUpload.emit($event)" />
                 <button mat-stroked-button (click)="iconPictureInput.click()" [disabled]="workerBusy"

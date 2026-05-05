@@ -15,6 +15,7 @@ export function drawObjectTrackOverlay(
   ctx: CanvasRenderingContext2D,
   worldToCanvas: (x: number, y: number) => [number, number],
   zoom: number,
+  interactionLocked: boolean,
   dragWp: TrackWaypointRef | null,
   hoverWp: TrackWaypointRef | null,
   hoverMid: TrackMidpointRef | null,
@@ -65,7 +66,7 @@ export function drawObjectTrackOverlay(
 
     const showAllMids = zoom > 0.5 && segs.length <= 80;
     for (let i = 0; i < segs.length - 1; i++) {
-      const isHovMid = hoverMid?.track === track && hoverMid.segIdx === i;
+      const isHovMid = !interactionLocked && hoverMid?.track === track && hoverMid.segIdx === i;
       if (!isHovMid && !showAllMids) continue;
       const mx = (segs[i].x + segs[i + 1].x) / 2;
       const my = (segs[i].y + segs[i + 1].y) / 2;
@@ -90,9 +91,16 @@ export function drawObjectTrackOverlay(
     for (let i = 0; i < segs.length; i += dotEvery) {
       const [cx, cy] = worldToCanvas(segs[i].x, segs[i].y);
       if (cx < -10 || cx > width + 10 || cy < -10 || cy > height + 10) continue;
-      const isDragged = dragWp?.track === track && dragWp.segIdx === i;
-      const isHovered = !isDragged && hoverWp?.track === track && hoverWp.segIdx === i;
-      ctx.fillStyle = isDragged ? '#ffffff' : isHovered ? '#ffdd00' : dotColor;
+      const isDragged = !interactionLocked && dragWp?.track === track && dragWp.segIdx === i;
+      const isHovered =
+        !interactionLocked && !isDragged && hoverWp?.track === track && hoverWp.segIdx === i;
+      ctx.fillStyle = interactionLocked
+        ? 'rgba(158, 158, 158, 0.75)'
+        : isDragged
+          ? '#ffffff'
+          : isHovered
+            ? '#ffdd00'
+            : dotColor;
       ctx.beginPath();
       ctx.arc(cx, cy, isDragged ? dotR + 3 : isHovered ? dotR + 2 : dotR, 0, Math.PI * 2);
       ctx.fill();
@@ -116,6 +124,8 @@ export function drawObjectTrackOverlay(
 
   drawPath(editTrackUp, 'rgba(66,165,245,0.9)', 'rgba(66,165,245,0.7)', '▲ Up', 'up');
   drawPath(editTrackDown, 'rgba(239,83,80,0.9)', 'rgba(239,83,80,0.7)', '▼ Down', 'down');
+
+  void interactionLocked;
 }
 
 export function drawMarksOnCanvas(
@@ -125,6 +135,7 @@ export function drawMarksOnCanvas(
   selectedMarkIndex: number | null,
   konvaActive: boolean,
   markCreateMode: boolean,
+  interactionLocked: boolean,
   pendingMarkPoints: TrackOverlayPoint[],
   markCreateHoverPoint: TrackOverlayPoint | null,
 ) {
@@ -140,7 +151,11 @@ export function drawMarksOnCanvas(
     ctx.lineTo(x2, y2);
     ctx.stroke();
     if (!konvaActive) {
-      ctx.fillStyle = isSel ? '#00e5ff' : '#ffd600';
+      ctx.fillStyle = interactionLocked
+        ? 'rgba(189, 189, 189, 0.9)'
+        : isSel
+          ? '#00e5ff'
+          : '#ffd600';
       [
         [x1, y1],
         [x2, y2],
@@ -171,6 +186,8 @@ export function drawMarksOnCanvas(
       ctx.setLineDash([]);
     }
   }
+
+  void interactionLocked;
 }
 
 export function getTileDimensions(entries: TextureTileEntry[], texId: number) {
@@ -179,7 +196,10 @@ export function getTileDimensions(entries: TextureTileEntry[], texId: number) {
   return `${entry.width}×${entry.height} px`;
 }
 
-export function getObjTypeDimensionLabel(objectTypeDefinitionMap: Map<number, ObjectTypeDefinition>, typeRes: number) {
+export function getObjTypeDimensionLabel(
+  objectTypeDefinitionMap: Map<number, ObjectTypeDefinition>,
+  typeRes: number,
+) {
   const def = objectTypeDefinitionMap.get(typeRes);
   if (!def) return '';
   return `${def.width.toFixed(1)}×${def.length.toFixed(1)} m`;

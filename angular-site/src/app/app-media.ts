@@ -10,6 +10,10 @@ import {
   renderPictBytes,
 } from './image-resource-codec';
 import { failEditor } from './app-loaders';
+import {
+  playAudioEntry as playAudioEntryHelper,
+  selectAudioEntry as selectAudioEntryHelper,
+} from './app-media-audio';
 
 import type { App } from './app';
 
@@ -23,17 +27,77 @@ export {
   selectAudioEntry,
 } from './app-media-audio';
 
+export async function previewAudioEntryById(host: App, id: number): Promise<void> {
+  await selectAudioEntryHelper(host, id);
+  await playAudioEntryHelper(host);
+}
+
 function normalizeResourceType(type: string): string {
   return type.trim().toUpperCase();
 }
 
-function isPictType(type: string): boolean {
+export function isPictType(type: string): boolean {
   const normalized = normalizeResourceType(type);
   return normalized === 'PICT' || normalized === 'PPIC';
 }
 
-function isPackedPictType(type: string): boolean {
+export function isPackedPictType(type: string): boolean {
   return normalizeResourceType(type) === 'PPIC';
+}
+
+export function monoMaskTypeForColorIcon(type: string): 'ICN#' | 'ICS#' | null {
+  const normalized = normalizeResourceType(type);
+  if (normalized === 'ICL8') return 'ICN#';
+  if (normalized === 'ICS8') return 'ICS#';
+  return null;
+}
+
+function isIconType(type: string): boolean {
+  const normalized = normalizeResourceType(type);
+  return (
+    normalized === 'ICN#' || normalized === 'ICS#' || normalized === 'ICL8' || normalized === 'ICS8'
+  );
+}
+
+function decodeResourceByType(type: string, bytes: Uint8Array): HTMLCanvasElement | null {
+  const normalized = normalizeResourceType(type);
+  if (normalized === 'ICN#' || normalized === 'ICS#') {
+    return renderIconBytes(bytes, normalized === 'ICS#' ? 'ics#' : 'ICN#');
+  }
+  if (normalized === 'ICL8') {
+    return renderIcl8Bytes(bytes);
+  }
+  if (normalized === 'ICS8') {
+    return renderIcs8Bytes(bytes);
+  }
+  return null;
+}
+
+function applyMonoMask(
+  canvas: HTMLCanvasElement,
+  monoIconBytes: Uint8Array,
+  width: number,
+  height: number,
+): void {
+  const bytesPerRow = Math.ceil(width / 8);
+  const planeSize = bytesPerRow * height;
+  if (monoIconBytes.length < planeSize * 2) {
+    return;
+  }
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return;
+  }
+  const imageData = ctx.getImageData(0, 0, width, height);
+  for (let row = 0; row < height; row += 1) {
+    for (let col = 0; col < width; col += 1) {
+      const byteIndex = row * bytesPerRow + Math.floor(col / 8);
+      const maskByte = monoIconBytes[planeSize + byteIndex] ?? 0;
+      const bit = (maskByte >> (7 - (col % 8))) & 1;
+      imageData.data[(row * width + col) * 4 + 3] = bit ? 255 : 0;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
 }
 
 function triggerBytesDownload(bytes: Uint8Array, filename: string): void {
@@ -50,9 +114,11 @@ export async function loadIconEntries(host: App): Promise<void> {
   try {
     type ListResult = { entries: { type: string; id: number; size: number }[] };
     const result: ListResult = await host.runtime.dispatchWorker<ListResult>('LIST_RESOURCES');
-    const SCREEN_TYPES = new Set(['ICN#', 'ICS#', 'ICL8', 'ICS8', 'PICT', 'PPIC']);
     const entries = result.entries
-      .filter((e) => SCREEN_TYPES.has(normalizeResourceType(e.type)))
+      .filter((e) => {
+        const trimmed = e.type.trim();
+        return isIconType(trimmed) || isPictType(trimmed);
+      })
       .map((e) => ({
         type: e.type,
         id: e.id,
@@ -73,6 +139,7 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
   host.selectedIconId.set(id);
   host.selectedIconType.set(type);
   host.iconPreviewCanvas.set(null);
+  const normalizedType = normalizeResourceType(type);
   if (isPictType(type)) {
     try {
       type RawResult = { bytes: ArrayBuffer | null };
@@ -82,13 +149,43 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
       });
       if (result.bytes) {
         const bytes = new Uint8Array(result.bytes);
-        const packedDecodeResult = isPackedPictType(type) ? packHandleDecompress(bytes) : ok(bytes);
-        const pictBytes = packedDecodeResult.match(
-          (value) => value,
-          () => bytes,
-        );
-        if (!pictBytes) return;
-        const canvas = renderPictBytes(pictBytes);
+        const pictCandidates: Uint8Array[] = [];
+        const maybePushCandidate = (candidate: Uint8Array): void => {
+          if (candidate.length < 14) return;
+          if (
+            candidate[10] === 0x00 &&
+            candidate[11] === 0x11 &&
+            candidate[12] === 0x02 &&
+            candidate[13] === 0xff
+          ) {
+            pictCandidates.push(candidate);
+          }
+        };
+
+        if (isPackedPictType(type)) {
+          const packedDecodeResult = packHandleDecompress(bytes);
+          packedDecodeResult.match(
+            (decoded) => {
+              maybePushCandidate(decoded);
+              return decoded;
+            },
+            () => bytes,
+          );
+        }
+
+        maybePushCandidate(bytes);
+        for (const offset of [10, 12, 14, 16]) {
+          if (bytes.length <= offset + 13) continue;
+          const slice = bytes.subarray(offset);
+          maybePushCandidate(slice);
+        }
+
+        let canvas: HTMLCanvasElement | null = null;
+        for (const candidate of pictCandidates) {
+          canvas = renderPictBytes(candidate);
+          if (canvas) break;
+        }
+
         if (canvas) {
           host.iconPreviewCanvas.set(canvas);
           const cacheKey = `${type}:${id}`;
@@ -113,13 +210,26 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
     });
     if (result.bytes) {
       const bytes = new Uint8Array(result.bytes);
-      let canvas: HTMLCanvasElement | null = null;
-      if (type === 'ICN#' || type === 'ics#') {
-        canvas = renderIconBytes(bytes, type);
-      } else if (type === 'icl8') {
-        canvas = renderIcl8Bytes(bytes);
-      } else if (type === 'ics8') {
-        canvas = renderIcs8Bytes(bytes);
+      const canvas = decodeResourceByType(type, bytes);
+      if (canvas && (normalizedType === 'ICL8' || normalizedType === 'ICS8')) {
+        const monoType = monoMaskTypeForColorIcon(normalizedType);
+        if (monoType) {
+          const monoResult: { bytes: ArrayBuffer | null } = await host.runtime.dispatchWorker(
+            'GET_RESOURCE_RAW',
+            {
+              type: monoType,
+              id,
+            },
+          );
+          if (monoResult.bytes) {
+            applyMonoMask(
+              canvas,
+              new Uint8Array(monoResult.bytes),
+              normalizedType === 'ICL8' ? 32 : 16,
+              normalizedType === 'ICL8' ? 32 : 16,
+            );
+          }
+        }
       }
       host.iconPreviewCanvas.set(canvas);
       if (canvas) {
@@ -178,7 +288,7 @@ export async function onIconRawUpload(host: App, event: Event): Promise<void> {
 
   const id = host.selectedIconId();
   const type = host.selectedIconType();
-  if (id === null || !isPictType(type)) return;
+  if (id === null || (!isPictType(type) && !isIconType(type))) return;
 
   try {
     host.workerBusy.set(true);
@@ -265,7 +375,8 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
     }
 
     let iconBytes: Uint8Array;
-    if (type === 'icl8') {
+    const normalizedType = normalizeResourceType(type);
+    if (normalizedType === 'ICL8') {
       const offscreen = document.createElement('canvas');
       offscreen.width = 32;
       offscreen.height = 32;
@@ -276,7 +387,7 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
       }
       ctx.drawImage(img, 0, 0, 32, 32);
       iconBytes = imageDataToIcl8(ctx.getImageData(0, 0, 32, 32).data);
-    } else if (type === 'ics8') {
+    } else if (normalizedType === 'ICS8') {
       const offscreen = document.createElement('canvas');
       offscreen.width = 16;
       offscreen.height = 16;
@@ -289,7 +400,7 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
       iconBytes = imageDataToIcl8(ctx.getImageData(0, 0, 16, 16).data);
     } else {
       const offscreen = document.createElement('canvas');
-      const monoSize = type === 'ics#' ? 16 : 32;
+      const monoSize = normalizeResourceType(type) === 'ICS#' ? 16 : 32;
       offscreen.width = monoSize;
       offscreen.height = monoSize;
       const ctx = offscreen.getContext('2d');
@@ -313,6 +424,83 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
     host.resourcesStatus.set(`${type} #${id} replaced.`);
   } catch (err) {
     host.editorError.set(err instanceof Error ? err.message : 'Image upload failed');
+  } finally {
+    host.workerBusy.set(false);
+  }
+}
+
+export function openIconImageEditor(host: App): void {
+  const id = host.selectedIconId();
+  const type = host.selectedIconType();
+  const canvas = host.iconPreviewCanvas();
+  if (id === null || !canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    failEditor(host, 'Failed to get 2D context');
+    return;
+  }
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  host._editingTileId = null;
+  host._editingIconResource = { type, id };
+  host.spriteEditorFrame.set({
+    frameId: id,
+    width: canvas.width,
+    height: canvas.height,
+    pixels: new Uint8ClampedArray(imageData.data),
+    bitDepth: 16,
+  });
+  host.spriteEditorOpen.set(true);
+}
+
+export async function onIconImageEditorSaved(
+  host: App,
+  event: { frameId: number; pixels: Uint8ClampedArray },
+): Promise<void> {
+  const editing = host._editingIconResource;
+  host._editingIconResource = null;
+  host.spriteEditorOpen.set(false);
+  if (!editing) {
+    return;
+  }
+
+  const frame = host.spriteEditorFrame();
+  const width = Math.max(1, frame?.width ?? host.iconPreviewCanvas()?.width ?? 32);
+  const height = Math.max(1, frame?.height ?? host.iconPreviewCanvas()?.height ?? 32);
+  const normalizedType = normalizeResourceType(editing.type);
+
+  try {
+    host.workerBusy.set(true);
+
+    let rawBytes: Uint8Array;
+    if (isPictType(editing.type)) {
+      const pictBytes = encodeRgbaToPictV2(event.pixels, width, height);
+      rawBytes = isPackedPictType(editing.type) ? packHandleCompress(pictBytes) : pictBytes;
+    } else if (normalizedType === 'ICL8' || normalizedType === 'ICS8') {
+      rawBytes = imageDataToIcl8(event.pixels);
+    } else {
+      rawBytes = imageDataToIconHash(event.pixels, width, height);
+    }
+
+    const writeBytes = rawBytes.buffer.slice(
+      rawBytes.byteOffset,
+      rawBytes.byteOffset + rawBytes.byteLength,
+    );
+    await host.runtime.dispatchWorker('PUT_RESOURCE_RAW', {
+      type: editing.type,
+      id: editing.id,
+      bytes: writeBytes,
+    });
+
+    await selectIconEntry(host, editing.type, editing.id);
+    host.resourcesStatus.set(`${editing.type} #${editing.id} saved from in-browser editor.`);
+    host.snackBar.open(`✓ ${editing.type} #${editing.id} saved`, 'OK', {
+      duration: 3000,
+      panelClass: 'snack-success',
+    });
+  } catch (err) {
+    host.editorError.set(err instanceof Error ? err.message : 'Image save failed');
   } finally {
     host.workerBusy.set(false);
   }
@@ -430,12 +618,32 @@ export async function loadAllIconThumbnails(host: App): Promise<void> {
         );
         if (!pictBytes) continue;
         canvas = renderPictBytes(pictBytes);
-      } else if (entry.type === 'ICN#' || entry.type === 'ics#') {
-        canvas = renderIconBytes(bytes, entry.type);
-      } else if (entry.type === 'icl8') {
-        canvas = renderIcl8Bytes(bytes);
-      } else if (entry.type === 'ics8') {
-        canvas = renderIcs8Bytes(bytes);
+      } else {
+        canvas = decodeResourceByType(entry.type, bytes);
+        const normalized = normalizeResourceType(entry.type);
+        if (canvas && (normalized === 'ICL8' || normalized === 'ICS8')) {
+          const monoType = monoMaskTypeForColorIcon(normalized);
+          if (!monoType) {
+            host.iconCanvasMap.set(key, canvas);
+            host._iconDataUrls.delete(key);
+            continue;
+          }
+          const monoResult: RawResult = await host.runtime.dispatchWorker<RawResult>(
+            'GET_RESOURCE_RAW',
+            {
+              type: monoType,
+              id: entry.id,
+            },
+          );
+          if (monoResult.bytes) {
+            applyMonoMask(
+              canvas,
+              new Uint8Array(monoResult.bytes),
+              normalized === 'ICL8' ? 32 : 16,
+              normalized === 'ICL8' ? 32 : 16,
+            );
+          }
+        }
       }
       if (canvas) {
         host.iconCanvasMap.set(key, canvas);

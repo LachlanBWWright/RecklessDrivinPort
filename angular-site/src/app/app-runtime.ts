@@ -75,11 +75,27 @@ export function setupAppLifecycle(app: App): void {
 
   effect(() => {
     const mode = app.drawMode();
+    const tab = app.activeTab();
+    const section = app.editorSection();
+
+    if (mode !== 'none') {
+      app.dragTrackWaypoint.set(null);
+      app.hoverTrackWaypoint.set(null);
+      app.hoverTrackMidpoint.set(null);
+      app.isDragging.set(false);
+      app.dragObjIndex.set(null);
+    }
+
     if (mode !== 'curve') {
       app._curveStartPoint = null;
       app._curveEndPoint = null;
       app.konva.clearBarrierDrawPreview();
     }
+
+    if (tab === 'editor' && section === 'objects') {
+      app.runtime.scheduleCanvasRedraw();
+    }
+
     if (typeof document === 'undefined') return;
     const kc = document.getElementById('konva-container');
     if (!kc) return;
@@ -240,21 +256,31 @@ export function initializeKonvaOverlay(app: App): void {
     }
   };
   app.konva.onObjectClick = (index) => app.selectObject(index);
-  app.konva.onObjectRotateMove = (e) => {
-    if (app.selectedObjIndex() === e.index) {
-      app.editObjDir.set(e.worldDir);
+  app.konva.onObjectRotateStart = (e) => {
+    if (app.selectedObjIndex() === e.index && !app._objectRotateDragUndoCaptured) {
+      app._pushUndo('objects');
+      app._objectRotateDragUndoCaptured = true;
     }
+  };
+  app.konva.onObjectRotateMove = (e) => {
+    if (app.selectedObjIndex() !== e.index) return;
+    const objs = app.objects();
+    if (e.index >= objs.length) return;
+    objs[e.index] = { ...objs[e.index], dir: e.worldDir };
+    app.editObjDir.set(e.worldDir);
+    app.runtime.scheduleCanvasRedraw();
   };
   app.konva.onObjectRotateEnd = (e) => {
     const objs = [...app.objects()];
+    app._objectRotateDragUndoCaptured = false;
     if (e.index >= objs.length) return;
     if (objs[e.index].dir === e.worldDir) {
       if (app.selectedObjIndex() === e.index) {
         app.editObjDir.set(e.worldDir);
       }
+      app.objects.set(objs);
       return;
     }
-    app._pushUndo('objects');
     objs[e.index] = { ...objs[e.index], dir: e.worldDir };
     app.objects.set(objs);
     if (app.selectedObjIndex() === e.index) {
@@ -264,10 +290,8 @@ export function initializeKonvaOverlay(app: App): void {
   app.konva.onStageDblClick = (wx, wy) => {
     if (app.markCreateMode() || app.drawMode() !== 'none') return;
     const objs = [...app.objects()];
-    const selIdx = app.selectedObjIndex();
-    const typeRes = selIdx !== null && selIdx < objs.length ? objs[selIdx].typeRes : 128;
     app._pushUndo('objects');
-    objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes });
+    objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: app.placementObjTypeRes() });
     app.objects.set(objs);
     app.selectObject(objs.length - 1);
   };
@@ -480,6 +504,7 @@ export function initializeKonvaOverlay(app: App): void {
         app._draggingFinishLine = false;
         app._startMarkerDragUndoCaptured = false;
         app._finishLineDragUndoCaptured = false;
+        app._objectRotateDragUndoCaptured = false;
       }
     }
   };

@@ -7,19 +7,25 @@
       </button>
 
       <div class="flex min-w-0 flex-wrap items-center gap-2">
+        <input #fileInput type="file" accept=".dat" (change)="onResourceUploadSelected($event)" [disabled]="workerBusy" style="display:none" />
         @if (!hasEditorData) {
           <button mat-stroked-button class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="loadDefaultResources.emit()" [disabled]="workerBusy">
             <mat-icon>cloud_download</mat-icon> <span>Load Default</span>
           </button>
-          <input #fileInput type="file" accept=".dat" (change)="resourceFileSelected.emit($event)" [disabled]="workerBusy" style="display:none" />
           <button mat-stroked-button type="button" class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="fileInput.click()" [disabled]="workerBusy">
             <mat-icon>folder_open</mat-icon> <span>Upload resources.dat</span>
           </button>
         } @else {
-          <button mat-stroked-button class="!border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="clearEditorFile.emit()" [disabled]="workerBusy">
+          <button mat-stroked-button type="button" class="!h-11 !min-h-11 !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="fileInput.click()" [disabled]="workerBusy">
+            <mat-icon>merge_type</mat-icon> <span>Merge resources.dat</span>
+          </button>
+          <button mat-stroked-button class="!h-11 !min-h-11 !border-[var(--accent2)] !text-[var(--accent2)] hover:!bg-[color:rgba(66,165,245,0.12)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="launchSelectedLevelPreview()" [disabled]="workerBusy || selectedLevelId === null">
+            <mat-icon>play_arrow</mat-icon> <span>Preview</span>
+          </button>
+          <button mat-stroked-button class="!h-11 !min-h-11 !border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="clearEditorFile.emit()" [disabled]="workerBusy">
             <mat-icon>delete</mat-icon> <span>Clear File</span>
           </button>
-          <button mat-raised-button class="!bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="downloadEditedResources.emit()" [disabled]="workerBusy">
+          <button mat-raised-button class="!h-11 !min-h-11 !bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="downloadEditedResources.emit()" [disabled]="workerBusy">
             <mat-icon>download</mat-icon> <span>Download</span>
           </button>
         }
@@ -39,7 +45,7 @@
         </div>
 
         @if (hasEditorData) {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="!m-0 w-[180px] self-center max-[900px]:w-[150px] [&_.mat-mdc-form-field-subscript-wrapper]:!hidden">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="!m-0 h-11 w-[180px] self-center max-[900px]:w-[150px] [&_.mat-mdc-form-field-flex]:h-11 [&_.mat-mdc-form-field-infix]:min-h-11 [&_.mat-mdc-form-field-infix]:py-2.5 [&_.mat-mdc-form-field-subscript-wrapper]:!hidden [&_.mat-mdc-text-field-wrapper]:h-11">
           <mat-select
             [value]="selectedLevelId"
             (valueChange)="selectLevel.emit($event)"
@@ -90,3 +96,98 @@
     </div>
   }
 </mat-toolbar>
+
+@if (mergeDialogOpen) {
+  <div class="fixed inset-0 z-[260] flex items-center justify-center bg-black/70 p-4">
+    <mat-card class="w-full max-w-[680px] border border-[var(--border)] bg-[var(--surface)]">
+      <mat-card-header>
+        <mat-card-title class="!text-[1.05rem] !font-bold">Merge Uploaded resources.dat</mat-card-title>
+        <mat-card-subtitle>
+          {{ pendingMergeFile?.name }}
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content class="!pb-2">
+        <p class="text-[0.86rem] leading-[1.55] text-[var(--muted)]">
+          Choose which categories from the uploaded file should override the currently loaded editor data.
+        </p>
+        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+          <mat-checkbox [checked]="mergeOptions.levels" (change)="mergeOptions.levels = $event.checked">Levels (Pack 140-149)</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.objectTypes" (change)="mergeOptions.objectTypes = $event.checked">Object Types (Pack 128)</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.objectGroups" (change)="mergeOptions.objectGroups = $event.checked">Object Groups (Pack 130)</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.roadInfo" (change)="mergeOptions.roadInfo = $event.checked">Road Info (Pack 135)</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.sprites" (change)="mergeOptions.sprites = $event.checked">Sprites (Pack 129/137)</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.tiles" (change)="mergeOptions.tiles = $event.checked">Tiles (Pack 136)</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.audio" (change)="mergeOptions.audio = $event.checked">Audio (Pack 134)</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.screens" (change)="mergeOptions.screens = $event.checked">Screens and Icons</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.strings" (change)="mergeOptions.strings = $event.checked">String resources (STR#)</mat-checkbox>
+          <mat-checkbox [checked]="mergeOptions.other" (change)="mergeOptions.other = $event.checked">Other resource types</mat-checkbox>
+        </div>
+        @if (mergeOptions.levels) {
+          <div class="mt-3 rounded border border-[var(--border)] bg-[var(--surface2)] p-3">
+            <p class="mb-2 text-[0.82rem] text-[var(--muted)]">Select exactly which levels to merge:</p>
+            <div class="grid gap-1 sm:grid-cols-2">
+              @for (levelResId of levelPackIds; track levelResId) {
+                <mat-checkbox
+                  [checked]="levelCheckboxChecked(levelResId)"
+                  (change)="onLevelCheckboxChange(levelResId, $event.checked)"
+                >
+                  Level {{ levelDisplayNum(levelResId) }} (Pack {{ levelResId }})
+                </mat-checkbox>
+              }
+            </div>
+          </div>
+        }
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <button mat-button (click)="closeMergeDialog()">Cancel</button>
+        <button
+          mat-raised-button
+          color="primary"
+          [disabled]="
+            !mergeOptions.levels &&
+            !mergeOptions.objectTypes &&
+            !mergeOptions.objectGroups &&
+            !mergeOptions.roadInfo &&
+            !mergeOptions.sprites &&
+            !mergeOptions.tiles &&
+            !mergeOptions.audio &&
+            !mergeOptions.screens &&
+            !mergeOptions.strings &&
+            !mergeOptions.other ||
+            (mergeOptions.levels && (mergeOptions.levelResourceIds?.length ?? 0) === 0)
+          "
+          (click)="confirmMergeDialog()"
+        >
+          Merge Selected
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+}
+
+@if (previewDialogOpen) {
+  <div class="fixed inset-0 z-[270] flex items-center justify-center bg-black/70 p-4">
+    <mat-card class="w-full max-w-[620px] border border-[var(--border)] bg-[var(--surface)]">
+      <mat-card-header>
+        <mat-card-title class="!text-[1.05rem] !font-bold">Preview Selected Level</mat-card-title>
+        <mat-card-subtitle>
+          @if (selectedLevelId !== null) {
+            Level {{ levelDisplayNum(selectedLevelId) }} (Pack {{ selectedLevelId }})
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content class="!pb-2">
+        <p class="text-[0.86rem] leading-[1.55] text-[var(--muted)]">
+          This preview uses your current editor resources.dat state. The editor serializes pending
+          changes, updates the game runtime resources, and restarts directly into this level.
+        </p>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <button mat-button (click)="closePreviewDialog()">Cancel</button>
+        <button mat-raised-button color="primary" (click)="confirmPreviewDialog()">
+          Start Preview
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+}

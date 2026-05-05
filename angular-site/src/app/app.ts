@@ -379,6 +379,22 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     this.editorTestDriveUseObjectGroupStartY.set(enabled);
   }
 
+  async launchSelectedLevelPreview(levelResourceId: number): Promise<void> {
+    const levelNum = this.levelDisplayNum(levelResourceId);
+    this.editorError.set('');
+
+    await this.runtime.saveEditedResourcesToGame();
+    if (this.editorError()) {
+      return;
+    }
+
+    this.editorTestDriveLevelEnabled.set(true);
+    this.editorTestDriveLevelNumberOverride.set(levelNum);
+    this.activeTab.set('game');
+    this.runtime.syncGameLoopWithActiveTab();
+    this.runtime.restartIntoEditorTestDrive();
+  }
+
   setEditorTestDriveObjectGroupStartY(rawValue: string): void {
     const trimmed = rawValue.trim();
     const parsed = trimmed === '' ? 500 : Number.parseInt(trimmed, 10);
@@ -430,10 +446,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     }
   }
 
-  setCustomSettingsPreset(
-    preset: CustomSettingsPresetId,
-    updateOptionsPreset = true,
-  ): void {
+  setCustomSettingsPreset(preset: CustomSettingsPresetId, updateOptionsPreset = true): void {
     this.customSettingsPreset.set(preset);
     switch (preset) {
       case 'default':
@@ -461,10 +474,7 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   }
 
   private syncCustomOptionsPreset(): void {
-    if (
-      this.customResourcesPreset() === 'default' &&
-      this.customSettingsPreset() === 'default'
-    ) {
+    if (this.customResourcesPreset() === 'default' && this.customSettingsPreset() === 'default') {
       this.customOptionsPreset.set('default');
       return;
     }
@@ -488,6 +498,14 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   selectRoadInfo(roadInfo: number): void {
     selectRoadInfo(this, roadInfo);
+  }
+
+  selectTileImage(tileId: number | null): void {
+    this.selectedTileId.set(tileId);
+    if (tileId !== null) {
+      this.selectedRoadInfoId.set(null);
+      this.selectedRoadInfoData.set(null);
+    }
   }
 
   createRoadInfo(): Promise<void> {
@@ -1002,6 +1020,9 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   }
 
   onSpriteEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
+    if (this._editingIconResource) {
+      return this.media.onIconImageEditorSaved(event);
+    }
     return onSpriteEditorSaved(this, event);
   }
 }

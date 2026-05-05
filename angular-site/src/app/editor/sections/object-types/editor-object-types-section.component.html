@@ -103,10 +103,10 @@
             <div class="flex min-h-0 flex-col gap-3" [formGroup]="typeForm">
               <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
                 <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Sprite frame</div>
-                <mat-form-field appearance="outline" class="w-full max-w-[520px]">
+                <mat-form-field appearance="outline" class="w-full max-w-[520px]" [matTooltip]="fieldTooltips.frame">
                   <mat-label>Sprite Frame</mat-label>
                   <mat-select
-                    panelClass="object-type-frame-select-panel"
+                    panelClass="max-h-[320px] [&_.mat-mdc-option]:!min-h-9"
                     formControlName="frame">
                     <mat-select-trigger>
                       {{ getFrameLabel(typeForm.controls.frame.value ?? type.frame) }}
@@ -124,7 +124,7 @@
               <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
                 <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Core data</div>
                 <div class="grid min-h-0 grid-cols-2 gap-3 max-[1200px]:grid-cols-1">
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.numFrames">
                     <mat-label>Frame Count</mat-label>
                     <input
                       matInput
@@ -135,67 +135,67 @@
                     <mat-hint>Raw `numFrames` encoding from the game</mat-hint>
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.frameDuration">
                     <mat-label>Frame Duration</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="frameDuration" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.mass">
                     <mat-label>Mass</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="mass" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.maxEngineForce">
                     <mat-label>Engine Force</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="maxEngineForce" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.maxNegEngineForce">
                     <mat-label>Reverse Force</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="maxNegEngineForce" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.friction">
                     <mat-label>Friction</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="friction" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.steering">
                     <mat-label>Steering</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="steering" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.wheelWidth">
                     <mat-label>Wheel Width</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="wheelWidth" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.wheelLength">
                     <mat-label>Wheel Length</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="wheelLength" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.width">
                     <mat-label>Collision Width</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="width" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.length">
                     <mat-label>Collision Length</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="length" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.score">
                     <mat-label>Score</mat-label>
                     <input matInput type="number" inputmode="numeric" formControlName="score" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.maxDamage">
                     <mat-label>Max Damage</mat-label>
                     <input matInput type="number" inputmode="decimal" formControlName="maxDamage" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.weaponInfo">
                     <mat-label>Weapon Info</mat-label>
                     <input matInput type="number" inputmode="numeric" formControlName="weaponInfo" />
                   </mat-form-field>
@@ -205,21 +205,53 @@
               <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
                 <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">References</div>
                 <div class="grid min-h-0 grid-cols-2 gap-3 max-[1200px]:grid-cols-1">
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.deathObj">
                     <mat-label>Death Object</mat-label>
                     <mat-select formControlName="deathObj">
-                      <mat-select-trigger>{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }}</mat-select-trigger>
-                      <mat-option [value]="-1">None</mat-option>
+                      <mat-select-trigger>
+                        <span class="inline-flex w-full min-w-0 items-center gap-2">
+                          @if (getObjectTypePreviewUrl(typeForm.controls.deathObj.value ?? type.deathObj); as url) {
+                            <img class="h-7 w-7 shrink-0 rounded border border-white/20 bg-white/[0.04] object-contain [image-rendering:pixelated]" [src]="url" [alt]="'Object type ' + (typeForm.controls.deathObj.value ?? type.deathObj)" />
+                          } @else {
+                            <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04]">
+                              <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">block</mat-icon>
+                            </span>
+                          }
+                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }}</span>
+                        </span>
+                      </mat-select-trigger>
+                      <mat-option [value]="-1">
+                        <span class="inline-flex min-w-0 items-center gap-2">
+                          <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04]">
+                            <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">block</mat-icon>
+                          </span>
+                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">None</span>
+                        </span>
+                      </mat-option>
                       @for (refType of objectTypes; track trackType($index, refType)) {
-                        <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
+                        <mat-option [value]="refType.typeRes">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            @if (getObjectTypePreviewUrl(refType.typeRes); as url) {
+                              <img class="h-7 w-7 shrink-0 rounded border border-white/20 bg-white/[0.04] object-contain [image-rendering:pixelated]" [src]="url" [alt]="'Object type ' + refType.typeRes" />
+                            } @else {
+                              <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04] text-[0.68rem] font-bold text-[var(--muted)]">{{ refType.frame }}</span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(refType.typeRes) }}</span>
+                          </span>
+                        </mat-option>
                       }
                       @if ((typeForm.controls.deathObj.value ?? type.deathObj) !== -1 && hasCustomObjectType(typeForm.controls.deathObj.value ?? type.deathObj)) {
-                        <mat-option [value]="typeForm.controls.deathObj.value ?? type.deathObj">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }} (custom)</mat-option>
+                        <mat-option [value]="typeForm.controls.deathObj.value ?? type.deathObj">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04] text-[0.68rem] font-bold text-[var(--muted)]">{{ typeForm.controls.deathObj.value ?? type.deathObj }}</span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }} (custom)</span>
+                          </span>
+                        </mat-option>
                       }
                     </mat-select>
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.creationSound">
                     <mat-label>Creation Sound</mat-label>
                     <mat-select formControlName="creationSound">
                       <mat-select-trigger>{{ getSoundLabel(typeForm.controls.creationSound.value ?? type.creationSound) }}</mat-select-trigger>
@@ -235,7 +267,7 @@
                     </mat-select>
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.otherSound">
                     <mat-label>Other Sound</mat-label>
                     <mat-select formControlName="otherSound">
                       <mat-select-trigger>{{ getSoundLabel(typeForm.controls.otherSound.value ?? type.otherSound) }}</mat-select-trigger>
@@ -251,7 +283,7 @@
                     </mat-select>
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
+                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.weaponObj">
                     <mat-label>Weapon Object</mat-label>
                     <mat-select formControlName="weaponObj">
                       <mat-select-trigger>{{ (typeForm.controls.weaponObj.value ?? type.weaponObj) === 0 ? 'None' : getObjectTypeLabel(typeForm.controls.weaponObj.value ?? type.weaponObj) }}</mat-select-trigger>

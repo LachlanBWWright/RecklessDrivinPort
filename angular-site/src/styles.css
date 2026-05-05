@@ -163,39 +163,6 @@
 }
 
 @layer components {
-  .type-id-select-panel {
-    max-width: min(100vw - 32px, 520px);
-  }
-
-  .type-id-select-panel .mat-mdc-option {
-    min-height: 30px;
-    height: 30px;
-    align-items: center;
-  }
-
-  .type-id-select-panel .mat-mdc-option .mdc-list-item__primary-text,
-  .object-group-type-select-panel .mat-mdc-option .mdc-list-item__primary-text {
-    width: 100%;
-    display: block;
-    overflow: hidden;
-  }
-
-  .object-group-type-select-panel.mat-mdc-select-panel {
-    max-height: 360px;
-  }
-
-  .object-group-type-select-panel .mat-mdc-option {
-    min-height: 40px;
-  }
-
-  .object-type-frame-select-panel.mat-mdc-select-panel {
-    max-height: 320px;
-  }
-
-  .object-type-frame-select-panel .mat-mdc-option {
-    min-height: 36px;
-  }
-
   .snack-success .mdc-snackbar__surface {
     border: 1px solid #2e6b2e !important;
     background: #1b3a1b !important;

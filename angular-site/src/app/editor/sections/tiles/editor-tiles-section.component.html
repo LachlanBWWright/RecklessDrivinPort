@@ -124,8 +124,42 @@
         </div>
       </aside>
 
-      <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 py-4 pr-1 max-[1100px]:px-3 max-[1100px]:py-3">
-        @if (selectedRoadInfoData) {
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 py-4 pr-1 max-[1100px]:px-3 max-[1100px]:py-3">
+        @if (selectedTileId !== null) {
+          <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+            @if (getTileDataUrl(selectedTileId); as url) {
+              <app-image-preview [src]="url" alt="tile preview" [pixelated]="true" loadingIcon="grid_view"></app-image-preview>
+            } @else {
+              <app-image-preview [src]="null" alt="tile preview" [pixelated]="true" loadingIcon="grid_view"></app-image-preview>
+            }
+            <mat-card class="w-full shrink-0 !border !border-[var(--border)] !bg-[var(--surface3)]">
+              <mat-card-content class="!px-3.5 !py-2.5">
+                <p class="m-0 text-[0.82rem] leading-[1.7] text-[var(--on-surface)] [&_strong]:font-semibold [&_strong]:text-[var(--muted)]">
+                  <strong>Tile</strong> #{{ selectedTileId }}<br>
+                  <strong>Size</strong> {{ selectedTileDimensions }}<br>
+                  <strong>Format</strong> RGB555 (16-bit)
+                </p>
+              </mat-card-content>
+            </mat-card>
+            <div class="flex shrink-0 flex-wrap gap-2">
+              <button mat-raised-button color="primary"
+                (click)="openTileEditor.emit(selectedTileId)"
+                [disabled]="workerBusy"
+                matTooltip="Open pixel editor for this tile">
+                <mat-icon>brush</mat-icon> Edit Pixels
+              </button>
+              <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
+                (change)="tilePngUpload.emit({ event: $event, texId: selectedTileId })" />
+              <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy"
+                matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
+                <mat-icon>upload</mat-icon> Upload PNG
+              </button>
+              <button mat-stroked-button (click)="exportTilePng.emit(selectedTileId)">
+                <mat-icon>download</mat-icon> Export PNG
+              </button>
+            </div>
+          </div>
+        } @else if (selectedRoadInfoData) {
           <h4 class="mb-3 text-[0.88rem] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">Road {{ selectedRoadInfoData.id }}</h4>
           <p class="text-sm leading-relaxed text-[var(--muted)]">
             Texture references are stored with the shared road record. Physics fields remain on the Properties tab.
@@ -366,32 +400,40 @@
               <tr>
                 <td>skidSound</td>
                 <td>
-                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
-                    <mat-select formControlName="skidSound">
-                      <mat-select-trigger>
-                        <span class="inline-flex w-full min-w-0 items-center gap-2">
-                          <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
-                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(getRoadValue('skidSound')) }}</span>
-                        </span>
-                      </mat-select-trigger>
-                      @for (audio of audioEntries; track audio.id) {
-                        <mat-option [value]="audio.id">
-                          <span class="inline-flex min-w-0 items-center gap-2">
+                  <div class="flex w-full items-start gap-2">
+                    <button mat-icon-button type="button"
+                      (click)="playRoadSkidSound.emit(getRoadValue('skidSound'))"
+                      [disabled]="workerBusy || !getAudioEntry(getRoadValue('skidSound'))"
+                      matTooltip="Play selected skid sound">
+                      <mat-icon>play_arrow</mat-icon>
+                    </button>
+                    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+                      <mat-select formControlName="skidSound">
+                        <mat-select-trigger>
+                          <span class="inline-flex w-full min-w-0 items-center gap-2">
                             <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
-                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(audio.id) }}</span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(getRoadValue('skidSound')) }}</span>
                           </span>
-                        </mat-option>
-                      }
-                      @if (!getAudioEntry(getRoadValue('skidSound'))) {
-                        <mat-option [value]="getRoadValue('skidSound')">
-                          <span class="inline-flex min-w-0 items-center gap-2">
-                            <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
-                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('skidSound') }} (custom)</span>
-                          </span>
-                        </mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
+                        </mat-select-trigger>
+                        @for (audio of audioEntries; track audio.id) {
+                          <mat-option [value]="audio.id">
+                            <span class="inline-flex min-w-0 items-center gap-2">
+                              <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
+                              <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getAudioLabel(audio.id) }}</span>
+                            </span>
+                          </mat-option>
+                        }
+                        @if (!getAudioEntry(getRoadValue('skidSound'))) {
+                          <mat-option [value]="getRoadValue('skidSound')">
+                            <span class="inline-flex min-w-0 items-center gap-2">
+                              <span class="inline-flex h-6 w-12 shrink-0 items-center justify-center rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)] text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">SFX</span>
+                              <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">#{{ getRoadValue('skidSound') }} (custom)</span>
+                            </span>
+                          </mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
                 </td>
               </tr>
               </tbody>
@@ -401,48 +443,6 @@
           <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
             <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">route</mat-icon>
             <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Select a road record to edit its tile assignments.</p>
-          </div>
-        }
-
-        @if (selectedTileId !== null) {
-          <div class="flex min-w-[220px] flex-1 flex-col items-start gap-2 overflow-y-auto">
-            @if (getTileDataUrl(selectedTileId); as url) {
-              <img [src]="url" class="block max-h-[220px] max-w-[220px] rounded-md border border-[var(--border)] bg-[var(--bg)] p-2 [image-rendering:pixelated]" [style.imageRendering]="'pixelated'" alt="tile preview" />
-            } @else {
-              <div class="flex min-h-[220px] min-w-[220px] items-center justify-center gap-2 text-[var(--muted)]">
-                <mat-icon>grid_view</mat-icon>
-                <span>Preview loading...</span>
-              </div>
-            }
-            <mat-card class="w-full !border !border-[var(--border)] !bg-[var(--surface3)]">
-              <mat-card-content class="!px-3.5 !py-2.5">
-                <p class="m-0 text-[0.82rem] leading-[1.7] text-[var(--on-surface)] [&_strong]:font-semibold [&_strong]:text-[var(--muted)]">
-                  <strong>Tile</strong> #{{ selectedTileId }}<br>
-                  <strong>Size</strong> {{ selectedTileDimensions }}<br>
-                  <strong>Format</strong> RGB555 (16-bit)
-                </p>
-              </mat-card-content>
-            </mat-card>
-            <div class="flex flex-wrap gap-2">
-              <button mat-raised-button color="primary"
-                (click)="openTileEditor.emit(selectedTileId)"
-                [disabled]="workerBusy"
-                matTooltip="Open pixel editor for this tile">
-                <mat-icon>brush</mat-icon> Edit Pixels
-              </button>
-              <input #tilePngInput type="file" accept="image/png,image/*" style="display:none"
-                (change)="tilePngUpload.emit({ event: $event, texId: selectedTileId })" />
-              <button mat-stroked-button (click)="tilePngInput.click()" [disabled]="workerBusy"
-                matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)">
-                <mat-icon>upload</mat-icon> Upload PNG
-              </button>
-              <button mat-stroked-button (click)="exportTilePng.emit(selectedTileId)">
-                <mat-icon>download</mat-icon> Export PNG
-              </button>
-            </div>
-          </div>
-        } @else {
-          <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
           </div>
         }
       </div>
