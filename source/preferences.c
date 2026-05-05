@@ -28,6 +28,65 @@ enum{
 tPrefs gPrefs;
 extern int gOSX;
 
+static void prefs_set_pascal_string(unsigned char *dst, size_t capacity, const char *src)
+{
+	size_t len;
+	if(capacity==0)
+		return;
+	memset(dst,0,capacity);
+	if(!src)
+		return;
+	len=strlen(src);
+	if(len>capacity-1)
+		len=capacity-1;
+	dst[0]=(unsigned char)len;
+	if(len>0)
+		memcpy(dst+1,src,len);
+}
+
+static void prefs_swap_high_scores(void)
+{
+	int i;
+	for(i=0;i<kNumHighScoreEntrys;i++)
+	{
+		gPrefs.high[i].time=(UInt32)be32_swap((uint32_t)gPrefs.high[i].time);
+		gPrefs.high[i].score=(UInt32)be32_swap((uint32_t)gPrefs.high[i].score);
+	}
+}
+
+static void prefs_seed_placeholder_high_scores(void)
+{
+	static const char *kDefaultNames[kNumHighScoreEntrys]={
+		"ACE",
+		"BEE",
+		"CAM",
+		"DOT",
+		"EEL",
+		"FOX",
+		"GAS",
+		"HEX",
+		"ION",
+		"JET"
+	};
+	int i;
+	for(i=0;i<kNumHighScoreEntrys;i++)
+	{
+		prefs_set_pascal_string((unsigned char *)gPrefs.high[i].name,sizeof(gPrefs.high[i].name),kDefaultNames[i]);
+		gPrefs.high[i].score=(UInt32)((kNumHighScoreEntrys-i)*1000);
+		gPrefs.high[i].time=0;
+	}
+	prefs_set_pascal_string((unsigned char *)gPrefs.lastName,sizeof(gPrefs.lastName),"PLAYER");
+}
+
+static void prefs_ensure_high_scores_visible(void)
+{
+	int i;
+	for(i=0;i<kNumHighScoreEntrys;i++)
+		if(gPrefs.high[i].name[0]!=0||gPrefs.high[i].score!=0)
+			return;
+	prefs_seed_placeholder_high_scores();
+}
+
 short GetPrefsFile(FSSpec *spec)
 {
 	return 0;
@@ -100,6 +159,7 @@ void FirstRun()
 		gPrefs.keyCodes[kMissile]   = 0x07; /* X */
 		gPrefs.keyCodes[kAbort]     = 0x35; /* Escape */
 		gPrefs.keyCodes[kPause]     = 0x0F; /* R */
+		prefs_ensure_high_scores_visible();
 		return;
 	}
 	{
@@ -110,6 +170,7 @@ void FirstRun()
 		 * Byte-swap the multi-byte fields on little-endian platforms. */
 		gPrefs.version = (UInt16)be16_swap((uint16_t)gPrefs.version);
 		gPrefs.volume  = (UInt16)be16_swap((uint16_t)gPrefs.volume);
+		prefs_swap_high_scores();
 		/* Clamp volume to a reasonable range */
 		if(gPrefs.volume > 256) gPrefs.volume = 100;
 	}
@@ -134,6 +195,7 @@ void FirstRun()
 	gPrefs.keyCodes[kAbort]     = 0x35; /* Escape */
 	gPrefs.keyCodes[kPause]     = 0x0F; /* R */
 #endif
+	prefs_ensure_high_scores_visible();
 }
 
 void LoadPrefs()

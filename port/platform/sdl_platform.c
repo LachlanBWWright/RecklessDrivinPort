@@ -1209,7 +1209,7 @@ void Blit2Screen(void) {
     {
         static Uint32 s_last_blit_ms = 0;
         Uint32 now_ms = SDL_GetTicks();
-        if (s_last_blit_ms && (now_ms - s_last_blit_ms) < BLIT2SCREEN_MIN_MS) {
+        if (gGameOn && s_last_blit_ms && (now_ms - s_last_blit_ms) < BLIT2SCREEN_MIN_MS) {
             /* Too soon – skip this present to stay within 144 fps */
             return;
         }

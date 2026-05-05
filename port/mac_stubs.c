@@ -21,6 +21,10 @@ extern int SDL_Platform_RunModalTextEntry(short dialogID, char *text, size_t tex
 /* Forward declarations for QuickDraw helpers used by DrawPicture */
 static UInt8 *current_port_pixels(void);
 static short  current_port_rowbytes(void);
+static short  current_port_pixel_size(void);
+static CTabHandle current_port_ctable(void);
+static UInt8 qdraw_palette_index_for_rgb(const RGBColor *color);
+static UInt16 qdraw_rgb_to_1555(const RGBColor *color);
 
 /* QuickDraw state: suppress drawing while OpenRgn() / CloseRgn() is active */
 static int gQDOpenRgn = 0;
@@ -1078,7 +1082,6 @@ static int pict_find_pixdata(const UInt8 *pict, int picSize,
                 pos += 6; break;
             case 0x0009: case 0x000A: case 0x0010:
             case 0x0020: case 0x0021:
-            case 0x0028: case 0x0029: case 0x002A: case 0x002B: case 0x002C:
             case 0x0030: case 0x0031: case 0x0032: case 0x0033: case 0x0034:
             case 0x0038: case 0x0039: case 0x003A: case 0x003B: case 0x003C:
                 pos += 8; break;
@@ -1096,24 +1099,31 @@ static int pict_find_pixdata(const UInt8 *pict, int picSize,
             }
 
             /* --- Text drawing opcodes ------------------------------------- */
-            case 0x00B0: {  /* LongText: point(4) + count(1) + text */
+            case 0x0028: {  /* LongText: point(4) + count(1) + text */
                 if (pos + 5 > picSize) return -1;
                 int cnt = (int)pict[pos+4];
                 pos += 5 + cnt;
                 if (pos & 1) pos++;  /* word-align */
                 break;
             }
-            case 0x00B1: case 0x00B2: {  /* DhText / DvText: dh/dv(1) + count(1) + text */
+            case 0x0029:
+            case 0x002A: {  /* DhText / DvText: dh/dv(1) + count(1) + text */
                 if (pos + 2 > picSize) return -1;
                 int cnt = (int)pict[pos+1];
                 pos += 2 + cnt;
                 if (pos & 1) pos++;
                 break;
             }
-            case 0x00B3: {  /* DhDvText: dh(1) + dv(1) + count(1) + text */
+            case 0x002B: {  /* DhDvText: dh(1) + dv(1) + count(1) + text */
                 if (pos + 3 > picSize) return -1;
                 int cnt = (int)pict[pos+2];
                 pos += 3 + cnt;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x002C: {  /* fontName: dataLen(2) + oldFontID(2) + nameLen(1) + name */
+                if (pos + 2 > picSize) return -1;
+                pos += 2 + (int)((pict[pos] << 8) | pict[pos+1]);
                 if (pos & 1) pos++;
                 break;
             }
@@ -1215,6 +1225,641 @@ static int pict_find_pixdata(const UInt8 *pict, int picSize,
     return -1;
 }
 
+typedef struct {
+    int top;
+    int left;
+    int bottom;
+    int right;
+} PictRect;
+
+typedef struct {
+    int anchorX;
+    int anchorY;
+    short fontID;
+    short fontSize;
+    short textFace;
+    short textMode;
+    RGBColor textColor;
+} PictTextState;
+
+static UInt16 pict_read_u16(const UInt8 *pict, int off) {
+    return (UInt16)(((UInt16)pict[off] << 8) | pict[off + 1]);
+}
+
+static SInt16 pict_read_s16(const UInt8 *pict, int off) {
+    return (SInt16)pict_read_u16(pict, off);
+}
+
+static PictRect pict_read_rect(const UInt8 *pict, int off) {
+    PictRect rect;
+    rect.top = pict_read_s16(pict, off);
+    rect.left = pict_read_s16(pict, off + 2);
+    rect.bottom = pict_read_s16(pict, off + 4);
+    rect.right = pict_read_s16(pict, off + 6);
+    return rect;
+}
+
+static int pict_rect_width(const PictRect *rect) {
+    return rect->right - rect->left;
+}
+
+static int pict_rect_height(const PictRect *rect) {
+    return rect->bottom - rect->top;
+}
+
+static void current_port_bounds_rect(Rect *bounds) {
+    extern short gXSize, gYSize;
+    if (!bounds) return;
+    if (gCurrentGWorld) {
+        bounds->left = ((GWorldImpl *)gCurrentGWorld)->pixmap.bounds.left;
+        bounds->top = ((GWorldImpl *)gCurrentGWorld)->pixmap.bounds.top;
+        bounds->right = ((GWorldImpl *)gCurrentGWorld)->pixmap.bounds.right;
+        bounds->bottom = ((GWorldImpl *)gCurrentGWorld)->pixmap.bounds.bottom;
+        return;
+    }
+    bounds->left = 0;
+    bounds->top = 0;
+    bounds->right = gXSize;
+    bounds->bottom = gYSize;
+}
+
+static int pict_map_x(int x, int picLeft, int picW, const Rect *dstRect) {
+    if (!dstRect || picW <= 0) return x;
+    return dstRect->left + (int)(((long)(x - picLeft) * (dstRect->right - dstRect->left)) / picW);
+}
+
+static int pict_map_y(int y, int picTop, int picH, const Rect *dstRect) {
+    if (!dstRect || picH <= 0) return y;
+    return dstRect->top + (int)(((long)(y - picTop) * (dstRect->bottom - dstRect->top)) / picH);
+}
+
+static void pict_fill_default_palette(RGBColor palette[256]) {
+    CTabHandle ctab = current_port_ctable();
+    int i;
+    for (i = 0; i < 256; i++) {
+        if (ctab && *ctab && i <= (*ctab)->ctSize) {
+            palette[i] = (*ctab)->ctTable[i].rgb;
+            continue;
+        }
+#ifdef PORT_SDL2
+        palette[i].red = (UInt16)(s_palette[i].r * 257u);
+        palette[i].green = (UInt16)(s_palette[i].g * 257u);
+        palette[i].blue = (UInt16)(s_palette[i].b * 257u);
+#else
+        palette[i].red = (UInt16)(i * 257u);
+        palette[i].green = (UInt16)(i * 257u);
+        palette[i].blue = (UInt16)(i * 257u);
+#endif
+    }
+}
+
+static int pict_parse_color_table(const UInt8 *pict, int picSize, int off,
+                                  RGBColor palette[256], int *nextOff) {
+    int flags;
+    int ctSize;
+    int entryCount;
+    int endOff;
+    int index;
+    if (off + 8 > picSize) return 0;
+    pict_fill_default_palette(palette);
+    flags = pict_read_u16(pict, off + 4);
+    ctSize = pict_read_u16(pict, off + 6);
+    entryCount = ctSize + 1;
+    endOff = off + 8 + entryCount * 8;
+    if (endOff > picSize) return 0;
+    for (index = 0; index < entryCount; index++) {
+        int entryOff = off + 8 + index * 8;
+        int paletteIndex = (flags & 0x8000) ? index : (pict_read_u16(pict, entryOff) & 0xFF);
+        if (paletteIndex < 0 || paletteIndex >= 256) continue;
+        palette[paletteIndex].red = pict_read_u16(pict, entryOff + 2);
+        palette[paletteIndex].green = pict_read_u16(pict, entryOff + 4);
+        palette[paletteIndex].blue = pict_read_u16(pict, entryOff + 6);
+    }
+    if (nextOff) *nextOff = endOff;
+    return 1;
+}
+
+static void pict_expand_indexed_row(const UInt8 *rowData, int width, int pixelSize, UInt8 *out) {
+    int col;
+    if (pixelSize >= 8) {
+        memcpy(out, rowData, (size_t)width);
+        return;
+    }
+    for (col = 0; col < width; col++) {
+        UInt8 byte = rowData[(col * pixelSize) / 8];
+        UInt8 value = 0;
+        if (pixelSize == 4) {
+            value = (UInt8)((byte >> ((col % 2 == 0) ? 4 : 0)) & 0x0F);
+        } else if (pixelSize == 2) {
+            int shift = 6 - (col % 4) * 2;
+            value = (UInt8)((byte >> shift) & 0x03);
+        } else if (pixelSize == 1) {
+            value = (UInt8)((byte >> (7 - (col % 8))) & 0x01);
+        }
+        out[col] = value;
+    }
+}
+
+static RGBColor pict_rgb_from_1555(UInt16 pixel) {
+    RGBColor rgb;
+    UInt16 red = (UInt16)((pixel >> 10) & 0x1F);
+    UInt16 green = (UInt16)((pixel >> 5) & 0x1F);
+    UInt16 blue = (UInt16)(pixel & 0x1F);
+    rgb.red = (UInt16)((red * 65535u + 15u) / 31u);
+    rgb.green = (UInt16)((green * 65535u + 15u) / 31u);
+    rgb.blue = (UInt16)((blue * 65535u + 15u) / 31u);
+    return rgb;
+}
+
+static UInt32 pict_rgb_to_8888(const RGBColor *color) {
+    return 0xFF000000u |
+        ((UInt32)(color->red >> 8) << 16) |
+        ((UInt32)(color->green >> 8) << 8) |
+        (UInt32)(color->blue >> 8);
+}
+
+static void pict_apply_text_state(const PictTextState *state, int picH, const Rect *dstRect) {
+    int scaledTextSize = state->fontSize;
+    if (dstRect && picH > 0) {
+        int dstH = dstRect->bottom - dstRect->top;
+        scaledTextSize = (int)(((long)state->fontSize * dstH + picH / 2) / picH);
+    }
+    if (scaledTextSize <= 0) scaledTextSize = 1;
+    TextFont(state->fontID);
+    TextSize((short)scaledTextSize);
+    TextFace(state->textFace);
+    TextMode(state->textMode);
+    RGBForeColor(&state->textColor);
+}
+
+static void pict_draw_text(const UInt8 *textBytes, int textLen,
+                           PictTextState *state,
+                           int x, int y,
+                           int originX, int originY,
+                           int picLeft, int picTop, int picW, int picH,
+                           const Rect *dstRect) {
+    unsigned char pascalText[256];
+    int drawX;
+    int drawY;
+    if (textLen <= 0) {
+        state->anchorX = x;
+        state->anchorY = y;
+        return;
+    }
+    if (textLen > 255) textLen = 255;
+    pascalText[0] = (unsigned char)textLen;
+    memcpy(pascalText + 1, textBytes, (size_t)textLen);
+    drawX = pict_map_x(x - originX, picLeft, picW, dstRect);
+    drawY = pict_map_y(y - originY, picTop, picH, dstRect);
+    pict_apply_text_state(state, picH, dstRect);
+    MoveTo((short)drawX, (short)drawY);
+    DrawString((char *)pascalText);
+    state->anchorX = x;
+    state->anchorY = y;
+}
+
+static int pict_draw_packed_pixmap(const UInt8 *pict, int picSize,
+                                   UInt16 opcode, int startOff,
+                                   int originX, int originY,
+                                   int picLeft, int picTop, int picW, int picH,
+                                   const Rect *pictureDstRect,
+                                   int *nextOff) {
+    int indexed = (opcode == 0x0098 || opcode == 0x0099);
+    int hasRegion = (opcode == 0x0099 || opcode == 0x009B);
+    int rowBytesOff = indexed ? startOff : startOff + 4;
+    int boundsOff = indexed ? startOff + 2 : startOff + 6;
+    int pixelSizeOff = indexed ? startOff + 28 : startOff + 32;
+    int cmpCountOff = indexed ? startOff + 30 : startOff + 34;
+    int cmpSizeOff = indexed ? startOff + 32 : startOff + 36;
+    int cursor = indexed ? startOff + 46 : startOff + 50;
+    int rowBytes;
+    PictRect bounds;
+    int srcWidth;
+    int srcHeight;
+    int pixelSize;
+    int cmpCount;
+    int cmpSize;
+    PictRect srcRect;
+    PictRect dstRect;
+    PictRect drawRect;
+    int drawLeft;
+    int drawTop;
+    int drawRight;
+    int drawBottom;
+    int drawW;
+    int drawH;
+    int bcBytes;
+    int directPixels;
+    int dataOff;
+    int row;
+    UInt8 *portPix;
+    int portRb;
+    int portDepth;
+    Rect portBounds;
+    int portLeft;
+    int portTop;
+    int portRight;
+    int portBottom;
+    UInt8 *rowBuf = NULL;
+    UInt8 *expandedRow = NULL;
+    RGBColor palette[256];
+
+    if (cursor > picSize) return 0;
+    rowBytes = pict_read_u16(pict, rowBytesOff) & 0x7FFF;
+    bounds = pict_read_rect(pict, boundsOff);
+    srcWidth = pict_rect_width(&bounds);
+    srcHeight = pict_rect_height(&bounds);
+    if (rowBytes <= 0 || srcWidth <= 0 || srcHeight <= 0) return 0;
+
+    pixelSize = pict_read_u16(pict, pixelSizeOff);
+    cmpCount = pict_read_u16(pict, cmpCountOff);
+    cmpSize = pict_read_u16(pict, cmpSizeOff);
+
+    if (indexed) {
+        if (!pict_parse_color_table(pict, picSize, cursor, palette, &cursor)) return 0;
+    } else {
+        pict_fill_default_palette(palette);
+    }
+
+    if (cursor + 18 > picSize) return 0;
+    srcRect = pict_read_rect(pict, cursor);
+    dstRect = pict_read_rect(pict, cursor + 8);
+    cursor += 18;
+    if (hasRegion) {
+        int regionSize;
+        if (cursor + 2 > picSize) return 0;
+        regionSize = pict_read_u16(pict, cursor);
+        if (regionSize < 2 || cursor + regionSize > picSize) return 0;
+        cursor += regionSize;
+    }
+
+    drawRect = (pict_rect_width(&dstRect) > 0 && pict_rect_height(&dstRect) > 0) ? dstRect : srcRect;
+    drawLeft = pict_map_x(drawRect.left - originX, picLeft, picW, pictureDstRect);
+    drawTop = pict_map_y(drawRect.top - originY, picTop, picH, pictureDstRect);
+    drawRight = pict_map_x(drawRect.right - originX, picLeft, picW, pictureDstRect);
+    drawBottom = pict_map_y(drawRect.bottom - originY, picTop, picH, pictureDstRect);
+    if (drawRight <= drawLeft) drawRight = drawLeft + 1;
+    if (drawBottom <= drawTop) drawBottom = drawTop + 1;
+    drawW = drawRight - drawLeft;
+    drawH = drawBottom - drawTop;
+    if (drawW <= 0 || drawH <= 0) return 0;
+
+    portPix = current_port_pixels();
+    portRb = current_port_rowbytes();
+    portDepth = current_port_pixel_size();
+    current_port_bounds_rect(&portBounds);
+    portLeft = portBounds.left;
+    portTop = portBounds.top;
+    portRight = portBounds.right;
+    portBottom = portBounds.bottom;
+    if (!portPix || portRb <= 0) return 0;
+
+    rowBuf = (UInt8 *)malloc((size_t)rowBytes);
+    if (!rowBuf) return 0;
+    if (indexed) {
+        expandedRow = (UInt8 *)malloc((size_t)srcWidth);
+        if (!expandedRow) {
+            free(rowBuf);
+            return 0;
+        }
+    }
+
+    bcBytes = (rowBytes > 250) ? 2 : 1;
+    directPixels = (pixelSize == 16) || (cmpCount == 3 && cmpSize == 5);
+    dataOff = cursor;
+
+    for (row = 0; row < srcHeight; row++) {
+        int bc;
+        int startY;
+        int endY;
+        if (dataOff + bcBytes > picSize) break;
+        bc = (bcBytes == 2) ? pict_read_u16(pict, dataOff) : (int)pict[dataOff];
+        dataOff += bcBytes;
+        if (bc < 0 || dataOff + bc > picSize) break;
+
+        memset(rowBuf, 0, (size_t)rowBytes);
+        if (bc > 0) {
+            if (directPixels)
+                unpack_bits16(pict + dataOff, bc, rowBuf, rowBytes);
+            else
+                unpack_bits(pict + dataOff, bc, rowBuf, rowBytes);
+        }
+        dataOff += bc;
+        if (!directPixels) pict_expand_indexed_row(rowBuf, srcWidth, pixelSize, expandedRow);
+
+        startY = (row * drawH) / srcHeight;
+        endY = ((row + 1) * drawH) / srcHeight;
+        if (endY <= startY) endY = startY + 1;
+        for (int sy = startY; sy < endY; sy++) {
+            int dstY = drawTop + sy;
+            UInt8 *dstRow;
+            if (dstY < portTop || dstY >= portBottom) continue;
+            dstRow = portPix + (dstY - portTop) * portRb;
+            for (int dx = 0; dx < drawW; dx++) {
+                int dstX = drawLeft + dx;
+                int srcX;
+                if (dstX < portLeft || dstX >= portRight) continue;
+                srcX = (dx * srcWidth) / drawW;
+                if (srcX < 0) srcX = 0;
+                if (srcX >= srcWidth) srcX = srcWidth - 1;
+
+                if (directPixels) {
+                    UInt16 pixel = (UInt16)(((UInt16)rowBuf[srcX * 2] << 8) | rowBuf[srcX * 2 + 1]);
+                    if (portDepth >= 24) {
+                        UInt32 *dst32 = (UInt32 *)dstRow;
+                        RGBColor rgb = pict_rgb_from_1555(pixel);
+                        dst32[dstX - portLeft] = pict_rgb_to_8888(&rgb);
+                    } else if (portDepth >= 16) {
+                        UInt16 *dst16 = (UInt16 *)dstRow;
+                        dst16[dstX - portLeft] = pixel;
+                    } else {
+#ifdef PORT_SDL2
+                        dstRow[dstX - portLeft] = rgb15_to_palette8(pixel, s_palette);
+#else
+                        RGBColor rgb = pict_rgb_from_1555(pixel);
+                        dstRow[dstX - portLeft] = qdraw_palette_index_for_rgb(&rgb);
+#endif
+                    }
+                    continue;
+                }
+
+                {
+                    RGBColor rgb = palette[expandedRow[srcX]];
+                    if (portDepth >= 24) {
+                        UInt32 *dst32 = (UInt32 *)dstRow;
+                        dst32[dstX - portLeft] = pict_rgb_to_8888(&rgb);
+                    } else if (portDepth >= 16) {
+                        UInt16 *dst16 = (UInt16 *)dstRow;
+                        dst16[dstX - portLeft] = qdraw_rgb_to_1555(&rgb);
+                    } else {
+                        dstRow[dstX - portLeft] = qdraw_palette_index_for_rgb(&rgb);
+                    }
+                }
+            }
+        }
+    }
+
+    free(expandedRow);
+    free(rowBuf);
+    if (nextOff) *nextOff = dataOff;
+    return 1;
+}
+
+static int pict_render_picture(const UInt8 *pict, int picSize, const Rect *dstRect) {
+    int picTop;
+    int picLeft;
+    int picBottom;
+    int picRight;
+    int picW;
+    int picH;
+    int pos;
+    int originX = 0;
+    int originY = 0;
+    int drewAnything = 0;
+    PictTextState textState;
+
+    if (picSize < 40) return 0;
+    if (pict[10] != 0x00 || pict[11] != 0x11) return 0;
+    if (pict[12] != 0x02 || pict[13] != 0xFF) return 0;
+    if (pict[14] != 0x0C || pict[15] != 0x00) return 0;
+
+    picTop = pict_read_s16(pict, 2);
+    picLeft = pict_read_s16(pict, 4);
+    picBottom = pict_read_s16(pict, 6);
+    picRight = pict_read_s16(pict, 8);
+    picW = picRight - picLeft;
+    picH = picBottom - picTop;
+    if (picW <= 0 || picH <= 0) return 0;
+
+    textState.anchorX = picLeft;
+    textState.anchorY = picTop;
+    textState.fontID = 0;
+    textState.fontSize = 12;
+    textState.textFace = 0;
+    textState.textMode = srcCopy;
+    textState.textColor.red = 0;
+    textState.textColor.green = 0;
+    textState.textColor.blue = 0;
+
+    pos = 40;
+    while (pos + 2 <= picSize) {
+        UInt16 op = pict_read_u16(pict, pos);
+        pos += 2;
+        switch (op) {
+            case 0x0000:
+            case 0x001D:
+            case 0x001E:
+                break;
+            case 0x0001: {
+                int rsize;
+                if (pos + 2 > picSize) return drewAnything;
+                rsize = pict_read_u16(pict, pos);
+                if (rsize < 2) rsize = 2;
+                pos += rsize;
+                break;
+            }
+            case 0x0003:
+                if (pos + 2 > picSize) return drewAnything;
+                textState.fontID = (short)pict_read_u16(pict, pos);
+                pos += 2;
+                break;
+            case 0x0004:
+                if (pos + 2 > picSize) return drewAnything;
+                textState.textFace = (short)pict[pos];
+                pos += 2;
+                break;
+            case 0x0005:
+                if (pos + 2 > picSize) return drewAnything;
+                textState.textMode = (short)pict_read_u16(pict, pos);
+                pos += 2;
+                break;
+            case 0x000D:
+                if (pos + 2 > picSize) return drewAnything;
+                textState.fontSize = (short)pict_read_u16(pict, pos);
+                pos += 2;
+                break;
+            case 0x0006:
+            case 0x0007:
+            case 0x000B:
+            case 0x000E:
+            case 0x000F:
+            case 0x0026:
+            case 0x0027:
+            case 0x002E:
+                pos += 4;
+                break;
+            case 0x000C:
+                if (pos + 4 > picSize) return drewAnything;
+                originX += pict_read_s16(pict, pos);
+                originY += pict_read_s16(pict, pos + 2);
+                pos += 4;
+                break;
+            case 0x001A:
+                if (pos + 6 > picSize) return drewAnything;
+                textState.textColor.red = pict_read_u16(pict, pos);
+                textState.textColor.green = pict_read_u16(pict, pos + 2);
+                textState.textColor.blue = pict_read_u16(pict, pos + 4);
+                pos += 6;
+                break;
+            case 0x001B:
+            case 0x001F:
+            case 0x0022:
+            case 0x0023:
+                pos += 6;
+                break;
+            case 0x0028: {
+                int x;
+                int y;
+                int textLen;
+                if (pos + 5 > picSize) return drewAnything;
+                y = pict_read_s16(pict, pos);
+                x = pict_read_s16(pict, pos + 2);
+                textLen = (int)pict[pos + 4];
+                if (pos + 5 + textLen > picSize) return drewAnything;
+                pict_draw_text(pict + pos + 5, textLen, &textState, x, y, originX, originY, picLeft, picTop, picW, picH, dstRect);
+                drewAnything = 1;
+                pos += 5 + textLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x0029: {
+                int textLen;
+                int x;
+                if (pos + 2 > picSize) return drewAnything;
+                textLen = (int)pict[pos + 1];
+                if (pos + 2 + textLen > picSize) return drewAnything;
+                x = textState.anchorX + (int)pict[pos];
+                pict_draw_text(pict + pos + 2, textLen, &textState, x, textState.anchorY, originX, originY, picLeft, picTop, picW, picH, dstRect);
+                drewAnything = 1;
+                pos += 2 + textLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x002A: {
+                int textLen;
+                int y;
+                if (pos + 2 > picSize) return drewAnything;
+                textLen = (int)pict[pos + 1];
+                if (pos + 2 + textLen > picSize) return drewAnything;
+                y = textState.anchorY + (int)pict[pos];
+                pict_draw_text(pict + pos + 2, textLen, &textState, textState.anchorX, y, originX, originY, picLeft, picTop, picW, picH, dstRect);
+                drewAnything = 1;
+                pos += 2 + textLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x002B: {
+                int textLen;
+                int x;
+                int y;
+                if (pos + 3 > picSize) return drewAnything;
+                textLen = (int)pict[pos + 2];
+                if (pos + 3 + textLen > picSize) return drewAnything;
+                x = textState.anchorX + (int)pict[pos];
+                y = textState.anchorY + (int)pict[pos + 1];
+                pict_draw_text(pict + pos + 3, textLen, &textState, x, y, originX, originY, picLeft, picTop, picW, picH, dstRect);
+                drewAnything = 1;
+                pos += 3 + textLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x002C: {
+                int dataLen;
+                if (pos + 2 > picSize) return drewAnything;
+                dataLen = pict_read_u16(pict, pos);
+                pos += 2 + dataLen;
+                if (pos & 1) pos++;
+                break;
+            }
+            case 0x0030:
+            case 0x0031:
+            case 0x0032:
+            case 0x0033:
+            case 0x0034:
+            case 0x0038:
+            case 0x0039:
+            case 0x003A:
+            case 0x003B:
+            case 0x003C:
+            case 0x0009:
+            case 0x000A:
+            case 0x0010:
+            case 0x0020:
+            case 0x0021:
+                pos += 8;
+                break;
+            case 0x0040:
+            case 0x0041:
+            case 0x0042:
+            case 0x0043:
+            case 0x0044:
+                pos += 12;
+                break;
+            case 0x0050:
+            case 0x0051:
+            case 0x0052:
+            case 0x0053:
+            case 0x0054:
+            case 0x0060:
+            case 0x0061:
+            case 0x0062:
+            case 0x0063:
+            case 0x0064:
+            case 0x0070:
+            case 0x0071:
+            case 0x0072:
+            case 0x0073:
+            case 0x0074: {
+                if (pos + 2 > picSize) return drewAnything;
+                pos += pict_read_u16(pict, pos);
+                break;
+            }
+            case 0x00A0:
+                pos += 2;
+                break;
+            case 0x00A1: {
+                int longSize;
+                if (pos + 4 > picSize) return drewAnything;
+                longSize = pict_read_u16(pict, pos + 2);
+                pos += 4 + longSize;
+                break;
+            }
+            case 0x0098:
+            case 0x0099:
+            case 0x009A:
+            case 0x009B: {
+                int nextPos = pos;
+                if (!pict_draw_packed_pixmap(pict, picSize, op, pos, originX, originY, picLeft, picTop, picW, picH, dstRect, &nextPos)) {
+                    return drewAnything;
+                }
+                drewAnything = 1;
+                pos = nextPos;
+                break;
+            }
+            case 0x00FF:
+                return drewAnything;
+            default:
+                if (op >= 0x0100 && op <= 0x7FFF) {
+                    if (pos + 2 > picSize) return drewAnything;
+                    pos += 2 + pict_read_u16(pict, pos);
+                    break;
+                }
+                if (op >= 0x8000) {
+                    int dataSize;
+                    if (pos + 4 > picSize) return drewAnything;
+                    dataSize = ((int)pict[pos] << 24) |
+                        ((int)pict[pos + 1] << 16) |
+                        ((int)pict[pos + 2] << 8) |
+                        (int)pict[pos + 3];
+                    pos += 4 + dataSize;
+                    break;
+                }
+                return drewAnything;
+        }
+    }
+    return drewAnything;
+}
+
 /*
  * DrawPicture - decode a Mac PICT v2 (PPic resource) into the current GWorld.
  *
@@ -1245,6 +1890,10 @@ void DrawPicture(PicHandle myPicture, const Rect *dstRect) {
 
     pict = (const UInt8 *)(*myPicture);
     int picSize = (int)GetHandleSize((Handle)myPicture);
+
+    if (pict_render_picture(pict, picSize, dstRect)) {
+        return;
+    }
 
     /* Parse PICT bounds rect (big-endian SInt16: top, left, bottom, right) */
     picTop    = (int16_t)(((uint16_t)pict[2] << 8) | pict[3]);
@@ -1546,6 +2195,21 @@ static UInt8 qdraw_palette_index_for_rgb(const RGBColor *color) {
     int bestIndex = color->green >> 8;
     unsigned long bestDistance = ~0UL;
     if (!ctab || !*ctab) {
+#ifdef PORT_SDL2
+        if (current_port_pixel_size() < 16) {
+            for (int i = 0; i < 256; i++) {
+                long dr = (long)s_palette[i].r - (long)(color->red >> 8);
+                long dg = (long)s_palette[i].g - (long)(color->green >> 8);
+                long db = (long)s_palette[i].b - (long)(color->blue >> 8);
+                unsigned long distance = (unsigned long)(dr * dr + dg * dg + db * db);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+            return (UInt8)bestIndex;
+        }
+#endif
         unsigned long red = color->red >> 8;
         unsigned long green = color->green >> 8;
         unsigned long blue = color->blue >> 8;
@@ -1642,16 +2306,17 @@ static void qdraw_plot_pixel(int x, int y, UInt8 paletteIndex, UInt16 pixel1555,
     UInt8 *pix = current_port_pixels();
     int rb = current_port_rowbytes();
     int depth = current_port_pixel_size();
-    extern short gXSize, gYSize;
-    if (!pix || !rb || x < 0 || y < 0 || x >= gXSize || y >= gYSize) return;
+    Rect bounds;
+    current_port_bounds_rect(&bounds);
+    if (!pix || !rb || x < bounds.left || y < bounds.top || x >= bounds.right || y >= bounds.bottom) return;
     if (depth >= 24) {
-        UInt32 *row = (UInt32 *)(pix + y * rb);
-        row[x] = pixel8888;
+        UInt32 *row = (UInt32 *)(pix + (y - bounds.top) * rb);
+        row[x - bounds.left] = pixel8888;
     } else if (depth >= 16) {
-        UInt16 *row = (UInt16 *)(pix + y * rb);
-        row[x] = pixel1555;
+        UInt16 *row = (UInt16 *)(pix + (y - bounds.top) * rb);
+        row[x - bounds.left] = pixel1555;
     } else {
-        pix[y * rb + x] = paletteIndex;
+        pix[(y - bounds.top) * rb + (x - bounds.left)] = paletteIndex;
     }
 }
 
@@ -1682,18 +2347,19 @@ static void qdraw_draw_scaled_glyph(const UInt8 *rows, int x, int y, int scale,
 static void fill_rect_color(const Rect *r, UInt8 color) {
     int x, y, x1, y1, x2, y2, rb;
     UInt8 *pix;
-    extern short gXSize, gYSize;
+    Rect bounds;
     if (!r || gQDOpenRgn) return;
     pix = current_port_pixels();
     rb  = current_port_rowbytes();
     if (!pix || !rb) return;
+    current_port_bounds_rect(&bounds);
     x1 = r->left; y1 = r->top; x2 = r->right; y2 = r->bottom;
     /* Clamp to pixel buffer bounds */
-    if (x1 < 0) x1 = 0; if (y1 < 0) y1 = 0;
-    if (x2 > gXSize) x2 = gXSize; if (y2 > gYSize) y2 = gYSize;
+    if (x1 < bounds.left) x1 = bounds.left; if (y1 < bounds.top) y1 = bounds.top;
+    if (x2 > bounds.right) x2 = bounds.right; if (y2 > bounds.bottom) y2 = bounds.bottom;
     if (x1 >= x2 || y1 >= y2) return;
     for (y = y1; y < y2; y++) {
-        UInt8 *row = pix + y * rb + x1;
+        UInt8 *row = pix + (y - bounds.top) * rb + (x1 - bounds.left);
         for (x = x1; x < x2; x++) *row++ = color;
     }
 }
@@ -1729,24 +2395,26 @@ void InvertRect(const Rect *r) {
 static void draw_hline(UInt8 *pix, int rb, int x1, int x2, int y, UInt8 color) {
     UInt8 *row;
     int x;
-    extern short gXSize, gYSize;
+    Rect bounds;
+    current_port_bounds_rect(&bounds);
     /* Bounds check */
-    if (y < 0 || y >= gYSize) return;
-    if (x1 < 0) x1 = 0;
-    if (x2 > gXSize) x2 = gXSize;
+    if (y < bounds.top || y >= bounds.bottom) return;
+    if (x1 < bounds.left) x1 = bounds.left;
+    if (x2 > bounds.right) x2 = bounds.right;
     if (x1 >= x2) return;
-    row = pix + y * rb + x1;
+    row = pix + (y - bounds.top) * rb + (x1 - bounds.left);
     for (x = x1; x < x2; x++) *row++ = color;
 }
 
 static void draw_vline(UInt8 *pix, int rb, int x, int y1, int y2, UInt8 color) {
     int y;
-    extern short gXSize, gYSize;
+    Rect bounds;
+    current_port_bounds_rect(&bounds);
     /* Bounds check */
-    if (x < 0 || x >= gXSize) return;
-    if (y1 < 0) y1 = 0;
-    if (y2 > gYSize) y2 = gYSize;
-    for (y = y1; y < y2; y++) pix[y * rb + x] = color;
+    if (x < bounds.left || x >= bounds.right) return;
+    if (y1 < bounds.top) y1 = bounds.top;
+    if (y2 > bounds.bottom) y2 = bounds.bottom;
+    for (y = y1; y < y2; y++) pix[(y - bounds.top) * rb + (x - bounds.left)] = color;
 }
 
 void FrameRect(const Rect *r) {
