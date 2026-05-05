@@ -14,6 +14,10 @@
 #include <emscripten.h>
 #endif
 
+#ifdef PORT_SDL2
+extern int SDL_Platform_RunModalTextEntry(short dialogID, char *text, size_t textCapacity);
+#endif
+
 /* Forward declarations for QuickDraw helpers used by DrawPicture */
 static UInt8 *current_port_pixels(void);
 static short  current_port_rowbytes(void);
@@ -701,12 +705,14 @@ static short gw_rowbytes(GWorldPtr gw) {
 void CopyBits(const BitMap *srcBits, const BitMap *dstBits,
                const Rect *srcRect, const Rect *dstRect,
                short mode, void *maskRgn) {
-    /* Simple 8-bit/pixel copy between Mac BitMaps (no scaling, no mode effects) */
-    int srcX, srcY, dstX, dstY, w, h;
-    int srcRB, dstRB;
+    int srcRB, dstRB, srcBpp, dstBpp;
     const UInt8 *src;
     UInt8 *dst;
+    int srcW, srcH, dstW, dstH;
+    int clipLeft, clipTop, clipRight, clipBottom;
     int y;
+    (void)mode;
+    (void)maskRgn;
 
     if (!srcBits || !dstBits || !srcRect || !dstRect) return;
 
@@ -716,16 +722,52 @@ void CopyBits(const BitMap *srcBits, const BitMap *dstBits,
     dst = (UInt8 *)dstBits->baseAddr;
     if (!src || !dst || !srcRB || !dstRB) return;
 
-    srcX = srcRect->left; srcY = srcRect->top;
-    dstX = dstRect->left; dstY = dstRect->top;
-    w = srcRect->right - srcRect->left;
-    h = srcRect->bottom - srcRect->top;
-    if (w <= 0 || h <= 0) return;
+    srcW = srcRect->right - srcRect->left;
+    srcH = srcRect->bottom - srcRect->top;
+    dstW = dstRect->right - dstRect->left;
+    dstH = dstRect->bottom - dstRect->top;
+    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return;
 
-    for (y = 0; y < h; y++) {
-        const UInt8 *srow = src + (srcY + y) * srcRB + srcX;
-        UInt8 *drow = dst + (dstY + y) * dstRB + dstX;
-        memcpy(drow, srow, (size_t)w);
+    srcBpp = srcRB / (((srcBits->bounds.right - srcBits->bounds.left) > 0)
+        ? (srcBits->bounds.right - srcBits->bounds.left)
+        : srcW);
+    dstBpp = dstRB / (((dstBits->bounds.right - dstBits->bounds.left) > 0)
+        ? (dstBits->bounds.right - dstBits->bounds.left)
+        : dstW);
+    if (srcBpp <= 0) srcBpp = 1;
+    if (dstBpp <= 0) dstBpp = 1;
+    if (srcBpp != dstBpp) return;
+
+    clipLeft = dstRect->left;
+    if (clipLeft < dstBits->bounds.left) clipLeft = dstBits->bounds.left;
+    clipTop = dstRect->top;
+    if (clipTop < dstBits->bounds.top) clipTop = dstBits->bounds.top;
+    clipRight = dstRect->right;
+    if (clipRight > dstBits->bounds.right) clipRight = dstBits->bounds.right;
+    clipBottom = dstRect->bottom;
+    if (clipBottom > dstBits->bounds.bottom) clipBottom = dstBits->bounds.bottom;
+    if (clipLeft >= clipRight || clipTop >= clipBottom) return;
+
+    for (y = clipTop; y < clipBottom; y++) {
+        int sy = srcRect->top + ((y - dstRect->top) * srcH) / dstH;
+        const UInt8 *srow;
+        UInt8 *drow;
+        int x;
+
+        if (sy < srcBits->bounds.top || sy >= srcBits->bounds.bottom) continue;
+
+        srow = src + (sy - srcBits->bounds.top) * srcRB;
+        drow = dst + (y - dstBits->bounds.top) * dstRB;
+
+        for (x = clipLeft; x < clipRight; x++) {
+            int sx = srcRect->left + ((x - dstRect->left) * srcW) / dstW;
+            const UInt8 *sp;
+            UInt8 *dp;
+            if (sx < srcBits->bounds.left || sx >= srcBits->bounds.right) continue;
+            sp = srow + (sx - srcBits->bounds.left) * srcBpp;
+            dp = drow + (x - dstBits->bounds.left) * dstBpp;
+            memcpy(dp, sp, (size_t)dstBpp);
+        }
     }
 }
 
@@ -1408,9 +1450,234 @@ static short current_port_rowbytes(void) {
     return gRowBytes;
 }
 
+static short current_port_pixel_size(void) {
+    extern short gRowBytes;
+    extern short gXSize;
+    if (gCurrentGWorld) return ((GWorldImpl *)gCurrentGWorld)->pixmap.pixelSize;
+    return gRowBytes >= gXSize * 2 ? 16 : 8;
+}
+
+static CTabHandle current_port_ctable(void) {
+    if (!gCurrentGWorld) return NULL;
+    return (CTabHandle)((GWorldImpl *)gCurrentGWorld)->pixmap.pmTable;
+}
+
 /* Current QuickDraw pen color (index into 8-bit palette) */
 static UInt8 gQDForeColor = 0;   /* black = 0 */
 static UInt8 gQDBackColor = 255; /* white = 255 */
+static RGBColor gQDForeRGB = { 0, 0, 0 };
+static RGBColor gQDBackRGB = { 0xFFFF, 0xFFFF, 0xFFFF };
+static short gQDPenH = 0;
+static short gQDPenV = 0;
+static short gQDTextFont = 0;
+static short gQDTextSize = 12;
+static short gQDTextMode = srcCopy;
+static short gQDTextFace = 0;
+
+#define QD_GLYPH(name, a, b, c, d, e, f, g) \
+    static const UInt8 name[7] = { a, b, c, d, e, f, g }
+
+QD_GLYPH(s_qd_glyph_space, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+QD_GLYPH(s_qd_glyph_dash, 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00);
+QD_GLYPH(s_qd_glyph_dot, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C);
+QD_GLYPH(s_qd_glyph_comma, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C, 0x08);
+QD_GLYPH(s_qd_glyph_bang, 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04);
+QD_GLYPH(s_qd_glyph_colon, 0x00, 0x04, 0x04, 0x00, 0x04, 0x04, 0x00);
+QD_GLYPH(s_qd_glyph_quote, 0x0A, 0x0A, 0x04, 0x00, 0x00, 0x00, 0x00);
+QD_GLYPH(s_qd_glyph_slash, 0x01, 0x02, 0x02, 0x04, 0x08, 0x08, 0x10);
+QD_GLYPH(s_qd_glyph_question, 0x0E, 0x11, 0x01, 0x02, 0x04, 0x00, 0x04);
+QD_GLYPH(s_qd_glyph_lparen, 0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02);
+QD_GLYPH(s_qd_glyph_rparen, 0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08);
+QD_GLYPH(s_qd_glyph_plus, 0x00, 0x04, 0x04, 0x1F, 0x04, 0x04, 0x00);
+QD_GLYPH(s_qd_glyph_0, 0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_1, 0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E);
+QD_GLYPH(s_qd_glyph_2, 0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F);
+QD_GLYPH(s_qd_glyph_3, 0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E);
+QD_GLYPH(s_qd_glyph_4, 0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02);
+QD_GLYPH(s_qd_glyph_5, 0x1F, 0x10, 0x10, 0x1E, 0x01, 0x01, 0x1E);
+QD_GLYPH(s_qd_glyph_6, 0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_7, 0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08);
+QD_GLYPH(s_qd_glyph_8, 0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_9, 0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x1C);
+QD_GLYPH(s_qd_glyph_A, 0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_B, 0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E);
+QD_GLYPH(s_qd_glyph_C, 0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_D, 0x1C, 0x12, 0x11, 0x11, 0x11, 0x12, 0x1C);
+QD_GLYPH(s_qd_glyph_E, 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F);
+QD_GLYPH(s_qd_glyph_F, 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10);
+QD_GLYPH(s_qd_glyph_G, 0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0F);
+QD_GLYPH(s_qd_glyph_H, 0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_I, 0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E);
+QD_GLYPH(s_qd_glyph_J, 0x01, 0x01, 0x01, 0x01, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_K, 0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11);
+QD_GLYPH(s_qd_glyph_L, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F);
+QD_GLYPH(s_qd_glyph_M, 0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_N, 0x11, 0x11, 0x19, 0x15, 0x13, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_O, 0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_P, 0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10);
+QD_GLYPH(s_qd_glyph_Q, 0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D);
+QD_GLYPH(s_qd_glyph_R, 0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11);
+QD_GLYPH(s_qd_glyph_S, 0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E);
+QD_GLYPH(s_qd_glyph_T, 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04);
+QD_GLYPH(s_qd_glyph_U, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E);
+QD_GLYPH(s_qd_glyph_V, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04);
+QD_GLYPH(s_qd_glyph_W, 0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A);
+QD_GLYPH(s_qd_glyph_X, 0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11);
+QD_GLYPH(s_qd_glyph_Y, 0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04);
+QD_GLYPH(s_qd_glyph_Z, 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F);
+
+static RGBColor qdraw_named_rgb(long color) {
+    switch (color) {
+        case whiteColor: return (RGBColor){ 0xFFFF, 0xFFFF, 0xFFFF };
+        case yellowColor: return (RGBColor){ 0xFFFF, 0xFFFF, 0x0000 };
+        case magentaColor: return (RGBColor){ 0xFFFF, 0x0000, 0xFFFF };
+        case redColor: return (RGBColor){ 0xFFFF, 0x0000, 0x0000 };
+        case cyanColor: return (RGBColor){ 0x0000, 0xFFFF, 0xFFFF };
+        case greenColor: return (RGBColor){ 0x0000, 0xFFFF, 0x0000 };
+        case blueColor: return (RGBColor){ 0x0000, 0x0000, 0xFFFF };
+        case blackColor:
+        default:
+            return (RGBColor){ 0x0000, 0x0000, 0x0000 };
+    }
+}
+
+static UInt8 qdraw_palette_index_for_rgb(const RGBColor *color) {
+    CTabHandle ctab = current_port_ctable();
+    int bestIndex = color->green >> 8;
+    unsigned long bestDistance = ~0UL;
+    if (!ctab || !*ctab) {
+        unsigned long red = color->red >> 8;
+        unsigned long green = color->green >> 8;
+        unsigned long blue = color->blue >> 8;
+        return (UInt8)((red * 30u + green * 59u + blue * 11u) / 100u);
+    }
+    for (int i = 0; i <= (*ctab)->ctSize && i < 256; i++) {
+        long dr = ((long)(*ctab)->ctTable[i].rgb.red - (long)color->red) >> 8;
+        long dg = ((long)(*ctab)->ctTable[i].rgb.green - (long)color->green) >> 8;
+        long db = ((long)(*ctab)->ctTable[i].rgb.blue - (long)color->blue) >> 8;
+        unsigned long distance = (unsigned long)(dr * dr + dg * dg + db * db);
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = i;
+        }
+    }
+    return (UInt8)bestIndex;
+}
+
+static UInt16 qdraw_rgb_to_1555(const RGBColor *color) {
+    UInt16 red = (UInt16)((color->red >> 11) & 0x1F);
+    UInt16 green = (UInt16)((color->green >> 11) & 0x1F);
+    UInt16 blue = (UInt16)((color->blue >> 11) & 0x1F);
+    return (UInt16)((red << 10) | (green << 5) | blue);
+}
+
+static const UInt8 *qdraw_glyph_rows(unsigned char ch) {
+    switch (ch) {
+        case 0xA0:
+        case ' ': return s_qd_glyph_space;
+        case '-':
+        case '_': return s_qd_glyph_dash;
+        case '.': return s_qd_glyph_dot;
+        case ',': return s_qd_glyph_comma;
+        case '!': return s_qd_glyph_bang;
+        case ':': return s_qd_glyph_colon;
+        case '\'': return s_qd_glyph_quote;
+        case '/': return s_qd_glyph_slash;
+        case '?': return s_qd_glyph_question;
+        case '(': return s_qd_glyph_lparen;
+        case ')': return s_qd_glyph_rparen;
+        case '+': return s_qd_glyph_plus;
+        case '0': return s_qd_glyph_0;
+        case '1': return s_qd_glyph_1;
+        case '2': return s_qd_glyph_2;
+        case '3': return s_qd_glyph_3;
+        case '4': return s_qd_glyph_4;
+        case '5': return s_qd_glyph_5;
+        case '6': return s_qd_glyph_6;
+        case '7': return s_qd_glyph_7;
+        case '8': return s_qd_glyph_8;
+        case '9': return s_qd_glyph_9;
+        case 'A': return s_qd_glyph_A;
+        case 'B': return s_qd_glyph_B;
+        case 'C': return s_qd_glyph_C;
+        case 'D': return s_qd_glyph_D;
+        case 'E': return s_qd_glyph_E;
+        case 'F': return s_qd_glyph_F;
+        case 'G': return s_qd_glyph_G;
+        case 'H': return s_qd_glyph_H;
+        case 'I': return s_qd_glyph_I;
+        case 'J': return s_qd_glyph_J;
+        case 'K': return s_qd_glyph_K;
+        case 'L': return s_qd_glyph_L;
+        case 'M': return s_qd_glyph_M;
+        case 'N': return s_qd_glyph_N;
+        case 'O': return s_qd_glyph_O;
+        case 'P': return s_qd_glyph_P;
+        case 'Q': return s_qd_glyph_Q;
+        case 'R': return s_qd_glyph_R;
+        case 'S': return s_qd_glyph_S;
+        case 'T': return s_qd_glyph_T;
+        case 'U': return s_qd_glyph_U;
+        case 'V': return s_qd_glyph_V;
+        case 'W': return s_qd_glyph_W;
+        case 'X': return s_qd_glyph_X;
+        case 'Y': return s_qd_glyph_Y;
+        case 'Z': return s_qd_glyph_Z;
+        default: return s_qd_glyph_space;
+    }
+}
+
+static int qdraw_text_scale(void) {
+    int scale = (gQDTextSize + 5) / 8;
+    return scale > 0 ? scale : 1;
+}
+
+static int qdraw_string_width_bytes(int length) {
+    int scale = qdraw_text_scale();
+    if (length <= 0) return 0;
+    return length * (6 * scale) - scale;
+}
+
+static void qdraw_plot_pixel(int x, int y, UInt8 paletteIndex, UInt16 pixel1555, UInt32 pixel8888) {
+    UInt8 *pix = current_port_pixels();
+    int rb = current_port_rowbytes();
+    int depth = current_port_pixel_size();
+    extern short gXSize, gYSize;
+    if (!pix || !rb || x < 0 || y < 0 || x >= gXSize || y >= gYSize) return;
+    if (depth >= 24) {
+        UInt32 *row = (UInt32 *)(pix + y * rb);
+        row[x] = pixel8888;
+    } else if (depth >= 16) {
+        UInt16 *row = (UInt16 *)(pix + y * rb);
+        row[x] = pixel1555;
+    } else {
+        pix[y * rb + x] = paletteIndex;
+    }
+}
+
+static void qdraw_draw_hline(int x, int y, int width, UInt8 paletteIndex, UInt16 pixel1555, UInt32 pixel8888) {
+    for (int i = 0; i < width; i++) qdraw_plot_pixel(x + i, y, paletteIndex, pixel1555, pixel8888);
+}
+
+static void qdraw_draw_scaled_glyph(const UInt8 *rows, int x, int y, int scale,
+                                    UInt8 paletteIndex, UInt16 pixel1555, UInt32 pixel8888) {
+    for (int row = 0; row < 7; row++) {
+        for (int col = 0; col < 5; col++) {
+            if ((rows[row] & (1 << (4 - col))) == 0) continue;
+            for (int py = 0; py < scale; py++) {
+                for (int px = 0; px < scale; px++) {
+                    qdraw_plot_pixel(
+                        x + col * scale + px,
+                        y + row * scale + py,
+                        paletteIndex,
+                        pixel1555,
+                        pixel8888
+                    );
+                }
+            }
+        }
+    }
+}
 
 static void fill_rect_color(const Rect *r, UInt8 color) {
     int x, y, x1, y1, x2, y2, rb;
@@ -1497,21 +1764,65 @@ void FrameRect(const Rect *r) {
     draw_vline(pix, rb, x1, y1, y2+1, gQDForeColor);
     draw_vline(pix, rb, x2, y1, y2+1, gQDForeColor);
 }
-void MoveTo(short h, short v)                       { }
+void MoveTo(short h, short v)                       { gQDPenH = h; gQDPenV = v; }
 void LineTo(short h, short v)                       { }
 void Line(short dh, short dv)                       { }
-void DrawString(const char *s)                      { (void)s; /* text rendering not implemented */ }
-void TextFont(short font)                           { }
-void TextSize(short size)                           { }
-void TextMode(short mode)                           { }
-void TextFace(short face)                           { }
-void ForeColor(long color)                          { }
-void BackColor(long color)                          { }
-void RGBForeColor(const RGBColor *color)            { }
-void RGBBackColor(const RGBColor *color)            { }
+void DrawString(const char *s) {
+    int scale;
+    int baseline;
+    int cursorX;
+    int length;
+    UInt8 paletteIndex;
+    UInt16 pixel1555;
+    UInt32 pixel8888;
+    if (!s) return;
+    length = (unsigned char)s[0];
+    if (length <= 0) return;
+
+    scale = qdraw_text_scale();
+    baseline = gQDPenV - 7 * scale;
+    cursorX = gQDPenH;
+    paletteIndex = qdraw_palette_index_for_rgb(&gQDForeRGB);
+    pixel1555 = qdraw_rgb_to_1555(&gQDForeRGB);
+    pixel8888 = 0xFF000000u |
+        ((UInt32)(gQDForeRGB.red >> 8) << 16) |
+        ((UInt32)(gQDForeRGB.green >> 8) << 8) |
+        (UInt32)(gQDForeRGB.blue >> 8);
+
+    for (int i = 0; i < length; i++) {
+        unsigned char ch = (unsigned char)s[i + 1];
+        const UInt8 *rows = qdraw_glyph_rows((unsigned char)toupper(ch));
+        qdraw_draw_scaled_glyph(rows, cursorX, baseline, scale, paletteIndex, pixel1555, pixel8888);
+        if (gQDTextFace & bold) {
+            qdraw_draw_scaled_glyph(rows, cursorX + 1, baseline, scale, paletteIndex, pixel1555, pixel8888);
+        }
+        cursorX += 6 * scale;
+    }
+
+    if (gQDTextFace & underline) {
+        qdraw_draw_hline(
+            gQDPenH,
+            gQDPenV + (scale > 1 ? 1 : 0),
+            qdraw_string_width_bytes(length),
+            paletteIndex,
+            pixel1555,
+            pixel8888
+        );
+    }
+
+    gQDPenH = cursorX - scale;
+}
+void TextFont(short font)                           { gQDTextFont = font; }
+void TextSize(short size)                           { gQDTextSize = size > 0 ? size : 12; }
+void TextMode(short mode)                           { gQDTextMode = mode; }
+void TextFace(short face)                           { gQDTextFace = face; }
+void ForeColor(long color)                          { gQDForeRGB = qdraw_named_rgb(color); gQDForeColor = qdraw_palette_index_for_rgb(&gQDForeRGB); }
+void BackColor(long color)                          { gQDBackRGB = qdraw_named_rgb(color); gQDBackColor = qdraw_palette_index_for_rgb(&gQDBackRGB); }
+void RGBForeColor(const RGBColor *color)            { if (color) { gQDForeRGB = *color; gQDForeColor = qdraw_palette_index_for_rgb(&gQDForeRGB); } }
+void RGBBackColor(const RGBColor *color)            { if (color) { gQDBackRGB = *color; gQDBackColor = qdraw_palette_index_for_rgb(&gQDBackRGB); } }
 short GetPixelSize(PixMapHandle pm)                 { return 8; }
-short StringWidth(const char *s)                    { return s ? (unsigned char)s[0] * 7 : 0; /* approx */ }
-void  Move(short dh, short dv)                      { }
+short StringWidth(const char *s)                    { return s ? (short)qdraw_string_width_bytes((unsigned char)s[0]) : 0; }
+void  Move(short dh, short dv)                      { gQDPenH += dh; gQDPenV += dv; }
 
 void NumToString(long theNum, char *theString) {
     if (!theString) return;
@@ -1593,6 +1904,7 @@ void SelectWindow(WindowPtr w) { (void)w; }
 /*---------------------------------------------------------------------------*/
 
 static Str255 gDialogItemText = { 0 };
+static short gLastDialogID = 0;
 
 static void copy_pascal_string(char *dst, const char *src)
 {
@@ -1629,6 +1941,7 @@ static void copy_pascal_to_c_string(const Str255 src, char *dst, size_t dstSize)
 DialogPtr GetNewDialog(short id, void *wStorage, WindowPtr behind) {
     (void)id; (void)wStorage; (void)behind;
     gDialogItemText[0] = 0;
+    gLastDialogID = id;
     return (DialogPtr)calloc(1, sizeof(OpaqueDialogPtr));
 }
 
@@ -1641,89 +1954,16 @@ void ModalDialog(void *filterProc, short *itemHit) {
     int done = 0;
     (void)filterProc;
 
-#ifdef __EMSCRIPTEN__
-        {
-                char defaultName[256];
-                char entered[256];
-                copy_pascal_to_c_string(gDialogItemText, defaultName, sizeof(defaultName));
-                EM_ASM({
-                        var initial = UTF8ToString($0);
-                        if (typeof Module.__rdNameDone === 'undefined') {
-                            Module.__rdNameDone = 0;
-                            Module.__rdNameSubmit = "";
-                        }
-                        Module.__rdNameDone = 0;
-                        Module.__rdNameSubmit = "";
-                        var old = document.getElementById('rd-highscore-overlay');
-                        if (old && old.parentNode) old.parentNode.removeChild(old);
-
-                        /* Blur the SDL canvas so it stops capturing keyboard events */
-                        var canvas = document.getElementById('canvas');
-                        if (canvas) canvas.blur();
-
-                        var overlay = document.createElement('div');
-                        overlay.id = 'rd-highscore-overlay';
-                        overlay.style.position = 'fixed';
-                        overlay.style.left = '50%';
-                        overlay.style.top = '50%';
-                        overlay.style.transform = 'translate(-50%, -50%)';
-                        overlay.style.zIndex = '99999';
-                        overlay.style.background = 'rgba(0,0,0,0.9)';
-                        overlay.style.border = '2px solid #ffffff';
-                        overlay.style.padding = '12px';
-                        overlay.style.color = '#fff';
-                        overlay.style.fontFamily = 'monospace';
-                        overlay.innerHTML = '<div style="margin-bottom:8px">NEW HIGH SCORE! ENTER YOUR NAME</div>';
-                        var input = document.createElement('input');
-                        input.type = 'text';
-                        input.maxLength = 15;
-                        input.value = initial;
-                        input.style.width = '240px';
-                        input.style.marginRight = '8px';
-                        var ok = document.createElement('button');
-                        ok.textContent = 'OK';
-                        var submit = function () {
-                            Module.__rdNameSubmit = input.value || "";
-                            Module.__rdNameDone = 1;
-                        };
-                        ok.onclick = submit;
-                        /* Stop all key events from propagating to SDL canvas listeners */
-                        input.addEventListener('keydown', function (e) {
-                            e.stopPropagation();
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                submit();
-                            }
-                        });
-                        input.addEventListener('keyup',    function (e) { e.stopPropagation(); });
-                        input.addEventListener('keypress', function (e) { e.stopPropagation(); });
-                        overlay.appendChild(input);
-                        overlay.appendChild(ok);
-                        document.body.appendChild(overlay);
-                        /* Short timeout so the DOM settles before focusing */
-                        setTimeout(function() { input.focus(); input.select(); }, 50);
-                }, defaultName);
-
-                while (!done) {
-                        if (EM_ASM_INT({ return Module.__rdNameDone ? 1 : 0; })) {
-                                EM_ASM({
-                                        var txt = Module.__rdNameSubmit || "";
-                                        stringToUTF8(txt, $0, 256);
-                                        var overlay = document.getElementById('rd-highscore-overlay');
-                                        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
-                                        /* Restore focus to the SDL canvas */
-                                        var canvas = document.getElementById('canvas');
-                                        if (canvas) canvas.focus();
-                                }, entered);
-                                copy_c_string_to_pascal(gDialogItemText, entered);
-                                done = 1;
-                                break;
-                        }
-                        WaitNextEvent(everyEvent, &event, 1, nil);
-                }
-                if (itemHit) *itemHit = 1;
-                return;
+#ifdef PORT_SDL2
+    {
+        char entered[256];
+        copy_pascal_to_c_string(gDialogItemText, entered, sizeof(entered));
+        if (SDL_Platform_RunModalTextEntry(gLastDialogID, entered, sizeof(entered))) {
+            copy_c_string_to_pascal(gDialogItemText, entered);
         }
+        if (itemHit) *itemHit = 1;
+        return;
+    }
 #endif
 
     while (!done) {

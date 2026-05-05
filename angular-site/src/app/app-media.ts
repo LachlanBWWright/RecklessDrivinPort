@@ -192,19 +192,7 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
           host.iconCanvasMap.set(cacheKey, canvas);
           host._iconDataUrls.delete(cacheKey);
         } else {
-          if (normalizeResourceType(type) === 'PPIC' && id === 1009) {
-            const fallback = await loadPpicFallbackCanvas('ppic-fallbacks/ppic-1009.png');
-            if (fallback) {
-              host.iconPreviewCanvas.set(fallback);
-              const cacheKey = `${type}:${id}`;
-              host.iconCanvasMap.set(cacheKey, fallback);
-              host._iconDataUrls.delete(cacheKey);
-            } else {
-              host.editorError.set(`Failed to decode ${type} #${id}`);
-            }
-          } else {
-            host.editorError.set(`Failed to decode ${type} #${id}`);
-          }
+          host.editorError.set(`Failed to decode ${type} #${id}`);
         }
       }
     } catch (err) {
@@ -253,26 +241,6 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
   } catch {
     host.iconPreviewCanvas.set(null);
   }
-}
-
-async function loadPpicFallbackCanvas(relativePath: string): Promise<HTMLCanvasElement | null> {
-  if (typeof document === 'undefined') return null;
-
-  const img = new Image();
-  const loaded = await new Promise<boolean>((resolve) => {
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = relativePath;
-  });
-  if (!loaded || !img.naturalWidth || !img.naturalHeight) return null;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.drawImage(img, 0, 0);
-  return canvas;
 }
 
 export function exportIconPng(host: App): void {
@@ -515,7 +483,10 @@ export async function onIconImageEditorSaved(
       rawBytes = imageDataToIconHash(event.pixels, width, height);
     }
 
-    const writeBytes = rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength);
+    const writeBytes = rawBytes.buffer.slice(
+      rawBytes.byteOffset,
+      rawBytes.byteOffset + rawBytes.byteLength,
+    );
     await host.runtime.dispatchWorker('PUT_RESOURCE_RAW', {
       type: editing.type,
       id: editing.id,
