@@ -500,6 +500,14 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     selectRoadInfo(this, roadInfo);
   }
 
+  selectTileImage(tileId: number | null): void {
+    this.selectedTileId.set(tileId);
+    if (tileId !== null) {
+      this.selectedRoadInfoId.set(null);
+      this.selectedRoadInfoData.set(null);
+    }
+  }
+
   createRoadInfo(): Promise<void> {
     return createRoadInfo(this);
   }

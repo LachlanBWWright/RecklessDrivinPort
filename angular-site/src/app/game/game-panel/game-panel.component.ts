@@ -20,6 +20,8 @@ import {
   type CustomSettingsPresetId,
 } from '../game-customisation-presets';
 
+type CustomResourcesSelectValue = CustomResourcesPresetId | 'upload-custom' | 'clear-custom';
+
 @Component({
   selector: 'app-game-panel',
   templateUrl: './game-panel.component.html',
@@ -122,5 +124,19 @@ export class GamePanelComponent {
       return 'Built-in resources.dat';
     }
     return this.customResourcesName ?? 'Custom resources.dat ready';
+  }
+
+  onCustomResourcesSelection(value: CustomResourcesSelectValue, input: HTMLInputElement): void {
+    if (value === 'upload-custom') {
+      input.click();
+      return;
+    }
+
+    if (value === 'clear-custom') {
+      this.clearCustomResources.emit();
+      return;
+    }
+
+    this.customResourcesPresetChange.emit(value);
   }
 }

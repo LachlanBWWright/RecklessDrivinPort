@@ -370,7 +370,7 @@ export function addObject(app: App): void {
     x: Math.round(app.canvasPanX()),
     y: Math.round(app.canvasPanY()),
     dir: 0,
-    typeRes: 128,
+    typeRes: app.placementObjTypeRes(),
   });
   app.objects.set(objs);
   selectObject(app, objs.length - 1);
@@ -743,6 +743,7 @@ export function onCanvasMouseUp(app: App): void {
     app._draggingFinishLine = false;
     app._startMarkerDragUndoCaptured = false;
     app._finishLineDragUndoCaptured = false;
+    app._objectRotateDragUndoCaptured = false;
     return;
   }
 
@@ -756,7 +757,7 @@ export function onCanvasDoubleClick(app: App, event: MouseEvent): void {
   const [wx, wy] = app.canvasToWorld(event.offsetX, event.offsetY);
   const objs = [...app.objects()];
   app._pushUndo('objects');
-  objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: 128 });
+  objs.push({ x: Math.round(wx), y: Math.round(wy), dir: 0, typeRes: app.placementObjTypeRes() });
   app.objects.set(objs);
   selectObject(app, objs.length - 1);
 }

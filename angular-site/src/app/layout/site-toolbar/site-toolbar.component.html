@@ -16,16 +16,16 @@
             <mat-icon>folder_open</mat-icon> <span>Upload resources.dat</span>
           </button>
         } @else {
-          <button mat-stroked-button type="button" class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="fileInput.click()" [disabled]="workerBusy">
+          <button mat-stroked-button type="button" class="editor-toolbar-control !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="fileInput.click()" [disabled]="workerBusy">
             <mat-icon>merge_type</mat-icon> <span>Merge resources.dat</span>
           </button>
-          <button mat-stroked-button class="!border-[var(--accent2)] !text-[var(--accent2)] hover:!bg-[color:rgba(66,165,245,0.12)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="launchSelectedLevelPreview()" [disabled]="workerBusy || selectedLevelId === null">
+          <button mat-stroked-button class="editor-toolbar-control !border-[var(--accent2)] !text-[var(--accent2)] hover:!bg-[color:rgba(66,165,245,0.12)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="launchSelectedLevelPreview()" [disabled]="workerBusy || selectedLevelId === null">
             <mat-icon>play_arrow</mat-icon> <span>Preview</span>
           </button>
-          <button mat-stroked-button class="!border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="clearEditorFile.emit()" [disabled]="workerBusy">
+          <button mat-stroked-button class="editor-toolbar-control !border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="clearEditorFile.emit()" [disabled]="workerBusy">
             <mat-icon>delete</mat-icon> <span>Clear File</span>
           </button>
-          <button mat-raised-button class="!bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="downloadEditedResources.emit()" [disabled]="workerBusy">
+          <button mat-raised-button class="editor-toolbar-control !bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="downloadEditedResources.emit()" [disabled]="workerBusy">
             <mat-icon>download</mat-icon> <span>Download</span>
           </button>
         }
@@ -45,7 +45,7 @@
         </div>
 
         @if (hasEditorData) {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="!m-0 w-[180px] self-center max-[900px]:w-[150px] [&_.mat-mdc-form-field-subscript-wrapper]:!hidden">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="editor-level-select !m-0 w-[180px] self-center max-[900px]:w-[150px] [&_.mat-mdc-form-field-subscript-wrapper]:!hidden">
           <mat-select
             [value]="selectedLevelId"
             (valueChange)="selectLevel.emit($event)"

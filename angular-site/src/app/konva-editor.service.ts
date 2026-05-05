@@ -57,6 +57,7 @@ import type {
   KonvaWaypointDragEndEvent,
   KonvaMarkDragEndEvent,
   KonvaFinishLineDragEvent,
+  KonvaObjectRotateStartEvent,
   KonvaObjectRotateEvent,
   KonvaWorldNode,
 } from './konva-editor.types';
@@ -100,6 +101,7 @@ export class KonvaEditorService implements OnDestroy {
   onObjectDragEnd?: (e: KonvaDragEndEvent) => void;
   onObjectClick?: (index: number) => void;
   onObjectRotateMove?: (e: KonvaObjectRotateEvent) => void;
+  onObjectRotateStart?: (e: KonvaObjectRotateStartEvent) => void;
   onObjectRotateEnd?: (e: KonvaObjectRotateEvent) => void;
   onWaypointDragEnd?: (e: KonvaWaypointDragEndEvent) => void;
   onWaypointRightClick?: (track: 'up' | 'down', segIdx: number, worldX: number, worldY: number) => void;
@@ -410,6 +412,9 @@ export class KonvaEditorService implements OnDestroy {
       this._panMode, this._cssW, this._cssH, this._logicalW, this._logicalH, zoom,
       (idx, wx, wy) => this.onObjectDragEnd?.({ index: idx, worldX: wx, worldY: wy }),
       (idx) => this.onObjectClick?.(idx),
+      (idx) => this.onObjectRotateStart?.({ index: idx }),
+      (idx, worldDir) => this.onObjectRotateMove?.({ index: idx, worldDir }),
+      (idx, worldDir) => this.onObjectRotateEnd?.({ index: idx, worldDir }),
     );
     this._konvaObjNodes = result.nodes;
     this._applyGroupTransform();
@@ -545,6 +550,7 @@ export class KonvaEditorService implements OnDestroy {
     const fixedX = -this._logicalW * 2;
     const fixedW = this._logicalW * 4;
     const strokeWidth = Math.max(2, 2.5 / Math.max(0.0001, sy));
+    const hitStrokeWidth = 28 / Math.max(0.0001, sy);
     const dash = [10 / Math.max(0.0001, sy), 6 / Math.max(0.0001, sy)];
 
     if (!this._finishLineNode) {
@@ -560,7 +566,7 @@ export class KonvaEditorService implements OnDestroy {
         listening: true,
         draggable: !this._panMode,
         id: 'finish-line',
-        hitStrokeWidth: 28,
+        hitStrokeWidth,
       });
       node.dragBoundFunc((pos) => ({ x: 0, y: pos.y }));
       const emit = () => ({ worldY: Math.round(-node.y()) });
@@ -584,6 +590,7 @@ export class KonvaEditorService implements OnDestroy {
     this._finishLineNode.points([fixedX, 0, fixedW, 0]);
     this._finishLineNode.y(-levelEnd);
     this._finishLineNode.strokeWidth(strokeWidth);
+    this._finishLineNode.hitStrokeWidth(hitStrokeWidth);
     this._finishLineNode.dash(dash);
     this._finishLineNode.draggable(!this._panMode);
     this._markLayerDirty(this.finishLayer);

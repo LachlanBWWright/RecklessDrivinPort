@@ -62,6 +62,10 @@ export class EditorCanvasComponent implements OnChanges {
   /** Mark create mode state for toolbar buttons. */
   @Input() markCreateMode = false;
   @Input() pendingMarkPointCount = 0;
+  @Input() placementObjTypeRes = 128;
+  @Input() availableTypeIds: number[] = [];
+  @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
+  @Input() getFallbackColor: (typeRes: number) => string = () => '#888';
 
   @Output() canvasMouseDown = new EventEmitter<MouseEvent>();
   @Output() canvasMouseMove = new EventEmitter<MouseEvent>();
@@ -124,6 +128,7 @@ export class EditorCanvasComponent implements OnChanges {
   @Output() previewRange = new EventEmitter<{ yStart: number; yEnd: number }>();
   @Output() removeMarks = new EventEmitter<{ yStart: number; yEnd: number }>();
   @Output() clearMarkingPreview = new EventEmitter<void>();
+  @Output() addObjectTypeChange = new EventEmitter<number>();
 
   showMarkingPopup = false;
   showInfoPopup = false;
@@ -211,6 +216,15 @@ export class EditorCanvasComponent implements OnChanges {
 
   getRoadInfoOption(roadInfoId: number): RoadInfoOption | undefined {
     return this.roadInfoOptions.find((option) => option.id === roadInfoId);
+  }
+
+  get selectedAddObjectTypeId(): number {
+    if (this.availableTypeIds.includes(this.placementObjTypeRes)) return this.placementObjTypeRes;
+    return this.availableTypeIds[0] ?? this.placementObjTypeRes;
+  }
+
+  trackTypeId(_index: number, typeRes: number): number {
+    return typeRes;
   }
 
   toggleMarkingPopup(): void {

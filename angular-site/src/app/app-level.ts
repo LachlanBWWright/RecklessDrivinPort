@@ -139,6 +139,7 @@ export function onRoadInfoChange(app: App, roadInfo: number): void {
 export function selectRoadInfo(app: App, roadInfo: number): void {
   const nextRoadInfo = Number(roadInfo);
   if (Number.isNaN(nextRoadInfo)) return;
+  app.selectedTileId.set(null);
   setSelectedRoadInfo(app, nextRoadInfo);
 }
 

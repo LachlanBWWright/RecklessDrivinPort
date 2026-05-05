@@ -208,13 +208,45 @@
                   <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.deathObj">
                     <mat-label>Death Object</mat-label>
                     <mat-select formControlName="deathObj">
-                      <mat-select-trigger>{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }}</mat-select-trigger>
-                      <mat-option [value]="-1">None</mat-option>
+                      <mat-select-trigger>
+                        <span class="inline-flex w-full min-w-0 items-center gap-2">
+                          @if (getObjectTypePreviewUrl(typeForm.controls.deathObj.value ?? type.deathObj); as url) {
+                            <img class="h-7 w-7 shrink-0 rounded border border-white/20 bg-white/[0.04] object-contain [image-rendering:pixelated]" [src]="url" [alt]="'Object type ' + (typeForm.controls.deathObj.value ?? type.deathObj)" />
+                          } @else {
+                            <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04]">
+                              <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">block</mat-icon>
+                            </span>
+                          }
+                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }}</span>
+                        </span>
+                      </mat-select-trigger>
+                      <mat-option [value]="-1">
+                        <span class="inline-flex min-w-0 items-center gap-2">
+                          <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04]">
+                            <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">block</mat-icon>
+                          </span>
+                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">None</span>
+                        </span>
+                      </mat-option>
                       @for (refType of objectTypes; track trackType($index, refType)) {
-                        <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
+                        <mat-option [value]="refType.typeRes">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            @if (getObjectTypePreviewUrl(refType.typeRes); as url) {
+                              <img class="h-7 w-7 shrink-0 rounded border border-white/20 bg-white/[0.04] object-contain [image-rendering:pixelated]" [src]="url" [alt]="'Object type ' + refType.typeRes" />
+                            } @else {
+                              <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04] text-[0.68rem] font-bold text-[var(--muted)]">{{ refType.frame }}</span>
+                            }
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(refType.typeRes) }}</span>
+                          </span>
+                        </mat-option>
                       }
                       @if ((typeForm.controls.deathObj.value ?? type.deathObj) !== -1 && hasCustomObjectType(typeForm.controls.deathObj.value ?? type.deathObj)) {
-                        <mat-option [value]="typeForm.controls.deathObj.value ?? type.deathObj">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }} (custom)</mat-option>
+                        <mat-option [value]="typeForm.controls.deathObj.value ?? type.deathObj">
+                          <span class="inline-flex min-w-0 items-center gap-2">
+                            <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04] text-[0.68rem] font-bold text-[var(--muted)]">{{ typeForm.controls.deathObj.value ?? type.deathObj }}</span>
+                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }} (custom)</span>
+                          </span>
+                        </mat-option>
                       }
                     </mat-select>
                   </mat-form-field>

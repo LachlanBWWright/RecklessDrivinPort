@@ -125,15 +125,7 @@ export function drawObjectTrackOverlay(
   drawPath(editTrackUp, 'rgba(66,165,245,0.9)', 'rgba(66,165,245,0.7)', '▲ Up', 'up');
   drawPath(editTrackDown, 'rgba(239,83,80,0.9)', 'rgba(239,83,80,0.7)', '▼ Down', 'down');
 
-  if (interactionLocked) {
-    ctx.save();
-    ctx.fillStyle = 'rgba(16, 20, 28, 0.76)';
-    ctx.fillRect(8, 8, 248, 26);
-    ctx.fillStyle = 'rgba(255, 214, 102, 0.95)';
-    ctx.font = 'bold 12px monospace';
-    ctx.fillText('Track nubs locked while barrier draw is active', 14, 25);
-    ctx.restore();
-  }
+  void interactionLocked;
 }
 
 export function drawMarksOnCanvas(
@@ -195,15 +187,7 @@ export function drawMarksOnCanvas(
     }
   }
 
-  if (interactionLocked) {
-    ctx.save();
-    ctx.fillStyle = 'rgba(16, 20, 28, 0.76)';
-    ctx.fillRect(8, 36, 248, 26);
-    ctx.fillStyle = 'rgba(255, 214, 102, 0.95)';
-    ctx.font = 'bold 12px monospace';
-    ctx.fillText('Marking nubs locked while barrier draw is active', 14, 53);
-    ctx.restore();
-  }
+  void interactionLocked;
 }
 
 export function getTileDimensions(entries: TextureTileEntry[], texId: number) {

@@ -45,11 +45,13 @@
         </aside>
 
         @if (selectedPackSpriteId !== null) {
-          <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col items-start gap-2 overflow-y-auto px-4 py-4">
+          <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
             @if (getPackSpriteDataUrl(selectedPackSpriteId); as url) {
-              <img [src]="url" class="block max-h-[220px] max-w-[220px] rounded-md border border-[var(--border)] bg-[var(--bg)] p-2 [image-rendering:pixelated]" alt="sprite preview" />
+              <div class="flex min-h-[360px] w-full items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg)] p-6 max-[700px]:min-h-[280px]">
+                <img [src]="url" class="block max-h-[520px] max-w-full rounded-md p-2 [image-rendering:pixelated]" alt="sprite preview" />
+              </div>
             } @else {
-              <div class="flex min-h-[220px] min-w-[220px] items-center justify-center gap-2 text-[var(--muted)]">
+              <div class="flex min-h-[360px] w-full items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-[var(--muted)] max-[700px]:min-h-[280px]">
                 <mat-icon>image</mat-icon>
                 <span>Preview loading...</span>
               </div>

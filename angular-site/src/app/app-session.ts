@@ -41,6 +41,7 @@ export function resetEditorData(app: App): void {
   app._resetObjectHistory();
   app._draggingStartMarker = false;
   app._draggingFinishLine = false;
+  app._objectRotateDragUndoCaptured = false;
   app.selectedMarkIndex.set(null);
   app.marks.set([]);
   app.editRoadInfo.set(0);

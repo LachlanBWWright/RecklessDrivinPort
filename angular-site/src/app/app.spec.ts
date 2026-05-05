@@ -320,20 +320,21 @@ describe('App', () => {
   it('should undo and redo a double-click object add', () => {
     const app = TestBed.createComponent(App).componentInstance;
     app.canvasToWorld = (() => [10, 20]) as typeof app.canvasToWorld;
+    app.placementObjTypeRes.set(136);
 
     app.onCanvasDoubleClick({
       offsetX: 0,
       offsetY: 0,
     } as MouseEvent);
 
-    expect(app.objects()).toEqual([{ x: 10, y: 20, dir: 0, typeRes: 128 }]);
+    expect(app.objects()).toEqual([{ x: 10, y: 20, dir: 0, typeRes: 136 }]);
 
     app.undo();
     expect(app.objects()).toEqual([]);
     expect(app.canRedo()).toBe(true);
 
     app.redo();
-    expect(app.objects()).toEqual([{ x: 10, y: 20, dir: 0, typeRes: 128 }]);
+    expect(app.objects()).toEqual([{ x: 10, y: 20, dir: 0, typeRes: 136 }]);
   });
 
   it('should undo and redo a property edit', () => {

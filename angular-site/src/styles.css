@@ -163,6 +163,52 @@
 }
 
 @layer components {
+  .canvas-toolbar-button.mat-mdc-button-base,
+  .canvas-toolbar-toggle-group.mat-button-toggle-group {
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .canvas-toolbar-toggle-group .mat-button-toggle,
+  .canvas-toolbar-toggle-group .mat-button-toggle-button,
+  .canvas-toolbar-toggle-group .mat-button-toggle-label-content {
+    height: 40px;
+  }
+
+  .canvas-toolbar-toggle-group .mat-button-toggle-label-content {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    line-height: 40px;
+  }
+
+  .canvas-toolbar-toggle-group .mat-icon {
+    height: 18px;
+    width: 18px;
+    font-size: 18px;
+    line-height: 18px;
+  }
+
+  .editor-toolbar-control.mat-mdc-button-base {
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .editor-level-select.mat-mdc-form-field {
+    height: 44px;
+  }
+
+  .editor-level-select .mat-mdc-text-field-wrapper,
+  .editor-level-select .mat-mdc-form-field-flex {
+    height: 44px;
+  }
+
+  .editor-level-select .mat-mdc-form-field-infix {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
   .type-id-select-panel {
     max-width: min(100vw - 32px, 520px);
   }

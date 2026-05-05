@@ -42,7 +42,7 @@
           <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">Tool</div>
           <div class="flex flex-wrap gap-1">
             @for (t of tools; track t) {
-              <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !bg-[var(--surface2)] transition"
+              <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !bg-[var(--surface2)] !p-2 transition [&_mat-icon]:!m-0 [&_mat-icon]:!leading-none"
                 [class.!border-[var(--accent2)]]="tool === t"
                 [class.!bg-[color:rgba(66,165,245,0.12)]]="tool === t"
                 [class.!text-[var(--accent2)]]="tool === t"
@@ -54,10 +54,10 @@
                 <mat-icon>{{ toolIcons[t] }}</mat-icon>
               </button>
             }
-            <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)]" (click)="undo()" matTooltip="Undo (Ctrl+Z)">
+            <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !border-[var(--border)] !bg-[var(--surface2)] !p-2 !text-[var(--on-surface)] [&_mat-icon]:!m-0 [&_mat-icon]:!leading-none" (click)="undo()" matTooltip="Undo (Ctrl+Z)">
               <mat-icon>undo</mat-icon>
             </button>
-            <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)]" (click)="redo()" matTooltip="Redo">
+            <button mat-icon-button class="!h-10 !w-10 !rounded-md !border !border-[var(--border)] !bg-[var(--surface2)] !p-2 !text-[var(--on-surface)] [&_mat-icon]:!m-0 [&_mat-icon]:!leading-none" (click)="redo()" matTooltip="Redo">
               <mat-icon>redo</mat-icon>
             </button>
           </div>

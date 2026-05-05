@@ -124,6 +124,7 @@ export class AppStateBase {
     parseFloat(((this.editObjDir() * 180) / Math.PI).toFixed(2)),
   );
   editObjTypeRes = signal(128);
+  placementObjTypeRes = signal(128);
   /** Sorted list of available typeRes IDs (populated after loading resources). */
   availableTypeIds = signal<number[]>([]);
   visibleTypeFilter = signal<Set<number>>(new Set(this.typePalette.map((item) => item.typeId)));
@@ -246,6 +247,7 @@ export class AppStateBase {
   /** True while user is dragging the finish line on the canvas. */
   _draggingFinishLine = false;
   _finishLineDragUndoCaptured = false;
+  _objectRotateDragUndoCaptured = false;
   _curveStartPoint: { wx: number; wy: number } | null = null;
   _curveEndPoint: { wx: number; wy: number } | null = null;
   /** True after the Konva overlay has been created for the current canvas. */

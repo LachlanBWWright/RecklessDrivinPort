@@ -10,9 +10,38 @@
     </button>
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Object actions -->
-    <button mat-stroked-button class="!h-10 !min-w-0 !border-[var(--border)] !bg-[var(--surface2)] !px-3 !text-[0.76rem] !text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px] hover:!border-[var(--accent2)] hover:!text-[var(--accent2)]" (click)="addObject.emit()" matTooltip="Add new object">
-      <mat-icon>add</mat-icon> Object
-    </button>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 min-w-[150px] max-w-[190px] flex-[0_0_auto]">
+      <mat-label>+ Object</mat-label>
+      <mat-select
+        [value]="selectedAddObjectTypeId"
+        [disabled]="availableTypeIds.length === 0"
+        aria-label="Object type to place"
+        (selectionChange)="addObjectTypeChange.emit($event.value)"
+      >
+        <mat-select-trigger>
+          <span class="inline-flex w-full min-w-0 items-center gap-2">
+            @if (getSpriteUrl(selectedAddObjectTypeId); as url) {
+              <img class="h-7 w-7 shrink-0 rounded border border-white/20 bg-white/[0.04] object-contain [image-rendering:pixelated]" [src]="url" [alt]="'Object type ' + selectedAddObjectTypeId" />
+            } @else {
+              <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04] text-[0.68rem] font-bold text-[var(--muted)]">{{ selectedAddObjectTypeId }}</span>
+            }
+            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Type {{ selectedAddObjectTypeId }}</span>
+          </span>
+        </mat-select-trigger>
+        @for (typeRes of availableTypeIds; track trackTypeId($index, typeRes)) {
+          <mat-option [value]="typeRes">
+            <span class="inline-flex min-w-0 items-center gap-2">
+              @if (getSpriteUrl(typeRes); as url) {
+                <img class="h-7 w-7 shrink-0 rounded border border-white/20 bg-white/[0.04] object-contain [image-rendering:pixelated]" [src]="url" [alt]="'Object type ' + typeRes" />
+              } @else {
+                <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04] text-[0.68rem] font-bold text-[var(--muted)]">{{ typeRes }}</span>
+              }
+              <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Type {{ typeRes }}</span>
+            </span>
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
     <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="duplicateObject.emit()" [disabled]="selectedObjIndex === null" matTooltip="Duplicate selected (Ctrl+D)">
       <mat-icon>content_copy</mat-icon>
     </button>
@@ -53,7 +82,7 @@
     }
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Draw mode selector: 'none' = select/pan; other values enable barrier drawing -->
-    <mat-button-toggle-group [value]="drawMode" (change)="drawModeChange.emit($event.value)"
+    <mat-button-toggle-group class="canvas-toolbar-toggle-group" [value]="drawMode" (change)="drawModeChange.emit($event.value)"
                              matTooltip="Select draw mode">
       <mat-button-toggle value="none" matTooltip="Select / pan (no drawing)">
         <mat-icon>pan_tool</mat-icon>
@@ -68,6 +97,16 @@
         <mat-icon>timeline</mat-icon>
       </mat-button-toggle>
     </mat-button-toggle-group>
+    @if (drawMode !== 'none') {
+      <mat-button-toggle-group class="canvas-toolbar-toggle-group" [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
+                               matTooltip="Select which barrier side to draw">
+        <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
+        <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
+        <mat-button-toggle value="i" matTooltip="Merge inner barriers: snap both v1 and v2 to the same drawn x">I</mat-button-toggle>
+        <mat-button-toggle value="v2" matTooltip="Right inner barrier (v2)">Ri</mat-button-toggle>
+        <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
+      </mat-button-toggle-group>
+    }
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <form class="flex min-w-0 flex-wrap items-center gap-2 overflow-visible py-1.5" [formGroup]="canvasForm">
       <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 min-w-[140px] max-w-[220px] flex-[1_1_0]">
@@ -126,16 +165,6 @@
         />
       </mat-form-field>
     </form>
-    @if (drawMode !== 'none') {
-      <mat-button-toggle-group [value]="barrierDrawSide" (change)="barrierDrawSideChange.emit($event.value)"
-                               matTooltip="Select which barrier side to draw">
-        <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
-        <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
-        <mat-button-toggle value="i" matTooltip="Merge inner barriers: snap both v1 and v2 to the same drawn x">I</mat-button-toggle>
-        <mat-button-toggle value="v2" matTooltip="Right inner barrier (v2)">Ri</mat-button-toggle>
-        <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
-      </mat-button-toggle-group>
-    }
     <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
     <!-- Zoom controls -->
     <button mat-icon-button class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]" (click)="zoomIn.emit()" matTooltip="Zoom in (+)"><mat-icon>zoom_in</mat-icon></button>

@@ -188,6 +188,8 @@ export async function addTileImage(app: App) {
     }
 
     await decodeRoadTexturesInBackground(app);
+    app.selectedRoadInfoId.set(null);
+    app.selectedRoadInfoData.set(null);
     app.selectedTileId.set(nextId);
     app.resourcesStatus.set(`New tile #${nextId} created.`);
     app.snackBar.open(`✓ Tile #${nextId} added`, 'OK', {

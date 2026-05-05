@@ -396,6 +396,12 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     return `Type #${type.typeRes} · ${this.getFrameLabel(type.frame)}`;
   }
 
+  getObjectTypePreviewUrl(typeRes: number): string | null {
+    if (typeRes === -1) return null;
+    const type = this.objectTypes.find((item) => item.typeRes === typeRes);
+    return type ? this.getSpriteUrl(type.frame) : null;
+  }
+
   getSoundLabel(soundId: number): string {
     if (soundId === 0) return 'None';
     const sound = this.audioEntries.find((item) => item.id === soundId);
