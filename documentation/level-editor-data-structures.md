@@ -398,7 +398,7 @@ Run with:
 
 ```sh
 cd angular-site
-npm test -- --watch=false
+pnpm test -- --watch=false
 ```
 
 ---

@@ -15,8 +15,8 @@
 ```bash
 git clone https://github.com/LachlanBWWright/RecklessDrivinPort.git
 cd RecklessDrivinPort/angular-site
-npm ci
-npm start
+pnpm install --frozen-lockfile
+pnpm start
 ```
 
 Open **http://localhost:4200/** in your browser.
@@ -24,7 +24,7 @@ Open **http://localhost:4200/** in your browser.
 The level editor works immediately. The game panel will show a "WASM bundle missing"
 message until you also complete Option B below.
 
-> **Note:** Always use `npm start`, not `npx ng serve`. The `prestart` lifecycle hook
+> **Note:** Always use `pnpm start`, not `pnpm exec ng serve`. The `prestart` lifecycle hook
 > copies `port/resources/resources.dat` into the dev assets automatically. Skipping it
 > means "Load Default" will return a 404 error.
 
@@ -35,7 +35,7 @@ message until you also complete Option B below.
 | Tool | Version |
 |---|---|
 | Node.js | 20 or later |
-| npm | bundled with Node.js |
+| pnpm | 10.28.1 or later |
 | cmake | 3.13 or later |
 | Emscripten SDK | any recent release (tested with 3.1.55) |
 
@@ -59,8 +59,8 @@ cmake --build build_wasm --parallel
 
 # 2. Start the Angular dev server (prestart syncs WASM files automatically)
 cd angular-site
-npm ci
-npm start
+pnpm install --frozen-lockfile
+pnpm start
 ```
 
 Open **http://localhost:4200/** and click **Start** to play.
@@ -99,12 +99,12 @@ Useful flags: `--skip-wasm`, `--skip-angular`, `--port 3000`, `--no-cleanup`.
 **"WASM bundle missing" in the game panel** — you haven't built the WASM bundle yet (Option B).
 The level editor still works without it.
 
-**"Failed to load resources" / 404 on resources.dat** — you ran `npx ng serve` directly
-instead of `npm start`. Always use `npm start` so the `prestart` hook copies the assets.
+**"Failed to load resources" / 404 on resources.dat** — you ran `pnpm exec ng serve` directly
+instead of `pnpm start`. Always use `pnpm start` so the `prestart` hook copies the assets.
 
 **Spinner in level editor never goes away** — open DevTools → Console and look for worker
 errors. The most common cause is opening the page from a `file://` URL; always use the dev
-server (`npm start`).
+server (`pnpm start`).
 
 **cmake / emcmake not found** — activate the Emscripten SDK first:
 `source /path/to/emsdk/emsdk_env.sh`

@@ -142,11 +142,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: angular-site/package-lock.json
+          cache: 'pnpm'
+          cache-dependency-path: angular-site/pnpm-lock.yaml
+
+      - name: Enable pnpm
+        run: corepack enable
 
       - name: Install Angular dependencies
-        run: npm ci --prefix angular-site
+        working-directory: angular-site
+        run: pnpm install --frozen-lockfile
 
       - name: Build Angular site
         env:
@@ -154,8 +158,8 @@ jobs:
         run: |
           cd angular-site
           # ensure analytics prompt doesn't block in CI
-          npx ng analytics disable || true
-          npx ng build --configuration=production
+          pnpm exec ng analytics disable || true
+          pnpm run build -- --configuration=production
           echo "Angular build output:"
           ls -lh dist/reckless-drivin/browser/
 

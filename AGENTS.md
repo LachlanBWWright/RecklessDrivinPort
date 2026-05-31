@@ -9,9 +9,9 @@ This repo contains a C port and an Angular editor:
 - `screenshots/` and `extracted-assets/` are reference material, not build outputs.
 
 ## Build, Test, and Development Commands
-- `cd angular-site && npm ci && npm start` runs the editor locally. Use `npm start`, not `npx ng serve`, so `prestart` syncs `port/resources/resources.dat`.
-- `cd angular-site && npm run lint` checks TypeScript and template-adjacent code with ESLint.
-- `cd angular-site && npm test` runs the Angular test suite.
+- `cd angular-site && pnpm install --frozen-lockfile && pnpm start` runs the editor locally. Use `pnpm start`, not `pnpm exec ng serve`, so `prestart` syncs `port/resources/resources.dat`.
+- `cd angular-site && pnpm run lint` checks TypeScript and template-adjacent code with ESLint.
+- `cd angular-site && pnpm test` runs the Angular test suite.
 - `emcmake cmake -B build_wasm -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON && cmake --build build_wasm --parallel` builds the WASM bundle.
 - `./scripts/build-wasm-local.sh --serve` creates a production-like local build and serves it on port 8080.
 

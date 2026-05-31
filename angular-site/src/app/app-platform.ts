@@ -388,7 +388,7 @@ export function setupEmscriptenModule(app: App): void {
       '[RecklessDrivin] Cross-origin isolation unavailable – WASM with SharedArrayBuffer ' +
         'will fail. The server must send Cross-Origin-Opener-Policy: same-origin and ' +
         'Cross-Origin-Embedder-Policy: require-corp headers. ' +
-        'Run `npm start` (ng serve) to enable these headers automatically. ' +
+      'Run `pnpm start` (ng serve) to enable these headers automatically. ' +
         'The level editor will still work without the game.',
     );
   }
@@ -468,7 +468,7 @@ export function loadWasmScript(app: App): void {
   app.wasmScript.onerror = () => {
     app.gameRestarting.set(false);
     app.statusText.set(
-      'WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).',
+      'WASM bundle missing. Build `build_wasm/` and rerun `pnpm start` (see dev-readme.md).',
     );
     console.error('[Angular] Failed to load WASM JS module');
   };
@@ -483,14 +483,14 @@ export async function readAssetBytes(app: App, path: string): Promise<Result<Uin
   const response = await fetch(assetUrl(app, path));
   if (!response.ok) {
     return err(
-      `Could not fetch ${path} (HTTP ${response.status}). Run \`npm start\` again so dev assets are synced.`,
+      `Could not fetch ${path} (HTTP ${response.status}). Run \`pnpm start\` again so dev assets are synced.`,
     );
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   const contentType = response.headers.get('content-type') ?? '';
   if (contentType.includes('text/html') || looksLikeHtml(bytes)) {
     return err(
-      `${path} is not being served as a binary asset. Run \`cd angular-site && npm start\` again; it now auto-syncs default assets before launching the dev server.`,
+      `${path} is not being served as a binary asset. Run \`cd angular-site && pnpm start\` again; it now auto-syncs default assets before launching the dev server.`,
     );
   }
   return ok(bytes);

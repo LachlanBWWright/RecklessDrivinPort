@@ -111,7 +111,7 @@ check_tool() {
 
 check_tool cmake
 check_tool node
-check_tool npm
+check_tool pnpm
 
 # ---------------------------------------------------------------------------
 # Locate and activate Emscripten
@@ -208,14 +208,14 @@ if ! $SKIP_ANGULAR; then
   cd "$ANGULAR_DIR"
 
   if [[ ! -d node_modules ]]; then
-    info "Installing npm dependencies…"
-    npm ci
+    info "Installing pnpm dependencies…"
+    pnpm install --frozen-lockfile
   fi
 
   info "Running ng build…"
   # The Angular site now uses a relative base href, so one production build
   # works both at / locally and at /RecklessDrivinPort/ on GitHub Pages.
-  npx ng build --configuration=production
+  pnpm run build -- --configuration=production
 
   ANGULAR_OUT="$ANGULAR_DIR/dist/reckless-drivin/browser"
   if [[ ! -d "$ANGULAR_OUT" ]]; then
@@ -368,11 +368,11 @@ print(f'Serving at http://localhost:{port}  (Ctrl+C to stop)')
 with http.server.HTTPServer(('', port), WasmHandler) as h:
     h.serve_forever()
 "
-  elif command -v npx &>/dev/null; then
+  elif command -v pnpm &>/dev/null; then
     cd "$OUTPUT_DIR"
-    npx --yes serve -l "$PORT" --no-clipboard
+    pnpm dlx serve -l "$PORT" --no-clipboard
   else
-    error "No suitable HTTP server found.  Install python3 or node."
+    error "No suitable HTTP server found.  Install python3 or pnpm."
     exit 1
   fi
 fi
