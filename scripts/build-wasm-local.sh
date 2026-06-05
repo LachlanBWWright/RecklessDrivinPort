@@ -215,7 +215,7 @@ if ! $SKIP_ANGULAR; then
   info "Running ng build…"
   # The Angular site now uses a relative base href, so one production build
   # works both at / locally and at /RecklessDrivinPort/ on GitHub Pages.
-  pnpm run build -- --configuration=production
+  pnpm run build --configuration=production
 
   ANGULAR_OUT="$ANGULAR_DIR/dist/reckless-drivin/browser"
   if [[ ! -d "$ANGULAR_OUT" ]]; then

@@ -161,7 +161,7 @@ jobs:
           cd angular-site
           # ensure analytics prompt doesn't block in CI
           pnpm exec ng analytics disable || true
-          pnpm run build -- --configuration=production
+          pnpm run build --configuration=production
           echo "Angular build output:"
           ls -lh dist/reckless-drivin/browser/
 
