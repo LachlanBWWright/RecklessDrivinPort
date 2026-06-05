@@ -8,8 +8,8 @@ Use this when working on the UI, level editor, or docs.
 
 ```bash
 cd angular-site
-npm ci
-npm start
+pnpm install --frozen-lockfile
+pnpm start
 ```
 
 Open:
@@ -32,8 +32,8 @@ These are the exact commands that should work from a fresh clone:
 
 ```bash
 cd angular-site
-npm ci
-npm start
+pnpm install --frozen-lockfile
+pnpm start
 ```
 
 Then in the browser:
@@ -44,13 +44,13 @@ Then in the browser:
 4. wait for the spinning indicator to disappear — LZRW3-A decompression runs in a
    **background web worker** so the page stays responsive while packs are parsed
 
-If the spinner appears but data never loads, stop `npm start`, rerun it, and try again —
+If the spinner appears but data never loads, stop `pnpm start`, rerun it, and try again —
 the prestart sync may not have run in a previous session.
 
 > **Important:** the `prestart` step copies `resources.dat` into `angular-site/public/`
-> before the dev server launches. If you ran `npx ng serve` directly (bypassing
-> `npm start`), the file will not be in place and **Load default resources.dat** will
-> fail. Always use `npm start`.
+> before the dev server launches. If you ran `pnpm exec ng serve` directly (bypassing
+> `pnpm start`), the file will not be in place and **Load default resources.dat** will
+> fail. Always use `pnpm start`.
 
 Notes:
 
@@ -59,7 +59,7 @@ Notes:
   - locally at `/`
   - on GitHub Pages at `/RecklessDrivinPort/`
 - If you have not built the WASM game yet, the page still loads and the level editor works; the game panel will show a clear “WASM bundle missing” message until you build it.
-- If you rebuild the WASM bundle while `npm start` is already running, rerun `npm run sync:dev-assets` or restart `npm start`.
+- If you rebuild the WASM bundle while `pnpm start` is already running, rerun `pnpm run sync:dev-assets` or restart `pnpm start`.
 
 ## 2. Angular dev server + real WASM game
 
@@ -78,11 +78,11 @@ cmake --build build_wasm --parallel
 
 ```bash
 cd angular-site
-npm ci
-npm start
+pnpm install --frozen-lockfile
+pnpm start
 ```
 
-`npm start` will automatically copy the built files from `build_wasm/` into the Angular dev assets:
+`pnpm start` will automatically copy the built files from `build_wasm/` into the Angular dev assets:
 
 - `reckless_drivin.js`
 - `reckless_drivin.wasm`
@@ -92,11 +92,11 @@ Open:
 
 - `http://localhost:4200/`
 
-If you already have `npm start` running and build WASM afterwards:
+If you already have `pnpm start` running and build WASM afterwards:
 
 ```bash
 cd angular-site
-npm run sync:dev-assets
+pnpm run sync:dev-assets
 ```
 
 Then refresh the browser.
@@ -134,12 +134,12 @@ Useful variants:
 ### Angular site only (level editor, no game)
 
 - Node.js 20+
-- npm
+- pnpm
 
 ### Full WASM + Angular build
 
 - Node.js 20+
-- npm
+- pnpm
 - cmake 3.13+
 - Emscripten SDK (`emcc` in PATH, `$EMSDK`, `~/emsdk`, or `./emsdk`)
 
@@ -151,9 +151,9 @@ The `build-wasm-local.sh` script auto-discovers Emscripten from those locations.
 
 ```bash
 cd angular-site
-npm ci
-npm test -- --watch=false
-npm run build
+pnpm install --frozen-lockfile
+pnpm test -- --watch=false
+pnpm run build
 ```
 
 ### Native desktop build
@@ -170,13 +170,13 @@ cmake --build build --parallel
 - `port/resources/resources.dat` — default game resources (tracked in git)
 - `build_wasm/` — local Emscripten output (gitignored)
 - `gh-pages-local/` — assembled local web output (gitignored)
-- `angular-site/public/resources.dat` and `angular-site/public/reckless_drivin.*` — generated dev assets copied by `npm start` / `npm run sync:dev-assets` (gitignored)
+- `angular-site/public/resources.dat` and `angular-site/public/reckless_drivin.*` — generated dev assets copied by `pnpm start` / `pnpm run sync:dev-assets` (gitignored)
 
 ## Troubleshooting
 
 ### `ng: not found`
 
-Run `npm ci` inside `angular-site/` first.
+Run `pnpm install --frozen-lockfile` inside `angular-site/` first.
 
 ### `reckless_drivin.js` failed to load
 
@@ -187,7 +187,7 @@ You launched the Angular site without building the WASM bundle yet, or the dev a
 
 ```bash
 cd angular-site
-npm run sync:dev-assets
+pnpm run sync:dev-assets
 ```
 
 ### `Failed to load resources` / `Invalid resources.dat: truncated payload …`
@@ -198,7 +198,7 @@ Fix it by restarting Angular from `angular-site/`:
 
 ```bash
 cd angular-site
-npm start
+pnpm start
 ```
 
 The prestart step copies `port/resources/resources.dat` into the dev assets before Angular launches.
@@ -208,7 +208,7 @@ The prestart step copies `port/resources/resources.dat` into the dev assets befo
 The LZRW3-A decompression runs in a background web worker. If the spinner is
 stuck, open DevTools → Console and look for worker errors. The most common cause
 is opening the page from a file path (`file://`) instead of a local server — always
-use `npm start` which runs a proper dev server.
+use `pnpm start` which runs a proper dev server.
 
 ### Manual upload gives pack/LZRW problems
 

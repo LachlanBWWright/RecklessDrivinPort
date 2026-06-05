@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
  * E2E test configuration for the Reckless Drivin level editor.
  *
  * Tests run against a production build served via Angular's dev server.
- * Start the server with `npm start` before running tests manually, or let
+ * Start the server with `pnpm start` before running tests manually, or let
  * Playwright's `webServer` block start and stop it automatically.
  */
 export default defineConfig({
@@ -25,7 +25,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm start',
+    command: 'pnpm start',
     url: 'http://localhost:4200',
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,

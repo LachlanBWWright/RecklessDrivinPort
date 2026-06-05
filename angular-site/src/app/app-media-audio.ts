@@ -20,9 +20,12 @@ const getAudioBytes = async (host: App, id: number) =>
 
 export async function loadAudioEntries(host: App) {
   const entriesResult = await resultFromPromise(
-    host.runtime.dispatchWorker<{ entries: { id: number; size: number }[] | null }>('LIST_PACK_ENTRIES', {
-      packId: 134,
-    }),
+    host.runtime.dispatchWorker<{ entries: { id: number; size: number }[] | null }>(
+      'LIST_PACK_ENTRIES',
+      {
+        packId: 134,
+      },
+    ),
     'Failed to load sound entries',
   );
   const entries = entriesResult.match(
@@ -36,7 +39,10 @@ export async function loadAudioEntries(host: App) {
     host.selectedAudioId.set(entries[0].id);
     await loadSelectedAudioBytes(host, entries[0].id);
   }
-  void loadAudioDurations(host, entries.map((entry) => entry.id));
+  void loadAudioDurations(
+    host,
+    entries.map((entry) => entry.id),
+  );
 }
 
 async function loadAudioDurations(host: App, ids: number[]) {
@@ -46,7 +52,9 @@ async function loadAudioDurations(host: App, ids: number[]) {
         if (!bytes) return null;
         return parseSndHeaderSafe(new Uint8Array(bytes)).match(
           (sndInfo) =>
-            !sndInfo || sndInfo.sampleRate <= 0 ? null : (sndInfo.numFrames / sndInfo.sampleRate) * 1000,
+            !sndInfo || sndInfo.sampleRate <= 0
+              ? null
+              : (sndInfo.numFrames / sndInfo.sampleRate) * 1000,
           () => null,
         );
       },
@@ -256,14 +264,22 @@ export async function addAudioEntry(host: App) {
 
     host.workerBusy.set(true);
 
-    const arrayBufferResult = await resultFromPromise(file.arrayBuffer(), 'Failed to read sound file');
+    const arrayBufferResult = await resultFromPromise(
+      file.arrayBuffer(),
+      'Failed to read sound file',
+    );
     const arrayBuffer = arrayBufferResult.match(
       (value) => value,
       (error) => {
         host.editorError.set(error);
         host.snackBar.open(`✗ ${error}`, 'Dismiss', {
           duration: 5000,
-          panelClass: 'snack-error',
+          panelClass: [
+            '[&_.mdc-snackbar__surface]:!border',
+            '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+            '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+            '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+          ],
         });
         return null;
       },
@@ -293,9 +309,16 @@ export async function addAudioEntry(host: App) {
       return;
     }
 
-    const buffer = sndBytes.buffer.slice(sndBytes.byteOffset, sndBytes.byteOffset + sndBytes.byteLength);
+    const buffer = sndBytes.buffer.slice(
+      sndBytes.byteOffset,
+      sndBytes.byteOffset + sndBytes.byteLength,
+    );
     const addSoundResult = await resultFromPromise(
-      host.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 134, entryId: nextId, bytes: buffer }, [buffer]),
+      host.runtime.dispatchWorker(
+        'PUT_PACK_ENTRY_RAW',
+        { packId: 134, entryId: nextId, bytes: buffer },
+        [buffer],
+      ),
       'Failed to add sound',
     );
     const saveError = addSoundResult.match(
@@ -306,7 +329,12 @@ export async function addAudioEntry(host: App) {
       host.editorError.set(saveError);
       host.snackBar.open(`✗ ${saveError}`, 'Dismiss', {
         duration: 5000,
-        panelClass: 'snack-error',
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
       });
       host.workerBusy.set(false);
       return;
@@ -315,7 +343,15 @@ export async function addAudioEntry(host: App) {
     await loadAudioEntries(host);
     await selectAudioEntry(host, nextId);
     host.resourcesStatus.set(`New sound #${nextId} created.`);
-    host.snackBar.open(`✓ Sound #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+    host.snackBar.open(`✓ Sound #${nextId} added`, 'OK', {
+      duration: 3000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+      ],
+    });
     host.workerBusy.set(false);
   };
   input.click();

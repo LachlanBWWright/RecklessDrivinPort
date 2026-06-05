@@ -174,7 +174,15 @@ export async function onResourceMergeSelected(
   app.snackBar.open(
     `Merged resources: ${mergeCounts.overwritten} overwritten, ${mergeCounts.added} added.`,
     'OK',
-    { duration: 4500, panelClass: 'snack-success' },
+    {
+      duration: 4500,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+      ],
+    },
   );
 }
 
@@ -182,7 +190,29 @@ export function clearEditorResources(app: App): void {
   resetEditorData(app);
   app.snackBar.open('Editor file cleared', 'OK', {
     duration: 2500,
-    panelClass: 'snack-success',
+    panelClass: [
+      '[&_.mdc-snackbar__surface]:!border',
+      '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+      '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+      '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+    ],
+  });
+}
+
+function warnIfSelectedLevelHasObjectsBeyondFinish(app: App): void {
+  const levelEnd = app.editLevelEnd();
+  const count = app.objects().filter((object) => object.y > levelEnd).length;
+  if (count === 0) return;
+  const warning = `${count} placed object(s) are beyond the finish line. Move or delete them before test-driving shortened levels.`;
+  app.resourcesStatus.set(warning);
+  app.snackBar.open(`⚠ ${warning}`, 'Dismiss', {
+    duration: 7000,
+    panelClass: [
+      '[&_.mdc-snackbar__surface]:!border',
+      '[&_.mdc-snackbar__surface]:!border-[#8a6d1f]',
+      '[&_.mdc-snackbar__surface]:!bg-[#3f3214]',
+      '[&_.mdc-snackbar__surface]:!text-[#ffe08a]',
+    ],
   });
 }
 
@@ -237,6 +267,7 @@ async function flushPendingEdits(app: App): Promise<void> {
   app.queuePackSync(syncPromises);
   app.queueRoadInfoSync(syncPromises);
   await Promise.all(syncPromises);
+  warnIfSelectedLevelHasObjectsBeyondFinish(app);
 }
 
 export async function downloadEditedResources(app: App): Promise<void> {
@@ -266,12 +297,25 @@ export async function downloadEditedResources(app: App): Promise<void> {
         app.resourcesStatus.set('Downloaded updated resources.dat.');
         app.snackBar.open('✓ Downloaded resources.dat', 'OK', {
           duration: 3000,
-          panelClass: 'snack-success',
+          panelClass: [
+            '[&_.mdc-snackbar__surface]:!border',
+            '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+            '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+            '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+          ],
         });
       },
       (msg) => {
         app.editorError.set(msg);
-        app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+        app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+          duration: 5000,
+          panelClass: [
+            '[&_.mdc-snackbar__surface]:!border',
+            '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+            '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+            '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+          ],
+        });
       },
     );
 
@@ -308,14 +352,27 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
         app.snackBar
           .open('✓ Saved to game – click Restart With Customisations to apply', 'Restart', {
             duration: 8000,
-            panelClass: 'snack-success',
+            panelClass: [
+              '[&_.mdc-snackbar__surface]:!border',
+              '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+              '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+              '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+            ],
           })
           .onAction()
           .subscribe(() => app.runtime.restartGameWithCustomResources());
       },
       (msg) => {
         app.editorError.set(msg);
-        app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+        app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+          duration: 5000,
+          panelClass: [
+            '[&_.mdc-snackbar__surface]:!border',
+            '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+            '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+            '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+          ],
+        });
       },
     );
 

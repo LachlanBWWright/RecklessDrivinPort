@@ -303,12 +303,25 @@ export async function onIconRawUpload(host: App, event: Event): Promise<void> {
     host.resourcesStatus.set(`${type} #${id} replaced.`);
     host.snackBar.open(`\u2713 ${type} #${id} replaced`, 'OK', {
       duration: 3000,
-      panelClass: 'snack-success',
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+      ],
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Raw resource upload failed';
     host.editorError.set(msg);
-    host.snackBar.open(`\u2717 ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    host.snackBar.open(`\u2717 ${msg}`, 'Dismiss', {
+      duration: 5000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
+    });
   } finally {
     host.workerBusy.set(false);
   }
@@ -369,7 +382,12 @@ export async function onIconPngUpload(host: App, event: Event): Promise<void> {
       host.resourcesStatus.set(`${type} #${id} replaced from image.`);
       host.snackBar.open(`\u2713 ${type} #${id} replaced`, 'OK', {
         duration: 3000,
-        panelClass: 'snack-success',
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+          '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+        ],
       });
       return;
     }
@@ -497,7 +515,12 @@ export async function onIconImageEditorSaved(
     host.resourcesStatus.set(`${editing.type} #${editing.id} saved from in-browser editor.`);
     host.snackBar.open(`✓ ${editing.type} #${editing.id} saved`, 'OK', {
       duration: 3000,
-      panelClass: 'snack-success',
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+      ],
     });
   } catch (err) {
     host.editorError.set(err instanceof Error ? err.message : 'Image save failed');
@@ -556,12 +579,25 @@ export async function addIconEntry(host: App): Promise<void> {
       host.resourcesStatus.set(`New ICN# #${nextId} created.`);
       host.snackBar.open(`✓ Icon #${nextId} added`, 'OK', {
         duration: 3000,
-        panelClass: 'snack-success',
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+          '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+        ],
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to add icon';
       host.editorError.set(msg);
-      host.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      host.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+        duration: 5000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
+      });
     } finally {
       host.workerBusy.set(false);
     }

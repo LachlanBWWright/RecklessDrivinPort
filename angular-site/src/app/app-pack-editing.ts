@@ -1,9 +1,16 @@
-import type { ObjectGroupDefinition, ObjectGroupEntryData, ObjectTypeDefinition } from './level-editor.service';
+import type {
+  ObjectGroupDefinition,
+  ObjectGroupEntryData,
+  ObjectTypeDefinition,
+} from './level-editor.service';
 import type { App } from './app';
 import { decodeSpritePreviewsInBackground } from './app-loaders';
 import { resultFromPromise } from './result-helpers';
 
-export function cloneObjectGroupDefinitions(app: App, groups = app.objectGroupDefinitions()): ObjectGroupDefinition[] {
+export function cloneObjectGroupDefinitions(
+  app: App,
+  groups = app.objectGroupDefinitions(),
+): ObjectGroupDefinition[] {
   return groups.map((group: ObjectGroupDefinition) => ({
     id: group.id,
     entries: group.entries.map((entry) => ({ ...entry })),
@@ -30,7 +37,9 @@ export function defaultObjectGroupEntry(app: App): ObjectGroupEntryData {
 export function selectedObjectGroup(app: App): ObjectGroupDefinition | null {
   const id = app.selectedObjectGroupId();
   if (id === null) return null;
-  return app.objectGroupDefinitions().find((group: ObjectGroupDefinition) => group.id === id) ?? null;
+  return (
+    app.objectGroupDefinitions().find((group: ObjectGroupDefinition) => group.id === id) ?? null
+  );
 }
 
 export function selectObjectGroup(app: App, groupId: number): void {
@@ -43,7 +52,9 @@ export function addObjectGroup(app: App, duplicateSelected = false): void {
   const id = nextObjectGroupId(app, groups);
   groups.push({
     id,
-    entries: selected ? selected.entries.map((entry) => ({ ...entry })) : [defaultObjectGroupEntry(app)],
+    entries: selected
+      ? selected.entries.map((entry) => ({ ...entry }))
+      : [defaultObjectGroupEntry(app)],
   });
   app.objectGroupDefinitions.set(groups);
   app.selectedObjectGroupId.set(id);
@@ -51,7 +62,9 @@ export function addObjectGroup(app: App, duplicateSelected = false): void {
 }
 
 export function deleteObjectGroup(app: App, groupId: number): void {
-  const groups = cloneObjectGroupDefinitions(app).filter((group: ObjectGroupDefinition) => group.id !== groupId);
+  const groups = cloneObjectGroupDefinitions(app).filter(
+    (group: ObjectGroupDefinition) => group.id !== groupId,
+  );
   app.objectGroupDefinitions.set(groups);
   app.selectedObjectGroupId.set(groups[0]?.id ?? null);
   app.markObjectGroupsDirty();
@@ -102,19 +115,33 @@ export async function saveObjectGroups(app: App): Promise<void> {
   }
   app.workerBusy.set(true);
   const result = await resultFromPromise(
-    app.runtime.dispatchWorker<{ objectGroups: ObjectGroupDefinition[] }>('APPLY_OBJECT_GROUPS', { objectGroups: groups }),
+    app.runtime.dispatchWorker<{ objectGroups: ObjectGroupDefinition[] }>('APPLY_OBJECT_GROUPS', {
+      objectGroups: groups,
+    }),
     'Object group save failed',
   );
   result.match(
     (data) => {
       app.objectGroupDefinitions.set(data.objectGroups);
-      if (!data.objectGroups.some((group: ObjectGroupDefinition) => group.id === app.selectedObjectGroupId())) {
+      if (
+        !data.objectGroups.some(
+          (group: ObjectGroupDefinition) => group.id === app.selectedObjectGroupId(),
+        )
+      ) {
         app.selectedObjectGroupId.set(data.objectGroups[0]?.id ?? null);
       }
       if (app.objectGroupsEditRevision === saveRevision) {
         app.objectGroupsDirty.set(false);
         app.resourcesStatus.set(`Saved ${data.objectGroups.length} object group(s).`);
-        app.snackBar.open(`✓ Object groups saved`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+        app.snackBar.open(`✓ Object groups saved`, 'OK', {
+          duration: 3000,
+          panelClass: [
+            '[&_.mdc-snackbar__surface]:!border',
+            '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+            '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+            '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+          ],
+        });
       } else {
         app.markObjectGroupsDirty();
         app.scheduleObjectGroupsAutoSave();
@@ -122,20 +149,33 @@ export async function saveObjectGroups(app: App): Promise<void> {
     },
     (msg) => {
       app.editorError.set(msg);
-      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+        duration: 5000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
+      });
     },
   );
   app.workerBusy.set(false);
 }
 
-export function cloneObjectTypeDefinitions(app: App, defs = app.objectTypeDefinitions()): ObjectTypeDefinition[] {
+export function cloneObjectTypeDefinitions(
+  app: App,
+  defs = app.objectTypeDefinitions(),
+): ObjectTypeDefinition[] {
   return defs.map((def: ObjectTypeDefinition) => ({ ...def }));
 }
 
 export function syncObjectTypeLookup(app: App, defs = app.objectTypeDefinitions()): void {
   app.objectTypeDefinitionMap.clear();
   for (const def of defs) app.objectTypeDefinitionMap.set(def.typeRes, def);
-  app.availableTypeIds.set(defs.map((def: ObjectTypeDefinition) => def.typeRes).sort((a: number, b: number) => a - b));
+  app.availableTypeIds.set(
+    defs.map((def: ObjectTypeDefinition) => def.typeRes).sort((a: number, b: number) => a - b),
+  );
 }
 
 export function nextObjectTypeId(app: App, defs = app.objectTypeDefinitions()): number {
@@ -148,7 +188,9 @@ export function nextObjectTypeId(app: App, defs = app.objectTypeDefinitions()): 
 export function selectedObjectType(app: App): ObjectTypeDefinition | null {
   const id = app.selectedObjectTypeId();
   if (id === null) return null;
-  return app.objectTypeDefinitions().find((def: ObjectTypeDefinition) => def.typeRes === id) ?? null;
+  return (
+    app.objectTypeDefinitions().find((def: ObjectTypeDefinition) => def.typeRes === id) ?? null
+  );
 }
 
 export function scheduleObjectTypesAutoSave(app: App): void {
@@ -213,7 +255,9 @@ export function addObjectType(app: App, duplicateSelected = false): void {
 }
 
 export function deleteObjectType(app: App, typeRes: number): void {
-  const defs = cloneObjectTypeDefinitions(app).filter((def: ObjectTypeDefinition) => def.typeRes !== typeRes);
+  const defs = cloneObjectTypeDefinitions(app).filter(
+    (def: ObjectTypeDefinition) => def.typeRes !== typeRes,
+  );
   app.selectedObjectTypeId.set(defs[0]?.typeRes ?? null);
   markObjectTypesDirty(app, defs);
 }
@@ -257,7 +301,7 @@ export function onObjectTypeFlagToggle(
   const defs = cloneObjectTypeDefinitions(app);
   const def = defs.find((item: ObjectTypeDefinition) => item.typeRes === typeRes);
   if (!def) return;
-  def[field] = checked ? (def[field] | bit) : (def[field] & ~bit);
+  def[field] = checked ? def[field] | bit : def[field] & ~bit;
   markObjectTypesDirty(app, defs);
 }
 
@@ -278,7 +322,10 @@ export async function saveObjectTypes(app: App): Promise<void> {
   const saveRevision = app.objectTypesEditRevision;
   app.workerBusy.set(true);
   const result = await resultFromPromise(
-    app.runtime.dispatchWorker<{ objectTypesArr: [number, ObjectTypeDefinition][] }>('APPLY_OBJECT_TYPES', { objectTypes }),
+    app.runtime.dispatchWorker<{ objectTypesArr: [number, ObjectTypeDefinition][] }>(
+      'APPLY_OBJECT_TYPES',
+      { objectTypes },
+    ),
     'Object type save failed',
   );
   result.match(
@@ -299,11 +346,27 @@ export async function saveObjectTypes(app: App): Promise<void> {
       }
       void decodeSpritePreviewsInBackground(app, data.objectTypesArr);
       app.resourcesStatus.set(`Saved ${defs.length} object type(s).`);
-      app.snackBar.open(`✓ Object types saved`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      app.snackBar.open(`✓ Object types saved`, 'OK', {
+        duration: 3000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+          '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+        ],
+      });
     },
     (msg) => {
       app.editorError.set(msg);
-      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+        duration: 5000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
+      });
     },
   );
   app.workerBusy.set(false);

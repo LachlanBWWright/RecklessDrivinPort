@@ -309,7 +309,12 @@ function scheduleGameRestart(app: App, options: PendingGameRestartOptions): void
   if (!savePendingRestartOptions(options)) {
     app.snackBar.open('Could not persist restart options.', 'Dismiss', {
       duration: 5000,
-      panelClass: 'snack-error',
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
     });
     return;
   }
@@ -388,7 +393,7 @@ export function setupEmscriptenModule(app: App): void {
       '[RecklessDrivin] Cross-origin isolation unavailable – WASM with SharedArrayBuffer ' +
         'will fail. The server must send Cross-Origin-Opener-Policy: same-origin and ' +
         'Cross-Origin-Embedder-Policy: require-corp headers. ' +
-        'Run `npm start` (ng serve) to enable these headers automatically. ' +
+        'Run `pnpm start` (ng serve) to enable these headers automatically. ' +
         'The level editor will still work without the game.',
     );
   }
@@ -468,7 +473,7 @@ export function loadWasmScript(app: App): void {
   app.wasmScript.onerror = () => {
     app.gameRestarting.set(false);
     app.statusText.set(
-      'WASM bundle missing. Build `build_wasm/` and rerun `npm start` (see dev-readme.md).',
+      'WASM bundle missing. Build `build_wasm/` and rerun `pnpm start` (see dev-readme.md).',
     );
     console.error('[Angular] Failed to load WASM JS module');
   };
@@ -483,14 +488,14 @@ export async function readAssetBytes(app: App, path: string): Promise<Result<Uin
   const response = await fetch(assetUrl(app, path));
   if (!response.ok) {
     return err(
-      `Could not fetch ${path} (HTTP ${response.status}). Run \`npm start\` again so dev assets are synced.`,
+      `Could not fetch ${path} (HTTP ${response.status}). Run \`pnpm start\` again so dev assets are synced.`,
     );
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   const contentType = response.headers.get('content-type') ?? '';
   if (contentType.includes('text/html') || looksLikeHtml(bytes)) {
     return err(
-      `${path} is not being served as a binary asset. Run \`cd angular-site && npm start\` again; it now auto-syncs default assets before launching the dev server.`,
+      `${path} is not being served as a binary asset. Run \`cd angular-site && pnpm start\` again; it now auto-syncs default assets before launching the dev server.`,
     );
   }
   return ok(bytes);
@@ -568,7 +573,12 @@ export async function applyCustomResourcesPreset(
       app.editorError.set(error);
       app.snackBar.open('Could not load the Terminator preset resources.dat.', 'Dismiss', {
         duration: 5000,
-        panelClass: 'snack-error',
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
       });
     },
   );
@@ -590,7 +600,12 @@ export function restartIntoEditorTestDrive(app: App): void {
   if (!savePendingEditorTestDriveLaunch(launch)) {
     app.snackBar.open('Could not persist test drive options for restart.', 'Dismiss', {
       duration: 5000,
-      panelClass: 'snack-error',
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
     });
     return;
   }
@@ -608,7 +623,12 @@ export function restartWithStartupOptions(app: App, useLevel: boolean): void {
   if (launch && !savePendingEditorTestDriveLaunch(launch)) {
     app.snackBar.open('Could not persist test drive options for restart.', 'Dismiss', {
       duration: 5000,
-      panelClass: 'snack-error',
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
     });
     return;
   }

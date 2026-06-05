@@ -94,7 +94,15 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
   app.hasEditorData.set(true);
   const statusMsg = `Loaded ${result.levels.length} level(s) and ${result.sprites.length} sprite(s) from ${sourceName}.`;
   app.resourcesStatus.set(statusMsg);
-  app.snackBar.open(`✓ ${statusMsg}`, 'OK', { duration: 4000, panelClass: 'snack-success' });
+  app.snackBar.open(`✓ ${statusMsg}`, 'OK', {
+    duration: 4000,
+    panelClass: [
+      '[&_.mdc-snackbar__surface]:!border',
+      '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+      '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+      '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+    ],
+  });
 
   const curId = app.selectedLevelId();
   if (curId !== null && result.levels.some((l) => l.resourceId === curId)) {

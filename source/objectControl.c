@@ -23,6 +23,31 @@
 #define kCopExtraBurstVelo	30.0				//when cops move slower than this, they will get extra acceleration
 #define kCopExtraBurst		1.8					//amount of extra acceleration recieved (1= no extra acceleration,2= double acceleration)
 
+static int RoadIndexForY(float y)
+{
+	int index=(int)(y/2);
+	int maxIndex;
+	if(!gRoadLenght||!*gRoadLenght)
+		return 0;
+	maxIndex=(int)*gRoadLenght-1;
+	if(index<0)
+		return 0;
+	if(index>maxIndex)
+		return maxIndex;
+	return index;
+}
+
+static int ClampTrackTarget(tTrackInfo *track,int target)
+{
+	if(!track||!track->num)
+		return -1;
+	if(target<0)
+		return 0;
+	if(target>=(int)track->num)
+		return (int)track->num-1;
+	return target;
+}
+
 float GetCloseCar(t2DPoint pos)
 {
 	tObject	*theObj=gFirstVisObj;
@@ -49,6 +74,9 @@ float GetCloseCar(t2DPoint pos)
 void CheckTarget(tObject *theObj)
 {
 	tTrackInfo *track=(theObj->control==kObjectDriveUp||theObj->control==kObjectCopControl)?gTrackUp:gTrackDown;
+	theObj->target=ClampTrackTarget(track,theObj->target);
+	if(theObj->target<0)
+		return;
 	t2DPoint targDist=VEC2D_Difference(P2D(track->track[theObj->target].x,track->track[theObj->target].y),theObj->pos);
 	float sqTargDist=targDist.x*targDist.x+targDist.y*targDist.y;
 	int passed=(theObj->control==kObjectDriveUp||theObj->control==kObjectCopControl)?track->track[theObj->target].y<theObj->pos.y:track->track[theObj->target].y>theObj->pos.y;
@@ -151,13 +179,21 @@ void HandleShot(float,tObject*,t2DPoint);
 void CopFollow(tObject *theObj,tInputData *input)
 {
 	tTrackInfoSeg target;
+	theObj->target=ClampTrackTarget(gTrackUp,theObj->target);
+	if(theObj->target<0)
+	{
+		input->brake=0;
+		input->throttle=0;
+		input->steering=0;
+		return;
+	}
  	if(fabs(theObj->pos.y-gCameraObj->pos.y)>kVisDist||gPlayerAddOns&kAddOnCop||gFinishDelay||gPlayerDeathDelay)
 		theObj->control=kObjectDriveUp;
 	else{
 		if((gPlayerObj->pos.y>theObj->pos.y)&&(gPlayerObj->pos.y<theObj->pos.y+kChaseDist*kScale))
 		{
-			tRoad objRoadData=gRoadData+(int)(theObj->pos.y/2);			
-			tRoad plrRoadData=gRoadData+(int)(gPlayerObj->pos.y/2);
+			tRoad objRoadData=gRoadData+RoadIndexForY(theObj->pos.y);
+			tRoad plrRoadData=gRoadData+RoadIndexForY(gPlayerObj->pos.y);
 			if(RanProb(kCallFriendProbility*kLowFrameDuration))
 				CallFriend(theObj);
 			if(((*objRoadData)[1]==(*objRoadData)[2])||(((*objRoadData)[1]>theObj->pos.x)==((*plrRoadData)[1]>gPlayerObj->pos.x)))
@@ -197,7 +233,7 @@ void CopFollow(tObject *theObj,tInputData *input)
 void ObjectCrossRoad(tObject *theObj,tInputData *input)
 {
 	tTrackInfoSeg target;
-	tRoad roadData=gRoadData+(int)(theObj->pos.y/2);
+	tRoad roadData=gRoadData+RoadIndexForY(theObj->pos.y);
 	target.y=theObj->pos.y;
 	target.flags=theObj->type->flags&kObjectOvertake?kTargetNoStop:0;
 	target.velo=INFINITY;
@@ -232,10 +268,16 @@ void ObjectControl(tObject *theObj,tInputData *input)
 				theObj->input.brake=0;theObj->input.throttle=0;theObj->input.steering=0;
 				break;
 			case kObjectDriveUp:			
-				ObjectFollow(theObj,&gTrackUp->track[theObj->target],&theObj->input);
+				if(ClampTrackTarget(gTrackUp,theObj->target)<0)
+					theObj->input.brake=0,theObj->input.throttle=0,theObj->input.steering=0;
+				else
+					ObjectFollow(theObj,&gTrackUp->track[theObj->target],&theObj->input);
 				break;
 			case kObjectDriveDown:
-				ObjectFollow(theObj,&gTrackDown->track[theObj->target],&theObj->input);
+				if(ClampTrackTarget(gTrackDown,theObj->target)<0)
+					theObj->input.brake=0,theObj->input.throttle=0,theObj->input.steering=0;
+				else
+					ObjectFollow(theObj,&gTrackDown->track[theObj->target],&theObj->input);
 				break;
 			case kObjectCrossRoad:
 				ObjectCrossRoad(theObj,&theObj->input);

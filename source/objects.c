@@ -21,6 +21,34 @@
 
 void ObjectPhysics(tObject *);
 
+static int RoadIndexForY(float y)
+{
+	int index=(int)(y/2);
+	int maxIndex;
+	if(!gRoadLenght||!*gRoadLenght)
+		return 0;
+	maxIndex=(int)*gRoadLenght-1;
+	if(index<0)
+		return 0;
+	if(index>maxIndex)
+		return maxIndex;
+	return index;
+}
+
+static int TrackSegmentForY(tTrackInfo *track,float y,int driveUp)
+{
+	int target;
+	if(!track||track->num<2)
+		return -1;
+	for(target=1;
+		(target<(int)track->num)&&
+		(driveUp?(track->track[target].y<y):(track->track[target].y>y));
+		target++);
+	if(target>=(int)track->num)
+		target=(int)track->num-1;
+	return target;
+}
+
 #ifndef _MSC_VER  /* MSVC treats abs() as an intrinsic; don't redefine it */
 int abs(int x)
 {
@@ -103,31 +131,61 @@ static float GetObjectGroupStartY(void)
 t2DPoint GetUniquePos(SInt16 minOffs,SInt16 maxOffs,float *objDir,int *dir)
 {
 	t2DPoint pos;
-	int ok;
+	int ok=0;
 	int target;
+	int attempts=0;
+	float startY=GetObjectGroupStartY();
+	if(!gRoadData||!gRoadLenght||!*gRoadLenght||gLevelData->levelEnd<=startY)
+	{
+		*dir=kObjectNoInput;
+		if(*objDir==-1)
+			*objDir=0;
+		return P2D(INFINITY,INFINITY);
+	}
 	do{
 		tRoad roadData;
 		float sqdist;
-		pos.y=RanFl(GetObjectGroupStartY(),gLevelData->levelEnd);
-		roadData=gRoadData+(int)(pos.y/2);
+		ok=0;
+		pos.y=RanFl(startY,gLevelData->levelEnd);
+		roadData=gRoadData+RoadIndexForY(pos.y);
 		if(*objDir==-1)
 		{
-			if(RanProb(0.5)||!gTrackDown->num)
+			if(RanProb(0.5)||!gTrackDown||!gTrackDown->num)
 			{
-				for(target=1;
-					(target<gTrackUp->num)&&(gTrackUp->track[target].y<pos.y);
-					target++);
+				float dy;
+				target=TrackSegmentForY(gTrackUp,pos.y,true);
+				if(target<0)
+				{
+					attempts++;
+					continue;
+				}
+				dy=gTrackUp->track[target].y-gTrackUp->track[target-1].y;
+				if(dy==0)
+				{
+					attempts++;
+					continue;
+				}
 				pos.x=gTrackUp->track[target-1].x+(gTrackUp->track[target].x-gTrackUp->track[target-1].x)/
-					(gTrackUp->track[target].y-gTrackUp->track[target-1].y)*(pos.y-gTrackUp->track[target-1].y);
+					dy*(pos.y-gTrackUp->track[target-1].y);
 				*dir=kObjectDriveUp;
 			}
 			else
 			{
-				for(target=1;
-					(target<gTrackDown->num)&&(gTrackDown->track[target].y>pos.y);
-					target++);
+				float dy;
+				target=TrackSegmentForY(gTrackDown,pos.y,false);
+				if(target<0)
+				{
+					attempts++;
+					continue;
+				}
+				dy=gTrackDown->track[target].y-gTrackDown->track[target-1].y;
+				if(dy==0)
+				{
+					attempts++;
+					continue;
+				}
 				pos.x=gTrackDown->track[target-1].x+(gTrackDown->track[target].x-gTrackDown->track[target-1].x)/
-					(gTrackDown->track[target].y-gTrackDown->track[target-1].y)*(pos.y-gTrackDown->track[target-1].y);			
+					dy*(pos.y-gTrackDown->track[target-1].y);
 				*dir=kObjectDriveDown;
 			}
 			GetCloseObj(pos,nil,&sqdist);	
@@ -165,10 +223,18 @@ t2DPoint GetUniquePos(SInt16 minOffs,SInt16 maxOffs,float *objDir,int *dir)
 						else
 						 	ok=(border==1)?(*roadData)[2]>=pos.x-minOffs:true;
 						break;
-				}
+			}
 			*dir=kObjectNoInput;	
 		}
-	}while(!ok);
+		attempts++;
+	}while(!ok&&attempts<1000);
+	if(!ok)
+	{
+		*dir=kObjectNoInput;
+		if(*objDir==-1)
+			*objDir=0;
+		return P2D(INFINITY,INFINITY);
+	}
 	if(*objDir==-1)
 	{
 		t2DPoint targetPos=(*dir==kObjectDriveUp?P2D(gTrackUp->track[target].x,gTrackUp->track[target].y)
@@ -199,9 +265,16 @@ void InsertObjectGroup(tObjectGroupReference groupRef)
 		int probIndex=probilities[RanInt(0,100)];
 		int control;
 		tObject *theObj=NewObject(gFirstObj,(*group).data[probIndex].typeRes);
+		if(!theObj)
+			continue;
 		theObj->pos=P2D(INFINITY,INFINITY);
 		theObj->dir=(*group).data[probIndex].dir;
 		theObj->pos=GetUniquePos((*group).data[probIndex].minOffs,(*group).data[probIndex].maxOffs,&theObj->dir,&control);
+		if(!isfinite(theObj->pos.x)||!isfinite(theObj->pos.y))
+		{
+			RemoveObject(theObj);
+			continue;
+		}
 		theObj->control+=control;
 		if((theObj->control&0x0000000f)==kObjectDriveUp)
 			for(theObj->target=0;

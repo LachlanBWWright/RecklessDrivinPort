@@ -140,7 +140,15 @@ export async function addTileImage(app: App) {
       (value) => value,
       (error) => {
         app.editorError.set(error);
-        app.snackBar.open(`✗ ${error}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+        app.snackBar.open(`✗ ${error}`, 'Dismiss', {
+          duration: 5000,
+          panelClass: [
+            '[&_.mdc-snackbar__surface]:!border',
+            '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+            '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+            '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+          ],
+        });
         return null;
       },
     );
@@ -182,7 +190,15 @@ export async function addTileImage(app: App) {
     );
     if (saveError) {
       app.editorError.set(saveError);
-      app.snackBar.open(`✗ ${saveError}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      app.snackBar.open(`✗ ${saveError}`, 'Dismiss', {
+        duration: 5000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
+      });
       finishWorkerBusy(app);
       return;
     }
@@ -194,7 +210,12 @@ export async function addTileImage(app: App) {
     app.resourcesStatus.set(`New tile #${nextId} created.`);
     app.snackBar.open(`✓ Tile #${nextId} added`, 'OK', {
       duration: 3000,
-      panelClass: 'snack-success',
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+      ],
     });
     finishWorkerBusy(app);
   };
@@ -206,13 +227,29 @@ export async function deleteTileImage(app: App, texId: number) {
   if (refs.length > 0) {
     const msg = `Tile ${texId} is still used by road${refs.length > 1 ? 's' : ''} ${refs.join(', ')}. Reassign those road textures first.`;
     app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 6000, panelClass: 'snack-error' });
+    app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+      duration: 6000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
+    });
     return;
   }
   if (!app.tileTileEntries().some((entry: { texId: number }) => entry.texId === texId)) {
     const msg = `Tile ${texId} was not found.`;
     app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+      duration: 5000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
+    });
     return;
   }
 
@@ -228,7 +265,15 @@ export async function deleteTileImage(app: App, texId: number) {
   );
   if (deleteError) {
     app.editorError.set(deleteError);
-    app.snackBar.open(`✗ ${deleteError}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    app.snackBar.open(`✗ ${deleteError}`, 'Dismiss', {
+      duration: 5000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
+    });
     finishWorkerBusy(app);
     return;
   }
@@ -240,7 +285,12 @@ export async function deleteTileImage(app: App, texId: number) {
   app.resourcesStatus.set(`Deleted tile #${texId}.`);
   app.snackBar.open(`✓ Tile #${texId} deleted`, 'OK', {
     duration: 3000,
-    panelClass: 'snack-success',
+    panelClass: [
+      '[&_.mdc-snackbar__surface]:!border',
+      '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+      '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+      '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+    ],
   });
   finishWorkerBusy(app);
 }
