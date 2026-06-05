@@ -7,6 +7,7 @@
     "sync:dev-assets": "node ../scripts/sync-angular-dev-assets.mjs",
     "prestart": "pnpm run sync:dev-assets",
     "start": "ng serve",
+    "dev": "ng server",
     "prestart:repo": "pnpm run sync:dev-assets",
     "start:repo": "ng serve --serve-path /RecklessDrivinPort/",
     "prebuild": "pnpm run sync:dev-assets",

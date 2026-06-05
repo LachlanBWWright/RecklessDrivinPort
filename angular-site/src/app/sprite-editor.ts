@@ -7,7 +7,9 @@ export async function selectSprite(app: App, spriteId: number): Promise<void> {
   app.selectedSpriteId.set(spriteId);
   app.currentSpriteBytes.set(null);
   try {
-    const result = await app.runtime.dispatchWorker<{ bytes: Uint8Array }>('GET_SPRITE_BYTES', { spriteId });
+    const result = await app.runtime.dispatchWorker<{ bytes: Uint8Array }>('GET_SPRITE_BYTES', {
+      spriteId,
+    });
     app.currentSpriteBytes.set(result.bytes);
   } catch {
     // non-fatal: pixel canvas just stays empty
@@ -115,14 +117,13 @@ export async function onSpritePngUpload(app: App, event: Event, frameId: number)
     const imageData = ctx.getImageData(0, 0, frame.width, frame.height);
 
     app.workerBusy.set(true);
-    const result = await app.runtime.dispatchWorker<{ levels: import('./level-editor.service').ParsedLevel[] }>(
-      'APPLY_SPRITE_PACK_PIXELS',
-      {
+    const result = await app.runtime.dispatchWorker<{
+      levels: import('./level-editor.service').ParsedLevel[];
+    }>('APPLY_SPRITE_PACK_PIXELS', {
       frameId,
       bitDepth: frame.bitDepth,
       pixels: imageData.data,
-      },
-    );
+    });
     app.applyLevelsResult(result.levels, {
       preserveCanvasView: true,
       refreshSelectedLevelState: false,
@@ -205,15 +206,35 @@ export async function addSpriteFrame(app: App): Promise<void> {
         return;
       }
       const buf = data.buffer.slice(0);
-      await app.runtime.dispatchWorker('PUT_PACK_ENTRY_RAW', { packId: 137, entryId: nextId, bytes: buf }, [buf]);
+      await app.runtime.dispatchWorker(
+        'PUT_PACK_ENTRY_RAW',
+        { packId: 137, entryId: nextId, bytes: buf },
+        [buf],
+      );
       await decodePackSpritesInBackground(app);
       app.selectedPackSpriteId.set(nextId);
       app.resourcesStatus.set(`New sprite frame #${nextId} created.`);
-      app.snackBar.open(`✓ Sprite #${nextId} added`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      app.snackBar.open(`✓ Sprite #${nextId} added`, 'OK', {
+        duration: 3000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+          '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+        ],
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to add sprite';
       app.editorError.set(msg);
-      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+        duration: 5000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
+      });
     } finally {
       app.workerBusy.set(false);
     }
@@ -235,14 +256,13 @@ export async function onSpriteEditorSaved(
   try {
     app.workerBusy.set(true);
     const bitDepth = app.spriteEditorFrame()?.bitDepth ?? 16;
-    const result = await app.runtime.dispatchWorker<{ levels: import('./level-editor.service').ParsedLevel[] }>(
-      'APPLY_SPRITE_PACK_PIXELS',
-      {
+    const result = await app.runtime.dispatchWorker<{
+      levels: import('./level-editor.service').ParsedLevel[];
+    }>('APPLY_SPRITE_PACK_PIXELS', {
       frameId: event.frameId,
       bitDepth,
       pixels: event.pixels,
-      },
-    );
+    });
     app.applyLevelsResult(result.levels, {
       preserveCanvasView: true,
       refreshSelectedLevelState: false,

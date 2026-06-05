@@ -456,11 +456,27 @@ export async function saveLevelObjects(app: App): Promise<void> {
     });
     const msg = `Saved ${app.objects().length} objects for level ${id - 139}.`;
     app.resourcesStatus.set(msg);
-    app.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+    app.snackBar.open(`✓ ${msg}`, 'OK', {
+      duration: 3000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+      ],
+    });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Save failed';
     app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+      duration: 5000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
+    });
   } finally {
     app.workerBusy.set(false);
   }
@@ -482,11 +498,27 @@ export async function saveTrack(app: App): Promise<void> {
     });
     const msg = `Saved track waypoints for level ${id - 139}.`;
     app.resourcesStatus.set(msg);
-    app.snackBar.open(`✓ ${msg}`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+    app.snackBar.open(`✓ ${msg}`, 'OK', {
+      duration: 3000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+      ],
+    });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Track save failed';
     app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+      duration: 5000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
+    });
   } finally {
     app.workerBusy.set(false);
   }

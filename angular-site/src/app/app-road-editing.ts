@@ -1,5 +1,9 @@
 import type { LevelProperties, RoadInfoData, ParsedLevel } from './level-editor.service';
-import { buildRoadTileGroups, getRoadReferenceLevelNums, getTileReferenceRoadInfoIds } from './app-helpers';
+import {
+  buildRoadTileGroups,
+  getRoadReferenceLevelNums,
+  getTileReferenceRoadInfoIds,
+} from './app-helpers';
 import { ROAD_THEMES } from './object-canvas';
 import type { App } from './app';
 import { resultFromPromise } from './result-helpers';
@@ -19,7 +23,10 @@ declare module './app' {
   }
 }
 
-export function cloneRoadInfoData(app: App, roadInfo: RoadInfoData | null | undefined): RoadInfoData | null {
+export function cloneRoadInfoData(
+  app: App,
+  roadInfo: RoadInfoData | null | undefined,
+): RoadInfoData | null {
   return roadInfo ? { ...roadInfo } : null;
 }
 
@@ -75,7 +82,9 @@ export function makeDefaultRoadInfo(app: App, roadInfoId: number): RoadInfoData 
 export function setSelectedRoadInfo(app: App, roadInfoId: number | null): void {
   const nextId = roadInfoId !== null && app.roadInfoDataMap.has(roadInfoId) ? roadInfoId : null;
   app.selectedRoadInfoId.set(nextId);
-  app.selectedRoadInfoData.set(cloneRoadInfoData(app, nextId === null ? null : app.roadInfoDataMap.get(nextId)));
+  app.selectedRoadInfoData.set(
+    cloneRoadInfoData(app, nextId === null ? null : app.roadInfoDataMap.get(nextId)),
+  );
 }
 
 export function setLevelRoadInfo(app: App, roadInfoId: number): void {
@@ -84,7 +93,10 @@ export function setLevelRoadInfo(app: App, roadInfoId: number): void {
   setSelectedRoadInfo(app, roadInfoId);
 }
 
-export function syncSelectedRoadInfoSelection(app: App, preferredId: number | null = app.selectedRoadInfoId()): void {
+export function syncSelectedRoadInfoSelection(
+  app: App,
+  preferredId: number | null = app.selectedRoadInfoId(),
+): void {
   const availableIds = getSortedRoadInfoIds(app);
   let nextId = preferredId;
   if (nextId === null || !app.roadInfoDataMap.has(nextId)) {
@@ -111,7 +123,11 @@ export function refreshRoadInfoDerivedState(app: App): void {
   app.roadInfoVersion.update((v: number) => v + 1);
 }
 
-export async function applyRoadInfoDataToWorker(app: App, roadInfoId: number, roadInfo: RoadInfoData): Promise<void> {
+export async function applyRoadInfoDataToWorker(
+  app: App,
+  roadInfoId: number,
+  roadInfo: RoadInfoData,
+): Promise<void> {
   await app.runtime.dispatchWorker('APPLY_ROAD_INFO', {
     roadInfoId,
     roadInfo,
@@ -120,9 +136,11 @@ export async function applyRoadInfoDataToWorker(app: App, roadInfoId: number, ro
 
 export async function createRoadInfo(app: App): Promise<void> {
   const baseId = app.selectedRoadInfoId() ?? app.editRoadInfo();
-  const baseRoad = baseId !== null ? app.roadInfoDataMap.get(baseId) ?? null : null;
+  const baseRoad = baseId !== null ? (app.roadInfoDataMap.get(baseId) ?? null) : null;
   const newRoadInfoId = getNextRoadInfoId(app);
-  const newRoadInfo = baseRoad ? { ...baseRoad, id: newRoadInfoId } : makeDefaultRoadInfo(app, newRoadInfoId);
+  const newRoadInfo = baseRoad
+    ? { ...baseRoad, id: newRoadInfoId }
+    : makeDefaultRoadInfo(app, newRoadInfoId);
 
   const previousMap = new Map(app.roadInfoDataMap);
   const previousSelectedRoadId = app.selectedRoadInfoId();
@@ -141,7 +159,15 @@ export async function createRoadInfo(app: App): Promise<void> {
   result.match(
     () => {
       app.resourcesStatus.set(`Created road ${newRoadInfoId}.`);
-      app.snackBar.open(`✓ Road ${newRoadInfoId} created`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      app.snackBar.open(`✓ Road ${newRoadInfoId} created`, 'OK', {
+        duration: 3000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+          '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+        ],
+      });
     },
     (msg) => {
       app.roadInfoDataMap.clear();
@@ -150,19 +176,38 @@ export async function createRoadInfo(app: App): Promise<void> {
       setSelectedRoadInfo(app, previousSelectedRoadId);
       app.editRoadInfoData.set(previousEditRoadInfo);
       app.editorError.set(msg);
-      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+        duration: 5000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
+      });
     },
   );
   app.workerBusy.set(false);
 }
 
-export async function deleteRoadInfo(app: App, roadInfoId: number | null = app.selectedRoadInfoId()): Promise<void> {
+export async function deleteRoadInfo(
+  app: App,
+  roadInfoId: number | null = app.selectedRoadInfoId(),
+): Promise<void> {
   if (roadInfoId === null) return;
   const refs = lookupRoadReferenceLevelNums(app, roadInfoId);
   if (refs.length > 0) {
     const msg = `Road ${roadInfoId} is still used by level${refs.length > 1 ? 's' : ''} ${refs.join(', ')}. Reassign those level road selections first.`;
     app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 6000, panelClass: 'snack-error' });
+    app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+      duration: 6000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
+    });
     return;
   }
 
@@ -172,7 +217,10 @@ export async function deleteRoadInfo(app: App, roadInfoId: number | null = app.s
   const previousEditRoadInfo = _editData ? { ..._editData } : null;
   app.roadInfoDataMap.delete(roadInfoId);
   refreshRoadInfoDerivedState(app);
-  syncSelectedRoadInfoSelection(app, previousSelectedRoadId === roadInfoId ? app.editRoadInfo() : previousSelectedRoadId);
+  syncSelectedRoadInfoSelection(
+    app,
+    previousSelectedRoadId === roadInfoId ? app.editRoadInfo() : previousSelectedRoadId,
+  );
 
   app.workerBusy.set(true);
   const result = await resultFromPromise(
@@ -182,7 +230,15 @@ export async function deleteRoadInfo(app: App, roadInfoId: number | null = app.s
   result.match(
     () => {
       app.resourcesStatus.set(`Deleted road ${roadInfoId}.`);
-      app.snackBar.open(`✓ Road ${roadInfoId} deleted`, 'OK', { duration: 3000, panelClass: 'snack-success' });
+      app.snackBar.open(`✓ Road ${roadInfoId} deleted`, 'OK', {
+        duration: 3000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+          '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+        ],
+      });
     },
     (msg) => {
       app.roadInfoDataMap.clear();
@@ -191,7 +247,15 @@ export async function deleteRoadInfo(app: App, roadInfoId: number | null = app.s
       setSelectedRoadInfo(app, previousSelectedRoadId);
       app.editRoadInfoData.set(previousEditRoadInfo);
       app.editorError.set(msg);
-      app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+      app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+        duration: 5000,
+        panelClass: [
+          '[&_.mdc-snackbar__surface]:!border',
+          '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+          '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+          '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+        ],
+      });
     },
   );
   app.workerBusy.set(false);
@@ -254,6 +318,10 @@ export function markObjectGroupsDirty(app: App): void {
   scheduleObjectGroupsAutoSave(app);
 }
 
+function countObjectsBeyondFinish(app: App, levelEnd: number): number {
+  return app.objects().filter((object) => object.y > levelEnd).length;
+}
+
 export async function saveLevelProperties(app: App): Promise<void> {
   const id = app.selectedLevelId();
   if (id === null || !app.propertiesDirty()) return;
@@ -279,6 +347,7 @@ export async function saveLevelProperties(app: App): Promise<void> {
       resourceId: id,
       props,
     });
+    const objectsBeyondFinish = countObjectsBeyondFinish(app, props.levelEnd);
     app.applyLevelsResult(result.levels, {
       preserveCanvasView: true,
       refreshSelectedLevelState: false,
@@ -286,18 +355,45 @@ export async function saveLevelProperties(app: App): Promise<void> {
     if (app.propertiesEditRevision === saveRevision) {
       app.propertiesDirty.set(false);
       app.propertiesSaveLevelId = null;
-      app.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
-      app.snackBar.open(`✓ Level ${id - 139} properties saved`, 'OK', {
-        duration: 3000,
-        panelClass: 'snack-success',
-      });
+      if (objectsBeyondFinish > 0) {
+        const warning = `${objectsBeyondFinish} placed object(s) are beyond the finish line. Move or delete them before test-driving shortened levels.`;
+        app.resourcesStatus.set(`Saved properties for level ${id - 139}. ${warning}`);
+        app.snackBar.open(`⚠ ${warning}`, 'Dismiss', {
+          duration: 7000,
+          panelClass: [
+            '[&_.mdc-snackbar__surface]:!border',
+            '[&_.mdc-snackbar__surface]:!border-[#8a6d1f]',
+            '[&_.mdc-snackbar__surface]:!bg-[#3f3214]',
+            '[&_.mdc-snackbar__surface]:!text-[#ffe08a]',
+          ],
+        });
+      } else {
+        app.resourcesStatus.set(`Saved properties for level ${id - 139}.`);
+        app.snackBar.open(`✓ Level ${id - 139} properties saved`, 'OK', {
+          duration: 3000,
+          panelClass: [
+            '[&_.mdc-snackbar__surface]:!border',
+            '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+            '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+            '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+          ],
+        });
+      }
     } else {
       markPropertiesDirty(app);
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Save failed';
     app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', { duration: 5000, panelClass: 'snack-error' });
+    app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
+      duration: 5000,
+      panelClass: [
+        '[&_.mdc-snackbar__surface]:!border',
+        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+      ],
+    });
   } finally {
     app.workerBusy.set(false);
   }
