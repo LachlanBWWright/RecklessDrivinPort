@@ -115,6 +115,8 @@ typedef struct{
 	int frameRepeation;
 	int layer;
 	int damageFlags;
+	int scriptId;
+	int objectTypeId;
 	tObjectTypePtr type;
 	void *shooter;
 	tInputData input;

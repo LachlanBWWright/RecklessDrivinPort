@@ -17,6 +17,7 @@
 #include "packs.h"
 #include "register.h"
 #include "byteswap_packs.h"
+#include "scripts.h"
 
 #if __option(profile)
 #include <profiler.h>
@@ -114,6 +115,7 @@ void Init()
 	PortByteSwapPackOgrp();
 	LoadPack(kPackRoad);
 	PortByteSwapPackRoad();
+	Script_Init();
 	if(gPrefs.hiColor)
 	{
 		LoadPack(kPacksR16);
@@ -165,6 +167,7 @@ void Exit()
 		FadeScreen(0);
 		ScreenMode(kScreenStopped);
 		InputMode(kInputStopped);
+		Script_Shutdown();
 	}
 	ExitToShell();
 }

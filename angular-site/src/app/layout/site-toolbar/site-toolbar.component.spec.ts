@@ -6,18 +6,36 @@ describe('SiteToolbarComponent', () => {
     const component = new SiteToolbarComponent();
     component.selectedLevelId = 142;
 
-    let emitted: number | null = null;
+    let emitted: { levelResourceId: number; stripScripts: boolean } | null = null;
     component.previewSelectedLevel.subscribe((value) => {
       emitted = value;
     });
 
     component.launchSelectedLevelPreview();
+    component.stripScriptsForPreview = true;
     expect(component.previewDialogOpen).toBe(true);
     expect(emitted).toBeNull();
 
     component.confirmPreviewDialog();
-    expect(emitted).toBe(142);
+    expect(emitted).toEqual({ levelResourceId: 142, stripScripts: true });
     expect(component.previewDialogOpen).toBe(false);
+  });
+
+  it('opens download modal and emits strip option after confirmation', () => {
+    const component = new SiteToolbarComponent();
+    let emitted: boolean | null = null;
+    component.downloadEditedResources.subscribe((value) => {
+      emitted = value;
+    });
+
+    component.launchDownloadDialog();
+    component.stripScriptsForDownload = true;
+    expect(component.downloadDialogOpen).toBe(true);
+    expect(emitted).toBeNull();
+
+    component.confirmDownloadDialog();
+    expect(emitted).toBe(true);
+    expect(component.downloadDialogOpen).toBe(false);
   });
 
   it('tracks level-by-level merge checkbox selections', () => {

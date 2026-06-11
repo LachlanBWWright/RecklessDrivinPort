@@ -302,6 +302,63 @@
               </div>
 
               <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <div class="text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Scripting</div>
+                  <div class="flex flex-wrap gap-2">
+                    <button mat-stroked-button type="button" [disabled]="workerBusy" (click)="createAndOpenScriptEditor(type.typeRes)">
+                      <mat-icon>add_circle</mat-icon> New Script
+                    </button>
+                    <button mat-flat-button type="button" [disabled]="workerBusy || !selectedScript" (click)="openSelectedScriptEditor()">
+                      <mat-icon>edit</mat-icon> Edit Script
+                    </button>
+                  </div>
+                </div>
+                <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 max-[1200px]:grid-cols-1">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Bound Script</mat-label>
+                    <mat-select
+                      [value]="selectedScriptBinding?.scriptId ?? null"
+                      (valueChange)="scriptBindingChange.emit({ typeRes: type.typeRes, scriptId: $event })">
+                      <mat-option [value]="null">None</mat-option>
+                      @for (script of scriptList; track script.id) {
+                        <mat-option [value]="script.id">{{ getScriptLabel(script.id) }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  @if (selectedScript; as script) {
+                    <div class="flex min-w-0 flex-col gap-2 text-[0.82rem]">
+                      <div class="font-semibold text-[var(--text)]">{{ script.name || 'Unnamed script' }}</div>
+                      <div class="text-[var(--muted)]">Validation: {{ getSelectedScriptValidationLabel() }}</div>
+                    </div>
+                  }
+                </div>
+
+                @if (selectedScript; as script) {
+                  <div class="mt-3 flex flex-col gap-2">
+                    @if (getSelectedScriptHookLabels().length > 0) {
+                      <div class="flex flex-wrap gap-1.5">
+                        @for (hook of getSelectedScriptHookLabels(); track hook) {
+                          <span class="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[0.72rem] text-[var(--text)]">{{ hook }}</span>
+                        }
+                      </div>
+                    }
+                    @if (getIssuesForSelectedScript().length > 0) {
+                      <div class="rounded-[10px] border border-amber-400/30 bg-amber-500/10 p-3">
+                        <div class="mb-2 text-[0.78rem] font-bold text-amber-200">Diagnostics</div>
+                        <div class="flex flex-col gap-1">
+                          @for (issue of getIssuesForSelectedScript(); track $index) {
+                            <div class="text-[0.78rem] text-amber-100">{{ issue.line === null ? '' : 'Line ' + issue.line + ': ' }}{{ issue.message }}</div>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <div class="text-[0.82rem] text-[var(--muted)]">No script bound. Existing object behavior remains unchanged.</div>
+                }
+              </div>
+
+              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
                 <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Flags</div>
                 <div class="grid grid-cols-2 gap-[14px] max-[1200px]:grid-cols-1">
                   <div class="min-w-0">

@@ -123,6 +123,7 @@ set(GAME_SOURCES
     source/rle.c
     source/roaddraw.c
     source/screenfx.c
+    source/scripts.c
     source/sound.c
     source/sprites.c
     source/textfx.c
@@ -229,6 +230,7 @@ if(EMSCRIPTEN)
         "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive]"
         "-s ASYNCIFY=1"
         "-s ASYNCIFY_STACK_SIZE=1048576"
+        "--use-port=contrib.lua"
         "--preload-file ${CMAKE_SOURCE_DIR}/port/resources/resources.dat@/resources.dat"
     )
 
@@ -242,6 +244,7 @@ if(EMSCRIPTEN)
 
     # For WASM, update the resource path to the virtual FS
     add_compile_definitions(RESOURCES_DAT_PATH="/resources.dat")
+    add_compile_definitions(HAVE_LUA_SCRIPTING=1)
     message(STATUS "Building for WebAssembly (Emscripten) with ASYNCIFY support")
 endif()
 
@@ -262,6 +265,10 @@ if(ANDROID)
 else()
     add_executable(reckless_drivin ${GAME_SOURCES})
     set(GAME_TARGET reckless_drivin)
+endif()
+
+if(EMSCRIPTEN)
+    target_compile_options(${GAME_TARGET} PRIVATE "--use-port=contrib.lua")
 endif()
 
 # ============================================================

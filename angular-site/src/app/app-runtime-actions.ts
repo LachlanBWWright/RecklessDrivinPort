@@ -45,8 +45,8 @@ export function createRuntimeActions(app: App): {
   onResourceFileSelected(event: Event): Promise<void>;
   onResourceMergeSelected(file: File, options: ResourceMergeOptions): Promise<void>;
   clearEditorResources(): void;
-  downloadEditedResources(): Promise<void>;
-  saveEditedResourcesToGame(): Promise<void>;
+  downloadEditedResources(stripScripts?: boolean): Promise<void>;
+  saveEditedResourcesToGame(stripScripts?: boolean): Promise<void>;
   initPackWorker(): void;
   dispatchWorker<T>(cmd: string, payload?: unknown, transferables?: Transferable[]): Promise<T>;
   setupEmscriptenModule(): void;
@@ -96,8 +96,10 @@ export function createRuntimeActions(app: App): {
     onResourceFileSelected: bindAppAction(app, onResourceFileSelectedHelper),
     onResourceMergeSelected: bindAppAction(app, onResourceMergeSelectedHelper),
     clearEditorResources: bindAppAction(app, clearEditorResourcesHelper),
-    downloadEditedResources: bindAppAction(app, downloadEditedResourcesHelper),
-    saveEditedResourcesToGame: bindAppAction(app, saveEditedResourcesToGameHelper),
+    downloadEditedResources: (stripScripts?: boolean) =>
+      downloadEditedResourcesHelper(app, stripScripts),
+    saveEditedResourcesToGame: (stripScripts?: boolean) =>
+      saveEditedResourcesToGameHelper(app, stripScripts),
     initPackWorker: bindAppAction(app, initPackWorkerHelper),
     dispatchWorker: <T>(cmd: string, payload?: unknown, transferables?: Transferable[]) =>
       dispatchWorkerHelper<T>(app, cmd, payload, transferables),

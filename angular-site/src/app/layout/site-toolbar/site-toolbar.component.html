@@ -25,7 +25,7 @@
           <button mat-stroked-button class="!h-11 !min-h-11 !border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]" (click)="clearEditorFile.emit()" [disabled]="workerBusy">
             <mat-icon>delete</mat-icon> <span>Clear File</span>
           </button>
-          <button mat-raised-button class="!h-11 !min-h-11 !bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="downloadEditedResources.emit()" [disabled]="workerBusy">
+          <button mat-raised-button class="!h-11 !min-h-11 !bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]" (click)="launchDownloadDialog()" [disabled]="workerBusy">
             <mat-icon>download</mat-icon> <span>Download</span>
           </button>
         }
@@ -181,11 +181,47 @@
           This preview uses your current editor resources.dat state. The editor serializes pending
           changes, updates the game runtime resources, and restarts directly into this level.
         </p>
+        <mat-checkbox
+          class="mt-3 block"
+          [checked]="stripScriptsForPreview"
+          (change)="stripScriptsForPreview = $event.checked"
+        >
+          Strip scripting resources for this preview
+        </mat-checkbox>
       </mat-card-content>
       <mat-card-actions align="end">
         <button mat-button (click)="closePreviewDialog()">Cancel</button>
         <button mat-raised-button color="primary" (click)="confirmPreviewDialog()">
           Start Preview
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+}
+
+@if (downloadDialogOpen) {
+  <div class="fixed inset-0 z-[270] flex items-center justify-center bg-black/70 p-4">
+    <mat-card class="w-full max-w-[560px] border border-[var(--border)] bg-[var(--surface)]">
+      <mat-card-header>
+        <mat-card-title class="!text-[1.05rem] !font-bold">Download resources.dat</mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="!pb-2">
+        <p class="text-[0.86rem] leading-[1.55] text-[var(--muted)]">
+          Download the current editor resources.dat. You can omit scripting resources for a file
+          that remains readable by the original game.
+        </p>
+        <mat-checkbox
+          class="mt-3 block"
+          [checked]="stripScriptsForDownload"
+          (change)="stripScriptsForDownload = $event.checked"
+        >
+          Strip scripting resources
+        </mat-checkbox>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <button mat-button (click)="closeDownloadDialog()">Cancel</button>
+        <button mat-raised-button color="primary" (click)="confirmDownloadDialog()">
+          Download
         </button>
       </mat-card-actions>
     </mat-card>

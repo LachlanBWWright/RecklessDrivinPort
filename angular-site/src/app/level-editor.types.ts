@@ -149,6 +149,36 @@ export interface ObjectTypeDefinition {
   weaponInfo: number;
 }
 
+export type ScriptHookId =
+  | 'onSpawn'
+  | 'onTick'
+  | 'onCollision'
+  | 'onDamage'
+  | 'onDeath'
+  | 'onAnimationEnd'
+  | 'onOffscreen';
+
+export interface ScriptDefinition {
+  id: number;
+  version: number;
+  name: string;
+  source: string;
+}
+
+export interface ScriptBinding {
+  objectTypeId: number;
+  scriptId: number;
+  flags: number;
+}
+
+export interface ScriptValidationIssue {
+  severity: 'error' | 'warning';
+  scriptId: number;
+  hook: ScriptHookId | null;
+  line: number | null;
+  message: string;
+}
+
 export interface DecodedSpriteFrame {
   frameId: number;
   width: number;

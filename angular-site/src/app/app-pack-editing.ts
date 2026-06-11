@@ -2,10 +2,14 @@ import type {
   ObjectGroupDefinition,
   ObjectGroupEntryData,
   ObjectTypeDefinition,
+  ScriptBinding,
+  ScriptDefinition,
+  ScriptValidationIssue,
 } from './level-editor.service';
 import type { App } from './app';
 import { decodeSpritePreviewsInBackground } from './app-loaders';
 import { resultFromPromise } from './result-helpers';
+import { SCRIPT_FORMAT_VERSION, validateScripts } from './script-format';
 
 export function cloneObjectGroupDefinitions(
   app: App,
@@ -204,6 +208,7 @@ export function scheduleObjectTypesAutoSave(app: App): void {
 export function markObjectTypesDirty(app: App, defs: ObjectTypeDefinition[]): void {
   app.objectTypeDefinitions.set(defs);
   syncObjectTypeLookup(app, defs);
+  revalidateScripts(app);
   app.objectTypesDirty.set(true);
   app.objectTypesEditRevision += 1;
   scheduleObjectTypesAutoSave(app);
@@ -313,28 +318,137 @@ export function onObjectTypeFrameChange(app: App, typeRes: number, frame: number
   markObjectTypesDirty(app, defs);
 }
 
+function scriptDefinitions(app: App): ScriptDefinition[] {
+  return app.scriptDefinitions() ?? [];
+}
+
+function scriptBindings(app: App): ScriptBinding[] {
+  return app.scriptBindings() ?? [];
+}
+
+function nextScriptId(app: App, scripts = scriptDefinitions(app)): number {
+  const used = new Set(scripts.map((script) => script.id));
+  let candidate = 128;
+  while (used.has(candidate)) candidate += 1;
+  return candidate;
+}
+
+function revalidateScripts(app: App, scripts = scriptDefinitions(app), bindings = scriptBindings(app)): void {
+  app.scriptValidationIssues.set(
+    validateScripts(scripts, bindings, {
+      availableObjectTypeIds: app.objectTypeDefinitions().map((definition) => definition.typeRes),
+      availableSoundIds: app.audioEntries().map((entry) => entry.id),
+    }),
+  );
+}
+
+function markScriptsDirty(app: App, scripts: ScriptDefinition[], bindings: ScriptBinding[]): void {
+  app.scriptDefinitions.set(scripts);
+  app.scriptBindings.set(bindings);
+  revalidateScripts(app, scripts, bindings);
+  app.objectTypesDirty.set(true);
+  app.objectTypesEditRevision += 1;
+  scheduleObjectTypesAutoSave(app);
+}
+
+export function scriptBindingForObjectType(app: App, typeRes: number): ScriptBinding | null {
+  return scriptBindings(app).find((binding) => binding.objectTypeId === typeRes) ?? null;
+}
+
+export function setObjectTypeScriptBinding(app: App, typeRes: number, scriptId: number | null): void {
+  const bindings = scriptBindings(app).filter((binding) => binding.objectTypeId !== typeRes);
+  if (scriptId !== null) {
+    bindings.push({ objectTypeId: typeRes, scriptId, flags: 0 });
+  }
+  markScriptsDirty(app, [...scriptDefinitions(app)], bindings);
+}
+
+export function createScriptForObjectType(app: App, typeRes: number): void {
+  const scriptId = nextScriptId(app);
+  const script: ScriptDefinition = {
+    id: scriptId,
+    version: SCRIPT_FORMAT_VERSION,
+    name: `Script ${scriptId}`,
+    source: [
+      'function onTick(self, ctx)',
+      '  if ctx:playerDistance() <= 160 then',
+      '    self:setInput(1.0, 0.65)',
+      '  end',
+      'end',
+      '',
+      'function onDeath(self, ctx)',
+      '  log("script death", self:typeId())',
+      '  ctx:playSound(129)',
+      'end',
+    ].join('\n'),
+  };
+  const scripts = [...scriptDefinitions(app), script].sort((a, b) => a.id - b.id);
+  const bindings = scriptBindings(app).filter((binding) => binding.objectTypeId !== typeRes);
+  bindings.push({ objectTypeId: typeRes, scriptId, flags: 0 });
+  markScriptsDirty(app, scripts, bindings);
+}
+
+export function updateScriptName(app: App, scriptId: number, name: string): void {
+  const scripts = scriptDefinitions(app)
+    .map((script) => (script.id === scriptId ? { ...script, name } : script))
+    .sort((a, b) => a.id - b.id);
+  markScriptsDirty(app, scripts, [...scriptBindings(app)]);
+}
+
+export function updateScriptSource(app: App, scriptId: number, source: string): void {
+  const scripts = scriptDefinitions(app)
+    .map((definition) =>
+      definition.id === scriptId ? { ...definition, source } : definition,
+    )
+    .sort((a, b) => a.id - b.id);
+  markScriptsDirty(app, scripts, [...scriptBindings(app)]);
+}
+
+export function updateScript(app: App, scriptId: number, name: string, source: string): void {
+  const scripts = scriptDefinitions(app)
+    .map((definition) =>
+      definition.id === scriptId ? { ...definition, name, source } : definition,
+    )
+    .sort((a, b) => a.id - b.id);
+  markScriptsDirty(app, scripts, [...scriptBindings(app)]);
+}
+
 export async function saveObjectTypes(app: App): Promise<void> {
   if (app.workerBusy()) {
     app.scheduleObjectTypesAutoSave();
     return;
   }
   const objectTypes = app.objectTypeDefinitions();
+  const scripts = scriptDefinitions(app);
+  const bindings = scriptBindings(app);
   const saveRevision = app.objectTypesEditRevision;
   app.workerBusy.set(true);
-  const result = await resultFromPromise(
+  const typeResult = await resultFromPromise(
     app.runtime.dispatchWorker<{ objectTypesArr: [number, ObjectTypeDefinition][] }>(
       'APPLY_OBJECT_TYPES',
       { objectTypes },
     ),
     'Object type save failed',
   );
+  const scriptResult = await resultFromPromise(
+    app.runtime.dispatchWorker<{
+      scripts: ScriptDefinition[];
+      scriptBindings: ScriptBinding[];
+      scriptIssues: ScriptValidationIssue[];
+    }>('APPLY_SCRIPTS', { scripts, bindings }),
+    'Script save failed',
+  );
+  const result = typeResult.andThen((typeData) => scriptResult.map((scriptData) => ({ typeData, scriptData })));
   result.match(
     (data) => {
-      const defs: ObjectTypeDefinition[] = data.objectTypesArr
+      const defs: ObjectTypeDefinition[] = data.typeData.objectTypesArr
         .map(([, def]: [number, ObjectTypeDefinition]) => def)
         .filter((def: ObjectTypeDefinition | null): def is ObjectTypeDefinition => !!def);
       app.objectTypeDefinitions.set(defs);
       syncObjectTypeLookup(app, defs);
+      app.scriptDefinitions.set(data.scriptData.scripts);
+      app.scriptBindings.set(data.scriptData.scriptBindings);
+      app.scriptValidationIssues.set(data.scriptData.scriptIssues);
       if (!defs.some((def) => def.typeRes === app.selectedObjectTypeId())) {
         app.selectedObjectTypeId.set(defs[0]?.typeRes ?? null);
       }
@@ -344,8 +458,8 @@ export async function saveObjectTypes(app: App): Promise<void> {
         app.objectTypesDirty.set(true);
         app.scheduleObjectTypesAutoSave();
       }
-      void decodeSpritePreviewsInBackground(app, data.objectTypesArr);
-      app.resourcesStatus.set(`Saved ${defs.length} object type(s).`);
+      void decodeSpritePreviewsInBackground(app, data.typeData.objectTypesArr);
+      app.resourcesStatus.set(`Saved ${defs.length} object type(s) and ${data.scriptData.scripts.length} script(s).`);
       app.snackBar.open(`✓ Object types saved`, 'OK', {
         duration: 3000,
         panelClass: [

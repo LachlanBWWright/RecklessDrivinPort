@@ -4,6 +4,9 @@ import type {
   ObjectTypeDefinition,
   RoadInfoData,
   ParsedLevel,
+  ScriptBinding,
+  ScriptDefinition,
+  ScriptValidationIssue,
 } from './level-editor.service';
 import { buildRoadInfoPreviewCanvas, getCanvasDataUrl, getTileDimensions } from './app-helpers';
 import { DEFAULT_ROAD_THEME, ROAD_THEMES } from './object-canvas';
@@ -35,6 +38,9 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
     objectTypesArr: [number, ObjectTypeDefinition][];
     roadInfoArr: [number, RoadInfoData][];
     objectGroups: ObjectGroupDefinition[];
+    scripts: ScriptDefinition[];
+    scriptBindings: ScriptBinding[];
+    scriptIssues: ScriptValidationIssue[];
   };
   const loadResult = await dispatchWorkerResult<LoadResult>(
     app,
@@ -67,6 +73,9 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
     app.objectTypesSaveTimer = null;
   }
   app.objectTypesEditRevision = 0;
+  app.scriptDefinitions.set(result.scripts);
+  app.scriptBindings.set(result.scriptBindings);
+  app.scriptValidationIssues.set(result.scriptIssues);
 
   app.objectSpritePreviews.clear();
   app._spritePreviewDataUrls.clear();

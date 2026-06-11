@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   EventEmitter,
+  inject,
   Input,
   OnChanges,
   Output,
@@ -9,7 +10,17 @@ import {
 } from '@angular/core';
 import { FormArray, FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import type { ObjectTypeDefinition } from '../../../level-editor.service';
+import { MatDialog } from '@angular/material/dialog';
+import type {
+  ObjectTypeDefinition,
+  ScriptBinding,
+  ScriptDefinition,
+  ScriptValidationIssue,
+} from '../../../level-editor.service';
+import {
+  LuaScriptEditorDialogComponent,
+  type LuaScriptEditorDialogResult,
+} from '../../lua-script-editor-dialog.component';
 
 interface SpriteFrameInfo {
   id: number;
@@ -59,6 +70,9 @@ type ReferenceField = 'deathObj' | 'creationSound' | 'otherSound' | 'weaponObj';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorObjectTypesSectionComponent implements OnChanges {
+  private readonly dialog = inject(MatDialog);
+  private pendingScriptEditorTypeRes: number | null = null;
+
   @Input() objectTypes: ObjectTypeDefinition[] = [];
   @Input() selectedObjectTypeId: number | null = null;
   @Input() spriteFrames: SpriteFrameInfo[] = [];
@@ -66,6 +80,9 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
   @Input() getSpriteUrl: (frameId: number) => string | null = () => null;
   @Input() typesDirty = false;
   @Input() workerBusy = false;
+  @Input() scripts: ScriptDefinition[] | undefined = [];
+  @Input() scriptBindings: ScriptBinding[] | undefined = [];
+  @Input() scriptIssues: ScriptValidationIssue[] | undefined = [];
 
   @Output() selectedObjectTypeIdChange = new EventEmitter<number>();
   @Output() addType = new EventEmitter<void>();
@@ -87,6 +104,11 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     checked: boolean;
   }>();
   @Output() frameChange = new EventEmitter<{ typeRes: number; frame: number }>();
+  @Output() scriptBindingChange = new EventEmitter<{ typeRes: number; scriptId: number | null }>();
+  @Output() createScript = new EventEmitter<number>();
+  @Output() scriptNameChange = new EventEmitter<{ scriptId: number; name: string }>();
+  @Output() scriptSourceChange = new EventEmitter<{ scriptId: number; source: string }>();
+  @Output() scriptSave = new EventEmitter<{ scriptId: number; name: string; source: string }>();
   @Output() saveObjectTypes = new EventEmitter<void>();
 
   /**
@@ -296,6 +318,30 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     return this.objectTypes.find((type) => type.typeRes === this.selectedObjectTypeId) ?? null;
   }
 
+  get scriptList(): ScriptDefinition[] {
+    return this.scripts ?? [];
+  }
+
+  private get scriptBindingList(): ScriptBinding[] {
+    return this.scriptBindings ?? [];
+  }
+
+  private get scriptIssueList(): ScriptValidationIssue[] {
+    return this.scriptIssues ?? [];
+  }
+
+  get selectedScriptBinding(): ScriptBinding | null {
+    const type = this.selectedType;
+    if (!type) return null;
+    return this.scriptBindingList.find((binding) => binding.objectTypeId === type.typeRes) ?? null;
+  }
+
+  get selectedScript(): ScriptDefinition | null {
+    const binding = this.selectedScriptBinding;
+    if (!binding) return null;
+    return this.scriptList.find((script) => script.id === binding.scriptId) ?? null;
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['selectedObjectTypeId'] && this.selectedObjectTypeId !== null) {
       const type = this.selectedType;
@@ -318,6 +364,17 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
         this.typeForm.enable({ emitEvent: false });
         this.flagForms.flags.enable({ emitEvent: false });
         this.flagForms.flags2.enable({ emitEvent: false });
+      }
+    }
+    if (
+      this.pendingScriptEditorTypeRes !== null &&
+      (changes['scripts'] || changes['scriptBindings'])
+    ) {
+      const pendingTypeRes = this.pendingScriptEditorTypeRes;
+      const hasBinding = this.scriptBindingList.some((binding) => binding.objectTypeId === pendingTypeRes);
+      if (hasBinding && this.selectedObjectTypeId === pendingTypeRes) {
+        this.pendingScriptEditorTypeRes = null;
+        queueMicrotask(() => this.openSelectedScriptEditor());
       }
     }
   }
@@ -409,6 +466,80 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
     const duration =
       sound.durationMs !== undefined ? ` · ${(sound.durationMs / 1000).toFixed(1)}s` : '';
     return `Sound #${sound.id}${duration}`;
+  }
+
+  getScriptLabel(scriptId: number): string {
+    const script = this.scriptList.find((entry) => entry.id === scriptId);
+    return script ? `#${script.id} · ${script.name || 'Unnamed script'}` : `#${scriptId}`;
+  }
+
+  getIssuesForSelectedScript(): ScriptValidationIssue[] {
+    const script = this.selectedScript;
+    if (!script) return [];
+    return this.scriptIssueList.filter((issue) => issue.scriptId === script.id);
+  }
+
+  getSelectedScriptValidationLabel(): string {
+    const issues = this.getIssuesForSelectedScript();
+    if (issues.some((issue) => issue.severity === 'error')) return 'Errors';
+    if (issues.length > 0) return 'Warnings';
+    return 'OK';
+  }
+
+  getSelectedScriptHookLabels(): string[] {
+    const script = this.selectedScript;
+    if (!script) return [];
+    const hooks = ['onSpawn', 'onTick', 'onCollision', 'onDamage', 'onDeath', 'onAnimationEnd', 'onOffscreen'];
+    return hooks.filter((hook) => new RegExp(`\\bfunction\\s+${hook}\\s*\\(`).test(script.source));
+  }
+
+  openSelectedScriptEditor(): void {
+    const script = this.selectedScript;
+    const type = this.selectedType;
+    if (!script || !type) return;
+    const dialogRef = this.dialog.open<
+      LuaScriptEditorDialogComponent,
+      {
+        script: ScriptDefinition;
+        objectTypeId: number;
+        objectTypes: readonly ObjectTypeDefinition[];
+        spriteFrames: readonly SpriteFrameInfo[];
+        audioEntries: readonly AudioEntryInfo[];
+        issues: readonly ScriptValidationIssue[];
+      },
+      LuaScriptEditorDialogResult
+    >(LuaScriptEditorDialogComponent, {
+      width: 'min(1680px, calc(100vw - 16px))',
+      height: 'min(980px, calc(100vh - 16px))',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      disableClose: true,
+      data: {
+        script,
+        objectTypeId: type.typeRes,
+        objectTypes: this.objectTypes,
+        spriteFrames: this.spriteFrames,
+        audioEntries: this.audioEntries,
+        issues: this.getIssuesForSelectedScript(),
+      },
+    });
+    dialogRef.afterClosed().subscribe((result) => {
+      if (!result) return;
+      this.scriptSave.emit(result);
+    });
+  }
+
+  createAndOpenScriptEditor(typeRes: number): void {
+    this.pendingScriptEditorTypeRes = typeRes;
+    this.createScript.emit(typeRes);
+  }
+
+  getEventString(event: Event): string {
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      return target.value;
+    }
+    return '';
   }
 
   hasFlag(flags: number, bit: number): boolean {

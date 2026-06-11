@@ -42,6 +42,9 @@ describe('App', () => {
     const frameWindow = frame.contentWindow;
     let pauseCount = 0;
     let resumeCount = 0;
+    let suspendCount = 0;
+    let audioResumeCount = 0;
+    const volumeValues: number[] = [];
 
     if (!frameWindow) {
       throw new Error('Expected iframe contentWindow in test environment');
@@ -54,15 +57,34 @@ describe('App', () => {
       resumeMainLoop: () => {
         resumeCount += 1;
       },
+      _set_wasm_master_volume: (value: number) => {
+        volumeValues.push(value);
+      },
+      SDL2: {
+        audioContext: {
+          suspend: () => {
+            suspendCount += 1;
+            return Promise.resolve();
+          },
+          resume: () => {
+            audioResumeCount += 1;
+            return Promise.resolve();
+          },
+        },
+      },
     } as unknown as NonNullable<typeof frameWindow.Module>;
 
     try {
       app.runtime.setTab('editor');
       expect(pauseCount).toBe(1);
       expect(resumeCount).toBe(0);
+      expect(suspendCount).toBe(1);
+      expect(volumeValues).toContain(0);
 
       app.runtime.setTab('game');
       expect(resumeCount).toBe(1);
+      expect(audioResumeCount).toBe(1);
+      expect(volumeValues).toContain(app.masterVolume() / 100);
     } finally {
       frame.remove();
     }
@@ -190,12 +212,15 @@ describe('App', () => {
     ]);
     app.objectTypesDirty.set(true);
 
-    const dispatchCalls: string[] = [];
+    const dispatchCalls: { cmd: string; payload: unknown }[] = [];
     const originalDispatchWorker = app.runtime.dispatchWorker;
-    app.runtime.dispatchWorker = ((cmd: string) => {
-      dispatchCalls.push(cmd);
+    app.runtime.dispatchWorker = ((cmd: string, payload?: unknown) => {
+      dispatchCalls.push({ cmd, payload });
       if (cmd === 'APPLY_OBJECT_TYPES') {
         return Promise.resolve({ objectTypesArr: [[200, app.objectTypeDefinitions()[0]]] });
+      }
+      if (cmd === 'APPLY_SCRIPTS') {
+        return Promise.resolve({ scripts: [], scriptBindings: [], scriptIssues: [] });
       }
       if (cmd === 'SERIALIZE') {
         return Promise.resolve(new ArrayBuffer(8));
@@ -209,7 +234,7 @@ describe('App', () => {
     Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, configurable: true });
 
     try {
-      await app.runtime.downloadEditedResources();
+      await app.runtime.downloadEditedResources(true);
     } finally {
       app.runtime.dispatchWorker = originalDispatchWorker;
       Object.defineProperty(URL, 'createObjectURL', {
@@ -222,8 +247,37 @@ describe('App', () => {
       });
     }
 
-    expect(dispatchCalls).toContain('APPLY_OBJECT_TYPES');
-    expect(dispatchCalls).toContain('SERIALIZE');
+    expect(dispatchCalls.map((call) => call.cmd)).toContain('APPLY_OBJECT_TYPES');
+    expect(dispatchCalls.map((call) => call.cmd)).toContain('APPLY_SCRIPTS');
+    expect(dispatchCalls).toContainEqual({ cmd: 'SERIALIZE', payload: { stripScripts: true } });
+  });
+
+  it('should clear script editor state when editor resources are reset', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.scriptDefinitions.set([
+      {
+        id: 128,
+        version: 1,
+        name: 'Ambush',
+        source: 'function onTick(self, ctx)\nend\n',
+      },
+    ]);
+    app.scriptBindings.set([{ objectTypeId: 200, scriptId: 128, flags: 0 }]);
+    app.scriptValidationIssues.set([
+      {
+        severity: 'warning',
+        scriptId: 128,
+        hook: null,
+        line: null,
+        message: 'stale issue',
+      },
+    ]);
+
+    app.runtime.clearEditorResources();
+
+    expect(app.scriptDefinitions()).toEqual([]);
+    expect(app.scriptBindings()).toEqual([]);
+    expect(app.scriptValidationIssues()).toEqual([]);
   });
 
   it('should undo and redo a dragged object', () => {

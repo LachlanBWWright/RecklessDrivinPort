@@ -52,6 +52,7 @@ import { SpriteEditorComponent } from './editor/sprite-editor.component';
 import { MarkingPopupComponent } from './editor/canvas-toolbar/marking-popup.component';
 import { CanvasInfoPopupComponent } from './editor/canvas-toolbar/canvas-info-popup.component';
 import { ImagePreviewComponent } from './editor/image-preview/image-preview.component';
+import { LuaScriptEditorDialogComponent } from './editor/lua-script-editor-dialog.component';
 
 const MATERIAL_MODULES = [
   MatButtonModule,
@@ -106,6 +107,7 @@ const MATERIAL_MODULES = [
     MarkingPopupComponent,
     CanvasInfoPopupComponent,
     ImagePreviewComponent,
+    LuaScriptEditorDialogComponent,
   ],
   imports: [
     BrowserModule,
