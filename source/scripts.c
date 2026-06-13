@@ -10,6 +10,8 @@
 #include "gamesounds.h"
 #include "packs.h"
 #include "roads.h"
+#include "screen.h"
+#include "trig.h"
 #include "vec2d.h"
 
 #ifdef HAVE_LUA_SCRIPTING
@@ -574,6 +576,131 @@ static int LuaCtxPlayerDamage(lua_State *L)
 	return 1;
 }
 
+static float ClampLevelY(float y)
+{
+	if(!gLevelData)
+		return y;
+	if(y < 0)
+		return 0;
+	if(y > gLevelData->levelEnd)
+		return gLevelData->levelEnd;
+	return y;
+}
+
+static tTrackInfo *TrackForName(const char *trackName, int *control)
+{
+	if(strcmp(trackName, "down") == 0 || strcmp(trackName, "Down") == 0)
+	{
+		if(control)
+			*control = kObjectDriveDown;
+		return gTrackDown;
+	}
+	if(control)
+		*control = kObjectDriveUp;
+	return gTrackUp;
+}
+
+static int TrackSegmentForScriptY(tTrackInfo *track, float y, int driveUp)
+{
+	int target;
+	if(!track || track->num < 2)
+		return -1;
+	for(target = 1;
+		(target < (int)track->num) &&
+		(driveUp ? (track->track[target].y < y) : (track->track[target].y > y));
+		target++);
+	if(target >= (int)track->num)
+		target = (int)track->num - 1;
+	return target;
+}
+
+static int TrackPointAtY(tTrackInfo *track, float y, int driveUp, float lateralOffset, t2DPoint *pos, float *dir, int *targetOut)
+{
+	int target = TrackSegmentForScriptY(track, y, driveUp);
+	if(target < 1)
+		return false;
+	float x1 = track->track[target - 1].x;
+	float y1 = track->track[target - 1].y;
+	float x2 = track->track[target].x;
+	float y2 = track->track[target].y;
+	float dy = y2 - y1;
+	if(dy == 0)
+		return false;
+	float x = x1 + (x2 - x1) / dy * (y - y1);
+	float dx = x2 - x1;
+	float len = sqrt(dx * dx + dy * dy);
+	float nx = 1;
+	if(len > 0)
+		nx = dy / len;
+	pos->x = x + nx * lateralOffset;
+	pos->y = y;
+	if(dir)
+	{
+		t2DPoint targetPos = P2D(x2, y2);
+		if(pos->y - targetPos.y)
+			*dir = atan((pos->x - targetPos.x) / (pos->y - targetPos.y));
+		else
+			*dir = 0;
+		if(!driveUp)
+			*dir += PI;
+	}
+	if(targetOut)
+		*targetOut = target;
+	return true;
+}
+
+static tRoad ScriptRoadForY(float y)
+{
+	int index = (int)(y / 2);
+	int maxIndex;
+	if(!gRoadLenght || !*gRoadLenght)
+		return nil;
+	maxIndex = (int)*gRoadLenght - 1;
+	if(index < 0)
+		index = 0;
+	if(index > maxIndex)
+		index = maxIndex;
+	return gRoadData + index;
+}
+
+static int LuaCtxTeleportPlayer(lua_State *L)
+{
+	if(!gPlayerObj)
+		return 0;
+	float x = (float)luaL_checknumber(L, 2);
+	float y = ClampLevelY((float)luaL_checknumber(L, 3));
+	float dir = (float)luaL_optnumber(L, 4, gPlayerObj->dir);
+	gPlayerObj->pos = P2D(x, y);
+	gPlayerObj->dir = dir;
+	gPlayerObj->velo = P2D(0, 0);
+	if(gTrackUp && gTrackUp->num)
+	{
+		gPlayerObj->target = 1;
+		while((gPlayerObj->target < (int)gTrackUp->num) && (gTrackUp->track[gPlayerObj->target].y < gPlayerObj->pos.y))
+			gPlayerObj->target++;
+	}
+	gCameraObj = gPlayerObj;
+	gScreenBlitSpecial = true;
+	return 0;
+}
+
+static int LuaCtxTeleportPlayerRelative(lua_State *L)
+{
+	if(!gPlayerObj)
+		return 0;
+	float dx = (float)luaL_checknumber(L, 2);
+	float dy = (float)luaL_checknumber(L, 3);
+	float dirOffset = (float)luaL_optnumber(L, 4, 0);
+	float x = gPlayerObj->pos.x + dx;
+	float y = ClampLevelY(gPlayerObj->pos.y + dy);
+	gPlayerObj->pos = P2D(x, y);
+	gPlayerObj->dir += dirOffset;
+	gPlayerObj->velo = P2D(0, 0);
+	gCameraObj = gPlayerObj;
+	gScreenBlitSpecial = true;
+	return 0;
+}
+
 static int LuaCtxObjectTypeExists(lua_State *L)
 {
 	SInt16 typeId = (SInt16)luaL_checkinteger(L, 2);
@@ -665,6 +792,74 @@ static int LuaCtxSpawnObjectType(lua_State *L)
 	return PushSpawnResult(L, SpawnScriptObject(typeId, P2D(x, y), dir, speed));
 }
 
+static int LuaCtxSpawnNearPlayer(lua_State *L)
+{
+	if(!gPlayerObj)
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+	SInt16 typeId = (SInt16)luaL_checkinteger(L, 2);
+	float dx = (float)luaL_optnumber(L, 3, 0);
+	float dy = (float)luaL_optnumber(L, 4, 0);
+	float dirOffset = (float)luaL_optnumber(L, 5, 0);
+	float speed = (float)luaL_optnumber(L, 6, 0);
+	float sinDir = sin(gPlayerObj->dir);
+	float cosDir = cos(gPlayerObj->dir);
+	float x = gPlayerObj->pos.x + cosDir * dx + sinDir * dy;
+	float y = gPlayerObj->pos.y - sinDir * dx + cosDir * dy;
+	return PushSpawnResult(L, SpawnScriptObject(typeId, P2D(x, y), gPlayerObj->dir + dirOffset, speed));
+}
+
+static int LuaCtxSpawnOnTrack(lua_State *L)
+{
+	SInt16 typeId = (SInt16)luaL_checkinteger(L, 2);
+	const char *trackName = luaL_optstring(L, 3, "up");
+	float y = ClampLevelY((float)luaL_optnumber(L, 4, gPlayerObj ? gPlayerObj->pos.y : 500));
+	float lateralOffset = (float)luaL_optnumber(L, 5, 0);
+	float speed = (float)luaL_optnumber(L, 6, 0);
+	int control;
+	tTrackInfo *track = TrackForName(trackName, &control);
+	t2DPoint pos;
+	float dir;
+	int target;
+	if(!TrackPointAtY(track, y, control == kObjectDriveUp, lateralOffset, &pos, &dir, &target))
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+	tObject *spawned = SpawnScriptObject(typeId, pos, dir, speed);
+	if(spawned)
+	{
+		spawned->control = control;
+		spawned->target = target;
+	}
+	return PushSpawnResult(L, spawned);
+}
+
+static int LuaCtxSpawnTrackside(lua_State *L)
+{
+	SInt16 typeId = (SInt16)luaL_checkinteger(L, 2);
+	const char *side = luaL_optstring(L, 3, "left");
+	float y = ClampLevelY((float)luaL_optnumber(L, 4, gPlayerObj ? gPlayerObj->pos.y : 500));
+	float offset = (float)luaL_optnumber(L, 5, 0);
+	int control = (int)luaL_optinteger(L, 6, kObjectNoInput);
+	float speed = (float)luaL_optnumber(L, 7, 0);
+	tRoad road = ScriptRoadForY(y);
+	if(!road)
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+	int useRight = strcmp(side, "right") == 0 || strcmp(side, "Right") == 0 || strcmp(side, "1") == 0;
+	float x = useRight ? (*road)[3] - offset : (*road)[0] + offset;
+	float dir = control == kObjectDriveDown ? PI : 0;
+	tObject *spawned = SpawnScriptObject(typeId, P2D(x, y), dir, speed);
+	if(spawned)
+		spawned->control = control;
+	return PushSpawnResult(L, spawned);
+}
+
 static int LuaCtxSpawnRelative(lua_State *L)
 {
 	if(!gCurrentScriptObject)
@@ -751,6 +946,20 @@ static void RegisterConstants(lua_State *L)
 	SetTableInteger(L, "Turbo", kAddOnTurbo);
 	SetTableInteger(L, "Spikes", kAddOnSpikes);
 	lua_setglobal(L, "Addon");
+
+	lua_newtable(L);
+	lua_pushstring(L, "up");
+	lua_setfield(L, -2, "Up");
+	lua_pushstring(L, "down");
+	lua_setfield(L, -2, "Down");
+	lua_setglobal(L, "Track");
+
+	lua_newtable(L);
+	lua_pushstring(L, "left");
+	lua_setfield(L, -2, "Left");
+	lua_pushstring(L, "right");
+	lua_setfield(L, -2, "Right");
+	lua_setglobal(L, "RoadSide");
 }
 
 static void PushObjectTable(lua_State *L, tObject *theObj, int selfTable)
@@ -813,6 +1022,8 @@ static void PushContextTable(lua_State *L)
 	RegisterMethod(L, "playerY", LuaCtxPlayerY);
 	RegisterMethod(L, "playerSpeed", LuaCtxPlayerSpeed);
 	RegisterMethod(L, "playerDamage", LuaCtxPlayerDamage);
+	RegisterMethod(L, "teleportPlayer", LuaCtxTeleportPlayer);
+	RegisterMethod(L, "teleportPlayerRelative", LuaCtxTeleportPlayerRelative);
 	RegisterMethod(L, "objectTypeExists", LuaCtxObjectTypeExists);
 	RegisterMethod(L, "soundExists", LuaCtxSoundExists);
 	RegisterMethod(L, "frameExists", LuaCtxFrameExists);
@@ -824,6 +1035,10 @@ static void PushContextTable(lua_State *L)
 	RegisterMethod(L, "timerRemaining", LuaCtxTimerRemaining);
 	RegisterMethod(L, "setPlayerNearRadius", LuaCtxSetPlayerNearRadius);
 	RegisterMethod(L, "spawnObjectType", LuaCtxSpawnObjectType);
+	RegisterMethod(L, "spawnAt", LuaCtxSpawnObjectType);
+	RegisterMethod(L, "spawnNearPlayer", LuaCtxSpawnNearPlayer);
+	RegisterMethod(L, "spawnOnTrack", LuaCtxSpawnOnTrack);
+	RegisterMethod(L, "spawnTrackside", LuaCtxSpawnTrackside);
 	RegisterMethod(L, "spawnRelative", LuaCtxSpawnRelative);
 	RegisterMethod(L, "playSound", LuaCtxPlaySound);
 	RegisterMethod(L, "addScore", LuaCtxAddScore);

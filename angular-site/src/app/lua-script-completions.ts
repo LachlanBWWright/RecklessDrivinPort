@@ -47,7 +47,11 @@ function resourceCompletion(resource: LuaResourceOption, detailPrefix: string): 
 function resourceContext(source: string, position: number): 'objectType' | 'sound' | 'spriteFrame' | null {
   const beforeCursor = source.slice(Math.max(0, position - 80), position);
   if (/ctx:spawnObjectType\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
+  if (/ctx:spawnAt\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
   if (/ctx:spawnRelative\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
+  if (/ctx:spawnNearPlayer\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
+  if (/ctx:spawnOnTrack\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
+  if (/ctx:spawnTrackside\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
   if (/ctx:fireWeapon\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
   if (/ctx:objectTypeExists\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
   if (/ctx:findNearestObject\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
@@ -77,6 +81,12 @@ export function completeLuaHostApi(source: string, position: number): LuaComplet
   }
   if (/Addon\.$/.test(beforeCursor)) {
     return { from, options: LUA_CONSTANT_COMPLETIONS.filter((completion) => completion.label.startsWith('Addon.')) };
+  }
+  if (/Track\.$/.test(beforeCursor)) {
+    return { from, options: LUA_CONSTANT_COMPLETIONS.filter((completion) => completion.label.startsWith('Track.')) };
+  }
+  if (/RoadSide\.$/.test(beforeCursor)) {
+    return { from, options: LUA_CONSTANT_COMPLETIONS.filter((completion) => completion.label.startsWith('RoadSide.')) };
   }
   if (/\bfunction\s+$/.test(source.slice(Math.max(0, position - 16), position))) {
     return { from, options: LUA_HOOK_COMPLETIONS };

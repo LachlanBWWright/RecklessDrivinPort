@@ -288,6 +288,20 @@ export const LUA_CTX_COMPLETIONS: readonly LuaApiCompletion[] = [
     apply: 'playerDamage()',
   },
   {
+    label: 'teleportPlayer',
+    type: 'method',
+    detail: 'ctx:teleportPlayer(x, y, direction)',
+    documentation: 'Moves the player to an absolute position and recenters the camera. Direction is optional.',
+    apply: 'teleportPlayer(x, y, direction)',
+  },
+  {
+    label: 'teleportPlayerRelative',
+    type: 'method',
+    detail: 'ctx:teleportPlayerRelative(dx, dy, directionOffset)',
+    documentation: 'Moves the player by an offset. Direction offset is optional.',
+    apply: 'teleportPlayerRelative(dx, dy, directionOffset)',
+  },
+  {
     label: 'objectTypeExists',
     type: 'method',
     detail: 'ctx:objectTypeExists(typeId)',
@@ -328,6 +342,34 @@ export const LUA_CTX_COMPLETIONS: readonly LuaApiCompletion[] = [
     detail: 'ctx:spawnObjectType(typeId, x, y, direction, speed)',
     documentation: 'Spawns an object type at the requested position and returns the spawned object, or nil.',
     apply: 'spawnObjectType(typeId, x, y, direction, speed)',
+  },
+  {
+    label: 'spawnAt',
+    type: 'method',
+    detail: 'ctx:spawnAt(typeId, x, y, direction, speed)',
+    documentation: 'Alias for absolute object spawning. Returns the spawned object, or nil.',
+    apply: 'spawnAt(typeId, x, y, direction, speed)',
+  },
+  {
+    label: 'spawnNearPlayer',
+    type: 'method',
+    detail: 'ctx:spawnNearPlayer(typeId, dx, dy, directionOffset, speed)',
+    documentation: 'Spawns an object relative to the player heading. Works from level scripts.',
+    apply: 'spawnNearPlayer(typeId, dx, dy, directionOffset, speed)',
+  },
+  {
+    label: 'spawnOnTrack',
+    type: 'method',
+    detail: 'ctx:spawnOnTrack(typeId, track, y, lateralOffset, speed)',
+    documentation: 'Spawns an object at an interpolated point on Track.Up or Track.Down and sets its path-following control.',
+    apply: 'spawnOnTrack(typeId, Track.Up, y, lateralOffset, speed)',
+  },
+  {
+    label: 'spawnTrackside',
+    type: 'method',
+    detail: 'ctx:spawnTrackside(typeId, side, y, offset, control, speed)',
+    documentation: 'Spawns an object beside the road edge at a deterministic y/offset. Use RoadSide.Left or RoadSide.Right.',
+    apply: 'spawnTrackside(typeId, RoadSide.Left, y, offset, Control.None, speed)',
   },
   {
     label: 'spawnRelative',
@@ -439,6 +481,10 @@ export const LUA_CONSTANT_COMPLETIONS: readonly LuaApiCompletion[] = [
   { label: 'Addon.Cop', type: 'constant', detail: 'Addon.Cop', documentation: 'Police jammer add-on bit.', apply: 'Addon.Cop' },
   { label: 'Addon.Turbo', type: 'constant', detail: 'Addon.Turbo', documentation: 'Turbo add-on bit.', apply: 'Addon.Turbo' },
   { label: 'Addon.Spikes', type: 'constant', detail: 'Addon.Spikes', documentation: 'Spikes add-on bit.', apply: 'Addon.Spikes' },
+  { label: 'Track.Up', type: 'constant', detail: 'Track.Up', documentation: 'Up-track selector for track spawning.', apply: 'Track.Up' },
+  { label: 'Track.Down', type: 'constant', detail: 'Track.Down', documentation: 'Down-track selector for track spawning.', apply: 'Track.Down' },
+  { label: 'RoadSide.Left', type: 'constant', detail: 'RoadSide.Left', documentation: 'Left road edge selector for trackside spawning.', apply: 'RoadSide.Left' },
+  { label: 'RoadSide.Right', type: 'constant', detail: 'RoadSide.Right', documentation: 'Right road edge selector for trackside spawning.', apply: 'RoadSide.Right' },
 ];
 
 export const LUA_API_GROUPS: readonly LuaApiGroup[] = [

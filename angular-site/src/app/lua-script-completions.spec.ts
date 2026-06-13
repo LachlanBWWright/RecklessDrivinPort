@@ -34,6 +34,14 @@ describe('lua script completions', () => {
     const result = completeLuaHostApi('self:setControl(Control.', 'self:setControl(Control.'.length);
     expect(result?.options.some((completion) => completion.label === 'Control.Cop')).toBe(true);
     expect(result?.options.some((completion) => completion.label === 'Addon.Turbo')).toBe(false);
+
+    const trackResult = completeLuaHostApi('ctx:spawnOnTrack(typeId, Track.', 'ctx:spawnOnTrack(typeId, Track.'.length);
+    expect(trackResult?.options.some((completion) => completion.label === 'Track.Up')).toBe(true);
+    expect(trackResult?.options.some((completion) => completion.label === 'RoadSide.Left')).toBe(false);
+
+    const sideResult = completeLuaHostApi('ctx:spawnTrackside(typeId, RoadSide.', 'ctx:spawnTrackside(typeId, RoadSide.'.length);
+    expect(sideResult?.options.some((completion) => completion.label === 'RoadSide.Right')).toBe(true);
+    expect(sideResult?.options.some((completion) => completion.label === 'Track.Down')).toBe(false);
   });
 
   it('suggests object type ids inside spawnObjectType', () => {
@@ -67,6 +75,19 @@ describe('lua script completions', () => {
     });
     expect(result?.options[0]?.apply).toBe('201');
     expect(result?.options[0]?.detail).toBe('object typeId 201 · Frame #20 · 1 frame');
+  });
+
+  it('suggests object type ids inside deterministic spawn helpers', () => {
+    for (const source of ['ctx:spawnAt(', 'ctx:spawnNearPlayer(', 'ctx:spawnOnTrack(', 'ctx:spawnTrackside(']) {
+      const result = completeLuaResourceReferences({
+        source,
+        position: source.length,
+        objectTypes: [{ id: 202, label: 'Frame #30 · 1 frame', description: 'Object typeId 202.' }],
+        sounds: [{ id: 129, label: '0.3s · 1200 bytes', description: 'Sound soundId 129.' }],
+        spriteFrames: [{ id: 301, label: '32x32 · 16-bit', description: 'Sprite frameId 301.' }],
+      });
+      expect(result?.options[0]?.apply).toBe('202');
+    }
   });
 
 
