@@ -2,6 +2,7 @@ import type {
   ObjectGroupDefinition,
   ObjectGroupEntryData,
   ObjectTypeDefinition,
+  LevelScriptBinding,
   ScriptBinding,
   ScriptDefinition,
   ScriptValidationIssue,
@@ -326,6 +327,10 @@ function scriptBindings(app: App): ScriptBinding[] {
   return app.scriptBindings() ?? [];
 }
 
+function levelScriptBindings(app: App): LevelScriptBinding[] {
+  return app.levelScriptBindings() ?? [];
+}
+
 function nextScriptId(app: App, scripts = scriptDefinitions(app)): number {
   const used = new Set(scripts.map((script) => script.id));
   let candidate = 128;
@@ -342,9 +347,15 @@ function revalidateScripts(app: App, scripts = scriptDefinitions(app), bindings 
   );
 }
 
-function markScriptsDirty(app: App, scripts: ScriptDefinition[], bindings: ScriptBinding[]): void {
+function markScriptsDirty(
+  app: App,
+  scripts: ScriptDefinition[],
+  bindings: ScriptBinding[],
+  levelBindings = levelScriptBindings(app),
+): void {
   app.scriptDefinitions.set(scripts);
   app.scriptBindings.set(bindings);
+  app.levelScriptBindings.set(levelBindings);
   revalidateScripts(app, scripts, bindings);
   app.objectTypesDirty.set(true);
   app.objectTypesEditRevision += 1;
@@ -388,6 +399,40 @@ export function createScriptForObjectType(app: App, typeRes: number): void {
   markScriptsDirty(app, scripts, bindings);
 }
 
+export function levelScriptBindingForLevel(app: App, levelResourceId: number): LevelScriptBinding | null {
+  return levelScriptBindings(app).find((binding) => binding.levelResourceId === levelResourceId) ?? null;
+}
+
+export function setLevelScriptBinding(app: App, levelResourceId: number, scriptId: number | null): void {
+  const bindings = levelScriptBindings(app).filter((binding) => binding.levelResourceId !== levelResourceId);
+  if (scriptId !== null) {
+    bindings.push({ levelResourceId, scriptId, flags: 0 });
+  }
+  markScriptsDirty(app, [...scriptDefinitions(app)], [...scriptBindings(app)], bindings);
+}
+
+export function createScriptForLevel(app: App, levelResourceId: number): void {
+  const scriptId = nextScriptId(app);
+  const script: ScriptDefinition = {
+    id: scriptId,
+    version: SCRIPT_FORMAT_VERSION,
+    name: levelResourceId === 0 ? 'Global Level Script' : `Level ${levelResourceId - 139} Script`,
+    source: [
+      'function onLevelStart(ctx)',
+      '  log("level start", ctx:levelNumber())',
+      'end',
+      '',
+      'function onLevelTick(ctx, dt)',
+      '  -- Runs once per gameplay frame.',
+      'end',
+    ].join('\n'),
+  };
+  const scripts = [...scriptDefinitions(app), script].sort((a, b) => a.id - b.id);
+  const bindings = levelScriptBindings(app).filter((binding) => binding.levelResourceId !== levelResourceId);
+  bindings.push({ levelResourceId, scriptId, flags: 0 });
+  markScriptsDirty(app, scripts, [...scriptBindings(app)], bindings);
+}
+
 export function updateScriptName(app: App, scriptId: number, name: string): void {
   const scripts = scriptDefinitions(app)
     .map((script) => (script.id === scriptId ? { ...script, name } : script))
@@ -421,6 +466,7 @@ export async function saveObjectTypes(app: App): Promise<void> {
   const objectTypes = app.objectTypeDefinitions();
   const scripts = scriptDefinitions(app);
   const bindings = scriptBindings(app);
+  const levelBindings = levelScriptBindings(app);
   const saveRevision = app.objectTypesEditRevision;
   app.workerBusy.set(true);
   const typeResult = await resultFromPromise(
@@ -434,8 +480,9 @@ export async function saveObjectTypes(app: App): Promise<void> {
     app.runtime.dispatchWorker<{
       scripts: ScriptDefinition[];
       scriptBindings: ScriptBinding[];
+      levelScriptBindings: LevelScriptBinding[];
       scriptIssues: ScriptValidationIssue[];
-    }>('APPLY_SCRIPTS', { scripts, bindings }),
+    }>('APPLY_SCRIPTS', { scripts, bindings, levelBindings }),
     'Script save failed',
   );
   const result = typeResult.andThen((typeData) => scriptResult.map((scriptData) => ({ typeData, scriptData })));
@@ -448,6 +495,7 @@ export async function saveObjectTypes(app: App): Promise<void> {
       syncObjectTypeLookup(app, defs);
       app.scriptDefinitions.set(data.scriptData.scripts);
       app.scriptBindings.set(data.scriptData.scriptBindings);
+      app.levelScriptBindings.set(data.scriptData.levelScriptBindings);
       app.scriptValidationIssues.set(data.scriptData.scriptIssues);
       if (!defs.some((def) => def.typeRes === app.selectedObjectTypeId())) {
         app.selectedObjectTypeId.set(defs[0]?.typeRes ?? null);

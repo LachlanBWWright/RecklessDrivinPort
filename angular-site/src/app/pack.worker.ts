@@ -66,6 +66,7 @@ import type {
   RoadSeg,
   ObjectTypeDefinition,
   DecodedRoadTexture,
+  LevelScriptBinding,
   RoadInfoData,
   ObjectGroupDefinition,
   ScriptBinding,
@@ -92,6 +93,7 @@ function extractAll(): {
   objectGroups: ObjectGroupDefinition[];
   scripts: ScriptDefinition[];
   scriptBindings: ScriptBinding[];
+  levelScriptBindings: LevelScriptBinding[];
   scriptIssues: ScriptValidationIssue[];
 } {
   const objectTypesMap = levelEditorSvc.extractObjectTypeDefinitions(resources);
@@ -105,6 +107,7 @@ function extractAll(): {
     objectGroups: extractObjectGroupDefinitions(resources),
     scripts: scripts.scripts,
     scriptBindings: scripts.bindings,
+    levelScriptBindings: scripts.levelBindings,
     scriptIssues: scripts.issues,
   };
 }
@@ -269,17 +272,18 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'APPLY_SCRIPTS': {
-        const { scripts, bindings } = payload as {
+        const { scripts, bindings, levelBindings = [] } = payload as {
           scripts: ScriptDefinition[];
           bindings: ScriptBinding[];
+          levelBindings?: LevelScriptBinding[];
         };
-        resources = applyScriptResources(resources, scripts, bindings);
-        const { scripts: nextScripts, scriptBindings, scriptIssues } = extractAll();
+        resources = applyScriptResources(resources, scripts, bindings, levelBindings);
+        const { scripts: nextScripts, scriptBindings, levelScriptBindings, scriptIssues } = extractAll();
         self.postMessage({
           id,
           ok: true,
           cmd,
-          result: { scripts: nextScripts, scriptBindings, scriptIssues },
+          result: { scripts: nextScripts, scriptBindings, levelScriptBindings, scriptIssues },
         });
         break;
       }

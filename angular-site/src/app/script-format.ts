@@ -1,5 +1,6 @@
 import { err, ok, type Result } from 'neverthrow';
 import type {
+  LevelScriptBinding,
   ScriptBinding,
   ScriptDefinition,
   ScriptHookId,
@@ -9,10 +10,13 @@ import type {
 export const SCRIPT_RESOURCE_TYPE = 'Scrp';
 export const SCRIPT_BINDINGS_RESOURCE_TYPE = 'ScMp';
 export const SCRIPT_BINDINGS_RESOURCE_ID = 128;
+export const LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE = 'ScLv';
+export const LEVEL_SCRIPT_BINDINGS_RESOURCE_ID = 128;
 export const SCRIPT_FORMAT_VERSION = 1;
 
 const SCRIPT_MAGIC = 0x53435250; // SCRP
 const SCRIPT_BINDINGS_MAGIC = 0x53434d50; // SCMP
+const LEVEL_SCRIPT_BINDINGS_MAGIC = 0x53434c56; // SCLV
 const TEXT_ENCODER = new TextEncoder();
 const TEXT_DECODER = new TextDecoder();
 
@@ -24,6 +28,8 @@ const LUA_HOOKS: readonly ScriptHookId[] = [
   'onDeath',
   'onAnimationEnd',
   'onOffscreen',
+  'onLevelStart',
+  'onLevelTick',
 ];
 
 const DISALLOWED_LUA_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
@@ -117,6 +123,51 @@ export function parseScriptBindings(bytes: Uint8Array): Result<ScriptBinding[], 
     bindings.push({
       objectTypeId: view.getInt16(offset, false),
       scriptId: view.getInt16(offset + 2, false),
+      flags: view.getUint16(offset + 4, false),
+    });
+    offset += 8;
+  }
+  return ok(bindings);
+}
+
+export function serializeLevelScriptBindings(bindings: LevelScriptBinding[]): Uint8Array {
+  const size = 8 + bindings.length * 8;
+  const bytes = new Uint8Array(size);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, LEVEL_SCRIPT_BINDINGS_MAGIC, false);
+  view.setUint16(4, SCRIPT_FORMAT_VERSION, false);
+  view.setUint16(6, bindings.length, false);
+  let offset = 8;
+  for (const binding of [...bindings].sort((a, b) => a.levelResourceId - b.levelResourceId)) {
+    view.setUint16(offset, binding.levelResourceId, false);
+    view.setUint16(offset + 2, binding.scriptId, false);
+    view.setUint16(offset + 4, binding.flags, false);
+    view.setUint16(offset + 6, 0, false);
+    offset += 8;
+  }
+  return bytes;
+}
+
+export function parseLevelScriptBindings(bytes: Uint8Array): Result<LevelScriptBinding[], string> {
+  if (bytes.length === 0) return ok([]);
+  if (bytes.length < 8) return err('Level script bindings payload is truncated');
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(0, false) !== LEVEL_SCRIPT_BINDINGS_MAGIC) {
+    return err('Level script bindings payload has invalid magic');
+  }
+  const version = view.getUint16(4, false);
+  if (version !== SCRIPT_FORMAT_VERSION) {
+    return err(`Unsupported level script bindings version ${version}`);
+  }
+  const count = view.getUint16(6, false);
+  const expectedLength = 8 + count * 8;
+  if (expectedLength > bytes.length) return err('Level script bindings payload is truncated');
+  const bindings: LevelScriptBinding[] = [];
+  let offset = 8;
+  for (let index = 0; index < count; index += 1) {
+    bindings.push({
+      levelResourceId: view.getUint16(offset, false),
+      scriptId: view.getUint16(offset + 2, false),
       flags: view.getUint16(offset + 4, false),
     });
     offset += 8;

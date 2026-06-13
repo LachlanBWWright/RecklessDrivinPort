@@ -288,9 +288,29 @@ void InsertObjectGroup(tObjectGroupReference groupRef)
 	}
 }
 
+static int gNextScriptObjectId = 1;
+
+int ObjectIsLive(tObject *theObj)
+{
+	if(!theObj || !gFirstObj)
+		return false;
+	tObject *scanObj = gFirstObj;
+	do
+	{
+		if(scanObj == theObj)
+			return true;
+		scanObj = (tObject*)scanObj->next;
+	}
+	while(scanObj && scanObj != gFirstObj);
+	return false;
+}
+
 tObject *NewObject(tObject *prev,SInt16 typeRes)
 {
 	tObject *theObj=(tObject*)NewPtrClear(sizeof(tObject));
+	theObj->scriptObjectId = gNextScriptObjectId++;
+	if(gNextScriptObjectId <= 0)
+		gNextScriptObjectId = 1;
 	theObj->next=prev->next;
 	theObj->prev=prev;
 	((tObject*)(prev->next))->prev=theObj;
@@ -321,6 +341,8 @@ tObject *NewObject(tObject *prev,SInt16 typeRes)
 
 void RemoveObject(tObject *theObj)
 {
+	if(!ObjectIsLive(theObj))
+		return;
 	if(theObj==gPlayerObj)
 	{
 		theObj->frame=0;
@@ -334,6 +356,7 @@ void RemoveObject(tObject *theObj)
 			gLastVisObj=(tObject*)gLastVisObj->next;
 		((tObject*)theObj->prev)->next=theObj->next;
 		((tObject*)theObj->next)->prev=theObj->prev;
+		theObj->scriptObjectId = 0;
 		DisposePtr((Ptr)theObj);
 	}
 }
@@ -635,6 +658,8 @@ void MoveObjects()
 				LOG_DEBUG("LOG: MO-MO\n"); fflush(stdout);
 				MoveObject(theObj);
 				Script_OnTick(theObj,kFrameDuration);
+				if(Script_DrainDeferredRemoval(theObj))
+					{theObj=next;continue;}
 				LOG_DEBUG("LOG: MO-AO\n"); fflush(stdout);
 				AnimateObject(theObj);
 			}
@@ -642,6 +667,8 @@ void MoveObjects()
 			LOG_DEBUG("LOG: MO-MO2\n"); fflush(stdout);
 			MoveObject(theObj);
 			Script_OnTick(theObj,kLowFrameDuration);
+			if(Script_DrainDeferredRemoval(theObj))
+				{theObj=next;continue;}
 			LOG_DEBUG("LOG: MO-AO2\n"); fflush(stdout);
 			AnimateObject(theObj);
 		}

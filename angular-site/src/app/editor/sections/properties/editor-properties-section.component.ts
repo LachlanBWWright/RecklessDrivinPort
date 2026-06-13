@@ -1,11 +1,28 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
 import type {
   ObjectGroupDefinition,
+  ObjectTypeDefinition,
   ParsedLevel,
+  LevelScriptBinding,
   ObjectGroupRef,
   RoadInfoData,
   RoadInfoOption,
+  ScriptDefinition,
 } from '../../../level-editor.service';
+import type { LuaScriptEditorDialogResult } from '../../lua-script-editor-dialog.component';
+
+interface SpriteFrameInfo {
+  id: number;
+  bitDepth: 8 | 16;
+  width: number;
+  height: number;
+}
+
+interface AudioEntryInfo {
+  id: number;
+  sizeBytes: number;
+  durationMs?: number;
+}
 
 @Component({
   selector: 'app-editor-properties-section',
@@ -27,6 +44,11 @@ export class EditorPropertiesSectionComponent {
   @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
   @Input() propertiesDirty = false;
   @Input() workerBusy = false;
+  @Input() scripts: ScriptDefinition[] | undefined = [];
+  @Input() levelScriptBindings: LevelScriptBinding[] | undefined = [];
+  @Input() objectTypes: ObjectTypeDefinition[] = [];
+  @Input() spriteFrames: SpriteFrameInfo[] = [];
+  @Input() audioEntries: AudioEntryInfo[] = [];
 
   @Output() roadInfoChange = new EventEmitter<number>();
   @Output() roadInfoInput = new EventEmitter<{
@@ -38,4 +60,10 @@ export class EditorPropertiesSectionComponent {
     field: 'resID' | 'numObjs';
     value: number;
   }>();
+  @Output() levelScriptBindingChange = new EventEmitter<{
+    levelResourceId: number;
+    scriptId: number | null;
+  }>();
+  @Output() createLevelScript = new EventEmitter<number>();
+  @Output() scriptSave = new EventEmitter<LuaScriptEditorDialogResult>();
 }

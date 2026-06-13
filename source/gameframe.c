@@ -9,6 +9,7 @@
 #include "gameinitexit.h"
 #include "packs.h"
 #include "random.h"
+#include "scripts.h"
 #ifdef PORT_SDL2
 #include <SDL2/SDL.h>
 #endif
@@ -315,6 +316,7 @@ void GameFrame()
 #endif
 	LOG_DEBUG("LOG: GF-A MoveObjects\n"); fflush(stdout);
 	MoveObjects();
+	Script_OnLevelTick(kFrameDuration);
 	LOG_DEBUG("LOG: GF-B PlayerHandling\n"); fflush(stdout);
 	PlayerHandling();
 	gFrameCount++;
@@ -328,5 +330,4 @@ void GameFrame()
 	if(gEndGame)
 		EndGame();
 }
-
 

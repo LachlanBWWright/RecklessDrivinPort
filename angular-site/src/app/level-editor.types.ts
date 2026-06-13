@@ -156,7 +156,9 @@ export type ScriptHookId =
   | 'onDamage'
   | 'onDeath'
   | 'onAnimationEnd'
-  | 'onOffscreen';
+  | 'onOffscreen'
+  | 'onLevelStart'
+  | 'onLevelTick';
 
 export interface ScriptDefinition {
   id: number;
@@ -167,6 +169,12 @@ export interface ScriptDefinition {
 
 export interface ScriptBinding {
   objectTypeId: number;
+  scriptId: number;
+  flags: number;
+}
+
+export interface LevelScriptBinding {
+  levelResourceId: number;
   scriptId: number;
   flags: number;
 }

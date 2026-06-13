@@ -6,6 +6,7 @@ import type {
   EditableSpriteAsset,
   MarkSeg,
   ObjectTypeDefinition,
+  LevelScriptBinding,
   ScriptBinding,
   ScriptDefinition,
   ScriptValidationIssue,
@@ -117,6 +118,7 @@ export class AppStateBase {
   objectTypesEditRevision = 0;
   scriptDefinitions = signal<ScriptDefinition[] | undefined>([]);
   scriptBindings = signal<ScriptBinding[] | undefined>([]);
+  levelScriptBindings = signal<LevelScriptBinding[] | undefined>([]);
   scriptValidationIssues = signal<ScriptValidationIssue[] | undefined>([]);
 
   // ---- Object placement ----

@@ -12,7 +12,12 @@ import {
   stripScriptResources,
 } from './level-editor.service';
 import { encodePackHandle, parsePackHandle } from './pack-parser.service';
-import { SCRIPT_FORMAT_VERSION } from './script-format';
+import {
+  LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
+  LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE,
+  SCRIPT_FORMAT_VERSION,
+  serializeLevelScriptBindings,
+} from './script-format';
 
 function makeLevelEntry(overrides: Partial<{
   roadInfo: number;
@@ -561,6 +566,7 @@ describe('script resource helpers', () => {
       },
     ]);
     expect(extracted.bindings).toEqual([{ objectTypeId: 200, scriptId: 128, flags: 0 }]);
+    expect(extracted.levelBindings).toEqual([]);
     expect(extracted.issues).toEqual([]);
   });
 
@@ -577,11 +583,17 @@ describe('script resource helpers', () => {
       ],
       [{ objectTypeId: 200, scriptId: 128, flags: 0 }],
     );
+    resources.push({
+      type: LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE,
+      id: LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
+      data: serializeLevelScriptBindings([{ levelResourceId: 140, scriptId: 128, flags: 0 }]),
+    });
 
     const stripped = stripScriptResources(resources);
 
     expect(stripped).toEqual([{ type: 'Pack', id: 140, data: new Uint8Array([1, 2, 3]) }]);
     expect(extractScriptResources(stripped).scripts).toEqual([]);
     expect(extractScriptResources(stripped).bindings).toEqual([]);
+    expect(extractScriptResources(stripped).levelBindings).toEqual([]);
   });
 });

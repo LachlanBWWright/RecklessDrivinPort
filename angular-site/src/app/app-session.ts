@@ -17,6 +17,7 @@ export function resetEditorData(app: App): void {
   app.objectTypesDirty.set(false);
   app.scriptDefinitions.set([]);
   app.scriptBindings.set([]);
+  app.levelScriptBindings.set([]);
   app.scriptValidationIssues.set([]);
   if (app.objectTypesSaveTimer !== null) {
     clearTimeout(app.objectTypesSaveTimer);

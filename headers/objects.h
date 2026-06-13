@@ -117,6 +117,8 @@ typedef struct{
 	int damageFlags;
 	int scriptId;
 	int objectTypeId;
+	int scriptObjectId;
+	int scriptRemoveRequested;
 	tObjectTypePtr type;
 	void *shooter;
 	tInputData input;
@@ -162,6 +164,7 @@ extern float gSpikeFrame;
 void MoveObjects();
 tObject *NewObject(tObject *,SInt16);
 void RemoveObject(tObject *);
+int ObjectIsLive(tObject *);
 void InsertObjectGroup(tObjectGroupReference);
 void KillObject(tObject *);
 int CalcBackCollision(t2DPoint);

@@ -30,6 +30,12 @@ describe('lua script completions', () => {
     expect(result?.options.some((completion) => completion.label === 'setVelocity')).toBe(false);
   });
 
+  it('suggests constants after constant table dots', () => {
+    const result = completeLuaHostApi('self:setControl(Control.', 'self:setControl(Control.'.length);
+    expect(result?.options.some((completion) => completion.label === 'Control.Cop')).toBe(true);
+    expect(result?.options.some((completion) => completion.label === 'Addon.Turbo')).toBe(false);
+  });
+
   it('suggests object type ids inside spawnObjectType', () => {
     const source = 'ctx:spawnObjectType(';
     const result = completeLuaResourceReferences({
@@ -50,6 +56,20 @@ describe('lua script completions', () => {
     ]);
   });
 
+  it('suggests object type ids inside spawnRelative', () => {
+    const source = 'ctx:spawnRelative(';
+    const result = completeLuaResourceReferences({
+      source,
+      position: source.length,
+      objectTypes: [{ id: 201, label: 'Frame #20 · 1 frame', description: 'Object typeId 201.' }],
+      sounds: [{ id: 128, label: '0.5s · 4000 bytes', description: 'Sound soundId 128.' }],
+      spriteFrames: [{ id: 300, label: '16x16 · 8-bit', description: 'Sprite frameId 300.' }],
+    });
+    expect(result?.options[0]?.apply).toBe('201');
+    expect(result?.options[0]?.detail).toBe('object typeId 201 · Frame #20 · 1 frame');
+  });
+
+
   it('suggests sound ids inside playSound', () => {
     const source = 'ctx:playSound(';
     const result = completeLuaResourceReferences({
@@ -61,6 +81,38 @@ describe('lua script completions', () => {
     });
     expect(result?.options[0]?.apply).toBe('128');
     expect(result?.options[0]?.detail).toBe('soundId 128 · 0.5s · 4000 bytes');
+  });
+
+  it('suggests resource ids inside existence checks', () => {
+    const objectSource = 'ctx:objectTypeExists(';
+    const objectResult = completeLuaResourceReferences({
+      source: objectSource,
+      position: objectSource.length,
+      objectTypes: [{ id: 202, label: 'Frame #30 · 1 frame', description: 'Object typeId 202.' }],
+      sounds: [{ id: 129, label: '0.3s · 1200 bytes', description: 'Sound soundId 129.' }],
+      spriteFrames: [{ id: 301, label: '32x32 · 16-bit', description: 'Sprite frameId 301.' }],
+    });
+    expect(objectResult?.options[0]?.apply).toBe('202');
+
+    const soundSource = 'ctx:soundExists(';
+    const soundResult = completeLuaResourceReferences({
+      source: soundSource,
+      position: soundSource.length,
+      objectTypes: [{ id: 202, label: 'Frame #30 · 1 frame', description: 'Object typeId 202.' }],
+      sounds: [{ id: 129, label: '0.3s · 1200 bytes', description: 'Sound soundId 129.' }],
+      spriteFrames: [{ id: 301, label: '32x32 · 16-bit', description: 'Sprite frameId 301.' }],
+    });
+    expect(soundResult?.options[0]?.apply).toBe('129');
+
+    const frameSource = 'ctx:frameExists(';
+    const frameResult = completeLuaResourceReferences({
+      source: frameSource,
+      position: frameSource.length,
+      objectTypes: [{ id: 202, label: 'Frame #30 · 1 frame', description: 'Object typeId 202.' }],
+      sounds: [{ id: 129, label: '0.3s · 1200 bytes', description: 'Sound soundId 129.' }],
+      spriteFrames: [{ id: 301, label: '32x32 · 16-bit', description: 'Sprite frameId 301.' }],
+    });
+    expect(frameResult?.options[0]?.apply).toBe('301');
   });
 
   it('suggests sprite frame ids inside setFrame', () => {

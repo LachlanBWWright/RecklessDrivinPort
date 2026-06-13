@@ -263,6 +263,7 @@ describe('App', () => {
       },
     ]);
     app.scriptBindings.set([{ objectTypeId: 200, scriptId: 128, flags: 0 }]);
+    app.levelScriptBindings.set([{ levelResourceId: 140, scriptId: 128, flags: 0 }]);
     app.scriptValidationIssues.set([
       {
         severity: 'warning',
@@ -277,6 +278,7 @@ describe('App', () => {
 
     expect(app.scriptDefinitions()).toEqual([]);
     expect(app.scriptBindings()).toEqual([]);
+    expect(app.levelScriptBindings()).toEqual([]);
     expect(app.scriptValidationIssues()).toEqual([]);
   });
 

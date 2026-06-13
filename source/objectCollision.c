@@ -11,6 +11,7 @@
 #include "random.h"
 #include "input.h"
 #include "gameinitexit.h"
+#include "scripts.h"
 
 #define kSeperatio			1.01
 #define kMaxCollDist		120.0
@@ -184,6 +185,9 @@ void DamageObj(tObject *theObj,float damage,t2DPoint diff)
 	float damDir=VEC2D_DotProduct(diff,P2D(sin(theObj->dir),cos(theObj->dir)));
 	t2DPoint damPoint=VEC2D_Sum(theObj->pos,P2D(sin(theObj->dir+damDir)*xSize,cos(theObj->dir+damDir)*ySize));
 	int damagePos;		
+	damage = Script_OnDamage(theObj, damage, nil);
+	if(damage <= 0)
+		return;
 	NewParticleFX(damPoint,theObj->velo,damage*4,0xf6,1,50);
 	theObj->damage+=damage;
 	if(damDir>0.83) damagePos=theObj->damageFlags&kFrontBumper?kMotor:kFrontBumper;
@@ -500,6 +504,8 @@ int HandleCollision(tObject *posObj)
 			if(sqdist<kMaxCollDist*kMaxCollDist)
 				if(TestCollision(posObj,theObj,sqdist))
 				{
+					Script_OnCollision(posObj, theObj);
+					Script_OnCollision(theObj, posObj);
 					/* Cache type flags and score before any KillObject calls that may free theObj */
 					UInt16 theObjFlags  = theObj->type->flags;
 					UInt16 theObjFlags2 = theObj->type->flags2;

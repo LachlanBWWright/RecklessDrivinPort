@@ -48,6 +48,7 @@ import {
   onObjectTypeFrameChange,
   onObjectTypeReferenceChange,
   createScriptForObjectType,
+  createScriptForLevel,
   saveObjectGroups,
   saveObjectTypes,
   scheduleObjectTypesAutoSave,
@@ -56,7 +57,9 @@ import {
   selectedObjectGroup,
   selectedObjectType,
   scriptBindingForObjectType,
+  levelScriptBindingForLevel,
   setObjectTypeScriptBinding,
+  setLevelScriptBinding,
   syncObjectTypeLookup,
   updateScriptName,
   updateScriptSource,
@@ -747,6 +750,18 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   createScriptForObjectType(typeRes: number): void {
     createScriptForObjectType(this, typeRes);
+  }
+
+  levelScriptBindingForLevel(levelResourceId: number) {
+    return levelScriptBindingForLevel(this, levelResourceId);
+  }
+
+  setLevelScriptBinding(levelResourceId: number, scriptId: number | null): void {
+    setLevelScriptBinding(this, levelResourceId, scriptId);
+  }
+
+  createScriptForLevel(levelResourceId: number): void {
+    createScriptForLevel(this, levelResourceId);
   }
 
   updateScriptName(scriptId: number, name: string): void {

@@ -1,6 +1,7 @@
 import {
   LUA_CTX_COMPLETIONS,
   LUA_HOOK_COMPLETIONS,
+  LUA_CONSTANT_COMPLETIONS,
   LUA_SELF_COMPLETIONS,
   LUA_SNIPPET_COMPLETIONS,
   type LuaApiCompletion,
@@ -46,20 +47,36 @@ function resourceCompletion(resource: LuaResourceOption, detailPrefix: string): 
 function resourceContext(source: string, position: number): 'objectType' | 'sound' | 'spriteFrame' | null {
   const beforeCursor = source.slice(Math.max(0, position - 80), position);
   if (/ctx:spawnObjectType\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
+  if (/ctx:spawnRelative\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
   if (/ctx:fireWeapon\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
+  if (/ctx:objectTypeExists\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
+  if (/ctx:findNearestObject\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
+  if (/ctx:countObjects\s*\([^)]*$/.test(beforeCursor)) return 'objectType';
   if (/ctx:playSound\s*\([^)]*$/.test(beforeCursor)) return 'sound';
+  if (/ctx:soundExists\s*\([^)]*$/.test(beforeCursor)) return 'sound';
   if (/self:setFrame\s*\([^)]*$/.test(beforeCursor)) return 'spriteFrame';
+  if (/ctx:frameExists\s*\([^)]*$/.test(beforeCursor)) return 'spriteFrame';
   return null;
 }
 
 export function completeLuaHostApi(source: string, position: number): LuaCompletionResult | null {
   const from = wordStart(source, position);
   const prefix = source.slice(Math.max(0, from - 5), from);
+  const beforeCursor = source.slice(Math.max(0, position - 24), position);
   if (prefix.endsWith('self:')) {
     return { from, options: LUA_SELF_COMPLETIONS };
   }
   if (prefix.endsWith('ctx:')) {
     return { from, options: LUA_CTX_COMPLETIONS };
+  }
+  if (/Control\.$/.test(beforeCursor)) {
+    return { from, options: LUA_CONSTANT_COMPLETIONS.filter((completion) => completion.label.startsWith('Control.')) };
+  }
+  if (/ObjectFlag\.$/.test(beforeCursor)) {
+    return { from, options: LUA_CONSTANT_COMPLETIONS.filter((completion) => completion.label.startsWith('ObjectFlag.')) };
+  }
+  if (/Addon\.$/.test(beforeCursor)) {
+    return { from, options: LUA_CONSTANT_COMPLETIONS.filter((completion) => completion.label.startsWith('Addon.')) };
   }
   if (/\bfunction\s+$/.test(source.slice(Math.max(0, position - 16), position))) {
     return { from, options: LUA_HOOK_COMPLETIONS };

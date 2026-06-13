@@ -31,6 +31,7 @@ import type {
   EditableLevel,
   EditableSpriteAsset,
   ObjectTypeDefinition,
+  LevelScriptBinding,
   ScriptBinding,
   ScriptDefinition,
   ScriptValidationIssue,
@@ -39,11 +40,15 @@ import type {
   DecodedRoadTexture,
 } from './level-editor.types';
 import {
+  LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
+  LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE,
   SCRIPT_BINDINGS_RESOURCE_ID,
   SCRIPT_BINDINGS_RESOURCE_TYPE,
   SCRIPT_RESOURCE_TYPE,
+  parseLevelScriptBindings,
   parseScriptBindings,
   parseScriptDefinition,
+  serializeLevelScriptBindings,
   serializeScriptBindings,
   serializeScriptDefinition,
   validateScripts,
@@ -67,6 +72,7 @@ export type {
   EditableLevel,
   EditableSpriteAsset,
   ObjectTypeDefinition,
+  LevelScriptBinding,
   ScriptBinding,
   ScriptDefinition,
   ScriptHookId,
@@ -1292,6 +1298,22 @@ export class LevelEditorService {
     );
   }
 
+  extractLevelScriptBindings(resources: ResourceDatEntry[]): LevelScriptBinding[] {
+    const resource = resources.find(
+      (entry) =>
+        entry.type === LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE &&
+        entry.id === LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
+    );
+    if (!resource) return [];
+    return parseLevelScriptBindings(resource.data).match(
+      (bindings) => bindings,
+      (error) => {
+        console.warn('[LevelEditor] failed to parse level script bindings:', error);
+        return [];
+      },
+    );
+  }
+
   decodeSpriteFrame(resources: ResourceDatEntry[], frameId: number): DecodedSpriteFrame | null {
     return (
       this.decodeSpriteFromPack(resources, SPRITE_PACK_16_ID, frameId) ??
@@ -1718,6 +1740,7 @@ export class LevelEditorService {
 export interface ScriptResourceExtraction {
   scripts: ScriptDefinition[];
   bindings: ScriptBinding[];
+  levelBindings: LevelScriptBinding[];
   issues: ScriptValidationIssue[];
 }
 
@@ -1725,8 +1748,9 @@ export function extractScriptResources(resources: ResourceDatEntry[]): ScriptRes
   const service = new LevelEditorService();
   const scripts = [...service.extractScriptDefinitions(resources).values()].sort((a, b) => a.id - b.id);
   const bindings = service.extractScriptBindings(resources);
+  const levelBindings = service.extractLevelScriptBindings(resources);
   const issues = validateScripts(scripts, bindings);
-  return { scripts, bindings, issues };
+  return { scripts, bindings, levelBindings, issues };
 }
 
 export function applyObjectTypeDefinitions(
@@ -1756,6 +1780,7 @@ export function applyScriptResources(
   resources: ResourceDatEntry[],
   scripts: ScriptDefinition[],
   bindings: ScriptBinding[],
+  levelBindings: LevelScriptBinding[] = [],
 ): ResourceDatEntry[] {
   const nextResources = stripScriptResources(resources);
 
@@ -1773,6 +1798,14 @@ export function applyScriptResources(
     data: serializeScriptBindings(bindings),
   });
 
+  if (levelBindings.length > 0) {
+    nextResources.push({
+      type: LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE,
+      id: LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
+      data: serializeLevelScriptBindings(levelBindings),
+    });
+  }
+
   return sortResourceEntries(nextResources);
 }
 
@@ -1780,7 +1813,8 @@ export function stripScriptResources(resources: ResourceDatEntry[]): ResourceDat
   return resources.filter(
     (resource) =>
       resource.type !== SCRIPT_RESOURCE_TYPE &&
-      !(resource.type === SCRIPT_BINDINGS_RESOURCE_TYPE && resource.id === SCRIPT_BINDINGS_RESOURCE_ID),
+      !(resource.type === SCRIPT_BINDINGS_RESOURCE_TYPE && resource.id === SCRIPT_BINDINGS_RESOURCE_ID) &&
+      !(resource.type === LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE && resource.id === LEVEL_SCRIPT_BINDINGS_RESOURCE_ID),
   );
 }
 

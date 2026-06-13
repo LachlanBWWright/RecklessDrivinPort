@@ -46,6 +46,65 @@
         </mat-select>
       </mat-form-field>
 
+      <div class="mb-3 rounded-md border border-[var(--border)] bg-[var(--surface2)] p-3">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h4 class="m-0 text-[0.88rem] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">Level Scripting</h4>
+          <span class="text-[0.78rem] text-[var(--muted)]">Stored in ScLv bindings</span>
+        </div>
+
+        <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3 max-[900px]:grid-cols-1">
+          <mat-form-field appearance="outline" class="w-full min-w-0">
+            <mat-label>Global level script</mat-label>
+            <mat-select
+              [value]="levelScriptBindingFor(0)?.scriptId ?? null"
+              [disabled]="workerBusy"
+              (selectionChange)="setLevelScript(0, $event.value)"
+            >
+              <mat-select-trigger>{{ scriptName(levelScriptBindingFor(0)?.scriptId) }}</mat-select-trigger>
+              <mat-option [value]="null">None</mat-option>
+              @for (script of scriptList; track script.id) {
+                <mat-option [value]="script.id">#{{ script.id }} · {{ script.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <button mat-stroked-button type="button" class="!h-14" [disabled]="workerBusy" (click)="createAndOpenLevelScript(0)">
+            <mat-icon>add</mat-icon>
+            New
+          </button>
+          <button mat-flat-button type="button" class="!h-14" [disabled]="workerBusy || !levelScriptFor(0)" (click)="openLevelScriptEditor(0)">
+            <mat-icon>code</mat-icon>
+            Edit
+          </button>
+        </div>
+
+        @if (currentLevelResourceId !== null) {
+          <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3 max-[900px]:grid-cols-1">
+            <mat-form-field appearance="outline" class="w-full min-w-0">
+              <mat-label>Level {{ levelNum }} script</mat-label>
+              <mat-select
+                [value]="levelScriptBindingFor(currentLevelResourceId)?.scriptId ?? null"
+                [disabled]="workerBusy"
+                (selectionChange)="setLevelScript(currentLevelResourceId, $event.value)"
+              >
+                <mat-select-trigger>{{ scriptName(levelScriptBindingFor(currentLevelResourceId)?.scriptId) }}</mat-select-trigger>
+                <mat-option [value]="null">None</mat-option>
+                @for (script of scriptList; track script.id) {
+                  <mat-option [value]="script.id">#{{ script.id }} · {{ script.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-stroked-button type="button" class="!h-14" [disabled]="workerBusy" (click)="createAndOpenLevelScript(currentLevelResourceId)">
+              <mat-icon>add</mat-icon>
+              New
+            </button>
+            <button mat-flat-button type="button" class="!h-14" [disabled]="workerBusy || !levelScriptFor(currentLevelResourceId)" (click)="openLevelScriptEditor(currentLevelResourceId)">
+              <mat-icon>code</mat-icon>
+              Edit
+            </button>
+          </div>
+        }
+      </div>
+
       @if (roadInfoData) {
         <form class="mb-4" [formGroup]="roadInfoForm">
           <table class="mb-4 w-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface2)] border-collapse [&_th]:border-b [&_th]:border-[var(--border)] [&_th]:bg-[var(--surface3)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-[0.75rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.05em] [&_th]:text-[var(--muted)] [&_td]:border-b [&_td]:border-[var(--border)] [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-[0.85rem] [&_td]:text-[var(--on-surface)] [&_tbody_tr:hover_td]:bg-[var(--surface3)]">

@@ -2,6 +2,7 @@ import type {
   EditableSpriteAsset,
   ObjectGroupDefinition,
   ObjectTypeDefinition,
+  LevelScriptBinding,
   RoadInfoData,
   ParsedLevel,
   ScriptBinding,
@@ -40,6 +41,7 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
     objectGroups: ObjectGroupDefinition[];
     scripts: ScriptDefinition[];
     scriptBindings: ScriptBinding[];
+    levelScriptBindings: LevelScriptBinding[];
     scriptIssues: ScriptValidationIssue[];
   };
   const loadResult = await dispatchWorkerResult<LoadResult>(
@@ -75,6 +77,7 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
   app.objectTypesEditRevision = 0;
   app.scriptDefinitions.set(result.scripts);
   app.scriptBindings.set(result.scriptBindings);
+  app.levelScriptBindings.set(result.levelScriptBindings);
   app.scriptValidationIssues.set(result.scriptIssues);
 
   app.objectSpritePreviews.clear();

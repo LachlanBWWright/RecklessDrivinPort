@@ -97,9 +97,17 @@
             [getSpriteUrl]="getSpritePreviewDataUrl"
             [propertiesDirty]="propertiesDirty()"
             [workerBusy]="workerBusy()"
+            [scripts]="scriptDefinitions()"
+            [levelScriptBindings]="levelScriptBindings()"
+            [objectTypes]="objectTypeDefinitions()"
+            [spriteFrames]="packSpriteFrames()"
+            [audioEntries]="audioEntries()"
             (roadInfoChange)="onRoadInfoChange($event)"
             (roadInfoInput)="onRoadInfoInput($event.field, $event.value)"
             (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.value)"
+            (levelScriptBindingChange)="setLevelScriptBinding($event.levelResourceId, $event.scriptId)"
+            (createLevelScript)="createScriptForLevel($event)"
+            (scriptSave)="updateScript($event.scriptId, $event.name, $event.source)"
           ></app-editor-properties-section>
         }
 
