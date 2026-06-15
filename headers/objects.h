@@ -118,6 +118,8 @@ typedef struct{
 	int scriptId;
 	int objectTypeId;
 	int scriptObjectId;
+	int scriptOwnerObjectId;
+	int scriptOwnerScriptId;
 	int scriptRemoveRequested;
 	tObjectTypePtr type;
 	void *shooter;

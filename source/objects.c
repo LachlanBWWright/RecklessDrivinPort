@@ -350,6 +350,7 @@ void RemoveObject(tObject *theObj)
 	}
 	else
 	{
+		Script_ClearObjectState(theObj);
 		if(theObj==gFirstVisObj)
 			gFirstVisObj=(tObject*)gFirstVisObj->next;
 		if(theObj==gLastVisObj)

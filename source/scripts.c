@@ -36,6 +36,9 @@
 #define kMaxScriptTimers 1024
 #define kMaxScriptProximityWatchers 512
 #define kMaxScriptTimerName 32
+#define kLuaObjectStateGlobal "__recklessObjectState"
+#define kLuaScriptStateGlobal "__recklessScriptState"
+#define kLuaLevelStateGlobal "__recklessLevelState"
 
 typedef struct {
 	SInt16 objectTypeId;
@@ -60,6 +63,9 @@ typedef struct {
 	int scriptId;
 	char name[kMaxScriptTimerName];
 	float remaining;
+	float interval;
+	int repeating;
+	int schedule;
 	int active;
 } tScriptTimer;
 
@@ -87,6 +93,12 @@ static int gScriptSpawnCount = 0;
 static tScriptTimer gScriptTimers[kMaxScriptTimers];
 static tScriptProximityWatcher gScriptProximityWatchers[kMaxScriptProximityWatchers];
 static void PushObjectTable(lua_State *L, tObject *theObj, int selfTable);
+static void CallHook(tObject *theObj, const char *hookName, float dt);
+static void CallScriptChangedHook(tObject *theObj, int oldScriptId, int newScriptId);
+static void CallDespawnHook(tObject *theObj, const char *reason);
+static void CallSpawnedChildHook(tObject *parentObj, tObject *childObj);
+static void CallSpawnedByHook(tObject *childObj, tObject *parentObj);
+static void ClearObjectRuntimeState(tObject *theObj, int clearLuaState);
 #endif
 
 static UInt16 ReadBE16(const UInt8 *data)
@@ -119,8 +131,20 @@ void Script_SetObjectScript(tObject *theObj, SInt16 typeRes)
 {
 	if(theObj)
 	{
-		theObj->scriptId = FindScriptIdForType(typeRes);
+		int oldScriptId = theObj->scriptId;
+		int newScriptId = FindScriptIdForType(typeRes);
+#ifdef HAVE_LUA_SCRIPTING
+		if(oldScriptId && oldScriptId != newScriptId)
+			CallDespawnHook(theObj, "script-changed");
+		if(oldScriptId && oldScriptId != newScriptId)
+			ClearObjectRuntimeState(theObj, true);
+#endif
+		theObj->scriptId = newScriptId;
 		theObj->objectTypeId = typeRes;
+#ifdef HAVE_LUA_SCRIPTING
+		if(oldScriptId && oldScriptId != newScriptId)
+			CallScriptChangedHook(theObj, oldScriptId, newScriptId);
+#endif
 	}
 }
 
@@ -356,6 +380,172 @@ static int LuaSelfRemove(lua_State *L)
 	return 0;
 }
 
+static void PushObjectStateTable(lua_State *L, tObject *theObj, int create)
+{
+	lua_getglobal(L, kLuaObjectStateGlobal);
+	if(!lua_istable(L, -1))
+	{
+		lua_pop(L, 1);
+		if(!create)
+		{
+			lua_pushnil(L);
+			return;
+		}
+		lua_newtable(L);
+		lua_pushvalue(L, -1);
+		lua_setglobal(L, kLuaObjectStateGlobal);
+	}
+	lua_pushinteger(L, theObj->scriptObjectId);
+	lua_gettable(L, -2);
+	if(!lua_istable(L, -1))
+	{
+		lua_pop(L, 1);
+		if(!create)
+		{
+			lua_pop(L, 1);
+			lua_pushnil(L);
+			return;
+		}
+		lua_newtable(L);
+		lua_pushinteger(L, theObj->scriptObjectId);
+		lua_pushvalue(L, -2);
+		lua_settable(L, -4);
+	}
+	lua_remove(L, -2);
+}
+
+static int LuaSelfGetState(lua_State *L)
+{
+	tObject *theObj = CheckObjectArg(L, 1);
+	luaL_checkany(L, 2);
+	PushObjectStateTable(L, theObj, false);
+	if(lua_isnil(L, -1))
+		return 1;
+	lua_pushvalue(L, 2);
+	lua_gettable(L, -2);
+	lua_remove(L, -2);
+	return 1;
+}
+
+static int LuaSelfSetState(lua_State *L)
+{
+	tObject *theObj = CheckObjectArg(L, 1);
+	int hasValue = lua_gettop(L) >= 3;
+	luaL_checkany(L, 2);
+	PushObjectStateTable(L, theObj, true);
+	lua_pushvalue(L, 2);
+	if(hasValue)
+		lua_pushvalue(L, 3);
+	else
+		lua_pushnil(L);
+	lua_settable(L, -3);
+	return 0;
+}
+
+static int LuaSelfAddChild(lua_State *L)
+{
+	tObject *parentObj = CheckObjectArg(L, 1);
+	tObject *childObj = CheckObjectArg(L, 2);
+	childObj->scriptOwnerObjectId = parentObj->scriptObjectId;
+	childObj->scriptOwnerScriptId = parentObj->scriptId;
+	CallSpawnedChildHook(parentObj, childObj);
+	CallSpawnedByHook(childObj, parentObj);
+	return 0;
+}
+
+static int LuaSelfRemoveChild(lua_State *L)
+{
+	tObject *parentObj = CheckObjectArg(L, 1);
+	tObject *childObj = CheckObjectArg(L, 2);
+	if(childObj->scriptOwnerObjectId == parentObj->scriptObjectId)
+	{
+		childObj->scriptOwnerObjectId = 0;
+		childObj->scriptOwnerScriptId = 0;
+	}
+	return 0;
+}
+
+static int LuaSelfChildCount(lua_State *L)
+{
+	tObject *parentObj = CheckObjectArg(L, 1);
+	int count = 0;
+	if(gFirstObj)
+	{
+		tObject *scanObj = (tObject*)gFirstObj->next;
+		while(scanObj != gFirstObj)
+		{
+			if(scanObj->scriptOwnerObjectId == parentObj->scriptObjectId)
+				count++;
+			scanObj = (tObject*)scanObj->next;
+		}
+	}
+	lua_pushinteger(L, count);
+	return 1;
+}
+
+static void PushNamedStateTable(lua_State *L, const char *globalName, int create)
+{
+	lua_getglobal(L, globalName);
+	if(!lua_istable(L, -1))
+	{
+		lua_pop(L, 1);
+		if(!create)
+		{
+			lua_pushnil(L);
+			return;
+		}
+		lua_newtable(L);
+		lua_pushvalue(L, -1);
+		lua_setglobal(L, globalName);
+	}
+}
+
+static int LuaCtxGetNamedState(lua_State *L, const char *globalName)
+{
+	luaL_checkany(L, 2);
+	PushNamedStateTable(L, globalName, false);
+	if(lua_isnil(L, -1))
+		return 1;
+	lua_pushvalue(L, 2);
+	lua_gettable(L, -2);
+	lua_remove(L, -2);
+	return 1;
+}
+
+static int LuaCtxSetNamedState(lua_State *L, const char *globalName)
+{
+	int hasValue = lua_gettop(L) >= 3;
+	luaL_checkany(L, 2);
+	PushNamedStateTable(L, globalName, true);
+	lua_pushvalue(L, 2);
+	if(hasValue)
+		lua_pushvalue(L, 3);
+	else
+		lua_pushnil(L);
+	lua_settable(L, -3);
+	return 0;
+}
+
+static int LuaCtxGetScriptState(lua_State *L)
+{
+	return LuaCtxGetNamedState(L, kLuaScriptStateGlobal);
+}
+
+static int LuaCtxSetScriptState(lua_State *L)
+{
+	return LuaCtxSetNamedState(L, kLuaScriptStateGlobal);
+}
+
+static int LuaCtxGetLevelState(lua_State *L)
+{
+	return LuaCtxGetNamedState(L, kLuaLevelStateGlobal);
+}
+
+static int LuaCtxSetLevelState(lua_State *L)
+{
+	return LuaCtxSetNamedState(L, kLuaLevelStateGlobal);
+}
+
 static int LuaCtxPlayerDistance(lua_State *L)
 {
 	(void)L;
@@ -377,13 +567,24 @@ static tObject *SpawnScriptObject(SInt16 typeId, t2DPoint pos, float dir, float 
 {
 	if(gScriptSpawnCount >= kMaxScriptSpawnsPerHook)
 		return nil;
-	tObject *spawned = NewObject(gCurrentScriptObject ? gCurrentScriptObject : gFirstObj, typeId);
+	tObject *parentObj = gCurrentScriptObject;
+	int parentSpawnCount = gScriptSpawnCount;
+	tObject *spawned = NewObject(parentObj ? parentObj : gFirstObj, typeId);
+	gCurrentScriptObject = parentObj;
+	gScriptSpawnCount = parentSpawnCount;
 	if(spawned)
 	{
 		gScriptSpawnCount++;
 		spawned->pos = pos;
 		spawned->dir = dir;
 		spawned->velo = P2D(sin(dir) * speed, cos(dir) * speed);
+		if(parentObj && ObjectIsLive(parentObj))
+		{
+			spawned->scriptOwnerObjectId = parentObj->scriptObjectId;
+			spawned->scriptOwnerScriptId = parentObj->scriptId;
+			CallSpawnedChildHook(parentObj, spawned);
+			CallSpawnedByHook(spawned, parentObj);
+		}
 	}
 	return spawned;
 }
@@ -504,6 +705,67 @@ static int LuaCtxClearTimer(lua_State *L)
 static int LuaCtxTimerRemaining(lua_State *L)
 {
 	return LuaCtxGetTimer(L);
+}
+
+static tScriptTimer *SetScriptSchedule(tObject *theObj, const char *name, float seconds, int repeating)
+{
+	if(seconds < 0)
+		seconds = 0;
+	tScriptTimer *timer = FindOrCreateScriptTimer(theObj, name);
+	if(timer)
+	{
+		timer->remaining = seconds;
+		timer->interval = seconds;
+		timer->repeating = repeating;
+		timer->schedule = true;
+	}
+	return timer;
+}
+
+static int LuaCtxAfter(lua_State *L)
+{
+	if(!gCurrentScriptObject)
+		return 0;
+	float seconds = (float)luaL_checknumber(L, 2);
+	const char *name = luaL_checkstring(L, 3);
+	SetScriptSchedule(gCurrentScriptObject, name, seconds, false);
+	return 0;
+}
+
+static int LuaCtxEvery(lua_State *L)
+{
+	if(!gCurrentScriptObject)
+		return 0;
+	float seconds = (float)luaL_checknumber(L, 2);
+	const char *name = luaL_checkstring(L, 3);
+	SetScriptSchedule(gCurrentScriptObject, name, seconds, true);
+	return 0;
+}
+
+static int LuaCtxCancelSchedule(lua_State *L)
+{
+	return LuaCtxClearTimer(L);
+}
+
+static int LuaCtxDespawnChildren(lua_State *L)
+{
+	if(!gCurrentScriptObject || !gFirstObj)
+		return 0;
+	int limit = (int)luaL_optinteger(L, 2, 64);
+	int removed = 0;
+	tObject *scanObj = (tObject*)gFirstObj->next;
+	while(scanObj != gFirstObj && removed < limit)
+	{
+		tObject *nextObj = (tObject*)scanObj->next;
+		if(scanObj->scriptOwnerObjectId == gCurrentScriptObject->scriptObjectId)
+		{
+			scanObj->scriptRemoveRequested = true;
+			removed++;
+		}
+		scanObj = nextObj;
+	}
+	lua_pushinteger(L, removed);
+	return 1;
 }
 
 static int LuaCtxSetPlayerNearRadius(lua_State *L)
@@ -1005,6 +1267,11 @@ static void PushObjectTable(lua_State *L, tObject *theObj, int selfTable)
 		RegisterMethod(L, "setControl", LuaSelfSetControl);
 		RegisterMethod(L, "kill", LuaSelfKill);
 		RegisterMethod(L, "remove", LuaSelfRemove);
+		RegisterMethod(L, "getState", LuaSelfGetState);
+		RegisterMethod(L, "setState", LuaSelfSetState);
+		RegisterMethod(L, "addChild", LuaSelfAddChild);
+		RegisterMethod(L, "removeChild", LuaSelfRemoveChild);
+		RegisterMethod(L, "childCount", LuaSelfChildCount);
 	}
 }
 
@@ -1033,6 +1300,9 @@ static void PushContextTable(lua_State *L)
 	RegisterMethod(L, "getTimer", LuaCtxGetTimer);
 	RegisterMethod(L, "clearTimer", LuaCtxClearTimer);
 	RegisterMethod(L, "timerRemaining", LuaCtxTimerRemaining);
+	RegisterMethod(L, "after", LuaCtxAfter);
+	RegisterMethod(L, "every", LuaCtxEvery);
+	RegisterMethod(L, "cancelSchedule", LuaCtxCancelSchedule);
 	RegisterMethod(L, "setPlayerNearRadius", LuaCtxSetPlayerNearRadius);
 	RegisterMethod(L, "spawnObjectType", LuaCtxSpawnObjectType);
 	RegisterMethod(L, "spawnAt", LuaCtxSpawnObjectType);
@@ -1040,9 +1310,14 @@ static void PushContextTable(lua_State *L)
 	RegisterMethod(L, "spawnOnTrack", LuaCtxSpawnOnTrack);
 	RegisterMethod(L, "spawnTrackside", LuaCtxSpawnTrackside);
 	RegisterMethod(L, "spawnRelative", LuaCtxSpawnRelative);
+	RegisterMethod(L, "despawnChildren", LuaCtxDespawnChildren);
 	RegisterMethod(L, "playSound", LuaCtxPlaySound);
 	RegisterMethod(L, "addScore", LuaCtxAddScore);
 	RegisterMethod(L, "fireWeapon", LuaCtxFireWeapon);
+	RegisterMethod(L, "getScriptState", LuaCtxGetScriptState);
+	RegisterMethod(L, "setScriptState", LuaCtxSetScriptState);
+	RegisterMethod(L, "getLevelState", LuaCtxGetLevelState);
+	RegisterMethod(L, "setLevelState", LuaCtxSetLevelState);
 }
 
 static lua_State *CreateScriptState(void)
@@ -1204,6 +1479,104 @@ static void CallHook(tObject *theObj, const char *hookName, float dt)
 	gScriptSpawnCount = 0;
 }
 
+static void CallObjectHookWithObjects(tObject *theObj, const char *hookName, tObject *argObj)
+{
+	if(!theObj || !theObj->scriptId)
+		return;
+	tLoadedScript *script = FindLoadedScript(theObj->scriptId);
+	if(!script || !script->state)
+		return;
+	lua_State *L = script->state;
+	lua_getglobal(L, hookName);
+	if(!lua_isfunction(L, -1))
+	{
+		lua_pop(L, 1);
+		return;
+	}
+	gCurrentScriptObject = theObj;
+	gScriptSpawnCount = 0;
+	PushObjectTable(L, theObj, true);
+	PushContextTable(L);
+	if(argObj)
+		PushObjectTable(L, argObj, true);
+	else
+		lua_pushnil(L);
+	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	{
+		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", theObj->scriptId, hookName, lua_tostring(L, -1));
+		lua_pop(L, 1);
+	}
+	gCurrentScriptObject = nil;
+	gScriptSpawnCount = 0;
+}
+
+static void CallSpawnedChildHook(tObject *parentObj, tObject *childObj)
+{
+	CallObjectHookWithObjects(parentObj, "onSpawnedChild", childObj);
+}
+
+static void CallSpawnedByHook(tObject *childObj, tObject *parentObj)
+{
+	CallObjectHookWithObjects(childObj, "onSpawnedBy", parentObj);
+}
+
+static void CallScriptChangedHook(tObject *theObj, int oldScriptId, int newScriptId)
+{
+	if(!theObj || !theObj->scriptId)
+		return;
+	tLoadedScript *script = FindLoadedScript(theObj->scriptId);
+	if(!script || !script->state)
+		return;
+	lua_State *L = script->state;
+	lua_getglobal(L, "onScriptChanged");
+	if(!lua_isfunction(L, -1))
+	{
+		lua_pop(L, 1);
+		return;
+	}
+	gCurrentScriptObject = theObj;
+	gScriptSpawnCount = 0;
+	PushObjectTable(L, theObj, true);
+	PushContextTable(L);
+	lua_pushinteger(L, oldScriptId);
+	lua_pushinteger(L, newScriptId);
+	if(lua_pcall(L, 4, 0, 0) != LUA_OK)
+	{
+		LOG_DEBUG("LOG: Lua script #%d onScriptChanged error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		lua_pop(L, 1);
+	}
+	gCurrentScriptObject = nil;
+	gScriptSpawnCount = 0;
+}
+
+static void CallDespawnHook(tObject *theObj, const char *reason)
+{
+	if(!theObj || !theObj->scriptId)
+		return;
+	tLoadedScript *script = FindLoadedScript(theObj->scriptId);
+	if(!script || !script->state)
+		return;
+	lua_State *L = script->state;
+	lua_getglobal(L, "onDespawn");
+	if(!lua_isfunction(L, -1))
+	{
+		lua_pop(L, 1);
+		return;
+	}
+	gCurrentScriptObject = theObj;
+	gScriptSpawnCount = 0;
+	PushObjectTable(L, theObj, true);
+	PushContextTable(L);
+	lua_pushstring(L, reason ? reason : "remove");
+	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	{
+		LOG_DEBUG("LOG: Lua script #%d onDespawn error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		lua_pop(L, 1);
+	}
+	gCurrentScriptObject = nil;
+	gScriptSpawnCount = 0;
+}
+
 static void CallCollisionHook(tObject *theObj, tObject *otherObj)
 {
 	if(!theObj || !theObj->scriptId)
@@ -1307,6 +1680,34 @@ static void CallTimerHook(tObject *theObj, const char *name)
 	gScriptSpawnCount = 0;
 }
 
+static void CallScheduleHook(tObject *theObj, const char *name)
+{
+	if(!theObj || !theObj->scriptId)
+		return;
+	tLoadedScript *script = FindLoadedScript(theObj->scriptId);
+	if(!script || !script->state)
+		return;
+	lua_State *L = script->state;
+	lua_getglobal(L, "onSchedule");
+	if(!lua_isfunction(L, -1))
+	{
+		lua_pop(L, 1);
+		return;
+	}
+	gCurrentScriptObject = theObj;
+	gScriptSpawnCount = 0;
+	PushObjectTable(L, theObj, true);
+	PushContextTable(L);
+	lua_pushstring(L, name);
+	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	{
+		LOG_DEBUG("LOG: Lua script #%d onSchedule error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		lua_pop(L, 1);
+	}
+	gCurrentScriptObject = nil;
+	gScriptSpawnCount = 0;
+}
+
 static void CallPlayerProximityHook(tObject *theObj, const char *hookName, float distance)
 {
 	if(!theObj || !theObj->scriptId)
@@ -1348,8 +1749,21 @@ static void UpdateObjectScriptTimers(tObject *theObj, float dt)
 			char name[kMaxScriptTimerName];
 			strncpy(name, timer->name, sizeof(name));
 			name[sizeof(name) - 1] = '\0';
-			memset(timer, 0, sizeof(*timer));
-			CallTimerHook(theObj, name);
+			if(timer->schedule)
+			{
+				int repeating = timer->repeating;
+				float interval = timer->interval;
+				if(repeating)
+					timer->remaining = interval > 0 ? interval : 0;
+				else
+					memset(timer, 0, sizeof(*timer));
+				CallScheduleHook(theObj, name);
+			}
+			else
+			{
+				memset(timer, 0, sizeof(*timer));
+				CallTimerHook(theObj, name);
+			}
 		}
 	}
 }
@@ -1414,6 +1828,17 @@ void Script_SetCurrentLevel(SInt16 levelResourceId)
 
 void Script_ClearCurrentLevel(void)
 {
+#ifdef HAVE_LUA_SCRIPTING
+	for(int i = 0; i < gScriptCount; i++)
+	{
+		lua_State *L = gScripts[i].state;
+		if(L)
+		{
+			lua_newtable(L);
+			lua_setglobal(L, kLuaLevelStateGlobal);
+		}
+	}
+#endif
 	gGlobalLevelScriptId = 0;
 	gCurrentLevelScriptId = 0;
 }
@@ -1507,15 +1932,59 @@ void Script_OnOffscreen(tObject *theObj)
 #endif
 }
 
+void Script_ClearObjectState(tObject *theObj)
+{
+#ifdef HAVE_LUA_SCRIPTING
+	if(!theObj || !theObj->scriptObjectId)
+		return;
+	CallDespawnHook(theObj, "remove");
+	ClearObjectRuntimeState(theObj, true);
+#else
+	(void)theObj;
+#endif
+}
+
+#ifdef HAVE_LUA_SCRIPTING
+static void ClearObjectRuntimeState(tObject *theObj, int clearLuaState)
+{
+	if(!theObj || !theObj->scriptObjectId)
+		return;
+	if(gFirstObj)
+	{
+		tObject *scanObj = (tObject*)gFirstObj->next;
+		while(scanObj != gFirstObj)
+		{
+			if(scanObj->scriptOwnerObjectId == theObj->scriptObjectId)
+				scanObj->scriptRemoveRequested = true;
+			scanObj = (tObject*)scanObj->next;
+		}
+	}
+	ClearObjectScriptTimers(theObj);
+	ClearObjectProximityWatcher(theObj);
+	if(!clearLuaState)
+		return;
+	for(int i = 0; i < gScriptCount; i++)
+	{
+		lua_State *L = gScripts[i].state;
+		if(!L)
+			continue;
+		lua_getglobal(L, kLuaObjectStateGlobal);
+		if(lua_istable(L, -1))
+		{
+			lua_pushinteger(L, theObj->scriptObjectId);
+			lua_pushnil(L);
+			lua_settable(L, -3);
+		}
+		lua_pop(L, 1);
+	}
+}
+#endif
+
 int Script_DrainDeferredRemoval(tObject *theObj)
 {
 	if(!theObj || !ObjectIsLive(theObj) || !theObj->scriptRemoveRequested)
 		return false;
 	theObj->scriptRemoveRequested = false;
-#ifdef HAVE_LUA_SCRIPTING
-	ClearObjectScriptTimers(theObj);
-	ClearObjectProximityWatcher(theObj);
-#endif
 	RemoveObject(theObj);
 	return true;
 }
