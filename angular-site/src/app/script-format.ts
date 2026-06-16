@@ -44,6 +44,7 @@ const DISALLOWED_LUA_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
   { pattern: /\bio\./, label: 'io' },
   { pattern: /\bos\./, label: 'os' },
   { pattern: /\bdebug\./, label: 'debug' },
+  { pattern: /\bpackage\./, label: 'package' },
   { pattern: /\brequire\s*\(/, label: 'require' },
   { pattern: /\bdofile\s*\(/, label: 'dofile' },
   { pattern: /\bloadfile\s*\(/, label: 'loadfile' },

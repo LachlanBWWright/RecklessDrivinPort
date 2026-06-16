@@ -340,3 +340,69 @@ endif()
 # ============================================================
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Resources: ${RESOURCES_DAT}")
+
+# ============================================================
+# Scripting Runtime Unit Tests
+# ============================================================
+option(SCRIPTING_TESTS "Build scripting unit tests" OFF)
+if(SCRIPTING_TESTS)
+    set(LUA_SRC_DIR "${CMAKE_SOURCE_DIR}/emsdk/upstream/emscripten/cache/ports/contrib.lua/lua-5.5.0/src")
+    if(NOT EXISTS "${LUA_SRC_DIR}/lua.h")
+        message(FATAL_ERROR "Lua source code not found at ${LUA_SRC_DIR}. Please run emscripten or ensure cache is populated.")
+    endif()
+
+    set(LUA_SOURCES
+        ${LUA_SRC_DIR}/lapi.c
+        ${LUA_SRC_DIR}/lauxlib.c
+        ${LUA_SRC_DIR}/lbaselib.c
+        ${LUA_SRC_DIR}/lcode.c
+        ${LUA_SRC_DIR}/lcorolib.c
+        ${LUA_SRC_DIR}/lctype.c
+        ${LUA_SRC_DIR}/ldblib.c
+        ${LUA_SRC_DIR}/ldebug.c
+        ${LUA_SRC_DIR}/ldo.c
+        ${LUA_SRC_DIR}/ldump.c
+        ${LUA_SRC_DIR}/lfunc.c
+        ${LUA_SRC_DIR}/lgc.c
+        ${LUA_SRC_DIR}/linit.c
+        ${LUA_SRC_DIR}/liolib.c
+        ${LUA_SRC_DIR}/llex.c
+        ${LUA_SRC_DIR}/lmathlib.c
+        ${LUA_SRC_DIR}/lmem.c
+        ${LUA_SRC_DIR}/loadlib.c
+        ${LUA_SRC_DIR}/lobject.c
+        ${LUA_SRC_DIR}/lopcodes.c
+        ${LUA_SRC_DIR}/loslib.c
+        ${LUA_SRC_DIR}/lparser.c
+        ${LUA_SRC_DIR}/lstate.c
+        ${LUA_SRC_DIR}/lstring.c
+        ${LUA_SRC_DIR}/lstrlib.c
+        ${LUA_SRC_DIR}/ltable.c
+        ${LUA_SRC_DIR}/ltablib.c
+        ${LUA_SRC_DIR}/ltm.c
+        ${LUA_SRC_DIR}/lundump.c
+        ${LUA_SRC_DIR}/lutf8lib.c
+        ${LUA_SRC_DIR}/lvm.c
+        ${LUA_SRC_DIR}/lzio.c
+    )
+
+    add_library(lua_static STATIC ${LUA_SOURCES})
+    target_include_directories(lua_static PUBLIC ${LUA_SRC_DIR})
+
+    add_executable(script_runtime_tests
+        tests/script_runtime_tests.c
+    )
+
+    target_compile_definitions(script_runtime_tests PRIVATE
+        HAVE_LUA_SCRIPTING=1
+    )
+
+    target_include_directories(script_runtime_tests PRIVATE
+        ${LUA_SRC_DIR}
+        ${CMAKE_SOURCE_DIR}/headers
+        ${CMAKE_SOURCE_DIR}/port
+    )
+
+    target_link_libraries(script_runtime_tests lua_static m)
+endif()
+

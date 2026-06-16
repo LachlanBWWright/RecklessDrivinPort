@@ -77,4 +77,64 @@ describe('script-format', () => {
     expect(issues.some((issue) => issue.message.includes('missing sound 777'))).toBe(true);
     expect(issues.some((issue) => issue.message.includes("Lua API 'os'"))).toBe(true);
   });
+
+  it('rejects invalid script definitions', () => {
+    const validBytes = serializeScriptDefinition({
+      id: 200,
+      version: SCRIPT_FORMAT_VERSION,
+      name: 'Test',
+      source: 'print("hello")',
+    });
+
+    // 1. Truncated header
+    const truncated = validBytes.slice(0, 10);
+    const parsedTruncated = parseScriptDefinition(200, truncated);
+    expect(parsedTruncated.isErr()).toBe(true);
+    expect(parsedTruncated._unsafeUnwrapErr()).toContain('truncated');
+
+    // 2. Invalid magic
+    const invalidMagic = new Uint8Array(validBytes);
+    invalidMagic[0] = 0;
+    const parsedMagic = parseScriptDefinition(200, invalidMagic);
+    expect(parsedMagic.isErr()).toBe(true);
+    expect(parsedMagic._unsafeUnwrapErr()).toContain('invalid magic');
+
+    // 3. Unsupported version
+    const invalidVersion = new Uint8Array(validBytes);
+    new DataView(invalidVersion.buffer).setUint16(4, 999, false);
+    const parsedVersion = parseScriptDefinition(200, invalidVersion);
+    expect(parsedVersion.isErr()).toBe(true);
+    expect(parsedVersion._unsafeUnwrapErr()).toContain('Unsupported script version');
+
+    // 4. Payload overrun (source length claims to be huge)
+    const overrun = new Uint8Array(validBytes);
+    new DataView(overrun.buffer).setUint32(12, 1000000, false);
+    const parsedOverrun = parseScriptDefinition(200, overrun);
+    expect(parsedOverrun.isErr()).toBe(true);
+    expect(parsedOverrun._unsafeUnwrapErr()).toContain('payload overruns resource');
+  });
+
+  it('flags all disallowed Lua globals during validation', () => {
+    const globals = ['io', 'os', 'debug', 'package', 'require', 'dofile', 'loadfile', 'load'];
+    for (const glob of globals) {
+      let code = '';
+      if (['require', 'dofile', 'loadfile', 'load'].includes(glob)) {
+        code = `${glob}("something")`;
+      } else {
+        code = `${glob}.something()`;
+      }
+      const issues = validateScripts(
+        [
+          {
+            id: 100,
+            version: SCRIPT_FORMAT_VERSION,
+            name: 'Test',
+            source: `function onSpawn(self, ctx)\n  ${code}\nend`,
+          },
+        ],
+        [],
+      );
+      expect(issues.some((issue) => issue.message.includes(`Lua API '${glob}'`))).toBe(true);
+    }
+  });
 });

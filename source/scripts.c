@@ -1420,6 +1420,8 @@ static void CallLevelHookForScript(int scriptId, const char *hookName, float dt)
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = nil;
 	gScriptSpawnCount = 0;
 	PushContextTable(L);
@@ -1440,8 +1442,8 @@ static void CallLevelHookForScript(int scriptId, const char *hookName, float dt)
 			lua_pop(L, 1);
 		}
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static void CallLevelHook(const char *hookName, float dt)
@@ -1465,6 +1467,8 @@ static void CallHook(tObject *theObj, const char *hookName, float dt)
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1475,8 +1479,8 @@ static void CallHook(tObject *theObj, const char *hookName, float dt)
 		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", theObj->scriptId, hookName, lua_tostring(L, -1));
 		lua_pop(L, 1);
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static void CallObjectHookWithObjects(tObject *theObj, const char *hookName, tObject *argObj)
@@ -1493,6 +1497,8 @@ static void CallObjectHookWithObjects(tObject *theObj, const char *hookName, tOb
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1506,8 +1512,8 @@ static void CallObjectHookWithObjects(tObject *theObj, const char *hookName, tOb
 		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", theObj->scriptId, hookName, lua_tostring(L, -1));
 		lua_pop(L, 1);
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static void CallSpawnedChildHook(tObject *parentObj, tObject *childObj)
@@ -1534,6 +1540,8 @@ static void CallScriptChangedHook(tObject *theObj, int oldScriptId, int newScrip
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1545,8 +1553,8 @@ static void CallScriptChangedHook(tObject *theObj, int oldScriptId, int newScrip
 		LOG_DEBUG("LOG: Lua script #%d onScriptChanged error: %s\n", theObj->scriptId, lua_tostring(L, -1));
 		lua_pop(L, 1);
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static void CallDespawnHook(tObject *theObj, const char *reason)
@@ -1563,6 +1571,8 @@ static void CallDespawnHook(tObject *theObj, const char *reason)
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1573,8 +1583,8 @@ static void CallDespawnHook(tObject *theObj, const char *reason)
 		LOG_DEBUG("LOG: Lua script #%d onDespawn error: %s\n", theObj->scriptId, lua_tostring(L, -1));
 		lua_pop(L, 1);
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static void CallCollisionHook(tObject *theObj, tObject *otherObj)
@@ -1591,6 +1601,8 @@ static void CallCollisionHook(tObject *theObj, tObject *otherObj)
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1607,8 +1619,8 @@ static void CallCollisionHook(tObject *theObj, tObject *otherObj)
 		LOG_DEBUG("LOG: Lua script #%d onCollision error: %s\n", theObj->scriptId, lua_tostring(L, -1));
 		lua_pop(L, 1);
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static float CallDamageHook(tObject *theObj, float amount, tObject *sourceObj)
@@ -1625,6 +1637,8 @@ static float CallDamageHook(tObject *theObj, float amount, tObject *sourceObj)
 		lua_pop(L, 1);
 		return amount;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1638,8 +1652,8 @@ static float CallDamageHook(tObject *theObj, float amount, tObject *sourceObj)
 	{
 		LOG_DEBUG("LOG: Lua script #%d onDamage error: %s\n", theObj->scriptId, lua_tostring(L, -1));
 		lua_pop(L, 1);
-		gCurrentScriptObject = nil;
-		gScriptSpawnCount = 0;
+		gCurrentScriptObject = prevObject;
+		gScriptSpawnCount = prevSpawnCount;
 		return amount;
 	}
 	if(lua_isboolean(L, -1) && !lua_toboolean(L, -1))
@@ -1647,8 +1661,8 @@ static float CallDamageHook(tObject *theObj, float amount, tObject *sourceObj)
 	else if(lua_isnumber(L, -1))
 		amount = (float)lua_tonumber(L, -1);
 	lua_pop(L, 1);
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 	return amount;
 }
 
@@ -1666,6 +1680,8 @@ static void CallTimerHook(tObject *theObj, const char *name)
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1676,8 +1692,8 @@ static void CallTimerHook(tObject *theObj, const char *name)
 		LOG_DEBUG("LOG: Lua script #%d onTimer error: %s\n", theObj->scriptId, lua_tostring(L, -1));
 		lua_pop(L, 1);
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static void CallScheduleHook(tObject *theObj, const char *name)
@@ -1694,6 +1710,8 @@ static void CallScheduleHook(tObject *theObj, const char *name)
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1704,8 +1722,8 @@ static void CallScheduleHook(tObject *theObj, const char *name)
 		LOG_DEBUG("LOG: Lua script #%d onSchedule error: %s\n", theObj->scriptId, lua_tostring(L, -1));
 		lua_pop(L, 1);
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static void CallPlayerProximityHook(tObject *theObj, const char *hookName, float distance)
@@ -1722,6 +1740,8 @@ static void CallPlayerProximityHook(tObject *theObj, const char *hookName, float
 		lua_pop(L, 1);
 		return;
 	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
 	gCurrentScriptObject = theObj;
 	gScriptSpawnCount = 0;
 	PushObjectTable(L, theObj, true);
@@ -1732,8 +1752,8 @@ static void CallPlayerProximityHook(tObject *theObj, const char *hookName, float
 		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", theObj->scriptId, hookName, lua_tostring(L, -1));
 		lua_pop(L, 1);
 	}
-	gCurrentScriptObject = nil;
-	gScriptSpawnCount = 0;
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
 }
 
 static void UpdateObjectScriptTimers(tObject *theObj, float dt)
@@ -1988,3 +2008,5 @@ int Script_DrainDeferredRemoval(tObject *theObj)
 	RemoveObject(theObj);
 	return true;
 }
+
+

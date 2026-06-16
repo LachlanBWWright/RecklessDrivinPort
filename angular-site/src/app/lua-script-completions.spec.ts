@@ -1,4 +1,4 @@
-import { LUA_API_GROUPS, LUA_HOOK_COMPLETIONS } from './lua-script-api';
+import { LUA_API_GROUPS, LUA_HOOK_COMPLETIONS, LUA_SELF_COMPLETIONS, LUA_CTX_COMPLETIONS } from './lua-script-api';
 import { completeLuaHostApi, completeLuaResourceReferences } from './lua-script-completions';
 
 describe('lua script completions', () => {
@@ -147,5 +147,67 @@ describe('lua script completions', () => {
     });
     expect(result?.options[0]?.apply).toBe('300');
     expect(result?.options[0]?.detail).toBe('sprite frameId 300 · 16x16 · 8-bit');
+  });
+
+  it('covers all runtime hooks in LUA_HOOK_COMPLETIONS', () => {
+    const expectedHooks = [
+      'onSpawn',
+      'onTick',
+      'onCollision',
+      'onDamage',
+      'onDeath',
+      'onDespawn',
+      'onScriptChanged',
+      'onSpawnedChild',
+      'onSpawnedBy',
+      'onSchedule',
+      'onTimer',
+      'onPlayerNear',
+      'onPlayerFar',
+      'onAnimationEnd',
+      'onOffscreen',
+      'onLevelStart',
+      'onLevelTick',
+    ];
+    for (const hookName of expectedHooks) {
+      const completion = LUA_HOOK_COMPLETIONS.find((h) => h.label === hookName);
+      expect(completion).toBeDefined();
+      expect(completion?.type).toBe('hook');
+      expect(completion?.apply).toContain(`function ${hookName}(`);
+    }
+  });
+
+  it('covers all expected self API methods', () => {
+    const expectedSelfMethods = [
+      'x', 'y', 'setPosition', 'velocityX', 'velocityY', 'setVelocity', 'addVelocity',
+      'direction', 'setDirection', 'frame', 'setFrame', 'setFrameDuration', 'damage', 'setDamage',
+      'typeId', 'maxDamage', 'scoreValue', 'mass', 'width', 'length', 'flags', 'flags2',
+      'control', 'layer', 'setLayer', 'isPlayer', 'exists', 'isOnScreen', 'distanceTo', 'angleTo',
+      'setInput', 'setControl', 'kill', 'remove', 'getState', 'setState', 'addChild', 'removeChild',
+      'childCount'
+    ];
+    for (const name of expectedSelfMethods) {
+      const completion = LUA_SELF_COMPLETIONS.find((c) => c.label === name);
+      expect(completion).toBeDefined();
+      expect(completion?.type).toBe('method');
+    }
+  });
+
+  it('covers all expected ctx API methods', () => {
+    const expectedCtxMethods = [
+      'playerDistance', 'levelTime', 'levelNumber', 'levelResourceId', 'levelEndY',
+      'player', 'playerX', 'playerY', 'playerSpeed', 'playerDamage',
+      'teleportPlayer', 'teleportPlayerRelative', 'objectTypeExists', 'soundExists', 'frameExists',
+      'findNearestObject', 'countObjects', 'spawnObjectType', 'spawnAt', 'spawnNearPlayer',
+      'spawnOnTrack', 'spawnTrackside', 'spawnRelative', 'despawnChildren', 'playSound',
+      'addScore', 'fireWeapon', 'getScriptState', 'setScriptState', 'getLevelState', 'setLevelState',
+      'setTimer', 'getTimer', 'clearTimer', 'timerRemaining', 'after', 'every', 'cancelSchedule',
+      'setPlayerNearRadius'
+    ];
+    for (const name of expectedCtxMethods) {
+      const completion = LUA_CTX_COMPLETIONS.find((c) => c.label === name);
+      expect(completion).toBeDefined();
+      expect(completion?.type).toBe('method');
+    }
   });
 });
