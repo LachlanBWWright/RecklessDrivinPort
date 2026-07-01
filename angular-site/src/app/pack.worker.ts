@@ -28,7 +28,7 @@
  *   APPLY_SPRITE_PACK_PIXELS payload: { frameId: number; bitDepth: 8 | 16; pixels: Uint8ClampedArray }
  *   DECODE_ALL_ROAD_TEXTURES (no payload) → { textures: DecodedRoadTexture[] }
  *   GET_SPRITE_BYTES       payload: { spriteId }
- *   SERIALIZE              (no payload)
+ *   SERIALIZE              payload?: { stripScripts?: boolean }
  *   LIST_RESOURCES         (no payload) → { entries: {type,id,size}[] }
  *   GET_RESOURCE_RAW       payload: { type, id } → { bytes: ArrayBuffer | null }
  *   PUT_RESOURCE_RAW       payload: { type, id, bytes: ArrayBuffer }
@@ -54,6 +54,9 @@ import {
   extractObjectGroupDefinitions,
   applyObjectGroupDefinitions,
   applyObjectTypeDefinitions,
+  applyScriptResources,
+  extractScriptResources,
+  stripScriptResources,
 } from './level-editor.service';
 import type { ResourceDatEntry } from './resource-dat.service';
 import type {
@@ -63,8 +66,12 @@ import type {
   RoadSeg,
   ObjectTypeDefinition,
   DecodedRoadTexture,
+  LevelScriptBinding,
   RoadInfoData,
   ObjectGroupDefinition,
+  ScriptBinding,
+  ScriptDefinition,
+  ScriptValidationIssue,
 } from './level-editor.service';
 import { mergeResourceEntries, type ResourceMergeOptions } from './resource-merge';
 
@@ -84,15 +91,24 @@ function extractAll(): {
   objectTypesArr: [number, ObjectTypeDefinition][];
   roadInfoArr: [number, RoadInfoData][];
   objectGroups: ObjectGroupDefinition[];
+  scripts: ScriptDefinition[];
+  scriptBindings: ScriptBinding[];
+  levelScriptBindings: LevelScriptBinding[];
+  scriptIssues: ScriptValidationIssue[];
 } {
   const objectTypesMap = levelEditorSvc.extractObjectTypeDefinitions(resources);
   const roadInfoMap = levelEditorSvc.extractRoadInfos(resources);
+  const scripts = extractScriptResources(resources);
   return {
     levels: levelEditorSvc.extractParsedLevels(resources),
     sprites: levelEditorSvc.extractSpriteAssets(resources),
     objectTypesArr: [...objectTypesMap.entries()],
     roadInfoArr: [...roadInfoMap.entries()],
     objectGroups: extractObjectGroupDefinitions(resources),
+    scripts: scripts.scripts,
+    scriptBindings: scripts.bindings,
+    levelScriptBindings: scripts.levelBindings,
+    scriptIssues: scripts.issues,
   };
 }
 
@@ -255,6 +271,23 @@ self.addEventListener('message', (event: MessageEvent) => {
         break;
       }
 
+      case 'APPLY_SCRIPTS': {
+        const { scripts, bindings, levelBindings = [] } = payload as {
+          scripts: ScriptDefinition[];
+          bindings: ScriptBinding[];
+          levelBindings?: LevelScriptBinding[];
+        };
+        resources = applyScriptResources(resources, scripts, bindings, levelBindings);
+        const { scripts: nextScripts, scriptBindings, levelScriptBindings, scriptIssues } = extractAll();
+        self.postMessage({
+          id,
+          ok: true,
+          cmd,
+          result: { scripts: nextScripts, scriptBindings, levelScriptBindings, scriptIssues },
+        });
+        break;
+      }
+
       case 'APPLY_TRACK': {
         const { resourceId, trackUp, trackDown } = payload as {
           resourceId: number;
@@ -326,7 +359,9 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'SERIALIZE': {
-        const serializedBytes = resourceDatSvc.serialize(resources).match(
+        const { stripScripts = false } = (payload ?? {}) as { stripScripts?: boolean };
+        const resourcesToSerialize = stripScripts ? stripScriptResources(resources) : resources;
+        const serializedBytes = resourceDatSvc.serialize(resourcesToSerialize).match(
           (value) => value,
           (error) => {
             self.postMessage({ id, ok: false, cmd, error });

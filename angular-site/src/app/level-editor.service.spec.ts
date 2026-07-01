@@ -1,5 +1,7 @@
 import {
   LevelEditorService,
+  applyScriptResources,
+  extractScriptResources,
   parseLevelEntry,
   parseMarkSegs,
   serializeLevelProperties,
@@ -7,8 +9,15 @@ import {
   serializeLevelTrack,
   serializeLevelRoadSegs,
   serializeMarkSegs,
+  stripScriptResources,
 } from './level-editor.service';
 import { encodePackHandle, parsePackHandle } from './pack-parser.service';
+import {
+  LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
+  LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE,
+  SCRIPT_FORMAT_VERSION,
+  serializeLevelScriptBindings,
+} from './script-format';
 
 function makeLevelEntry(overrides: Partial<{
   roadInfo: number;
@@ -529,5 +538,62 @@ describe('rgbaToRgb555', () => {
       expect(val).toBeGreaterThanOrEqual(0);
       expect(val).toBeLessThanOrEqual(0x7FFF);
     }
+  });
+});
+
+describe('script resource helpers', () => {
+  it('round-trips scripts and bindings through resources', () => {
+    const resources = applyScriptResources(
+      [],
+      [
+        {
+          id: 128,
+          version: SCRIPT_FORMAT_VERSION,
+          name: 'Ambush',
+          source: 'function onTick(self, ctx)\n  self:setInput(1.0, 0.65)\nend\n',
+        },
+      ],
+      [{ objectTypeId: 200, scriptId: 128, flags: 0 }],
+    );
+
+    const extracted = extractScriptResources(resources);
+    expect(extracted.scripts).toEqual([
+      {
+        id: 128,
+        version: SCRIPT_FORMAT_VERSION,
+        name: 'Ambush',
+        source: 'function onTick(self, ctx)\n  self:setInput(1.0, 0.65)\nend\n',
+      },
+    ]);
+    expect(extracted.bindings).toEqual([{ objectTypeId: 200, scriptId: 128, flags: 0 }]);
+    expect(extracted.levelBindings).toEqual([]);
+    expect(extracted.issues).toEqual([]);
+  });
+
+  it('strips only scripting resources', () => {
+    const resources = applyScriptResources(
+      [{ type: 'Pack', id: 140, data: new Uint8Array([1, 2, 3]) }],
+      [
+        {
+          id: 128,
+          version: SCRIPT_FORMAT_VERSION,
+          name: 'Ambush',
+          source: 'function onTick(self, ctx)\nend\n',
+        },
+      ],
+      [{ objectTypeId: 200, scriptId: 128, flags: 0 }],
+    );
+    resources.push({
+      type: LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE,
+      id: LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
+      data: serializeLevelScriptBindings([{ levelResourceId: 140, scriptId: 128, flags: 0 }]),
+    });
+
+    const stripped = stripScriptResources(resources);
+
+    expect(stripped).toEqual([{ type: 'Pack', id: 140, data: new Uint8Array([1, 2, 3]) }]);
+    expect(extractScriptResources(stripped).scripts).toEqual([]);
+    expect(extractScriptResources(stripped).bindings).toEqual([]);
+    expect(extractScriptResources(stripped).levelBindings).toEqual([]);
   });
 });

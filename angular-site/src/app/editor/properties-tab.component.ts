@@ -6,16 +6,25 @@ import {
   ChangeDetectionStrategy,
   OnChanges,
   SimpleChanges,
+  inject,
 } from '@angular/core';
 import { FormArray, FormControl, FormGroup } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatDialog } from '@angular/material/dialog';
 import type {
   ObjectGroupDefinition,
+  ObjectTypeDefinition,
   ParsedLevel,
+  LevelScriptBinding,
   ObjectGroupRef,
   RoadInfoData,
   RoadInfoOption,
+  ScriptDefinition,
 } from '../level-editor.service';
+import {
+  LuaScriptEditorDialogComponent,
+  type LuaScriptEditorDialogResult,
+} from './lua-script-editor-dialog.component';
 
 type RoadField = Exclude<keyof RoadInfoData, 'id'>;
 type RoadFieldValue = number | boolean;
@@ -40,6 +49,19 @@ type RoadInfoFormModel = {
   slideFriction: FormControl<number | null>;
 };
 
+interface SpriteFrameInfo {
+  id: number;
+  bitDepth: 8 | 16;
+  width: number;
+  height: number;
+}
+
+interface AudioEntryInfo {
+  id: number;
+  sizeBytes: number;
+  durationMs?: number;
+}
+
 /**
  * Level Properties tab — extracted from app.html for better component separation.
  * Lets the user choose the level road and edit non-texture road fields.
@@ -54,6 +76,9 @@ type RoadInfoFormModel = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PropertiesTabComponent implements OnChanges {
+  private readonly dialog = inject(MatDialog);
+  private pendingLevelScriptResourceId: number | null = null;
+
   @Input() selectedLevel: ParsedLevel | null = null;
   @Input() levelNum = 0;
   @Input() editRoadInfo = 0;
@@ -64,6 +89,11 @@ export class PropertiesTabComponent implements OnChanges {
   @Input() getSpriteUrl: (typeRes: number) => string | null = () => null;
   @Input() propertiesDirty = false;
   @Input() workerBusy = false;
+  @Input() scripts: ScriptDefinition[] | undefined = [];
+  @Input() levelScriptBindings: LevelScriptBinding[] | undefined = [];
+  @Input() objectTypes: ObjectTypeDefinition[] = [];
+  @Input() spriteFrames: SpriteFrameInfo[] = [];
+  @Input() audioEntries: AudioEntryInfo[] = [];
 
   @Output() roadInfoChange = new EventEmitter<number>();
   @Output() roadInfoInput = new EventEmitter<{ field: RoadField; value: RoadFieldValue }>();
@@ -72,6 +102,12 @@ export class PropertiesTabComponent implements OnChanges {
     field: 'resID' | 'numObjs';
     value: number;
   }>();
+  @Output() levelScriptBindingChange = new EventEmitter<{
+    levelResourceId: number;
+    scriptId: number | null;
+  }>();
+  @Output() createLevelScript = new EventEmitter<number>();
+  @Output() scriptSave = new EventEmitter<LuaScriptEditorDialogResult>();
 
   readonly roadInfoForm = new FormGroup<RoadInfoFormModel>({
     friction: new FormControl<number | null>(null),
@@ -143,6 +179,14 @@ export class PropertiesTabComponent implements OnChanges {
         this.objectGroupNumObjsForm.enable({ emitEvent: false });
       }
     }
+    if (changes['scripts'] && this.pendingLevelScriptResourceId !== null) {
+      const script = this.levelScriptFor(this.pendingLevelScriptResourceId);
+      if (script) {
+        const levelResourceId = this.pendingLevelScriptResourceId;
+        this.pendingLevelScriptResourceId = null;
+        queueMicrotask(() => this.openLevelScriptEditor(levelResourceId));
+      }
+    }
   }
 
   getRoadInfoOption(roadInfoId: number): RoadInfoOption | undefined {
@@ -169,6 +213,77 @@ export class PropertiesTabComponent implements OnChanges {
       index,
       field: 'resID',
       value: resId,
+    });
+  }
+
+  get scriptList(): ScriptDefinition[] {
+    return this.scripts ?? [];
+  }
+
+  get levelScriptBindingList(): LevelScriptBinding[] {
+    return this.levelScriptBindings ?? [];
+  }
+
+  get currentLevelResourceId(): number | null {
+    return this.selectedLevel?.resourceId ?? null;
+  }
+
+  levelScriptBindingFor(levelResourceId: number): LevelScriptBinding | null {
+    return this.levelScriptBindingList.find((binding) => binding.levelResourceId === levelResourceId) ?? null;
+  }
+
+  levelScriptFor(levelResourceId: number): ScriptDefinition | null {
+    const binding = this.levelScriptBindingFor(levelResourceId);
+    if (!binding) return null;
+    return this.scriptList.find((script) => script.id === binding.scriptId) ?? null;
+  }
+
+  scriptName(scriptId: number | null | undefined): string {
+    if (scriptId === null || scriptId === undefined) return 'None';
+    return this.scriptList.find((script) => script.id === scriptId)?.name ?? `Script ${scriptId}`;
+  }
+
+  setLevelScript(levelResourceId: number, scriptId: number | null): void {
+    this.levelScriptBindingChange.emit({ levelResourceId, scriptId });
+  }
+
+  createAndOpenLevelScript(levelResourceId: number): void {
+    this.pendingLevelScriptResourceId = levelResourceId;
+    this.createLevelScript.emit(levelResourceId);
+  }
+
+  openLevelScriptEditor(levelResourceId: number): void {
+    const script = this.levelScriptFor(levelResourceId);
+    if (!script) return;
+    const dialogRef = this.dialog.open<
+      LuaScriptEditorDialogComponent,
+      {
+        script: ScriptDefinition;
+        objectTypeId: number;
+        objectTypes: readonly ObjectTypeDefinition[];
+        spriteFrames: readonly SpriteFrameInfo[];
+        audioEntries: readonly AudioEntryInfo[];
+        issues: readonly [];
+      },
+      LuaScriptEditorDialogResult
+    >(LuaScriptEditorDialogComponent, {
+      width: 'min(1680px, calc(100vw - 16px))',
+      height: 'min(980px, calc(100vh - 16px))',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      disableClose: true,
+      data: {
+        script,
+        objectTypeId: 0,
+        objectTypes: this.objectTypes,
+        spriteFrames: this.spriteFrames,
+        audioEntries: this.audioEntries,
+        issues: [],
+      },
+    });
+    dialogRef.afterClosed().subscribe((result) => {
+      if (!result) return;
+      this.scriptSave.emit(result);
     });
   }
 

@@ -26,6 +26,15 @@ interface EmscriptenModuleLike {
   _rd_start_editor_test_drive?: () => void;
 }
 
+interface EmscriptenSdlAudioLike {
+  SDL2?: {
+    audioContext?: {
+      suspend?: () => Promise<void>;
+      resume?: () => Promise<void>;
+    };
+  };
+}
+
 interface PendingEditorTestDriveLaunch {
   enabled: boolean;
   autoStart: boolean;
@@ -516,10 +525,18 @@ export function applyVolumeToWasm(app: App, pct: number): void {
 export function syncGameLoopWithActiveTab(app: App): void {
   const mod = getGameModule(app);
   if (!mod) return;
+  const gameAudio = mod as EmscriptenModuleLike & EmscriptenSdlAudioLike;
   try {
-    if (app.activeTab() === 'editor') mod.pauseMainLoop?.();
-    else mod.resumeMainLoop?.();
-    if (app.activeTab() === 'editor') mod.canvas?.blur();
+    if (app.activeTab() === 'editor') {
+      mod.pauseMainLoop?.();
+      mod.canvas?.blur();
+      mod._set_wasm_master_volume?.(0);
+      void gameAudio.SDL2?.audioContext?.suspend?.();
+    } else {
+      mod.resumeMainLoop?.();
+      mod._set_wasm_master_volume?.(app.masterVolume() / 100.0);
+      void gameAudio.SDL2?.audioContext?.resume?.();
+    }
   } catch {
     /* ignore */
   }

@@ -6,6 +6,10 @@ import type {
   EditableSpriteAsset,
   MarkSeg,
   ObjectTypeDefinition,
+  LevelScriptBinding,
+  ScriptBinding,
+  ScriptDefinition,
+  ScriptValidationIssue,
   RoadInfoData,
   TrackWaypointRef,
   TrackMidpointRef,
@@ -112,6 +116,10 @@ export class AppStateBase {
   objectTypesDirty = signal(false);
   objectTypesSaveTimer: ReturnType<typeof setTimeout> | null = null;
   objectTypesEditRevision = 0;
+  scriptDefinitions = signal<ScriptDefinition[] | undefined>([]);
+  scriptBindings = signal<ScriptBinding[] | undefined>([]);
+  levelScriptBindings = signal<LevelScriptBinding[] | undefined>([]);
+  scriptValidationIssues = signal<ScriptValidationIssue[] | undefined>([]);
 
   // ---- Object placement ----
   objects = signal<ObjectPos[]>([]);

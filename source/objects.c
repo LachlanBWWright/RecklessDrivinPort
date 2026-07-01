@@ -12,6 +12,7 @@
 #include "objectcontrol.h"
 #include "random.h"
 #include "gameinitexit.h"
+#include "scripts.h"
 
 #define kWreckDelay			0.3
 #define kPlayerDeathDelay	2.5
@@ -287,9 +288,29 @@ void InsertObjectGroup(tObjectGroupReference groupRef)
 	}
 }
 
+static int gNextScriptObjectId = 1;
+
+int ObjectIsLive(tObject *theObj)
+{
+	if(!theObj || !gFirstObj)
+		return false;
+	tObject *scanObj = gFirstObj;
+	do
+	{
+		if(scanObj == theObj)
+			return true;
+		scanObj = (tObject*)scanObj->next;
+	}
+	while(scanObj && scanObj != gFirstObj);
+	return false;
+}
+
 tObject *NewObject(tObject *prev,SInt16 typeRes)
 {
 	tObject *theObj=(tObject*)NewPtrClear(sizeof(tObject));
+	theObj->scriptObjectId = gNextScriptObjectId++;
+	if(gNextScriptObjectId <= 0)
+		gNextScriptObjectId = 1;
 	theObj->next=prev->next;
 	theObj->prev=prev;
 	((tObject*)(prev->next))->prev=theObj;
@@ -313,11 +334,15 @@ tObject *NewObject(tObject *prev,SInt16 typeRes)
 	theObj->layer=(*theObj->type).flags2>>5&3;
 	if((*theObj->type).creationSound)
 		PlaySound(gPlayerObj->pos,gPlayerObj->velo,1,1,(*theObj->type).creationSound);
+	Script_SetObjectScript(theObj, typeRes);
+	Script_OnSpawn(theObj);
 	return theObj;
 }
 
 void RemoveObject(tObject *theObj)
 {
+	if(!ObjectIsLive(theObj))
+		return;
 	if(theObj==gPlayerObj)
 	{
 		theObj->frame=0;
@@ -325,12 +350,14 @@ void RemoveObject(tObject *theObj)
 	}
 	else
 	{
+		Script_ClearObjectState(theObj);
 		if(theObj==gFirstVisObj)
 			gFirstVisObj=(tObject*)gFirstVisObj->next;
 		if(theObj==gLastVisObj)
 			gLastVisObj=(tObject*)gLastVisObj->next;
 		((tObject*)theObj->prev)->next=theObj->next;
 		((tObject*)theObj->next)->prev=theObj->prev;
+		theObj->scriptObjectId = 0;
 		DisposePtr((Ptr)theObj);
 	}
 }
@@ -351,6 +378,7 @@ void KillObject(tObject *theObj)
 {
 	tObjectTypePtr objType=theObj->type;
 	int sinkEnable=CalcBackCollision(theObj->pos)==2&&(*objType).flags2&kObjectSink;
+	Script_OnDeath(theObj);
 	LOG_DEBUG("LOG: KillObject obj=%p isPlayer=%d deathObj=%d frame=%d\n",
 	       (void*)theObj, (theObj==gPlayerObj)?1:0,
 	       (int)(*objType).deathObj, (int)theObj->frame);
@@ -403,6 +431,7 @@ void KillObject(tObject *theObj)
 		int deathID=(*objType).deathObj+(sinkEnable?gRoadInfo->deathOffs:0);
 		LOG_DEBUG("LOG: KillObject deathObj transform id=%d\n", deathID);
 		theObj->type=(tObjectTypePtr)GetUnsortedPackEntry(kPackObTy,deathID,0);
+		Script_SetObjectScript(theObj, deathID);
 	}
 	if(!theObj->type)
 	{
@@ -501,6 +530,8 @@ void FireWeapon(tObject *shooter,int weaponID)
 {
 	if(!shooter->jumpHeight){
 		tObject *projectile=NewObject(shooter,weaponID);
+		if(!projectile)
+			return;
 		projectile->dir=shooter->dir;
 		projectile->pos=shooter->pos;
 		projectile->shooter=shooter;
@@ -508,6 +539,7 @@ void FireWeapon(tObject *shooter,int weaponID)
 			projectile->jumpVelo=25.0+RanFl(-2.0,2.0);
 		if(projectile->type->weaponInfo)
 			projectile->velo=VEC2D_Sum(shooter->velo,P2D(sin(shooter->dir)*projectile->type->weaponInfo,cos(shooter->dir)*projectile->type->weaponInfo));
+		Script_LinkSpawnedChild(shooter, projectile);
 	}
 }
 
@@ -580,6 +612,7 @@ static inline void AnimateObject(tObject *theObj)
 			theObj->frame++;
 		else
 			if((*objType).flags&kObjectDieWhenAnimEndsFlag&&(theObj->frame==(*objType).frame+((*objType).numFrames&0x00ff)-1)){
+				Script_OnAnimationEnd(theObj);
 				KillObject(theObj);
 				return;
 			}
@@ -628,12 +661,18 @@ void MoveObjects()
 			if(next->prev==theObj){
 				LOG_DEBUG("LOG: MO-MO\n"); fflush(stdout);
 				MoveObject(theObj);
+				Script_OnTick(theObj,kFrameDuration);
+				if(Script_DrainDeferredRemoval(theObj))
+					{theObj=next;continue;}
 				LOG_DEBUG("LOG: MO-AO\n"); fflush(stdout);
 				AnimateObject(theObj);
 			}
 		}else{
 			LOG_DEBUG("LOG: MO-MO2\n"); fflush(stdout);
 			MoveObject(theObj);
+			Script_OnTick(theObj,kLowFrameDuration);
+			if(Script_DrainDeferredRemoval(theObj))
+				{theObj=next;continue;}
 			LOG_DEBUG("LOG: MO-AO2\n"); fflush(stdout);
 			AnimateObject(theObj);
 		}

@@ -39,14 +39,17 @@ export class SiteToolbarComponent {
     file: File;
     options: ResourceMergeOptions;
   }>();
-  @Output() downloadEditedResources = new EventEmitter<void>();
+  @Output() downloadEditedResources = new EventEmitter<boolean>();
   @Output() clearEditorFile = new EventEmitter<void>();
   @Output() selectLevel = new EventEmitter<number>();
-  @Output() previewSelectedLevel = new EventEmitter<number>();
+  @Output() previewSelectedLevel = new EventEmitter<{ levelResourceId: number; stripScripts: boolean }>();
 
   pendingMergeFile: File | null = null;
   mergeDialogOpen = false;
   previewDialogOpen = false;
+  downloadDialogOpen = false;
+  stripScriptsForPreview = false;
+  stripScriptsForDownload = false;
   readonly mergeOptions: ResourceMergeOptions = {
     levels: true,
     levelResourceIds: [...this.levelPackIds],
@@ -131,8 +134,24 @@ export class SiteToolbarComponent {
       this.previewDialogOpen = false;
       return;
     }
-    this.previewSelectedLevel.emit(levelId);
+    this.previewSelectedLevel.emit({
+      levelResourceId: levelId,
+      stripScripts: this.stripScriptsForPreview,
+    });
     this.previewDialogOpen = false;
+  }
+
+  launchDownloadDialog(): void {
+    this.downloadDialogOpen = true;
+  }
+
+  closeDownloadDialog(): void {
+    this.downloadDialogOpen = false;
+  }
+
+  confirmDownloadDialog(): void {
+    this.downloadEditedResources.emit(this.stripScriptsForDownload);
+    this.downloadDialogOpen = false;
   }
 
   levelCheckboxChecked(levelResId: number): boolean {

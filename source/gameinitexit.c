@@ -17,6 +17,7 @@
 #include "register.h"
 #include "preferences.h"
 #include "gamesounds.h"
+#include "scripts.h"
 #include "byteswap_packs.h"
 #include <string.h>
 #ifdef PORT_SDL2
@@ -210,11 +211,14 @@ int LoadLevel()
 	ClearTextFX();
 	StartCarChannels();
 	gScreenBlitSpecial=true;
+	Script_SetCurrentLevel(kPackLevel1+gLevelID);
+	Script_OnLevelStart();
 	return true;
 }
 
 void DisposeLevel()
 {
+	Script_ClearCurrentLevel();
 	UnloadPack(kPackLevel1+gLevelID);
 	gPlayerObj=nil;
 	while((tObject*)gFirstObj->next!=gFirstObj)

@@ -286,6 +286,12 @@ export function queuePackSync(app: App, syncPromises: Promise<unknown>[]): void 
         objectTypes: app.objectTypeDefinitions(),
       }),
     );
+    syncPromises.push(
+      app.runtime.dispatchWorker('APPLY_SCRIPTS', {
+        scripts: app.scriptDefinitions(),
+        bindings: app.scriptBindings(),
+      }),
+    );
   }
 }
 

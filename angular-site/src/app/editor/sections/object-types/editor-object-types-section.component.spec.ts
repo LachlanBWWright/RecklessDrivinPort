@@ -1,10 +1,14 @@
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { EditorObjectTypesSectionComponent } from './editor-object-types-section.component';
-import type { ObjectTypeDefinition } from '../../../level-editor.service';
+import type { ObjectTypeDefinition, ScriptBinding, ScriptDefinition, ScriptValidationIssue } from '../../../level-editor.service';
+import { SCRIPT_FORMAT_VERSION } from '../../../script-format';
 
 describe('EditorObjectTypesSectionComponent', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [{ provide: MatDialog, useValue: { open: () => ({ afterClosed: () => ({ subscribe: () => undefined }) }) } }],
+    });
   });
 
   function createComponent(): EditorObjectTypesSectionComponent {
@@ -69,5 +73,36 @@ describe('EditorObjectTypesSectionComponent', () => {
     component.selectedObjectTypeId = 200;
 
     expect(component.hasPreviewFrameControls(component.selectedType!)).toBe(false);
+  });
+
+  it('resolves the selected script binding and diagnostics', () => {
+    const component = createComponent();
+    component.objectTypes = [makeType()];
+    component.selectedObjectTypeId = 200;
+    component.scripts = [
+      {
+        id: 128,
+        version: SCRIPT_FORMAT_VERSION,
+        name: 'Ambush',
+        source: 'function onTick(self, ctx)\n  self:setInput(1, 0.65)\nend\n',
+      } satisfies ScriptDefinition,
+    ];
+    component.scriptBindings = [{ objectTypeId: 200, scriptId: 128, flags: 0 }] satisfies ScriptBinding[];
+    component.scriptIssues = [
+      {
+        severity: 'warning',
+        scriptId: 128,
+        hook: 'onTick',
+        line: 1,
+        message: 'test issue',
+      },
+    ] satisfies ScriptValidationIssue[];
+
+    expect(component.selectedScriptBinding).toEqual({ objectTypeId: 200, scriptId: 128, flags: 0 });
+    expect(component.selectedScript?.name).toBe('Ambush');
+    expect(component.getIssuesForSelectedScript()).toEqual(component.scriptIssues);
+    expect(component.selectedScript?.source).toContain('onTick');
+    expect(component.getSelectedScriptValidationLabel()).toBe('Warnings');
+    expect(component.getSelectedScriptHookLabels()).toEqual(['onTick']);
   });
 });

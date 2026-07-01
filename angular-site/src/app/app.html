@@ -11,10 +11,10 @@
   (loadDefaultResources)="runtime.loadDefaultResources()"
   (resourceFileSelected)="runtime.onResourceFileSelected($event)"
   (resourceMergeSelected)="runtime.onResourceMergeSelected($event.file, $event.options)"
-  (downloadEditedResources)="runtime.downloadEditedResources()"
+  (downloadEditedResources)="runtime.downloadEditedResources($event)"
   (clearEditorFile)="runtime.clearEditorResources()"
   (selectLevel)="selectLevel($event)"
-  (previewSelectedLevel)="launchSelectedLevelPreview($event)"
+  (previewSelectedLevel)="launchSelectedLevelPreview($event.levelResourceId, $event.stripScripts)"
 ></app-site-toolbar>
 
 <main class="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--bg)]">
@@ -97,9 +97,17 @@
             [getSpriteUrl]="getSpritePreviewDataUrl"
             [propertiesDirty]="propertiesDirty()"
             [workerBusy]="workerBusy()"
+            [scripts]="scriptDefinitions()"
+            [levelScriptBindings]="levelScriptBindings()"
+            [objectTypes]="objectTypeDefinitions()"
+            [spriteFrames]="packSpriteFrames()"
+            [audioEntries]="audioEntries()"
             (roadInfoChange)="onRoadInfoChange($event)"
             (roadInfoInput)="onRoadInfoInput($event.field, $event.value)"
             (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.value)"
+            (levelScriptBindingChange)="setLevelScriptBinding($event.levelResourceId, $event.scriptId)"
+            (createLevelScript)="createScriptForLevel($event)"
+            (scriptSave)="updateScript($event.scriptId, $event.name, $event.source)"
           ></app-editor-properties-section>
         }
 
@@ -131,6 +139,9 @@
             [getSpriteUrl]="getPackSpriteDataUrl"
             [typesDirty]="objectTypesDirty()"
             [workerBusy]="workerBusy()"
+            [scripts]="scriptDefinitions()"
+            [scriptBindings]="scriptBindings()"
+            [scriptIssues]="scriptValidationIssues()"
             (selectedObjectTypeIdChange)="selectObjectType($event)"
             (addType)="addObjectType()"
             (deleteType)="deleteObjectType($event)"
@@ -138,6 +149,11 @@
             (referenceChange)="onObjectTypeReferenceChange($event.typeRes, $event.field, $event.value)"
             (flagToggle)="onObjectTypeFlagToggle($event.typeRes, $event.field, $event.bit, $event.checked)"
             (frameChange)="onObjectTypeFrameChange($event.typeRes, $event.frame)"
+            (scriptBindingChange)="setObjectTypeScriptBinding($event.typeRes, $event.scriptId)"
+            (createScript)="createScriptForObjectType($event)"
+            (scriptNameChange)="updateScriptName($event.scriptId, $event.name)"
+            (scriptSourceChange)="updateScriptSource($event.scriptId, $event.source)"
+            (scriptSave)="updateScript($event.scriptId, $event.name, $event.source)"
             (saveObjectTypes)="saveObjectTypes()"
           ></app-editor-object-types-section>
         }

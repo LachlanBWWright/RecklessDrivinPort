@@ -15,6 +15,10 @@ export function resetEditorData(app: App): void {
   app.objectTypeDefinitions.set([]);
   app.selectedObjectTypeId.set(null);
   app.objectTypesDirty.set(false);
+  app.scriptDefinitions.set([]);
+  app.scriptBindings.set([]);
+  app.levelScriptBindings.set([]);
+  app.scriptValidationIssues.set([]);
   if (app.objectTypesSaveTimer !== null) {
     clearTimeout(app.objectTypesSaveTimer);
     app.objectTypesSaveTimer = null;
@@ -270,7 +274,7 @@ async function flushPendingEdits(app: App): Promise<void> {
   warnIfSelectedLevelHasObjectsBeyondFinish(app);
 }
 
-export async function downloadEditedResources(app: App): Promise<void> {
+export async function downloadEditedResources(app: App, stripScripts = false): Promise<void> {
   if (!app.hasEditorData()) return;
   app.workerBusy.set(true);
   app.resourcesStatus.set('Saving pending edits before download…');
@@ -279,7 +283,7 @@ export async function downloadEditedResources(app: App): Promise<void> {
     .andThen(() => {
       app.resourcesStatus.set('Serializing resources…');
       return resultFromPromise(
-        app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE'),
+        app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE', { stripScripts }),
         'Failed to serialize resources',
       );
     })
@@ -289,13 +293,17 @@ export async function downloadEditedResources(app: App): Promise<void> {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'resources.dat';
+        a.download = stripScripts ? 'resources-no-scripts.dat' : 'resources.dat';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        app.resourcesStatus.set('Downloaded updated resources.dat.');
-        app.snackBar.open('✓ Downloaded resources.dat', 'OK', {
+        app.resourcesStatus.set(
+          stripScripts
+            ? 'Downloaded updated resources.dat without scripting resources.'
+            : 'Downloaded updated resources.dat.',
+        );
+        app.snackBar.open(stripScripts ? '✓ Downloaded resources.dat without scripts' : '✓ Downloaded resources.dat', 'OK', {
           duration: 3000,
           panelClass: [
             '[&_.mdc-snackbar__surface]:!border',
@@ -322,7 +330,7 @@ export async function downloadEditedResources(app: App): Promise<void> {
   app.workerBusy.set(false);
 }
 
-export async function saveEditedResourcesToGame(app: App): Promise<void> {
+export async function saveEditedResourcesToGame(app: App, stripScripts = false): Promise<void> {
   if (!app.hasEditorData()) return;
   app.workerBusy.set(true);
   app.resourcesStatus.set('Flushing pending edits…');
@@ -331,7 +339,7 @@ export async function saveEditedResourcesToGame(app: App): Promise<void> {
     .andThen(() => {
       app.resourcesStatus.set('Serializing…');
       return resultFromPromise(
-        app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE'),
+        app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE', { stripScripts }),
         'Failed to save resources',
       );
     })

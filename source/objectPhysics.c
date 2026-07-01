@@ -9,6 +9,7 @@
 #include "particlefx.h"
 #include "objectcontrol.h"
 #include "random.h"
+#include "scripts.h"
 
 #define kMechResistance		100
 #define kMinSteerTime		0.8		//minimum time (in seconds) for the steering wheel to go to maximum steering.
@@ -447,7 +448,10 @@ void ObjectPhysics(tObject *theObj)
 			}
 		}
 		else if(theObj->type->flags2&kObjectDieWhenOutOfScreen)
+		{
+			Script_OnOffscreen(theObj);
 			RemoveObject(theObj);
+		}
 	}else if(theObj->type->flags2&kObjectMissile) HandleCollision(theObj);
 
 }

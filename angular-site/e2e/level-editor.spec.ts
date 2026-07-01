@@ -66,6 +66,26 @@ test.describe('Editor with default resources loaded', () => {
     // The properties tab should show road-info selector
     await expect(page.locator('mat-select[aria-label="Shared road selector"]')).toBeVisible();
   });
+
+  test('can create and edit a Lua script in the Object Types modal editor', async ({ page }) => {
+    await page.getByRole('button', { name: /object types/i }).click();
+    await page.getByRole('button', { name: /new script/i }).click();
+    await page.getByRole('button', { name: /edit script/i }).click();
+
+    const dialog = page.locator('app-lua-script-editor-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.cm-editor')).toBeVisible();
+    await expect(dialog.getByText(/ctx Methods/i)).toBeVisible();
+
+    const nameInput = dialog.getByLabel(/script name/i);
+    await nameInput.fill('E2E Script');
+    await expect(nameInput).toHaveValue('E2E Script');
+    await dialog.getByRole('button', { name: /^save$/i }).click();
+
+    await expect(dialog).not.toBeVisible();
+    await page.getByRole('button', { name: /edit script/i }).click();
+    await expect(dialog.getByLabel(/script name/i)).toHaveValue('E2E Script');
+  });
 });
 
 test.describe('Number input editing (InputValueDirective fix)', () => {

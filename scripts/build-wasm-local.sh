@@ -87,6 +87,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ANGULAR_DIR="$REPO_ROOT/angular-site"
 OUTPUT_DIR="$REPO_ROOT/gh-pages-local"
 BUILD_WASM_DIR="$REPO_ROOT/build_wasm"
+EMSDK_INSTALL_DIR="$REPO_ROOT/emsdk"
 
 info "Repository root : $REPO_ROOT"
 info "Angular site    : $ANGULAR_DIR"
@@ -160,13 +161,19 @@ find_and_activate_emsdk() {
     exit 1
   fi
 
-  local EMSDK_INSTALL_DIR="$REPO_ROOT/emsdk"
+  # EMSDK_INSTALL_DIR is declared at the top of the script alongside the
+  # other *_DIR variables so it is always visible under set -u.
+
+  if [[ -d "$EMSDK_INSTALL_DIR" && ! -f "$EMSDK_INSTALL_DIR/emsdk" ]]; then
+    warn "Directory $EMSDK_INSTALL_DIR exists but does not contain the emsdk tool – removing and re-cloning."
+    rm -rf "$EMSDK_INSTALL_DIR"
+  fi
 
   if [[ ! -d "$EMSDK_INSTALL_DIR" ]]; then
     info "Cloning emsdk repository…"
     git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$EMSDK_INSTALL_DIR"
   else
-    info "Updating existing emsdk clone at $EMSDK_INSTALL_DIR…"
+    info "Updating existing emsdk clone at ${EMSDK_INSTALL_DIR}…"
     git -C "$EMSDK_INSTALL_DIR" pull --ff-only || true
   fi
 

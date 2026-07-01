@@ -9,50 +9,51 @@
 #include "gameinitexit.h"
 #include "packs.h"
 #include "random.h"
+#include "scripts.h"
 #ifdef PORT_SDL2
 #include <SDL2/SDL.h>
 #endif
 
-#define kCalcFPMS			(kCalcFPS/(float)1000000)
-#define kGraphFrameCount 	12
-#define kDisplayScoreIncr	360
-#define kZoomAcceleration	80.0
+#define kCalcFPMS (kCalcFPS / (float)1000000)
+#define kGraphFrameCount 12
+#define kDisplayScoreIncr 360
+#define kZoomAcceleration 80.0
 
-#define kExtraLiveScore		5000
-#define kPenaltyTime		0 //penalty seconds for loosing a life.
-#define kMinCopDist			1200	//minumum distance resurrecting player has from cops in pixels
-UInt64 gStartMS,gPauseMS,gLastGraphFrameMS[kGraphFrameCount];
-unsigned long gFrameCount,gGraphFrameCount;
+#define kExtraLiveScore 5000
+#define kPenaltyTime 0	 // penalty seconds for loosing a life.
+#define kMinCopDist 1200 // minumum distance resurrecting player has from cops in pixels
+UInt64 gStartMS, gPauseMS, gLastGraphFrameMS[kGraphFrameCount];
+unsigned long gFrameCount, gGraphFrameCount;
 int gEndGame;
 
 void InitFrameCount()
 {
-	gFrameCount=0;
-	gStartMS=GetMSTime();
+	gFrameCount = 0;
+	gStartMS = GetMSTime();
 }
 
 void PauseFrameCount()
 {
-	gPauseMS=GetMSTime();
+	gPauseMS = GetMSTime();
 }
 
 void ResumeFrameCount()
 {
-	gStartMS+=GetMSTime()-gPauseMS;
+	gStartMS += GetMSTime() - gPauseMS;
 }
 
 static inline Boolean CheckFrameTime()
 {
 	unsigned long optFrameCount;
 	UInt64 curMS;
-	
-	curMS=GetMSTime()-gStartMS;
-	optFrameCount=curMS*kCalcFPMS;
-	if(gFrameCount>optFrameCount)
+
+	curMS = GetMSTime() - gStartMS;
+	optFrameCount = curMS * kCalcFPMS;
+	if (gFrameCount > optFrameCount)
 	{
-		//AddFloatToMessageBuffer("\x05FPS: ",(float)1000000/((curMS-gLastGraphFrameMS[0])/kGraphFrameCount));
-		BlockMoveData(gLastGraphFrameMS+1,gLastGraphFrameMS,sizeof(UInt64)*(kGraphFrameCount-1));
-		gLastGraphFrameMS[kGraphFrameCount-1]=curMS;
+		// AddFloatToMessageBuffer("\x05FPS: ",(float)1000000/((curMS-gLastGraphFrameMS[0])/kGraphFrameCount));
+		BlockMoveData(gLastGraphFrameMS + 1, gLastGraphFrameMS, sizeof(UInt64) * (kGraphFrameCount - 1));
+		gLastGraphFrameMS[kGraphFrameCount - 1] = curMS;
 		return true;
 	}
 	return false;
@@ -67,37 +68,46 @@ static inline void CheckTimeSkip(void)
 	 * unnecessary latency on the last busy-wait iteration */
 #define kMinSleepThreshUS ((UInt64)2000)
 #endif
-	do{
-		curMS=GetMSTime()-gStartMS;
-		optFrameCount=curMS*kCalcFPMS;
+	do
+	{
+		curMS = GetMSTime() - gStartMS;
+		optFrameCount = curMS * kCalcFPMS;
 #ifdef PORT_SDL2
-		/* Yield to the OS so the window stays responsive during the wait */
-		if(gFrameCount>optFrameCount) {
-			UInt64 nextFrameUS=(UInt64)(gFrameCount/kCalcFPMS);
-			UInt64 remainUS=(curMS<nextFrameUS)?nextFrameUS-curMS:0;
-			if(remainUS>kMinSleepThreshUS) SDL_Delay(1);
+		/* Sleep for the bulk of the remaining time instead of 1 ms busy-waits */
+		if (gFrameCount > optFrameCount)
+		{
+			UInt64 nextFrameUS = (UInt64)(gFrameCount / kCalcFPMS);
+			UInt64 remainUS = (curMS < nextFrameUS) ? nextFrameUS - curMS : 0;
+			if (remainUS > kMinSleepThreshUS)
+			{
+				Uint32 sleepMS = (Uint32)((remainUS - kMinSleepThreshUS) / 1000);
+				if (sleepMS > 16)
+					sleepMS = 16;
+				if (sleepMS >= 1)
+					SDL_Delay(sleepMS);
+			}
 		}
 #undef kMinSleepThreshUS
 #endif
-	}while(gFrameCount>optFrameCount);
+	} while (gFrameCount > optFrameCount);
 }
 
-t2DPoint GetUniquePos(SInt16 minOffs,SInt16 maxOffs,float *objDir,int *dir);
+t2DPoint GetUniquePos(SInt16 minOffs, SInt16 maxOffs, float *objDir, int *dir);
 
 void CopClear()
 {
-	tObject	*theObj=(tObject*)(gFirstObj->next);
-	while(theObj!=gFirstObj)
+	tObject *theObj = (tObject *)(gFirstObj->next);
+	while (theObj != gFirstObj)
 	{
-		if(theObj->type->flags&kObjectCop)	
+		if (theObj->type->flags & kObjectCop)
 		{
-			while(fabs(theObj->pos.y-gPlayerObj->pos.y)<kMinCopDist)
+			while (fabs(theObj->pos.y - gPlayerObj->pos.y) < kMinCopDist)
 			{
-				theObj->dir=-1;
-				theObj->pos=GetUniquePos(20,200,&theObj->dir,&theObj->control);
+				theObj->dir = -1;
+				theObj->pos = GetUniquePos(20, 200, &theObj->dir, &theObj->control);
 			}
-		}	
-		theObj=(tObject*)theObj->next;
+		}
+		theObj = (tObject *)theObj->next;
 	}
 }
 
@@ -105,188 +115,201 @@ void ResurrectPlayer()
 {
 	int i;
 	LOG_DEBUG("LOG: ResurrectPlayer called (lives=%d)\n", gPlayerLives);
-	for(i=0;(i<gTrackUp->num)&&(gTrackUp->track[i].y<gPlayerObj->pos.y);i++);
-	gPlayerObj=NewObject(gFirstObj,gRoadInfo->water?kNormalPlayerBoatID:gPlayerCarID);
-	gPlayerObj->pos.x=gTrackUp->track[i-1].x;
-	gPlayerObj->pos.y=gTrackUp->track[i-1].y;
-	gPlayerObj->control=kObjectDriveUp;
-	if(gPlayerObj->pos.y>=500)
+	for (i = 0; (i < gTrackUp->num) && (gTrackUp->track[i].y < gPlayerObj->pos.y); i++)
+		;
+	gPlayerObj = NewObject(gFirstObj, gRoadInfo->water ? kNormalPlayerBoatID : gPlayerCarID);
+	gPlayerObj->pos.x = gTrackUp->track[i - 1].x;
+	gPlayerObj->pos.y = gTrackUp->track[i - 1].y;
+	gPlayerObj->control = kObjectDriveUp;
+	if (gPlayerObj->pos.y >= 500)
 	{
-		gPlayerObj->target=i;
+		gPlayerObj->target = i;
 		{
-			t2DPoint targetPos=P2D(gTrackUp->track[i].x,gTrackUp->track[i].y);
-			if(gPlayerObj->pos.y-targetPos.y)
-				gPlayerObj->dir=atan((gPlayerObj->pos.x-targetPos.x)/(gPlayerObj->pos.y-targetPos.y));
+			t2DPoint targetPos = P2D(gTrackUp->track[i].x, gTrackUp->track[i].y);
+			if (gPlayerObj->pos.y - targetPos.y)
+				gPlayerObj->dir = atan((gPlayerObj->pos.x - targetPos.x) / (gPlayerObj->pos.y - targetPos.y));
 			else
-				gPlayerObj->dir=0;
+				gPlayerObj->dir = 0;
 		}
 	}
-	else{
-		gPlayerObj->pos.x=gLevelData->xStartPos;
-		gPlayerObj->pos.y=500;
-		gPlayerObj->target=1;
+	else
+	{
+		gPlayerObj->pos.x = gLevelData->xStartPos;
+		gPlayerObj->pos.y = 500;
+		gPlayerObj->target = 1;
 	}
-	gCameraObj=gPlayerObj;
-	gScreenBlitSpecial=true;
-	gZoomVelo=kMaxZoomVelo;
-	gGameTime+=kPenaltyTime;
+	gCameraObj = gPlayerObj;
+	gScreenBlitSpecial = true;
+	gZoomVelo = kMaxZoomVelo;
+	gGameTime += kPenaltyTime;
 	CopClear();
+	Script_OnPlayerRespawn(gPlayerObj);
 }
 
 int abs(int);
 
 void PlayerHandling()
 {
-	//weapons handling and engine sound.
-	if(gPlayerDeathDelay)
+	// weapons handling and engine sound.
+	if (gPlayerDeathDelay)
 	{
-		gPlayerDeathDelay-=kFrameDuration;
-		if(gPlayerDeathDelay<=0)
+		gPlayerDeathDelay -= kFrameDuration;
+		if (gPlayerDeathDelay <= 0)
 		{
-			gPlayerDeathDelay=0;
-			if(gPlayerLives)
+			gPlayerDeathDelay = 0;
+			if (gPlayerLives)
 				ResurrectPlayer();
 			else
-				gEndGame=true;
+				gEndGame = true;
 		}
-		SetCarSound(-1,0,0,0);
-		FFBDirect(0,0);
+		SetCarSound(-1, 0, 0, 0);
+		FFBDirect(0, 0);
 	}
 	else
 	{
-		if(!gCameraObj->jumpHeight)
+		if (!gCameraObj->jumpHeight)
 		{
-			float lMag=(gPlayerSlide[0]+gPlayerSlide[2])*0.1;
-			float rMag=(gPlayerSlide[1]+gPlayerSlide[3])*0.1;
-			SetCarSound(fabs(gCameraObj->throttle)+(gRoadInfo->water?gCameraObj->input.brake:0),(gPlayerSlide[0]+gPlayerSlide[2])*0.5,(gPlayerSlide[1]+gPlayerSlide[3])*0.5,VEC2D_DotProduct(gCameraObj->velo,P2D(sin(gCameraObj->dir),cos(gCameraObj->dir))));
-			if(gRoadInfo->skidSound!=145)
-				FFBDirect(lMag>0.3?0.3:lMag,rMag>0.3?0.3:rMag);
+			float lMag = (gPlayerSlide[0] + gPlayerSlide[2]) * 0.1;
+			float rMag = (gPlayerSlide[1] + gPlayerSlide[3]) * 0.1;
+			SetCarSound(fabs(gCameraObj->throttle) + (gRoadInfo->water ? gCameraObj->input.brake : 0), (gPlayerSlide[0] + gPlayerSlide[2]) * 0.5, (gPlayerSlide[1] + gPlayerSlide[3]) * 0.5, VEC2D_DotProduct(gCameraObj->velo, P2D(sin(gCameraObj->dir), cos(gCameraObj->dir))));
+			if (gRoadInfo->skidSound != 145)
+				FFBDirect(lMag > 0.3 ? 0.3 : lMag, rMag > 0.3 ? 0.3 : rMag);
 			else
-				FFBDirect(0,0);
+				FFBDirect(0, 0);
 		}
 		else
 		{
-			SetCarSound(fabs(gCameraObj->throttle)+(gRoadInfo->water?gCameraObj->input.brake:0),0,0,fabs(gCameraObj->input.throttle)*71);	
-			FFBDirect(0,0);
+			SetCarSound(fabs(gCameraObj->throttle) + (gRoadInfo->water ? gCameraObj->input.brake : 0), 0, 0, fabs(gCameraObj->input.throttle) * 71);
+			FFBDirect(0, 0);
 		}
-		if(!gPlayerObj->jumpHeight)
-		{	
-			if(gFire&&gNumMines)
+		if (!gPlayerObj->jumpHeight)
+		{
+			if (gFire && gNumMines)
 			{
-				FireWeapon(gPlayerObj,(*gRoadInfo).water?254:206);
+				FireWeapon(gPlayerObj, (*gRoadInfo).water ? 254 : 206);
 				gNumMines--;
-				FFBJolt(1.0,1.0,0.1);
+				FFBJolt(1.0, 1.0, 0.1);
 			}
-			if(gMissile&&gNumMissiles)
+			if (gMissile && gNumMissiles)
 			{
-				FireWeapon(gPlayerObj,(*gRoadInfo).water?221:162);
+				FireWeapon(gPlayerObj, (*gRoadInfo).water ? 221 : 162);
 				gNumMissiles--;
-				FFBJolt(0.8,0.8,0.8);
+				FFBJolt(0.8, 0.8, 0.8);
 			}
 		}
 	}
-	//time handling.
-	if(gFinishDelay)
-		gFinishDelay+=kFrameDuration;
+	// time handling.
+	if (gFinishDelay)
+		gFinishDelay += kFrameDuration;
 	else
-		gGameTime+=kFrameDuration;
-	if(!(gFrameCount%(int)(kCalcFPS/10)))
+		gGameTime += kFrameDuration;
+	if (!(gFrameCount % (int)(kCalcFPS / 10)))
 	{
-		if(gGameTime>gLevelData->time)
-			if(gPlayerScore)
-				gPlayerScore-=1;
-		if(!(gFrameCount%(int)kCalcFPS)&&!gFinishDelay)
-			if(gGameTime>=gLevelData->time-10)
+		if (gGameTime > gLevelData->time)
+			if (gPlayerScore)
+				gPlayerScore -= 1;
+		if (!(gFrameCount % (int)kCalcFPS) && !gFinishDelay)
+			if (gGameTime >= gLevelData->time - 10)
 			{
-				if(gGameTime<gLevelData->time)
+				if (gGameTime < gLevelData->time)
 					SimplePlaySound(144);
-				if((int)gGameTime==(int)gLevelData->time)
+				if ((int)gGameTime == (int)gLevelData->time)
 				{
-					tTextEffect fx={320,240,kEffectSinLines+kEffectMoveDown,0,"\x09" "TIMEhUPee"};
+					tTextEffect fx = {320, 240, kEffectSinLines + kEffectMoveDown, 0, "\x09"
+																					  "TIMEhUPee"};
 					NewTextEffect(&fx);
 					SimplePlaySound(149);
 				}
 			}
-	}		
-	//score handling
-	if(gDisplayScore<gPlayerScore)
-	{
-		gDisplayScore+=kDisplayScoreIncr*kFrameDuration;
-		if(gDisplayScore>gPlayerScore)
-			gDisplayScore=gPlayerScore;
 	}
-	if(gDisplayScore>gPlayerScore)
-		gDisplayScore=gPlayerScore;
-	if(gPlayerScore>(gExtraLives+1)*kExtraLiveScore)
+	// score handling
+	if (gDisplayScore < gPlayerScore)
 	{
-		tTextEffect fx={320,240,kEffectSinLines+kEffectMoveUp,0,"\x0c" "EXTRAhLIFEee"};
+		gDisplayScore += kDisplayScoreIncr * kFrameDuration;
+		if (gDisplayScore > gPlayerScore)
+			gDisplayScore = gPlayerScore;
+	}
+	if (gDisplayScore > gPlayerScore)
+		gDisplayScore = gPlayerScore;
+	if (gPlayerScore > (gExtraLives + 1) * kExtraLiveScore)
+	{
+		tTextEffect fx = {320, 240, kEffectSinLines + kEffectMoveUp, 0, "\x0c"
+																		"EXTRAhLIFEee"};
 		NewTextEffect(&fx);
 		gExtraLives++;
 		gPlayerLives++;
 		SimplePlaySound(154);
 	}
-	//finish detection
-	if(gCameraObj->pos.y<320)gCameraObj->pos.y=320;
-	if(gPlayerObj->pos.y>gLevelData->levelEnd)
-		if(!gPlayerDeathDelay)
+	// finish detection
+	if (gCameraObj->pos.y < 320)
+		gCameraObj->pos.y = 320;
+	if (gPlayerObj->pos.y > gLevelData->levelEnd)
+		if (!gPlayerDeathDelay)
 		{
-			tTextEffect fx={320,240,kEffectExplode,0,"\x0f" "LEVELhCOMPLETED"};
+			tTextEffect fx = {320, 240, kEffectExplode, 0, "\x0f"
+														   "LEVELhCOMPLETED"};
 			NewTextEffect(&fx);
-			if(!gFinishDelay)
-				gFinishDelay=0.001;
+			if (!gFinishDelay)
+			{
+				gFinishDelay = 0.001;
+				Script_OnLevelComplete();
+			}
 		}
-	//background drift
-	gXDriftPos+=(*gRoadInfo).xDrift*kFrameDuration;
-	gYDriftPos+=(*gRoadInfo).yDrift*kFrameDuration;
-	gXFrontDriftPos+=(*gRoadInfo).xFrontDrift*kFrameDuration;
-	gYFrontDriftPos+=(*gRoadInfo).yFrontDrift*kFrameDuration;
-	//camera distance
-	if(gZoomVelo>VEC2D_Value(gPlayerObj->velo))
+	// background drift
+	gXDriftPos += (*gRoadInfo).xDrift * kFrameDuration;
+	gYDriftPos += (*gRoadInfo).yDrift * kFrameDuration;
+	gXFrontDriftPos += (*gRoadInfo).xFrontDrift * kFrameDuration;
+	gYFrontDriftPos += (*gRoadInfo).yFrontDrift * kFrameDuration;
+	// camera distance
+	if (gZoomVelo > VEC2D_Value(gPlayerObj->velo))
 	{
-		gZoomVelo-=kZoomAcceleration*kFrameDuration;
-		if(gZoomVelo<VEC2D_Value(gPlayerObj->velo))
-			gZoomVelo=VEC2D_Value(gPlayerObj->velo);
+		gZoomVelo -= kZoomAcceleration * kFrameDuration;
+		if (gZoomVelo < VEC2D_Value(gPlayerObj->velo))
+			gZoomVelo = VEC2D_Value(gPlayerObj->velo);
 	}
 	else
 	{
-		gZoomVelo+=kZoomAcceleration*kFrameDuration;
-		if(gZoomVelo>VEC2D_Value(gPlayerObj->velo))
-			gZoomVelo=VEC2D_Value(gPlayerObj->velo);
+		gZoomVelo += kZoomAcceleration * kFrameDuration;
+		if (gZoomVelo > VEC2D_Value(gPlayerObj->velo))
+			gZoomVelo = VEC2D_Value(gPlayerObj->velo);
 	}
-	if(gZoomVelo>kMaxZoomVelo)
-		gZoomVelo=kMaxZoomVelo;
-	//spike handling
-	gSpikeFrame+=VEC2D_Value(gPlayerObj->velo)/20;
-	if(gPlayerAddOns&kAddOnSpikes&&!(gPlayerDeathDelay!=0)&&!(*gRoadInfo).water)
+	if (gZoomVelo > kMaxZoomVelo)
+		gZoomVelo = kMaxZoomVelo;
+	// spike handling
+	gSpikeFrame += VEC2D_Value(gPlayerObj->velo) / 20;
+	if (gPlayerAddOns & kAddOnSpikes && !(gPlayerDeathDelay != 0) && !(*gRoadInfo).water)
 	{
-		if(!gSpikeObj)
-			gSpikeObj=NewObject(gPlayerObj,207);
-		gSpikeObj->pos=gPlayerObj->pos;
-		gSpikeObj->dir=gPlayerObj->dir;
-		gSpikeObj->jumpHeight=gPlayerObj->jumpHeight;
-		gSpikeObj->frame=gSpikeObj->type->frame+(int)gSpikeFrame%gSpikeObj->type->numFrames;
-	}else if(gSpikeObj)
+		if (!gSpikeObj)
+			gSpikeObj = NewObject(gPlayerObj, 207);
+		gSpikeObj->pos = gPlayerObj->pos;
+		gSpikeObj->dir = gPlayerObj->dir;
+		gSpikeObj->jumpHeight = gPlayerObj->jumpHeight;
+		gSpikeObj->frame = gSpikeObj->type->frame + (int)gSpikeFrame % gSpikeObj->type->numFrames;
+	}
+	else if (gSpikeObj)
 	{
 		KillObject(gSpikeObj);
-		gSpikeObj=nil;
+		gSpikeObj = nil;
 	}
-	//brake light handling
-	if(gBrakeObj)
+	// brake light handling
+	if (gBrakeObj)
 	{
 		KillObject(gBrakeObj);
-		gBrakeObj=nil;
-	}	
-	if((gPlayerObj->input.brake||gPlayerObj->input.reverse)&&!(*gRoadInfo).water&&!(gPlayerDeathDelay!=0)&&gPlayerLives)
+		gBrakeObj = nil;
+	}
+	if ((gPlayerObj->input.brake || gPlayerObj->input.reverse) && !(*gRoadInfo).water && !(gPlayerDeathDelay != 0) && gPlayerLives)
 	{
-		gBrakeObj=NewObject(gPlayerObj,228);
-		if(gPlayerObj->input.reverse)gBrakeObj->frame=394;
-		if(!gPlayerObj->input.brake)gBrakeObj->frame=395;
-		gBrakeObj->pos=gPlayerObj->pos;
-		gBrakeObj->dir=gPlayerObj->dir;
-		gBrakeObj->jumpHeight=gPlayerObj->jumpHeight;
-	} 
-	//invincibility
-	gPlayerObj->damage=0;
+		gBrakeObj = NewObject(gPlayerObj, 228);
+		if (gPlayerObj->input.reverse)
+			gBrakeObj->frame = 394;
+		if (!gPlayerObj->input.brake)
+			gBrakeObj->frame = 395;
+		gBrakeObj->pos = gPlayerObj->pos;
+		gBrakeObj->dir = gPlayerObj->dir;
+		gBrakeObj->jumpHeight = gPlayerObj->jumpHeight;
+	}
+	// invincibility
+	gPlayerObj->damage = 0;
 	/*AddFloatToMessageBuffer("\x06Velo: ",VEC2D_Value(gCameraObj->velo)*3.6);
 	AddFloatToMessageBuffer("\x07Slide: ",gCameraObj->slide);
 	AddFloatToMessageBuffer("\x07Brake: ",gCameraObj->input.brake);0*/
@@ -295,38 +318,67 @@ void PlayerHandling()
 void GameFrame()
 {
 #ifdef PORT_SDL2
+#ifndef __EMSCRIPTEN__
 	/* Log every 180 frames (~3 seconds) so user can see the game is running */
-	if (gFrameCount % 180 == 0) {
+	if (gFrameCount % 180 == 0)
+	{
 		LOG_DEBUG("LOG: GameFrame count=%lu graphFrames=%lu\n",
-		       gFrameCount, gGraphFrameCount);
+				  gFrameCount, gGraphFrameCount);
 	}
 	/* Throttle game-logic to real-time so gFrameCount cannot race arbitrarily
-	 * far ahead of optFrameCount.  Without this guard a vsync-less renderer can
-	 * increment gFrameCount thousands of times per second, forcing CheckTimeSkip
-	 * to busy-wait for hours before the clock catches up. */
+	 * far ahead of optFrameCount.  Sleep for the actual remaining time rather
+	 * than a fixed 1 ms so we don't still spin at ~1000 calls/sec. */
 	{
-		UInt64 curMS=GetMSTime()-gStartMS;
-		unsigned long targetCount=(unsigned long)(curMS*kCalcFPMS);
-		if(gFrameCount>targetCount+1){
-			SDL_Delay(1);
+		UInt64 curMS = GetMSTime() - gStartMS;
+		unsigned long targetCount = (unsigned long)(curMS * kCalcFPMS);
+		if (gFrameCount > targetCount + 1)
+		{
+			/* Compute how many microseconds until the next expected frame */
+			UInt64 nextFrameUS = (UInt64)(gFrameCount / kCalcFPMS);
+			if (nextFrameUS > curMS)
+			{
+				Uint32 sleepMS = (Uint32)((nextFrameUS - curMS) / 1000);
+				if (sleepMS < 1)
+					sleepMS = 1;
+				if (sleepMS > 16)
+					sleepMS = 16; /* cap to one display frame */
+				SDL_Delay(sleepMS);
+			}
+			else
+			{
+				SDL_Delay(1);
+			}
 			return;
 		}
 	}
 #endif
-	LOG_DEBUG("LOG: GF-A MoveObjects\n"); fflush(stdout);
+#endif
+	LOG_DEBUG("LOG: GF-A MoveObjects\n");
+	fflush(stdout);
 	MoveObjects();
-	LOG_DEBUG("LOG: GF-B PlayerHandling\n"); fflush(stdout);
+	Script_OnLevelTick(kFrameDuration);
+	LOG_DEBUG("LOG: GF-B PlayerHandling\n");
+	fflush(stdout);
 	PlayerHandling();
 	gFrameCount++;
-	if(CheckFrameTime())
+#ifdef __EMSCRIPTEN__
+	/* The browser already paces the wasm loop via requestAnimationFrame.
+	 * Rendering every loop tick keeps the canvas smooth instead of letting the
+	 * desktop-style time-skip logic stall the presentation path. */
+	LOG_DEBUG("LOG: GF-C RenderFrame\n");
+	fflush(stdout);
+	RenderFrame();
+	gGraphFrameCount++;
+#else
+	if (CheckFrameTime())
 	{
-		LOG_DEBUG("LOG: GF-C RenderFrame\n"); fflush(stdout);
+		LOG_DEBUG("LOG: GF-C RenderFrame\n");
+		fflush(stdout);
 		RenderFrame();
 		gGraphFrameCount++;
 		CheckTimeSkip();
 	}
-	if(gEndGame)
+#endif
+	if (gEndGame)
 		EndGame();
 }
-
-

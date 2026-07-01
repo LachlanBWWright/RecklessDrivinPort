@@ -47,6 +47,8 @@ import {
   onObjectTypeFlagToggle,
   onObjectTypeFrameChange,
   onObjectTypeReferenceChange,
+  createScriptForObjectType,
+  createScriptForLevel,
   saveObjectGroups,
   saveObjectTypes,
   scheduleObjectTypesAutoSave,
@@ -54,7 +56,14 @@ import {
   selectObjectType,
   selectedObjectGroup,
   selectedObjectType,
+  scriptBindingForObjectType,
+  levelScriptBindingForLevel,
+  setObjectTypeScriptBinding,
+  setLevelScriptBinding,
   syncObjectTypeLookup,
+  updateScriptName,
+  updateScriptSource,
+  updateScript,
 } from './app-pack-editing';
 import {
   addObject,
@@ -379,11 +388,11 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     this.editorTestDriveUseObjectGroupStartY.set(enabled);
   }
 
-  async launchSelectedLevelPreview(levelResourceId: number): Promise<void> {
+  async launchSelectedLevelPreview(levelResourceId: number, stripScripts = false): Promise<void> {
     const levelNum = this.levelDisplayNum(levelResourceId);
     this.editorError.set('');
 
-    await this.runtime.saveEditedResourcesToGame();
+    await this.runtime.saveEditedResourcesToGame(stripScripts);
     if (this.editorError()) {
       return;
     }
@@ -729,6 +738,42 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
 
   onObjectTypeFrameChange(typeRes: number, frame: number): void {
     onObjectTypeFrameChange(this, typeRes, frame);
+  }
+
+  scriptBindingForObjectType(typeRes: number) {
+    return scriptBindingForObjectType(this, typeRes);
+  }
+
+  setObjectTypeScriptBinding(typeRes: number, scriptId: number | null): void {
+    setObjectTypeScriptBinding(this, typeRes, scriptId);
+  }
+
+  createScriptForObjectType(typeRes: number): void {
+    createScriptForObjectType(this, typeRes);
+  }
+
+  levelScriptBindingForLevel(levelResourceId: number) {
+    return levelScriptBindingForLevel(this, levelResourceId);
+  }
+
+  setLevelScriptBinding(levelResourceId: number, scriptId: number | null): void {
+    setLevelScriptBinding(this, levelResourceId, scriptId);
+  }
+
+  createScriptForLevel(levelResourceId: number): void {
+    createScriptForLevel(this, levelResourceId);
+  }
+
+  updateScriptName(scriptId: number, name: string): void {
+    updateScriptName(this, scriptId, name);
+  }
+
+  updateScriptSource(scriptId: number, source: string): void {
+    updateScriptSource(this, scriptId, source);
+  }
+
+  updateScript(scriptId: number, name: string, source: string): void {
+    updateScript(this, scriptId, name, source);
   }
 
   saveObjectTypes(): Promise<void> {
