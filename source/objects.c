@@ -530,6 +530,8 @@ void FireWeapon(tObject *shooter,int weaponID)
 {
 	if(!shooter->jumpHeight){
 		tObject *projectile=NewObject(shooter,weaponID);
+		if(!projectile)
+			return;
 		projectile->dir=shooter->dir;
 		projectile->pos=shooter->pos;
 		projectile->shooter=shooter;
@@ -537,6 +539,7 @@ void FireWeapon(tObject *shooter,int weaponID)
 			projectile->jumpVelo=25.0+RanFl(-2.0,2.0);
 		if(projectile->type->weaponInfo)
 			projectile->velo=VEC2D_Sum(shooter->velo,P2D(sin(shooter->dir)*projectile->type->weaponInfo,cos(shooter->dir)*projectile->type->weaponInfo));
+		Script_LinkSpawnedChild(shooter, projectile);
 	}
 }
 

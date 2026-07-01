@@ -166,8 +166,12 @@ describe('lua script completions', () => {
       'onPlayerFar',
       'onAnimationEnd',
       'onOffscreen',
+      'onPickup',
       'onLevelStart',
       'onLevelTick',
+      'onLevelComplete',
+      'onPlayerRespawn',
+      'onAddOnAward',
     ];
     for (const hookName of expectedHooks) {
       const completion = LUA_HOOK_COMPLETIONS.find((h) => h.label === hookName);

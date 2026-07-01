@@ -38,22 +38,22 @@
  * ============================================================ */
 
 /* Screen globals (declared extern in screen.h) */
-Ptr   gBaseAddr  = NULL;
-short gRowBytes  = 0;
-short gXSize     = 640;
-short gYSize     = 480;
-int   gOddLines  = 0;
+Ptr gBaseAddr = NULL;
+short gRowBytes = 0;
+short gXSize = 640;
+short gYSize = 480;
+int gOddLines = 0;
 Handle gTranslucenceTab = NULL;
-Handle g16BitClut       = NULL;
-UInt8  gLightningTab[kLightValues][256];
-int    gScreenBlitSpecial = 0;
+Handle g16BitClut = NULL;
+UInt8 gLightningTab[kLightValues][256];
+int gScreenBlitSpecial = 0;
 
 /* SDL objects */
-static SDL_Window   *s_window   = NULL;
+static SDL_Window *s_window = NULL;
 static SDL_Renderer *s_renderer = NULL;
-static SDL_Texture  *s_texture  = NULL;
-static SDL_Surface  *s_surface  = NULL;  /* 8-bit paletted surface (blit source) */
-static SDL_Surface  *s_rgb_surface = NULL; /* 32-bit surface for upload to texture */
+static SDL_Texture *s_texture = NULL;
+static SDL_Surface *s_surface = NULL;     /* 8-bit paletted surface (blit source) */
+static SDL_Surface *s_rgb_surface = NULL; /* 32-bit surface for upload to texture */
 
 /*
  * Dedicated back-buffer for gBaseAddr. We keep this separate from the SDL
@@ -93,19 +93,20 @@ extern int gExit;
  *     GAS:     x in [TC_ACT_MX, 1.0       ], y in [TC_ACT_MY, 1.0      ]
  * ============================================================ */
 
-#define TC_Y_TOP    0.70f   /* control strip: bottom 30% of screen */
-#define TC_DPAD_L_R 0.20f   /* left/right split in d-pad: x < this = LEFT, else RIGHT */
-#define TC_DPAD_W   0.40f   /* d-pad occupies leftmost 40% of screen */
-#define TC_ACT_L    0.60f   /* action zone starts at 60% */
-#define TC_ACT_MX   0.80f   /* mine|missile / brake|gas vertical split */
-#define TC_ACT_MY   0.85f   /* weapon row / movement row horizontal split */
+#define TC_Y_TOP 0.70f    /* control strip: bottom 30% of screen */
+#define TC_DPAD_L_R 0.20f /* left/right split in d-pad: x < this = LEFT, else RIGHT */
+#define TC_DPAD_W 0.40f   /* d-pad occupies leftmost 40% of screen */
+#define TC_ACT_L 0.60f    /* action zone starts at 60% */
+#define TC_ACT_MX 0.80f   /* mine|missile / brake|gas vertical split */
+#define TC_ACT_MY 0.85f   /* weapon row / movement row horizontal split */
 
 #define TOUCH_MAX_FINGERS 10
 
-static struct {
-    int          active;
+static struct
+{
+    int active;
     SDL_FingerID finger_id;
-    int          key_mask;
+    int key_mask;
 } s_touch_fingers[TOUCH_MAX_FINGERS];
 
 /* Per-key virtual state accumulated from all active fingers */
@@ -119,18 +120,23 @@ static int s_touch_controls_active = 0;
 static void sdl_get_game_dst_rect(SDL_Rect *dst, int *out_w, int *out_h)
 {
     int rw = gXSize, rh = gYSize;
-    if (s_renderer && SDL_GetRendererOutputSize(s_renderer, &rw, &rh) < 0) {
+    if (s_renderer && SDL_GetRendererOutputSize(s_renderer, &rw, &rh) < 0)
+    {
         rw = gXSize;
         rh = gYSize;
     }
-    if (out_w) *out_w = rw;
-    if (out_h) *out_h = rh;
+    if (out_w)
+        *out_w = rw;
+    if (out_h)
+        *out_h = rh;
 
-    if (!dst) return;
+    if (!dst)
+        return;
     {
         int d_w = rh * gXSize / gYSize;
         int d_h = rh;
-        if (d_w > rw) {
+        if (d_w > rw)
+        {
             d_w = rw;
             d_h = rw * gYSize / gXSize;
         }
@@ -148,42 +154,60 @@ static void sdl_output_to_game_xy(int px, int py, int *gx, int *gy)
     SDL_Rect dst;
     sdl_get_game_dst_rect(&dst, NULL, NULL);
 
-    if (dst.w <= 0 || dst.h <= 0) {
-        if (gx) *gx = px;
-        if (gy) *gy = py;
+    if (dst.w <= 0 || dst.h <= 0)
+    {
+        if (gx)
+            *gx = px;
+        if (gy)
+            *gy = py;
         return;
     }
 
-    if (px < dst.x) px = dst.x;
-    if (py < dst.y) py = dst.y;
-    if (px >= dst.x + dst.w) px = dst.x + dst.w - 1;
-    if (py >= dst.y + dst.h) py = dst.y + dst.h - 1;
+    if (px < dst.x)
+        px = dst.x;
+    if (py < dst.y)
+        py = dst.y;
+    if (px >= dst.x + dst.w)
+        px = dst.x + dst.w - 1;
+    if (py >= dst.y + dst.h)
+        py = dst.y + dst.h - 1;
 
-    if (gx) *gx = (px - dst.x) * gXSize / dst.w;
-    if (gy) *gy = (py - dst.y) * gYSize / dst.h;
+    if (gx)
+        *gx = (px - dst.x) * gXSize / dst.w;
+    if (gy)
+        *gy = (py - dst.y) * gYSize / dst.h;
 }
 
 /* Returns the bitmask of game keys activated by a normalised touch at (nx,ny) */
 static int touch_pos_to_keymask(float nx, float ny)
 {
-    if (ny < TC_Y_TOP) return 0;
+    if (ny < TC_Y_TOP)
+        return 0;
 
     /* Left d-pad zone */
-    if (nx < TC_DPAD_W) {
-        if (nx < TC_DPAD_L_R) return (1 << kLeft);
+    if (nx < TC_DPAD_W)
+    {
+        if (nx < TC_DPAD_L_R)
+            return (1 << kLeft);
         return (1 << kRight);
     }
 
     /* Right action zone */
-    if (nx >= TC_ACT_L) {
-        if (ny < TC_ACT_MY) {
+    if (nx >= TC_ACT_L)
+    {
+        if (ny < TC_ACT_MY)
+        {
             /* Weapon row */
-            if (nx < TC_ACT_MX) return (1 << kFire);    /* MINE  */
-            return (1 << kMissile);                       /* MISSILE */
-        } else {
+            if (nx < TC_ACT_MX)
+                return (1 << kFire); /* MINE  */
+            return (1 << kMissile);  /* MISSILE */
+        }
+        else
+        {
             /* Drive row */
-            if (nx < TC_ACT_MX) return (1 << kBrake);   /* BRAKE */
-            return (1 << kForward);                       /* GAS   */
+            if (nx < TC_ACT_MX)
+                return (1 << kBrake); /* BRAKE */
+            return (1 << kForward);   /* GAS   */
         }
     }
 
@@ -196,25 +220,38 @@ static void sdl_touch_finger_event(SDL_FingerID finger_id, float nx, float ny, i
     int i, slot = -1;
     int combined;
 
-    for (i = 0; i < TOUCH_MAX_FINGERS; i++) {
-        if (s_touch_fingers[i].active && s_touch_fingers[i].finger_id == finger_id) {
-            slot = i; break;
+    for (i = 0; i < TOUCH_MAX_FINGERS; i++)
+    {
+        if (s_touch_fingers[i].active && s_touch_fingers[i].finger_id == finger_id)
+        {
+            slot = i;
+            break;
         }
     }
-    if (slot < 0 && down) {
-        for (i = 0; i < TOUCH_MAX_FINGERS; i++) {
-            if (!s_touch_fingers[i].active) { slot = i; break; }
+    if (slot < 0 && down)
+    {
+        for (i = 0; i < TOUCH_MAX_FINGERS; i++)
+        {
+            if (!s_touch_fingers[i].active)
+            {
+                slot = i;
+                break;
+            }
         }
     }
-    if (slot < 0) return;
+    if (slot < 0)
+        return;
 
-    if (!down) {
-        s_touch_fingers[slot].active   = 0;
+    if (!down)
+    {
+        s_touch_fingers[slot].active = 0;
         s_touch_fingers[slot].key_mask = 0;
-    } else {
-        s_touch_fingers[slot].active    = 1;
+    }
+    else
+    {
+        s_touch_fingers[slot].active = 1;
         s_touch_fingers[slot].finger_id = finger_id;
-        s_touch_fingers[slot].key_mask  = touch_pos_to_keymask(nx, ny);
+        s_touch_fingers[slot].key_mask = touch_pos_to_keymask(nx, ny);
     }
 
     combined = 0;
@@ -228,7 +265,8 @@ static void sdl_touch_finger_event(SDL_FingerID finger_id, float nx, float ny, i
 
 int SDL_Platform_GetTouchKey(int element)
 {
-    if (element < 0 || element >= kNumElements) return 0;
+    if (element < 0 || element >= kNumElements)
+        return 0;
     return s_touch_key_state[element];
 }
 
@@ -272,11 +310,12 @@ static void tc_draw_arrow_left(int cx, int cy, int hw, int hh)
 
     /* Arrowhead (filled triangle via horizontal scan lines) */
     int i;
-    for (i = 0; i <= hw; i++) {
+    for (i = 0; i <= hw; i++)
+    {
         int row_half = (hh * i) / hw;
         SDL_RenderDrawLine(s_renderer,
-            cx - i, cy - row_half,
-            cx - i, cy + row_half);
+                           cx - i, cy - row_half,
+                           cx - i, cy + row_half);
     }
     /* Outline the arrow shape */
     SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy - stem_h);
@@ -293,11 +332,12 @@ static void tc_draw_arrow_right(int cx, int cy, int hw, int hh)
     int tail = cx - hw / 2;
     int i;
 
-    for (i = 0; i <= hw; i++) {
+    for (i = 0; i <= hw; i++)
+    {
         int row_half = (hh * i) / hw;
         SDL_RenderDrawLine(s_renderer,
-            cx + i, cy - row_half,
-            cx + i, cy + row_half);
+                           cx + i, cy - row_half,
+                           cx + i, cy + row_half);
     }
     SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy - hh / 3);
     SDL_RenderDrawLine(s_renderer, tip, cy, tail, cy + hh / 3);
@@ -313,11 +353,12 @@ static void tc_draw_arrow_up(int cx, int cy, int hw, int hh)
     int tail = cy + hh / 2;
     int i;
 
-    for (i = 0; i <= hh; i++) {
+    for (i = 0; i <= hh; i++)
+    {
         int col_half = (hw * i) / hh;
         SDL_RenderDrawLine(s_renderer,
-            cx - col_half, cy - i,
-            cx + col_half, cy - i);
+                           cx - col_half, cy - i,
+                           cx + col_half, cy - i);
     }
     SDL_RenderDrawLine(s_renderer, cx, tip, cx - hw / 3, tail);
     SDL_RenderDrawLine(s_renderer, cx, tip, cx + hw / 3, tail);
@@ -333,11 +374,12 @@ static void tc_draw_arrow_down(int cx, int cy, int hw, int hh)
     int tail = cy - hh / 2;
     int i;
 
-    for (i = 0; i <= hh; i++) {
+    for (i = 0; i <= hh; i++)
+    {
         int col_half = (hw * i) / hh;
         SDL_RenderDrawLine(s_renderer,
-            cx - col_half, cy + i,
-            cx + col_half, cy + i);
+                           cx - col_half, cy + i,
+                           cx + col_half, cy + i);
     }
     SDL_RenderDrawLine(s_renderer, cx, tip, cx - hw / 3, tail);
     SDL_RenderDrawLine(s_renderer, cx, tip, cx + hw / 3, tail);
@@ -351,7 +393,8 @@ static void tc_draw_arrow_down(int cx, int cy, int hw, int hh)
 static void tc_draw_circle(int cx, int cy, int r)
 {
     int x = 0, y = r, d = 3 - 2 * r;
-    while (y >= x) {
+    while (y >= x)
+    {
         SDL_RenderDrawPoint(s_renderer, cx + x, cy + y);
         SDL_RenderDrawPoint(s_renderer, cx - x, cy + y);
         SDL_RenderDrawPoint(s_renderer, cx + x, cy - y);
@@ -361,8 +404,13 @@ static void tc_draw_circle(int cx, int cy, int r)
         SDL_RenderDrawPoint(s_renderer, cx + y, cy - x);
         SDL_RenderDrawPoint(s_renderer, cx - y, cy - x);
         x++;
-        if (d < 0) d += 4 * x + 6;
-        else { d += 4 * (x - y) + 10; y--; }
+        if (d < 0)
+            d += 4 * x + 6;
+        else
+        {
+            d += 4 * (x - y) + 10;
+            y--;
+        }
     }
     /* Small spikes on the mine */
     SDL_RenderDrawLine(s_renderer, cx, cy - r - 4, cx, cy - r + 2);
@@ -403,27 +451,28 @@ static void sdl_render_touch_overlay(void)
      * devices where the window fills the native screen resolution). */
     SDL_GetRendererOutputSize(s_renderer, &w, &h);
     /* alpha values: idle = muted translucent, active = bright */
-    Uint8 bg_idle   = 50;   /* button background when not pressed */
-    Uint8 bg_active = 140;  /* button background when pressed */
-    Uint8 ico_alpha = 220;  /* icon/glyph alpha */
-    int   pressed;
+    Uint8 bg_idle = 50;    /* button background when not pressed */
+    Uint8 bg_active = 140; /* button background when pressed */
+    Uint8 ico_alpha = 220; /* icon/glyph alpha */
+    int pressed;
 
     /* Button centre coords & glyph sizes */
-    int dpad_y  = (int)((TC_Y_TOP + 1.0f) * 0.5f * h);  /* vert centre of d-pad strip */
+    int dpad_y = (int)((TC_Y_TOP + 1.0f) * 0.5f * h); /* vert centre of d-pad strip */
     int left_cx = (int)(TC_DPAD_L_R * 0.5f * w);
     int right_cx = (int)((TC_DPAD_L_R + TC_DPAD_W) * 0.5f * w);
     int dpad_hw = (int)(TC_DPAD_L_R * w * 0.30f);
     int dpad_hh = (int)((1.0f - TC_Y_TOP) * h * 0.25f);
 
     /* Action zone row heights */
-    int wpn_cy  = (int)((TC_Y_TOP + TC_ACT_MY) * 0.5f * h);
-    int drv_cy  = (int)((TC_ACT_MY + 1.0f) * 0.5f * h);
+    int wpn_cy = (int)((TC_Y_TOP + TC_ACT_MY) * 0.5f * h);
+    int drv_cy = (int)((TC_ACT_MY + 1.0f) * 0.5f * h);
     int mine_cx = (int)((TC_ACT_L + TC_ACT_MX) * 0.5f * w);
-    int msl_cx  = (int)((TC_ACT_MX + 1.0f) * 0.5f * w);
-    int act_hw  = (int)((TC_ACT_MX - TC_ACT_L) * w * 0.25f);
-    int act_hh  = (int)((TC_ACT_MY - TC_Y_TOP) * h * 0.30f);
+    int msl_cx = (int)((TC_ACT_MX + 1.0f) * 0.5f * w);
+    int act_hw = (int)((TC_ACT_MX - TC_ACT_L) * w * 0.25f);
+    int act_hh = (int)((TC_ACT_MY - TC_Y_TOP) * h * 0.30f);
 
-    if (!s_renderer) return;
+    if (!s_renderer)
+        return;
     SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_BLEND);
 
     /* ---- LEFT button ---- */
@@ -470,17 +519,17 @@ static void sdl_render_touch_overlay(void)
 
     /* ---- Button borders (white translucent outlines) ---- */
     SDL_SetRenderDrawColor(s_renderer, 255, 255, 255, 90);
-    tc_draw_nrect(w, h, 0.0f,     TC_Y_TOP, TC_DPAD_L_R, 1.0f);
+    tc_draw_nrect(w, h, 0.0f, TC_Y_TOP, TC_DPAD_L_R, 1.0f);
     tc_draw_nrect(w, h, TC_DPAD_L_R, TC_Y_TOP, TC_DPAD_W, 1.0f);
     tc_draw_nrect(w, h, TC_ACT_L, TC_Y_TOP, TC_ACT_MX, TC_ACT_MY);
-    tc_draw_nrect(w, h, TC_ACT_MX, TC_Y_TOP, 1.0f,    TC_ACT_MY);
+    tc_draw_nrect(w, h, TC_ACT_MX, TC_Y_TOP, 1.0f, TC_ACT_MY);
     tc_draw_nrect(w, h, TC_ACT_L, TC_ACT_MY, TC_ACT_MX, 1.0f);
-    tc_draw_nrect(w, h, TC_ACT_MX, TC_ACT_MY, 1.0f,  1.0f);
+    tc_draw_nrect(w, h, TC_ACT_MX, TC_ACT_MY, 1.0f, 1.0f);
 
     SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_NONE);
 }
 
-#define MODAL_GLYPH(name, a, b, c, d, e, f, g) static const UInt8 name[7] = { a, b, c, d, e, f, g }
+#define MODAL_GLYPH(name, a, b, c, d, e, f, g) static const UInt8 name[7] = {a, b, c, d, e, f, g}
 MODAL_GLYPH(s_modal_glyph_space, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 MODAL_GLYPH(s_modal_glyph_dash, 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00);
 MODAL_GLYPH(s_modal_glyph_dot, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C);
@@ -527,58 +576,104 @@ MODAL_GLYPH(s_modal_glyph_Z, 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F);
 
 static const UInt8 *sdl_modal_glyph_rows(char ch)
 {
-    switch (toupper((unsigned char)ch)) {
-        case ' ': return s_modal_glyph_space;
-        case '-': return s_modal_glyph_dash;
-        case '.': return s_modal_glyph_dot;
-        case '!': return s_modal_glyph_bang;
-        case ':': return s_modal_glyph_colon;
-        case '\'': return s_modal_glyph_quote;
-        case '0': return s_modal_glyph_0;
-        case '1': return s_modal_glyph_1;
-        case '2': return s_modal_glyph_2;
-        case '3': return s_modal_glyph_3;
-        case '4': return s_modal_glyph_4;
-        case '5': return s_modal_glyph_5;
-        case '6': return s_modal_glyph_6;
-        case '7': return s_modal_glyph_7;
-        case '8': return s_modal_glyph_8;
-        case '9': return s_modal_glyph_9;
-        case 'A': return s_modal_glyph_A;
-        case 'B': return s_modal_glyph_B;
-        case 'C': return s_modal_glyph_C;
-        case 'D': return s_modal_glyph_D;
-        case 'E': return s_modal_glyph_E;
-        case 'F': return s_modal_glyph_F;
-        case 'G': return s_modal_glyph_G;
-        case 'H': return s_modal_glyph_H;
-        case 'I': return s_modal_glyph_I;
-        case 'J': return s_modal_glyph_J;
-        case 'K': return s_modal_glyph_K;
-        case 'L': return s_modal_glyph_L;
-        case 'M': return s_modal_glyph_M;
-        case 'N': return s_modal_glyph_N;
-        case 'O': return s_modal_glyph_O;
-        case 'P': return s_modal_glyph_P;
-        case 'Q': return s_modal_glyph_Q;
-        case 'R': return s_modal_glyph_R;
-        case 'S': return s_modal_glyph_S;
-        case 'T': return s_modal_glyph_T;
-        case 'U': return s_modal_glyph_U;
-        case 'V': return s_modal_glyph_V;
-        case 'W': return s_modal_glyph_W;
-        case 'X': return s_modal_glyph_X;
-        case 'Y': return s_modal_glyph_Y;
-        case 'Z': return s_modal_glyph_Z;
-        default: return s_modal_glyph_dash;
+    switch (toupper((unsigned char)ch))
+    {
+    case ' ':
+        return s_modal_glyph_space;
+    case '-':
+        return s_modal_glyph_dash;
+    case '.':
+        return s_modal_glyph_dot;
+    case '!':
+        return s_modal_glyph_bang;
+    case ':':
+        return s_modal_glyph_colon;
+    case '\'':
+        return s_modal_glyph_quote;
+    case '0':
+        return s_modal_glyph_0;
+    case '1':
+        return s_modal_glyph_1;
+    case '2':
+        return s_modal_glyph_2;
+    case '3':
+        return s_modal_glyph_3;
+    case '4':
+        return s_modal_glyph_4;
+    case '5':
+        return s_modal_glyph_5;
+    case '6':
+        return s_modal_glyph_6;
+    case '7':
+        return s_modal_glyph_7;
+    case '8':
+        return s_modal_glyph_8;
+    case '9':
+        return s_modal_glyph_9;
+    case 'A':
+        return s_modal_glyph_A;
+    case 'B':
+        return s_modal_glyph_B;
+    case 'C':
+        return s_modal_glyph_C;
+    case 'D':
+        return s_modal_glyph_D;
+    case 'E':
+        return s_modal_glyph_E;
+    case 'F':
+        return s_modal_glyph_F;
+    case 'G':
+        return s_modal_glyph_G;
+    case 'H':
+        return s_modal_glyph_H;
+    case 'I':
+        return s_modal_glyph_I;
+    case 'J':
+        return s_modal_glyph_J;
+    case 'K':
+        return s_modal_glyph_K;
+    case 'L':
+        return s_modal_glyph_L;
+    case 'M':
+        return s_modal_glyph_M;
+    case 'N':
+        return s_modal_glyph_N;
+    case 'O':
+        return s_modal_glyph_O;
+    case 'P':
+        return s_modal_glyph_P;
+    case 'Q':
+        return s_modal_glyph_Q;
+    case 'R':
+        return s_modal_glyph_R;
+    case 'S':
+        return s_modal_glyph_S;
+    case 'T':
+        return s_modal_glyph_T;
+    case 'U':
+        return s_modal_glyph_U;
+    case 'V':
+        return s_modal_glyph_V;
+    case 'W':
+        return s_modal_glyph_W;
+    case 'X':
+        return s_modal_glyph_X;
+    case 'Y':
+        return s_modal_glyph_Y;
+    case 'Z':
+        return s_modal_glyph_Z;
+    default:
+        return s_modal_glyph_dash;
     }
 }
 
 static int sdl_modal_text_width(const char *text, int scale)
 {
     int width = 0;
-    if (!text || scale <= 0) return 0;
-    while (*text) {
+    if (!text || scale <= 0)
+        return 0;
+    while (*text)
+    {
         width += 6 * scale;
         text++;
     }
@@ -589,18 +684,23 @@ static void sdl_modal_draw_text(const char *text, int x, int y, int scale,
                                 Uint8 red, Uint8 green, Uint8 blue, Uint8 alpha)
 {
     SDL_Rect pixel;
-    if (!text || scale <= 0 || !s_renderer) return;
+    if (!text || scale <= 0 || !s_renderer)
+        return;
     SDL_SetRenderDrawColor(s_renderer, red, green, blue, alpha);
     pixel.w = scale;
     pixel.h = scale;
-    while (*text) {
+    while (*text)
+    {
         const UInt8 *rows = sdl_modal_glyph_rows(*text);
         int row;
-        for (row = 0; row < 7; row++) {
+        for (row = 0; row < 7; row++)
+        {
             int col;
             UInt8 bits = rows[row];
-            for (col = 0; col < 5; col++) {
-                if ((bits & (1 << (4 - col))) == 0) continue;
+            for (col = 0; col < 5; col++)
+            {
+                if ((bits & (1 << (4 - col))) == 0)
+                    continue;
                 pixel.x = x + col * scale;
                 pixel.y = y + row * scale;
                 SDL_RenderFillRect(s_renderer, &pixel);
@@ -613,32 +713,46 @@ static void sdl_modal_draw_text(const char *text, int x, int y, int scale,
 
 static const char *sdl_modal_title(short dialogID)
 {
-    switch (dialogID) {
-        case 129: return "ENTER CHEAT CODE";
-        case 130: return "NEW HIGH SCORE";
-        case 132:
-        case 133: return "REGISTRATION";
-        case 134:
-        case 135: return "KEY CONFIG";
-        default: return "ENTER TEXT";
+    switch (dialogID)
+    {
+    case 129:
+        return "ENTER CHEAT CODE";
+    case 130:
+        return "NEW HIGH SCORE";
+    case 132:
+    case 133:
+        return "REGISTRATION";
+    case 134:
+    case 135:
+        return "KEY CONFIG";
+    default:
+        return "ENTER TEXT";
     }
 }
 
 static const char *sdl_modal_subtitle(short dialogID)
 {
-    switch (dialogID) {
-        case 130: return "TYPE YOUR NAME";
-        case 129: return "PRESS ENTER TO APPLY";
-        default: return "PRESS ENTER TO ACCEPT";
+    switch (dialogID)
+    {
+    case 130:
+        return "TYPE YOUR NAME";
+    case 129:
+        return "PRESS ENTER TO APPLY";
+    default:
+        return "PRESS ENTER TO ACCEPT";
     }
 }
 
 static const char *sdl_modal_footer(short dialogID)
 {
-    switch (dialogID) {
-        case 130: return "PRESS ENTER TO SUBMIT SCORE";
-        case 129: return "PRESS ENTER TO APPLY";
-        default: return "ENTER TO ACCEPT";
+    switch (dialogID)
+    {
+    case 130:
+        return "PRESS ENTER TO SUBMIT SCORE";
+    case 129:
+        return "PRESS ENTER TO APPLY";
+    default:
+        return "ENTER TO ACCEPT";
     }
 }
 
@@ -663,19 +777,26 @@ static void sdl_render_modal_overlay(short dialogID, const char *text, int blink
     int i;
     int cursorX;
 
-    if (!s_renderer) return;
+    if (!s_renderer)
+        return;
     sdl_get_game_dst_rect(&game, &output.w, &output.h);
     output.x = 0;
     output.y = 0;
 
     panel.w = game.w * 3 / 4;
-    if (dialogID == 130) panel.w = game.w * 5 / 6;
-    if (panel.w < 320) panel.w = 320;
-    if (panel.w > game.w - 24) panel.w = game.w - 24;
+    if (dialogID == 130)
+        panel.w = game.w * 5 / 6;
+    if (panel.w < 320)
+        panel.w = 320;
+    if (panel.w > game.w - 24)
+        panel.w = game.w - 24;
     panel.h = game.h / 3;
-    if (dialogID == 130) panel.h = game.h * 2 / 5;
-    if (panel.h < 150) panel.h = 150;
-    if (panel.h > game.h - 24) panel.h = game.h - 24;
+    if (dialogID == 130)
+        panel.h = game.h * 2 / 5;
+    if (panel.h < 150)
+        panel.h = 150;
+    if (panel.h > game.h - 24)
+        panel.h = game.h - 24;
     panel.x = game.x + (game.w - panel.w) / 2;
     panel.y = game.y + (game.h - panel.h) / 2;
 
@@ -694,10 +815,13 @@ static void sdl_render_modal_overlay(short dialogID, const char *text, int blink
     SDL_RenderDrawRect(s_renderer, &panel);
 
     titleScale = panel.w / 190;
-    if (titleScale < 2) titleScale = 2;
-    if (titleScale > 4) titleScale = 4;
+    if (titleScale < 2)
+        titleScale = 2;
+    if (titleScale > 4)
+        titleScale = 4;
     bodyScale = titleScale > 2 ? titleScale - 1 : 2;
-    if (dialogID == 130 && bodyScale < 3) bodyScale = 3;
+    if (dialogID == 130 && bodyScale < 3)
+        bodyScale = 3;
 
     titleWidth = sdl_modal_text_width(title, titleScale);
     subtitleWidth = sdl_modal_text_width(subtitle, bodyScale);
@@ -713,19 +837,23 @@ static void sdl_render_modal_overlay(short dialogID, const char *text, int blink
     SDL_RenderDrawRect(s_renderer, &input);
 
     maxChars = (input.w - 16) / (6 * bodyScale);
-    if (maxChars < 1) maxChars = 1;
+    if (maxChars < 1)
+        maxChars = 1;
     textLen = text ? (int)strlen(text) : 0;
     startIndex = textLen > maxChars ? textLen - maxChars : 0;
-    for (i = 0; i < maxChars && text && text[startIndex + i]; i++) {
+    for (i = 0; i < maxChars && text && text[startIndex + i]; i++)
+    {
         visibleText[i] = text[startIndex + i];
     }
     visibleText[i] = '\0';
     sdl_modal_draw_text(visibleText, input.x + 8, input.y + 5, bodyScale,
                         255, 255, 255, 255);
 
-    if (blinkCursor) {
+    if (blinkCursor)
+    {
         cursorX = input.x + 8 + sdl_modal_text_width(visibleText, bodyScale) + bodyScale;
-        if (cursorX > input.x + input.w - bodyScale * 2) {
+        if (cursorX > input.x + input.w - bodyScale * 2)
+        {
             cursorX = input.x + input.w - bodyScale * 2;
         }
         SDL_SetRenderDrawColor(s_renderer, 255, 239, 160, 255);
@@ -742,15 +870,20 @@ static void sdl_render_modal_overlay(short dialogID, const char *text, int blink
 static void sdl_set_depth(int bpp)
 {
     size_t needed = (size_t)gXSize * gYSize * bpp;
-    short  wanted_rowbytes = (short)(gXSize * bpp);
+    short wanted_rowbytes = (short)(gXSize * bpp);
     if (s_back_buffer && gRowBytes == wanted_rowbytes)
-        return;  /* already the right depth */
-    if (s_back_buffer) free(s_back_buffer);
+        return; /* already the right depth */
+    if (s_back_buffer)
+        free(s_back_buffer);
     s_back_buffer = (UInt8 *)malloc(needed);
-    if (!s_back_buffer) { fprintf(stderr, "sdl_set_depth: malloc failed\n"); exit(1); }
+    if (!s_back_buffer)
+    {
+        fprintf(stderr, "sdl_set_depth: malloc failed\n");
+        exit(1);
+    }
     memset(s_back_buffer, 0, needed);
-    gBaseAddr  = (Ptr)s_back_buffer;
-    gRowBytes  = wanted_rowbytes;
+    gBaseAddr = (Ptr)s_back_buffer;
+    gRowBytes = wanted_rowbytes;
 }
 
 /*
@@ -758,14 +891,15 @@ static void sdl_set_depth(int bpp)
  * This allows CopyBits/GetPortBitMapForCopyBits to work with the SDL screen
  * without requiring special-case SDL_Surface handling in mac_stubs.c.
  */
-typedef struct {
-    PixMap  pixmap;
-    UInt8  *pixels;
-    int     owned;
-} GWorldImpl;  /* must match definition in mac_stubs.c */
+typedef struct
+{
+    PixMap pixmap;
+    UInt8 *pixels;
+    int owned;
+} GWorldImpl; /* must match definition in mac_stubs.c */
 
 static GWorldImpl s_screen_gworld;
-static int        s_screen_gworld_valid = 0;
+static int s_screen_gworld_valid = 0;
 
 int gScreenMode = kScreenSuspended;
 
@@ -892,14 +1026,14 @@ static const SDL_Scancode s_mac_to_sdl[128] = {
     /* 0x68 */ SDL_SCANCODE_UNKNOWN,
     /* 0x69 */ SDL_SCANCODE_PRINTSCREEN, /* F13 */
     /* 0x6A */ SDL_SCANCODE_F16,
-    /* 0x6B */ SDL_SCANCODE_SCROLLLOCK,  /* F14 */
+    /* 0x6B */ SDL_SCANCODE_SCROLLLOCK, /* F14 */
     /* 0x6C */ SDL_SCANCODE_UNKNOWN,
     /* 0x6D */ SDL_SCANCODE_F10,
     /* 0x6E */ SDL_SCANCODE_UNKNOWN,
     /* 0x6F */ SDL_SCANCODE_F12,
     /* 0x70 */ SDL_SCANCODE_UNKNOWN,
-    /* 0x71 */ SDL_SCANCODE_PAUSE,       /* F15 */
-    /* 0x72 */ SDL_SCANCODE_INSERT,      /* Help key */
+    /* 0x71 */ SDL_SCANCODE_PAUSE,  /* F15 */
+    /* 0x72 */ SDL_SCANCODE_INSERT, /* Help key */
     /* 0x73 */ SDL_SCANCODE_HOME,
     /* 0x74 */ SDL_SCANCODE_PAGEUP,
     /* 0x75 */ SDL_SCANCODE_DELETE,
@@ -919,11 +1053,14 @@ static const SDL_Scancode s_mac_to_sdl[128] = {
 static uint8_t s_sdl_to_mac[SDL_NUM_SCANCODES];
 static int s_sdl_to_mac_built = 0;
 
-static void build_sdl_to_mac(void) {
+static void build_sdl_to_mac(void)
+{
     int i;
-    if (s_sdl_to_mac_built) return;
+    if (s_sdl_to_mac_built)
+        return;
     memset(s_sdl_to_mac, 0xFF, sizeof(s_sdl_to_mac));
-    for (i = 0; i < 128; i++) {
+    for (i = 0; i < 128; i++)
+    {
         SDL_Scancode sc = s_mac_to_sdl[i];
         if (sc != SDL_SCANCODE_UNKNOWN && s_sdl_to_mac[sc] == 0xFF)
             s_sdl_to_mac[sc] = (uint8_t)i;
@@ -934,7 +1071,8 @@ static void build_sdl_to_mac(void) {
 /* ============================================================
  * GetKeys - Mac keyboard state using SDL2 keyboard state
  * ============================================================ */
-void GetKeys(KeyMap theKeys) {
+void GetKeys(KeyMap theKeys)
+{
     unsigned char *km = (unsigned char *)theKeys;
     memset(km, 0, 16);
 
@@ -946,9 +1084,11 @@ void GetKeys(KeyMap theKeys) {
 
     /* For each Mac scan code, check if the corresponding SDL key is pressed */
     int i;
-    for (i = 0; i < 128; i++) {
+    for (i = 0; i < 128; i++)
+    {
         SDL_Scancode sc = s_mac_to_sdl[i];
-        if (sc != SDL_SCANCODE_UNKNOWN && sc < numKeys && sdl_keys[sc]) {
+        if (sc != SDL_SCANCODE_UNKNOWN && sc < numKeys && sdl_keys[sc])
+        {
             km[i >> 3] |= (1 << (i & 7));
         }
     }
@@ -963,9 +1103,11 @@ SDL_Color s_palette[256];
 static int s_palette_set = 0;
 
 /* Set palette colors for 8-bit mode */
-void SDL_Platform_SetPalette(int index, int count, UInt16 *rgbValues) {
+void SDL_Platform_SetPalette(int index, int count, UInt16 *rgbValues)
+{
     int i;
-    for (i = 0; i < count && (index + i) < 256; i++) {
+    for (i = 0; i < count && (index + i) < 256; i++)
+    {
         /* Mac RGB values are 0-65535, SDL wants 0-255 */
         s_palette[index + i].r = rgbValues[i * 3 + 0] >> 8;
         s_palette[index + i].g = rgbValues[i * 3 + 1] >> 8;
@@ -973,13 +1115,16 @@ void SDL_Platform_SetPalette(int index, int count, UInt16 *rgbValues) {
         s_palette[index + i].a = 255;
     }
     s_palette_set = 1;
-    if (s_surface) {
+    if (s_surface)
+    {
         SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
     }
 }
 
-void InitScreen(int unused) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
+void InitScreen(int unused)
+{
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0)
+    {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         exit(1);
     }
@@ -994,19 +1139,31 @@ void InitScreen(int unused) {
         "Reckless Drivin'",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         gXSize, gYSize,
-        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
-    );
-    if (!s_window) {
+        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    if (!s_window)
+    {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         exit(1);
     }
 
-    s_renderer = SDL_CreateRenderer(s_window, -1,
-        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!s_renderer) {
+#ifdef __EMSCRIPTEN__
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
+#endif
+
+    {
+        Uint32 renderer_flags = SDL_RENDERER_ACCELERATED;
+#ifndef __EMSCRIPTEN__
+        renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
+#endif
+        s_renderer = SDL_CreateRenderer(s_window, -1, renderer_flags);
+    }
+    if (!s_renderer)
+    {
         /* Fall back to software renderer */
         s_renderer = SDL_CreateRenderer(s_window, -1, SDL_RENDERER_SOFTWARE);
-        if (!s_renderer) {
+        if (!s_renderer)
+        {
             fprintf(stderr, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
             exit(1);
         }
@@ -1014,7 +1171,8 @@ void InitScreen(int unused) {
 
     /* Create an 8-bit indexed surface as the back buffer */
     s_surface = SDL_CreateRGBSurface(0, gXSize, gYSize, 8, 0, 0, 0, 0);
-    if (!s_surface) {
+    if (!s_surface)
+    {
         fprintf(stderr, "SDL_CreateRGBSurface (8-bit) failed: %s\n", SDL_GetError());
         exit(1);
     }
@@ -1022,7 +1180,8 @@ void InitScreen(int unused) {
     /* Set a default grayscale palette */
     {
         int i;
-        for (i = 0; i < 256; i++) {
+        for (i = 0; i < 256; i++)
+        {
             s_palette[i].r = i;
             s_palette[i].g = i;
             s_palette[i].b = i;
@@ -1033,18 +1192,20 @@ void InitScreen(int unused) {
 
     /* Create a 32-bit RGB surface for uploading to the texture */
     s_rgb_surface = SDL_CreateRGBSurface(0, gXSize, gYSize, 32,
-        0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-    if (!s_rgb_surface) {
+                                         0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    if (!s_rgb_surface)
+    {
         fprintf(stderr, "SDL_CreateRGBSurface (32-bit) failed: %s\n", SDL_GetError());
         exit(1);
     }
 
     /* Create the streaming texture */
     s_texture = SDL_CreateTexture(s_renderer,
-        SDL_PIXELFORMAT_ARGB8888,
-        SDL_TEXTUREACCESS_STREAMING,
-        gXSize, gYSize);
-    if (!s_texture) {
+                                  SDL_PIXELFORMAT_ARGB8888,
+                                  SDL_TEXTUREACCESS_STREAMING,
+                                  gXSize, gYSize);
+    if (!s_texture)
+    {
         fprintf(stderr, "SDL_CreateTexture failed: %s\n", SDL_GetError());
         exit(1);
     }
@@ -1058,7 +1219,7 @@ void InitScreen(int unused) {
 
     /* Enable touch controls if any touch device is present (e.g. Android) */
 #ifdef __ANDROID__
-    s_touch_controls_active = 1;  /* always active on Android */
+    s_touch_controls_active = 1; /* always active on Android */
 #else
     if (SDL_GetNumTouchDevices() > 0 || getenv("SDL_TOUCH_CONTROLS"))
         s_touch_controls_active = 1;
@@ -1070,54 +1231,86 @@ void InitScreen(int unused) {
 #endif
 }
 
-void ScreenMode(int mode) {
+void ScreenMode(int mode)
+{
     gScreenMode = mode;
-    switch (mode) {
-        case kScreenRunning:
-            /* Switch to 16-bit back-buffer for hiColor gameplay; stay 8-bit for menus */
-            if (gGameOn && gPrefs.hiColor) {
-                if (gRowBytes != gXSize * 2)
-                    sdl_set_depth(2);
-            } else {
-                if (gRowBytes != gXSize)
-                    sdl_set_depth(1);
-            }
-            /* Load the game's 8-bit colour lookup table (same as screen.c) */
-            if (!s_palette_set) {
-                SetScreenClut(8);
-            }
-            break;
-        case kScreenSuspended:
-            /* Always switch back to 8-bit for menu/interface */
+    switch (mode)
+    {
+    case kScreenRunning:
+        /* Switch to 16-bit back-buffer for hiColor gameplay; stay 8-bit for menus */
+        if (gGameOn && gPrefs.hiColor)
+        {
+            if (gRowBytes != gXSize * 2)
+                sdl_set_depth(2);
+        }
+        else
+        {
             if (gRowBytes != gXSize)
                 sdl_set_depth(1);
-            break;
-        case kScreenStopped:
-            /* Clean up SDL resources */
-            if (s_texture)    { SDL_DestroyTexture(s_texture);   s_texture = NULL; }
-            if (s_rgb_surface){ SDL_FreeSurface(s_rgb_surface);  s_rgb_surface = NULL; }
-            if (s_surface)    { SDL_FreeSurface(s_surface);      s_surface = NULL; }
-            if (s_renderer)   { SDL_DestroyRenderer(s_renderer); s_renderer = NULL; }
-            if (s_window)     { SDL_DestroyWindow(s_window);     s_window = NULL; }
-            if (s_back_buffer){ free(s_back_buffer);             s_back_buffer = NULL; }
-            SDL_Quit();
-            break;
-        default:
-            break;
+        }
+        /* Load the game's 8-bit colour lookup table (same as screen.c) */
+        if (!s_palette_set)
+        {
+            SetScreenClut(8);
+        }
+        break;
+    case kScreenSuspended:
+        /* Always switch back to 8-bit for menu/interface */
+        if (gRowBytes != gXSize)
+            sdl_set_depth(1);
+        break;
+    case kScreenStopped:
+        /* Clean up SDL resources */
+        if (s_texture)
+        {
+            SDL_DestroyTexture(s_texture);
+            s_texture = NULL;
+        }
+        if (s_rgb_surface)
+        {
+            SDL_FreeSurface(s_rgb_surface);
+            s_rgb_surface = NULL;
+        }
+        if (s_surface)
+        {
+            SDL_FreeSurface(s_surface);
+            s_surface = NULL;
+        }
+        if (s_renderer)
+        {
+            SDL_DestroyRenderer(s_renderer);
+            s_renderer = NULL;
+        }
+        if (s_window)
+        {
+            SDL_DestroyWindow(s_window);
+            s_window = NULL;
+        }
+        if (s_back_buffer)
+        {
+            free(s_back_buffer);
+            s_back_buffer = NULL;
+        }
+        SDL_Quit();
+        break;
+    default:
+        break;
     }
 }
 
 /* GWorldPtr stub - return a GWorldImpl wrapping our SDL surface */
-GWorldPtr GetScreenGW(void) {
-    if (!s_surface) return NULL;
+GWorldPtr GetScreenGW(void)
+{
+    if (!s_surface)
+        return NULL;
     /* Keep the screen GWorldImpl in sync with the SDL surface */
     s_screen_gworld.pixels = (UInt8 *)gBaseAddr;
-    s_screen_gworld.owned  = 0;
-    s_screen_gworld.pixmap.baseAddr  = gBaseAddr;
-    s_screen_gworld.pixmap.rowBytes  = (short)gRowBytes | (short)0x8000;
-    s_screen_gworld.pixmap.bounds.left   = 0;
-    s_screen_gworld.pixmap.bounds.top    = 0;
-    s_screen_gworld.pixmap.bounds.right  = (short)gXSize;
+    s_screen_gworld.owned = 0;
+    s_screen_gworld.pixmap.baseAddr = gBaseAddr;
+    s_screen_gworld.pixmap.rowBytes = (short)gRowBytes | (short)0x8000;
+    s_screen_gworld.pixmap.bounds.left = 0;
+    s_screen_gworld.pixmap.bounds.top = 0;
+    s_screen_gworld.pixmap.bounds.right = (short)gXSize;
     s_screen_gworld.pixmap.bounds.bottom = (short)gYSize;
     s_screen_gworld.pixmap.pixelSize = 8;
     s_screen_gworld_valid = 1;
@@ -1132,20 +1325,26 @@ static void sdl_upload_back_buffer_to_texture(void)
 
     {
         static int s_first_blit = 1;
-        if (s_first_blit) {
+        if (s_first_blit)
+        {
             LOG_DEBUG("LOG: first Blit2Screen – gRowBytes=%d gXSize=%d gYSize=%d\n",
-                   gRowBytes, gXSize, gYSize);
+                      gRowBytes, gXSize, gYSize);
             s_first_blit = 0;
         }
     }
 
-    if (gRowBytes == gXSize) {
-        if (!s_surface) return;
-        if (s_palette_set) {
+    if (gRowBytes == gXSize)
+    {
+        if (!s_surface)
+            return;
+        if (s_palette_set)
+        {
             SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
         }
-        if (SDL_LockSurface(s_surface) == 0) {
-            for (y = 0; y < gYSize; y++) {
+        if (SDL_LockSurface(s_surface) == 0)
+        {
+            for (y = 0; y < gYSize; y++)
+            {
                 UInt8 *dst = (UInt8 *)s_surface->pixels + y * s_surface->pitch;
                 const UInt8 *src = s_back_buffer + y * gXSize;
                 memcpy(dst, src, (size_t)gXSize);
@@ -1153,20 +1352,23 @@ static void sdl_upload_back_buffer_to_texture(void)
             SDL_UnlockSurface(s_surface);
         }
         SDL_BlitSurface(s_surface, NULL, s_rgb_surface, NULL);
-    } else {
-        if (SDL_LockSurface(s_rgb_surface) == 0) {
-            for (y = 0; y < gYSize; y++) {
-                Uint32 *dst = (Uint32 *)((UInt8 *)s_rgb_surface->pixels
-                                         + y * s_rgb_surface->pitch);
+    }
+    else
+    {
+        if (SDL_LockSurface(s_rgb_surface) == 0)
+        {
+            for (y = 0; y < gYSize; y++)
+            {
+                Uint32 *dst = (Uint32 *)((UInt8 *)s_rgb_surface->pixels + y * s_rgb_surface->pitch);
                 const UInt16 *src = (const UInt16 *)(s_back_buffer + y * gRowBytes);
                 int x;
-                for (x = 0; x < gXSize; x++) {
+                for (x = 0; x < gXSize; x++)
+                {
                     UInt16 p = src[x];
                     Uint8 r = (Uint8)(((p >> 10) & 0x1F) << 3);
-                    Uint8 g = (Uint8)(((p >>  5) & 0x1F) << 3);
-                    Uint8 b = (Uint8)(( p        & 0x1F) << 3);
-                    dst[x] = (Uint32)(0xFF000000u | ((Uint32)r << 16)
-                                      | ((Uint32)g << 8) | b);
+                    Uint8 g = (Uint8)(((p >> 5) & 0x1F) << 3);
+                    Uint8 b = (Uint8)((p & 0x1F) << 3);
+                    dst[x] = (Uint32)(0xFF000000u | ((Uint32)r << 16) | ((Uint32)g << 8) | b);
                 }
             }
             SDL_UnlockSurface(s_rgb_surface);
@@ -1179,7 +1381,8 @@ static void sdl_upload_back_buffer_to_texture(void)
 static void sdl_render_base_frame(int renderTouchOverlay)
 {
     SDL_Rect dst;
-    if (!s_renderer || !s_texture) return;
+    if (!s_renderer || !s_texture)
+        return;
     SDL_RenderClear(s_renderer);
     sdl_get_game_dst_rect(&dst, NULL, NULL);
     SDL_RenderCopy(s_renderer, s_texture, NULL, &dst);
@@ -1187,9 +1390,11 @@ static void sdl_render_base_frame(int renderTouchOverlay)
         sdl_render_touch_overlay();
 }
 
-void FadeScreen(int out) {
+void FadeScreen(int out)
+{
     /* On fade-in (out=0): present whatever is in the back buffer */
-    if (!out) Blit2Screen();
+    if (!out)
+        Blit2Screen();
 }
 
 /*
@@ -1198,24 +1403,16 @@ void FadeScreen(int out) {
  *  - 8-bit indexed (gRowBytes == gXSize):  copy into paletted surface, blit to 32-bit
  *  - 16-bit XRGB1555 (gRowBytes == gXSize*2):  convert XRGB1555 pixels → ARGB8888
  */
-void Blit2Screen(void) {
+void Blit2Screen(void)
+{
     if (!s_renderer || !s_texture || !s_rgb_surface || !s_back_buffer)
         return;
 
-    /* 144 fps cap: drop frames that arrive too soon after the previous one.
-     * The game logic already runs at 60 fps (kCalcFPS=60) so this guard is a
-     * safety net in case the render loop ever runs faster than intended. */
-#define BLIT2SCREEN_MIN_MS (1000 / 144)   /* ~6 ms */
-    {
-        static Uint32 s_last_blit_ms = 0;
-        Uint32 now_ms = SDL_GetTicks();
-        if (gGameOn && s_last_blit_ms && (now_ms - s_last_blit_ms) < BLIT2SCREEN_MIN_MS) {
-            /* Too soon – skip this present to stay within 144 fps */
-            return;
-        }
-        s_last_blit_ms = now_ms;
-    }
-#undef BLIT2SCREEN_MIN_MS
+    /* VSync on the renderer already rate-limits presents to the display
+     * refresh rate, so no additional software cap is needed here.  A previous
+     * 144 fps software cap was removed because it competed with VSync and the
+     * game's own 60 fps logic timing, silently dropping rendered frames and
+     * causing visible stutter. */
 
     sdl_upload_back_buffer_to_texture();
     sdl_render_base_frame(1);
@@ -1230,22 +1427,24 @@ void Blit2Screen(void) {
     {
         SDL_Event ev;
         extern int gExit;
-        while (SDL_PollEvent(&ev)) {
-            switch (ev.type) {
-                case SDL_QUIT:
-                    gExit = 1;
-                    break;
-                case SDL_FINGERDOWN:
-                case SDL_FINGERMOTION:
-                    sdl_touch_finger_event(ev.tfinger.fingerId,
-                                           ev.tfinger.x, ev.tfinger.y, 1);
-                    break;
-                case SDL_FINGERUP:
-                    sdl_touch_finger_event(ev.tfinger.fingerId,
-                                           ev.tfinger.x, ev.tfinger.y, 0);
-                    break;
-                default:
-                    break;
+        while (SDL_PollEvent(&ev))
+        {
+            switch (ev.type)
+            {
+            case SDL_QUIT:
+                gExit = 1;
+                break;
+            case SDL_FINGERDOWN:
+            case SDL_FINGERMOTION:
+                sdl_touch_finger_event(ev.tfinger.fingerId,
+                                       ev.tfinger.x, ev.tfinger.y, 1);
+                break;
+            case SDL_FINGERUP:
+                sdl_touch_finger_event(ev.tfinger.fingerId,
+                                       ev.tfinger.x, ev.tfinger.y, 0);
+                break;
+            default:
+                break;
             }
         }
     }
@@ -1255,17 +1454,22 @@ void Blit2Screen(void) {
 #define SCREENSHOT_WARMUP_FRAMES 200
     {
         static int s_shot_count = 0;
-        static int s_shot_skip  = 0;
-        static int s_shot_done  = 0;
+        static int s_shot_skip = 0;
+        static int s_shot_done = 0;
         const char *dir = SDL_getenv("RECKLESS_SCREENSHOT_DIR");
-        if (dir && !s_shot_done && s_rgb_surface) {
-            if (s_shot_skip < SCREENSHOT_WARMUP_FRAMES) {
+        if (dir && !s_shot_done && s_rgb_surface)
+        {
+            if (s_shot_skip < SCREENSHOT_WARMUP_FRAMES)
+            {
                 s_shot_skip++;
-            } else {
+            }
+            else
+            {
                 char path[512];
                 snprintf(path, sizeof(path), "%s/native_%03d.bmp", dir, s_shot_count++);
                 SDL_SaveBMP(s_rgb_surface, path);
-                if (s_shot_count >= 5) s_shot_done = 1;
+                if (s_shot_count >= 5)
+                    s_shot_done = 1;
             }
         }
     }
@@ -1277,59 +1481,72 @@ int SDL_Platform_RunModalTextEntry(short dialogID, char *text, size_t textCapaci
     size_t len;
     size_t maxLen;
 
-    if (!text || textCapacity == 0 || !s_renderer || !s_texture) return 0;
+    if (!text || textCapacity == 0 || !s_renderer || !s_texture)
+        return 0;
 
     len = strlen(text);
-    if (len >= textCapacity) len = textCapacity - 1;
+    if (len >= textCapacity)
+        len = textCapacity - 1;
     text[len] = '\0';
     maxLen = textCapacity - 1;
-    if (maxLen > 31) maxLen = 31;
+    if (maxLen > 31)
+        maxLen = 31;
 
     SDL_StartTextInput();
-    while (!gExit) {
+    while (!gExit)
+    {
         SDL_Event ev;
-        while (SDL_PollEvent(&ev)) {
-            switch (ev.type) {
-                case SDL_QUIT:
-                    gExit = 1;
-                    break;
+        while (SDL_PollEvent(&ev))
+        {
+            switch (ev.type)
+            {
+            case SDL_QUIT:
+                gExit = 1;
+                break;
 
-                case SDL_TEXTINPUT:
+            case SDL_TEXTINPUT:
+            {
+                const char *incoming = ev.text.text;
+                while (*incoming && len < maxLen)
+                {
+                    unsigned char ch = (unsigned char)*incoming++;
+                    if (!isprint(ch))
+                        continue;
+                    text[len++] = (char)ch;
+                }
+                text[len] = '\0';
+            }
+            break;
+
+            case SDL_KEYDOWN:
+                if (ev.key.keysym.sym == SDLK_BACKSPACE)
+                {
+                    if (len > 0)
                     {
-                        const char *incoming = ev.text.text;
-                        while (*incoming && len < maxLen) {
-                            unsigned char ch = (unsigned char)*incoming++;
-                            if (!isprint(ch)) continue;
-                            text[len++] = (char)ch;
-                        }
+                        len--;
                         text[len] = '\0';
                     }
-                    break;
-
-                case SDL_KEYDOWN:
-                    if (ev.key.keysym.sym == SDLK_BACKSPACE) {
-                        if (len > 0) {
-                            len--;
-                            text[len] = '\0';
-                        }
-                    } else if (ev.key.keysym.sym == SDLK_RETURN ||
-                               ev.key.keysym.sym == SDLK_KP_ENTER ||
-                               ev.key.keysym.sym == SDLK_ESCAPE) {
-                        SDL_StopTextInput();
-                        return 1;
-                    }
-                    break;
-
-                case SDL_MOUSEBUTTONDOWN:
-                case SDL_FINGERDOWN:
-                    if (dialogID == 130) {
-                        break;
-                    }
+                }
+                else if (ev.key.keysym.sym == SDLK_RETURN ||
+                         ev.key.keysym.sym == SDLK_KP_ENTER ||
+                         ev.key.keysym.sym == SDLK_ESCAPE)
+                {
                     SDL_StopTextInput();
                     return 1;
+                }
+                break;
 
-                default:
+            case SDL_MOUSEBUTTONDOWN:
+            case SDL_FINGERDOWN:
+                if (dialogID == 130)
+                {
                     break;
+                }
+                SDL_StopTextInput();
+                return 1;
+
+            default:
+                break;
             }
         }
 
@@ -1350,21 +1567,25 @@ int SDL_Platform_RunModalTextEntry(short dialogID, char *text, size_t textCapaci
 }
 
 /* SetScreenClut - set palette from color table resource */
-void SetScreenClut(int id) {
+void SetScreenClut(int id)
+{
     /* For hi-color mode, nothing to do; for 8-bit mode, load the color table */
     CTabHandle ct = GetCTable(id);
-    if (!ct || !*ct) return;
+    if (!ct || !*ct)
+        return;
 
     int i;
     ColorTable *ctab = *ct;
-    for (i = 0; i <= ctab->ctSize && i < 256; i++) {
-        s_palette[i].r = ctab->ctTable[i].rgb.red   >> 8;
+    for (i = 0; i <= ctab->ctSize && i < 256; i++)
+    {
+        s_palette[i].r = ctab->ctTable[i].rgb.red >> 8;
         s_palette[i].g = ctab->ctTable[i].rgb.green >> 8;
-        s_palette[i].b = ctab->ctTable[i].rgb.blue  >> 8;
+        s_palette[i].b = ctab->ctTable[i].rgb.blue >> 8;
         s_palette[i].a = 255;
     }
     s_palette_set = 1;
-    if (s_surface) {
+    if (s_surface)
+    {
         SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
     }
 
@@ -1378,15 +1599,19 @@ void SetScreenClut(int id) {
      * Sprites dereference gTranslucenceTab directly so it must be non-NULL. */
     {
         extern Handle gTranslucenceTab;
-        if (gTranslucenceTab) {
+        if (gTranslucenceTab)
+        {
             ReleaseResource(gTranslucenceTab);
             gTranslucenceTab = NULL;
         }
         gTranslucenceTab = GetResource('Trtb', (short)id);
-        if (!gTranslucenceTab || !*gTranslucenceTab) {
+        if (!gTranslucenceTab || !*gTranslucenceTab)
+        {
             /* Fallback: build an identity table (no blending) */
-            if (!gTranslucenceTab) gTranslucenceTab = NewHandle(65536);
-            if (gTranslucenceTab && *gTranslucenceTab) {
+            if (!gTranslucenceTab)
+                gTranslucenceTab = NewHandle(65536);
+            if (gTranslucenceTab && *gTranslucenceTab)
+            {
                 UInt8 *tbl = (UInt8 *)*gTranslucenceTab;
                 int fg, bg;
                 for (fg = 0; fg < 256; fg++)
@@ -1397,27 +1622,30 @@ void SetScreenClut(int id) {
     }
 
     /* Build lightning table (same as original code) */
-    if (ct && *ct) {
+    if (ct && *ct)
+    {
         long bright, color, bestScore, bestIndex, score, testIndex;
         RGBColor optColor, testColor;
         ColorTable *tbl = *ct;
-        for (bright = 0; bright < kLightValues; bright++) {
-            for (color = 0; color < 256; color++) {
+        for (bright = 0; bright < kLightValues; bright++)
+        {
+            for (color = 0; color < 256; color++)
+            {
                 bestScore = 3 * 65536;
                 bestIndex = 0;
                 optColor = tbl->ctTable[color].rgb;
                 {
                     float fade = (float)bright / kLightValues;
-                    optColor.red   = (UInt16)(fade * optColor.red);
+                    optColor.red = (UInt16)(fade * optColor.red);
                     optColor.green = (UInt16)(fade * optColor.green);
-                    optColor.blue  = (UInt16)(fade * optColor.blue);
+                    optColor.blue = (UInt16)(fade * optColor.blue);
                 }
-                for (testIndex = 0; testIndex < 256; testIndex++) {
+                for (testIndex = 0; testIndex < 256; testIndex++)
+                {
                     testColor = tbl->ctTable[testIndex].rgb;
-                    score = __abs((int)optColor.red   - (int)testColor.red)
-                          + __abs((int)optColor.green - (int)testColor.green)
-                          + __abs((int)optColor.blue  - (int)testColor.blue);
-                    if (score < bestScore) {
+                    score = __abs((int)optColor.red - (int)testColor.red) + __abs((int)optColor.green - (int)testColor.green) + __abs((int)optColor.blue - (int)testColor.blue);
+                    if (score < bestScore)
+                    {
                         bestScore = score;
                         bestIndex = testIndex;
                     }
@@ -1436,7 +1664,8 @@ void SetScreenClut(int id) {
  * when PORT_SDL2 is defined). The following provide the Mac-style
  * time APIs needed by the rest of the code.
  */
-AbsoluteTime UpTime(void) {
+AbsoluteTime UpTime(void)
+{
     Uint64 ms = SDL_GetTicks64();
     Uint64 us = ms * 1000ULL;
     AbsoluteTime at;
@@ -1445,19 +1674,23 @@ AbsoluteTime UpTime(void) {
     return at;
 }
 
-Nanoseconds AbsoluteToNanoseconds(AbsoluteTime a) {
+Nanoseconds AbsoluteToNanoseconds(AbsoluteTime a)
+{
     return a;
 }
 
-void Microseconds(UnsignedWide *microTickCount) {
+void Microseconds(UnsignedWide *microTickCount)
+{
     Uint64 us = SDL_GetTicks64() * 1000ULL;
-    if (microTickCount) {
+    if (microTickCount)
+    {
         microTickCount->lo = (UInt32)(us & 0xFFFFFFFF);
         microTickCount->hi = (UInt32)(us >> 32);
     }
 }
 
-UInt32 TickCount(void) {
+UInt32 TickCount(void)
+{
     return (UInt32)(SDL_GetTicks64() * 60 / 1000); /* 60 ticks per second */
 }
 
@@ -1475,132 +1708,138 @@ static int s_mouse_down = 0;
 
 extern int gExit; /* declared in interface.h or gameframe.h */
 
-Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *mouseRgn) {
+Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *mouseRgn)
+{
     /* Process pending sound callbacks first (must be on main thread) */
     sdl_audio_process_callbacks();
 
     SDL_Event ev;
-    if (!theEvent) return 0;
+    if (!theEvent)
+        return 0;
     memset(theEvent, 0, sizeof(EventRecord));
     theEvent->what = nullEvent;
 
     /* Process pending SDL events */
-    while (SDL_PollEvent(&ev)) {
-        switch (ev.type) {
-            case SDL_QUIT:
-                theEvent->what = kHighLevelEvent;
-                gExit = 1;
-                return 1;
+    while (SDL_PollEvent(&ev))
+    {
+        switch (ev.type)
+        {
+        case SDL_QUIT:
+            theEvent->what = kHighLevelEvent;
+            gExit = 1;
+            return 1;
 
-            case SDL_KEYDOWN:
-                build_sdl_to_mac();
-                {
-                    uint8_t mac_vk = s_sdl_to_mac[ev.key.keysym.scancode];
-                    theEvent->what = keyDown;
-                    /* Mac EventRecord.message: bits 15-8 = virtual key code, bits 7-0 = char code */
-                    theEvent->message = (ev.key.keysym.sym & charCodeMask)
-                                      | ((mac_vk != 0xFF) ? ((UInt32)mac_vk << 8) : 0);
-                    theEvent->when = SDL_GetTicks();
-                }
-                return 1;
+        case SDL_KEYDOWN:
+            build_sdl_to_mac();
+            {
+                uint8_t mac_vk = s_sdl_to_mac[ev.key.keysym.scancode];
+                theEvent->what = keyDown;
+                /* Mac EventRecord.message: bits 15-8 = virtual key code, bits 7-0 = char code */
+                theEvent->message = (ev.key.keysym.sym & charCodeMask) | ((mac_vk != 0xFF) ? ((UInt32)mac_vk << 8) : 0);
+                theEvent->when = SDL_GetTicks();
+            }
+            return 1;
 
-            case SDL_KEYUP:
-                build_sdl_to_mac();
-                {
-                    uint8_t mac_vk = s_sdl_to_mac[ev.key.keysym.scancode];
-                    theEvent->what = keyUp;
-                    theEvent->message = (ev.key.keysym.sym & charCodeMask)
-                                      | ((mac_vk != 0xFF) ? ((UInt32)mac_vk << 8) : 0);
-                    theEvent->when = SDL_GetTicks();
-                }
-                return 1;
+        case SDL_KEYUP:
+            build_sdl_to_mac();
+            {
+                uint8_t mac_vk = s_sdl_to_mac[ev.key.keysym.scancode];
+                theEvent->what = keyUp;
+                theEvent->message = (ev.key.keysym.sym & charCodeMask) | ((mac_vk != 0xFF) ? ((UInt32)mac_vk << 8) : 0);
+                theEvent->when = SDL_GetTicks();
+            }
+            return 1;
 
-            case SDL_MOUSEBUTTONDOWN:
-                sdl_output_to_game_xy(ev.button.x, ev.button.y, &s_mouse_x, &s_mouse_y);
+        case SDL_MOUSEBUTTONDOWN:
+            sdl_output_to_game_xy(ev.button.x, ev.button.y, &s_mouse_x, &s_mouse_y);
+            s_mouse_down = 1;
+            theEvent->what = mouseDown;
+            theEvent->where.h = (short)s_mouse_x;
+            theEvent->where.v = (short)s_mouse_y;
+            theEvent->when = SDL_GetTicks();
+            return 1;
+
+        case SDL_MOUSEBUTTONUP:
+            sdl_output_to_game_xy(ev.button.x, ev.button.y, &s_mouse_x, &s_mouse_y);
+            s_mouse_down = 0;
+            theEvent->what = mouseUp;
+            theEvent->where.h = (short)s_mouse_x;
+            theEvent->where.v = (short)s_mouse_y;
+            theEvent->when = SDL_GetTicks();
+            return 1;
+
+        case SDL_MOUSEMOTION:
+            sdl_output_to_game_xy(ev.motion.x, ev.motion.y, &s_mouse_x, &s_mouse_y);
+            {
+                /* mouseMovedMessage osEvt */
+                theEvent->what = osEvt;
+                theEvent->message = ((UInt32)mouseMovedMessage << 24);
+                theEvent->where.h = (short)s_mouse_x;
+                theEvent->where.v = (short)s_mouse_y;
+                theEvent->when = SDL_GetTicks();
+            }
+            return 1;
+
+        case SDL_FINGERDOWN:
+        case SDL_FINGERMOTION:
+            sdl_touch_finger_event(ev.tfinger.fingerId,
+                                   ev.tfinger.x, ev.tfinger.y, 1);
+            /* On Android, translate first touch to a mouse event for menus */
+            {
+                int out_w = gXSize, out_h = gYSize;
+                int px, py;
+                sdl_get_game_dst_rect(NULL, &out_w, &out_h);
+                px = (int)(ev.tfinger.x * out_w);
+                py = (int)(ev.tfinger.y * out_h);
+                sdl_output_to_game_xy(px, py, &s_mouse_x, &s_mouse_y);
+            }
+            if (ev.type == SDL_FINGERDOWN)
+            {
                 s_mouse_down = 1;
                 theEvent->what = mouseDown;
                 theEvent->where.h = (short)s_mouse_x;
                 theEvent->where.v = (short)s_mouse_y;
                 theEvent->when = SDL_GetTicks();
                 return 1;
+            }
+            break;
 
-            case SDL_MOUSEBUTTONUP:
-                sdl_output_to_game_xy(ev.button.x, ev.button.y, &s_mouse_x, &s_mouse_y);
-                s_mouse_down = 0;
-                theEvent->what = mouseUp;
-                theEvent->where.h = (short)s_mouse_x;
-                theEvent->where.v = (short)s_mouse_y;
-                theEvent->when = SDL_GetTicks();
-                return 1;
+        case SDL_FINGERUP:
+            sdl_touch_finger_event(ev.tfinger.fingerId,
+                                   ev.tfinger.x, ev.tfinger.y, 0);
+            s_mouse_down = 0;
+            theEvent->what = mouseUp;
+            {
+                int out_w = gXSize, out_h = gYSize;
+                int px, py, gx, gy;
+                sdl_get_game_dst_rect(NULL, &out_w, &out_h);
+                px = (int)(ev.tfinger.x * out_w);
+                py = (int)(ev.tfinger.y * out_h);
+                sdl_output_to_game_xy(px, py, &gx, &gy);
+                theEvent->where.h = (short)gx;
+                theEvent->where.v = (short)gy;
+            }
+            theEvent->when = SDL_GetTicks();
+            return 1;
 
-            case SDL_MOUSEMOTION:
-                sdl_output_to_game_xy(ev.motion.x, ev.motion.y, &s_mouse_x, &s_mouse_y);
-                {
-                    /* mouseMovedMessage osEvt */
-                    theEvent->what = osEvt;
-                    theEvent->message = ((UInt32)mouseMovedMessage << 24);
-                    theEvent->where.h = (short)s_mouse_x;
-                    theEvent->where.v = (short)s_mouse_y;
-                    theEvent->when = SDL_GetTicks();
-                }
-                return 1;
-
-            case SDL_FINGERDOWN:
-            case SDL_FINGERMOTION:
-                sdl_touch_finger_event(ev.tfinger.fingerId,
-                                       ev.tfinger.x, ev.tfinger.y, 1);
-                /* On Android, translate first touch to a mouse event for menus */
-                {
-                    int out_w = gXSize, out_h = gYSize;
-                    int px, py;
-                    sdl_get_game_dst_rect(NULL, &out_w, &out_h);
-                    px = (int)(ev.tfinger.x * out_w);
-                    py = (int)(ev.tfinger.y * out_h);
-                    sdl_output_to_game_xy(px, py, &s_mouse_x, &s_mouse_y);
-                }
-                if (ev.type == SDL_FINGERDOWN) {
-                    s_mouse_down = 1;
-                    theEvent->what = mouseDown;
-                    theEvent->where.h = (short)s_mouse_x;
-                    theEvent->where.v = (short)s_mouse_y;
-                    theEvent->when = SDL_GetTicks();
-                    return 1;
-                }
-                break;
-
-            case SDL_FINGERUP:
-                sdl_touch_finger_event(ev.tfinger.fingerId,
-                                       ev.tfinger.x, ev.tfinger.y, 0);
-                s_mouse_down = 0;
-                theEvent->what = mouseUp;
-                {
-                    int out_w = gXSize, out_h = gYSize;
-                    int px, py, gx, gy;
-                    sdl_get_game_dst_rect(NULL, &out_w, &out_h);
-                    px = (int)(ev.tfinger.x * out_w);
-                    py = (int)(ev.tfinger.y * out_h);
-                    sdl_output_to_game_xy(px, py, &gx, &gy);
-                    theEvent->where.h = (short)gx;
-                    theEvent->where.v = (short)gy;
-                }
-                theEvent->when = SDL_GetTicks();
-                return 1;
-
-            default:
-                break;
+        default:
+            break;
         }
     }
 
     /* No event - short sleep */
-    if (sleep > 0) SDL_Delay(1);
+    if (sleep > 0)
+        SDL_Delay(1);
     return 0;
 }
 
-void FlushEvents(short eventMask, short stopMask) {
+void FlushEvents(short eventMask, short stopMask)
+{
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
 }
 
-Boolean Button(void) {
+Boolean Button(void)
+{
     /* Query current mouse button state directly so Button() returns the
      * actual hardware state, not the stale event-driven s_mouse_down flag.
      * This prevents WaitForPress() from exiting immediately because the
@@ -1609,17 +1848,22 @@ Boolean Button(void) {
     return (Boolean)(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON_LMASK);
 }
 
-Boolean StillDown(void) {
+Boolean StillDown(void)
+{
     SDL_PumpEvents();
     Uint32 buttons = SDL_GetMouseState(NULL, NULL);
     return (Boolean)(buttons & SDL_BUTTON_LMASK);
 }
 
-Point GetScreenPos(Point *inPos) {
+Point GetScreenPos(Point *inPos)
+{
     Point pos;
-    if (inPos) {
+    if (inPos)
+    {
         pos = *inPos;
-    } else {
+    }
+    else
+    {
         int mx, my;
         SDL_GetMouseState(&mx, &my);
         sdl_output_to_game_xy(mx, my, &mx, &my);
@@ -1632,12 +1876,18 @@ Point GetScreenPos(Point *inPos) {
 /* ============================================================
  * Exit
  * ============================================================ */
-void ExitToShell(void) {
-    if (s_texture)    SDL_DestroyTexture(s_texture);
-    if (s_rgb_surface)SDL_FreeSurface(s_rgb_surface);
-    if (s_surface)    SDL_FreeSurface(s_surface);
-    if (s_renderer)   SDL_DestroyRenderer(s_renderer);
-    if (s_window)     SDL_DestroyWindow(s_window);
+void ExitToShell(void)
+{
+    if (s_texture)
+        SDL_DestroyTexture(s_texture);
+    if (s_rgb_surface)
+        SDL_FreeSurface(s_rgb_surface);
+    if (s_surface)
+        SDL_FreeSurface(s_surface);
+    if (s_renderer)
+        SDL_DestroyRenderer(s_renderer);
+    if (s_window)
+        SDL_DestroyWindow(s_window);
     SDL_Quit();
     exit(0);
 }
@@ -1647,13 +1897,16 @@ void ExitToShell(void) {
  * These functions are defined in screen.c in the original, but reference
  * Mac-specific QuickDraw calls. We provide SDL-friendly stubs.
  * ============================================================ */
-void FlushMessageBuffer(void) {
+void FlushMessageBuffer(void)
+{
     gMessagePos = gMessageBuffer + 1;
     gMessageCount = 0;
 }
 
-void AddFloatToMessageBuffer(StringPtr label, float value) {
-    (void)label; (void)value;
+void AddFloatToMessageBuffer(StringPtr label, float value)
+{
+    (void)label;
+    (void)value;
 }
 
 /* ============================================================
@@ -1690,25 +1943,26 @@ void AddFloatToMessageBuffer(StringPtr label, float value) {
  */
 
 /* SDL_AudioSpec for mixer */
-#define SND_SAMPLE_RATE   22050  /* requested output rate; actual rate stored in s_output_rate */
-#define SND_CHANNELS      1
+#define SND_SAMPLE_RATE 22050 /* requested output rate; actual rate stored in s_output_rate */
+#define SND_CHANNELS 1
 /* WASM (Emscripten) needs a larger buffer to avoid audio underruns caused by the
  * single-threaded browser event loop.  Desktop and Android are fine with 1024. */
 #ifdef __EMSCRIPTEN__
-#define SND_BUFFER_SIZE   4096
+#define SND_BUFFER_SIZE 4096
 #else
-#define SND_BUFFER_SIZE   1024
+#define SND_BUFFER_SIZE 1024
 #endif
-#define MAX_SND_CHANNELS  16    /* max simultaneous Sound Manager channels */
+#define MAX_SND_CHANNELS 16 /* max simultaneous Sound Manager channels */
 
-typedef struct SndVoice {
+typedef struct SndVoice
+{
     /* Playback position */
-    const uint8_t *samples;   /* 8-bit unsigned PCM data from Mac SoundHeader (or NULL) */
-    uint32_t      num_samples;
-    double        pos;        /* current read position (fractional) */
-    double        rate;       /* samples per output sample (= src_rate/dst_rate * multiplier) */
-    double        rate_mul;   /* rateMultiplierCmd value (1.0 = normal) */
-    uint32_t      src_rate;   /* sample rate from SoundHeader */
+    const uint8_t *samples; /* 8-bit unsigned PCM data from Mac SoundHeader (or NULL) */
+    uint32_t num_samples;
+    double pos;        /* current read position (fractional) */
+    double rate;       /* samples per output sample (= src_rate/dst_rate * multiplier) */
+    double rate_mul;   /* rateMultiplierCmd value (1.0 = normal) */
+    uint32_t src_rate; /* sample rate from SoundHeader */
 
     /* Volume/pan: 0-255 range, left/right separate */
     float vol_l, vol_r;
@@ -1718,9 +1972,9 @@ typedef struct SndVoice {
 
     /* Callback on completion */
     SndCallBackProcPtr callback;
-    SndChannelPtr      chan;
-    int                callback_pending;  /* 1 = fire callBackCmd at end */
-    int                callback_param1;
+    SndChannelPtr chan;
+    int callback_pending; /* 1 = fire callBackCmd at end */
+    int callback_param1;
 
     /* Active flag */
     int active;
@@ -1733,56 +1987,67 @@ typedef struct SndVoice {
 } SndVoice;
 
 /* One mixer voice per SndChannel */
-static SndVoice  s_voices[MAX_SND_CHANNELS];
-static int       s_voice_count = 0;     /* high-water mark of allocated slots */
+static SndVoice s_voices[MAX_SND_CHANNELS];
+static int s_voice_count = 0; /* high-water mark of allocated slots */
 static SDL_mutex *s_audio_mutex = NULL;
-static int       s_audio_open   = 0;
+static int s_audio_open = 0;
 /* Actual output sample rate reported by SDL after SDL_OpenAudio.  Initialized
  * to the requested rate so rate calculations are safe before audio opens. */
-static int       s_output_rate     = SND_SAMPLE_RATE;
+static int s_output_rate = SND_SAMPLE_RATE;
 /* Actual number of output channels (1=mono, 2=stereo).  Browsers often force
  * stereo even when mono is requested, so we must check got.channels and mix
  * accordingly; otherwise every source sample advances the position twice as
  * fast as intended, causing audio to play at double speed. */
-static int       s_output_channels = 1;
+static int s_output_channels = 1;
 /* Actual output sample format/width reported by SDL.  Browsers commonly use
  * float32 output; assuming int16 in that case causes crackly/glitchy audio
  * and incorrect frame stepping. */
 static SDL_AudioFormat s_output_format = AUDIO_S16SYS;
-static int       s_output_sample_bytes = 2;
+static int s_output_sample_bytes = 2;
 /* Master volume scalar (0.0 -- 1.0).  Exposed to JavaScript via
  * set_wasm_master_volume() so the browser UI slider can control it. */
-static float     s_master_volume = 1.0f;
+static float s_master_volume = 1.0f;
 
 /* -------- Helper: get voice index for a channel -------- */
-static int voice_for_chan(SndChannelPtr chan) {
-    if (!chan) return -1;
-    int idx = (int)(intptr_t)chan->nextChan;  /* we store index in nextChan */
-    if (idx < 0 || idx >= MAX_SND_CHANNELS) return -1;
+static int voice_for_chan(SndChannelPtr chan)
+{
+    if (!chan)
+        return -1;
+    int idx = (int)(intptr_t)chan->nextChan; /* we store index in nextChan */
+    if (idx < 0 || idx >= MAX_SND_CHANNELS)
+        return -1;
     return idx;
 }
 
 /* -------- Decode one source frame as mono int16 -------- */
-static int sample_frame_mono(const SndVoice *v, uint32_t idx) {
+static int sample_frame_mono(const SndVoice *v, uint32_t idx)
+{
     int channels = (v->src_channels > 0 && v->src_channels <= 8) ? v->src_channels : 1;
-    if (v->is16bit) {
+    if (v->is16bit)
+    {
         uint32_t base = idx * (uint32_t)(channels * 2);
-        if (channels == 1) {
+        if (channels == 1)
+        {
             return (int)(int16_t)(((uint16_t)v->samples[base] << 8) | v->samples[base + 1]);
         }
         int sum = 0;
-        for (int ch = 0; ch < channels; ch++) {
+        for (int ch = 0; ch < channels; ch++)
+        {
             uint32_t b = base + (uint32_t)(ch * 2);
             sum += (int)(int16_t)(((uint16_t)v->samples[b] << 8) | v->samples[b + 1]);
         }
         return sum / channels;
-    } else {
+    }
+    else
+    {
         uint32_t base = idx * (uint32_t)channels;
-        if (channels == 1) {
+        if (channels == 1)
+        {
             return (int)((uint8_t)v->samples[base] - 128) * 256;
         }
         int sum = 0;
-        for (int ch = 0; ch < channels; ch++) {
+        for (int ch = 0; ch < channels; ch++)
+        {
             sum += (int)((uint8_t)v->samples[base + (uint32_t)ch] - 128) * 256;
         }
         return sum / channels;
@@ -1790,7 +2055,8 @@ static int sample_frame_mono(const SndVoice *v, uint32_t idx) {
 }
 
 /* -------- SDL audio callback -------- */
-static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
+static void sdl_audio_callback(void *userdata, Uint8 *stream, int len)
+{
     (void)userdata;
     int bytes_per_sample = (s_output_sample_bytes > 0) ? s_output_sample_bytes : 2;
     int bytes_per_frame = bytes_per_sample * s_output_channels;
@@ -1801,15 +2067,19 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
      * of whether the output device is mono (1 ch) or stereo (2 ch).  Mixing
      * the same sample into all channels gives a correct mono→stereo upmix. */
     int n_frames = (bytes_per_frame > 0) ? (len / bytes_per_frame) : 0;
-    if (n_frames <= 0) return;
+    if (n_frames <= 0)
+        return;
     memset(stream, 0, (size_t)len);
 
-    if (!s_audio_mutex) return;
+    if (!s_audio_mutex)
+        return;
     SDL_LockMutex(s_audio_mutex);
 
-    for (int vi = 0; vi < s_voice_count; vi++) {
+    for (int vi = 0; vi < s_voice_count; vi++)
+    {
         SndVoice *v = &s_voices[vi];
-        if (!v->active || !v->samples || v->num_samples == 0) continue;
+        if (!v->active || !v->samples || v->num_samples == 0)
+            continue;
 
         /* Reckless Drivin' requeues continuous sounds (engine + skid) via
          * callBackCmd in source/sound.c rather than relying on SoundHeader loop
@@ -1818,13 +2088,16 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
          * repeat forever after a single PlaySound() call.  Keep playback
          * one-shot here and let explicit callback-driven requeueing handle the
          * genuinely continuous channels. */
-        int      has_loop = 0;
-        uint32_t end_pos  = v->num_samples;
+        int has_loop = 0;
+        uint32_t end_pos = v->num_samples;
 
-        for (int i = 0; i < n_frames; i++) {
+        for (int i = 0; i < n_frames; i++)
+        {
             uint32_t idx = (uint32_t)v->pos;
-            if (idx >= end_pos) {
-                if (has_loop) {
+            if (idx >= end_pos)
+            {
+                if (has_loop)
+                {
                     /* Loop: wrap position back to loop_start, preserving the
                      * fractional overshoot for smooth looping.
                      * overshoot = v->pos - end_pos.  Because idx = (uint32_t)v->pos
@@ -1835,12 +2108,18 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
                     if (v->pos < (double)v->loop_start)
                         v->pos = (double)v->loop_start;
                     idx = (uint32_t)v->pos;
-                    if (idx >= v->num_samples) { v->active = 0; break; }
-                } else {
+                    if (idx >= v->num_samples)
+                    {
+                        v->active = 0;
+                        break;
+                    }
+                }
+                else
+                {
                     /* End of non-looping sample */
                     v->active = 0;
                     if (v->callback_pending == 1)
-                        v->callback_pending = 2;  /* 2 = needs firing */
+                        v->callback_pending = 2; /* 2 = needs firing */
                     break;
                 }
             }
@@ -1863,22 +2142,30 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
             sample = (int)(sample * v->vol_l * s_master_volume);
             /* Mix the (mono) source sample into every output channel so that
              * stereo devices receive the same signal on both L and R channels. */
-            if (s_output_format == AUDIO_F32SYS) {
+            if (s_output_format == AUDIO_F32SYS)
+            {
                 float *out = (float *)stream;
                 float f = (float)sample / 32768.0f;
-                for (int ch = 0; ch < s_output_channels; ch++) {
+                for (int ch = 0; ch < s_output_channels; ch++)
+                {
                     int out_idx = i * s_output_channels + ch;
                     float sum = out[out_idx] + f;
-                    if (sum > 1.0f) sum = 1.0f;
-                    if (sum < -1.0f) sum = -1.0f;
+                    if (sum > 1.0f)
+                        sum = 1.0f;
+                    if (sum < -1.0f)
+                        sum = -1.0f;
                     out[out_idx] = sum;
                 }
-            } else {
+            }
+            else
+            {
                 int16_t *out = (int16_t *)stream;
-                for (int ch = 0; ch < s_output_channels; ch++) {
+                for (int ch = 0; ch < s_output_channels; ch++)
+                {
                     int out_idx = i * s_output_channels + ch;
                     int32_t sum = (int32_t)out[out_idx] + (int32_t)sample;
-                    out[out_idx] = (int16_t)(sum > 32767 ? 32767 : sum < -32768 ? -32768 : sum);
+                    out[out_idx] = (int16_t)(sum > 32767 ? 32767 : sum < -32768 ? -32768
+                                                                                : sum);
                 }
             }
             v->pos += v->rate;
@@ -1889,20 +2176,23 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
 }
 
 /* -------- Open SDL audio device -------- */
-static void sdl_audio_open(void) {
-    if (s_audio_open) return;
+static void sdl_audio_open(void)
+{
+    if (s_audio_open)
+        return;
     s_audio_mutex = SDL_CreateMutex();
 
     SDL_AudioSpec want, got;
     SDL_memset(&want, 0, sizeof(want));
-    want.freq     = SND_SAMPLE_RATE;
-    want.format   = AUDIO_S16SYS;
-    want.channels = 1;      /* mono mixing */
-    want.samples  = SND_BUFFER_SIZE;
+    want.freq = SND_SAMPLE_RATE;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1; /* mono mixing */
+    want.samples = SND_BUFFER_SIZE;
     want.callback = sdl_audio_callback;
     want.userdata = NULL;
 
-    if (SDL_OpenAudio(&want, &got) < 0) {
+    if (SDL_OpenAudio(&want, &got) < 0)
+    {
         fprintf(stderr, "[SDL] SDL_OpenAudio failed: %s\n", SDL_GetError());
         return;
     }
@@ -1911,11 +2201,12 @@ static void sdl_audio_open(void) {
      * or 48000 Hz even when 22050 Hz is requested, and may force stereo even
      * when mono is requested.  Both values must be stored and used in the
      * audio callback so that pitch and speed are correct on all platforms. */
-    s_output_rate     = (got.freq     > 0) ? got.freq     : SND_SAMPLE_RATE;
+    s_output_rate = (got.freq > 0) ? got.freq : SND_SAMPLE_RATE;
     s_output_channels = (got.channels > 0) ? got.channels : 1;
-    s_output_format   = got.format;
+    s_output_format = got.format;
     s_output_sample_bytes = (int)(SDL_AUDIO_BITSIZE(s_output_format) / 8);
-    if (s_output_sample_bytes <= 0) s_output_sample_bytes = 2;
+    if (s_output_sample_bytes <= 0)
+        s_output_sample_bytes = 2;
 #ifdef __EMSCRIPTEN__
     /* Emscripten's SDL_OpenAudio may report the *requested* sample rate in
      * got.freq instead of the actual Web Audio context rate.  The
@@ -1926,25 +2217,30 @@ static void sdl_audio_open(void) {
      * JavaScript to guarantee correctness. */
     {
         int wasm_rate = EM_ASM_INT({
-            try {
-                if (Module.SDL2 && Module.SDL2.audioContext) {
+            try
+            {
+                if (Module.SDL2 && Module.SDL2.audioContext)
+                {
                     return Module.SDL2.audioContext.sampleRate | 0;
                 }
-            } catch(e) {}
+            }
+            catch(e) {}
             return 0;
         });
-        if (wasm_rate > 0) {
+        if (wasm_rate > 0)
+        {
             if (wasm_rate != s_output_rate)
                 fprintf(stderr, "[SDL] WASM: overriding SDL audio rate %d Hz -> actual "
-                        "Web Audio rate %d Hz\n", s_output_rate, wasm_rate);
+                                "Web Audio rate %d Hz\n",
+                        s_output_rate, wasm_rate);
             s_output_rate = wasm_rate;
         }
     }
 #endif
     s_audio_open = 1;
-    SDL_PauseAudio(0);  /* start playback */
+    SDL_PauseAudio(0); /* start playback */
     LOG_DEBUG("[SDL] Audio opened: %d Hz (requested %d Hz), format=%d (%d bytes), ch=%d\n",
-           got.freq, want.freq, got.format, s_output_sample_bytes, got.channels);
+              got.freq, want.freq, got.format, s_output_sample_bytes, got.channels);
 }
 
 /* ============================================================
@@ -1952,11 +2248,14 @@ static void sdl_audio_open(void) {
  * ============================================================ */
 
 OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
-                    SndCallBackProcPtr userRoutine) {
-    if (!chan) return -50;
+                    SndCallBackProcPtr userRoutine)
+{
+    if (!chan)
+        return -50;
 
     /* Open audio device on first channel */
-    if (!s_audio_open) {
+    if (!s_audio_open)
+    {
         SDL_InitSubSystem(SDL_INIT_AUDIO);
         sdl_audio_open();
     }
@@ -1967,12 +2266,19 @@ OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
     int vi = -1;
     {
         int slot_idx;
-        for (slot_idx = 0; slot_idx < s_voice_count; slot_idx++) {
-            if (s_voices[slot_idx].chan == NULL) { vi = slot_idx; break; }
+        for (slot_idx = 0; slot_idx < s_voice_count; slot_idx++)
+        {
+            if (s_voices[slot_idx].chan == NULL)
+            {
+                vi = slot_idx;
+                break;
+            }
         }
     }
-    if (vi < 0) {
-        if (s_voice_count >= MAX_SND_CHANNELS) {
+    if (vi < 0)
+    {
+        if (s_voice_count >= MAX_SND_CHANNELS)
+        {
             fprintf(stderr, "[SDL] SndNewChannel: too many channels\n");
             return -108;
         }
@@ -1980,35 +2286,39 @@ OSErr SndNewChannel(SndChannelPtr *chan, short synth, long init,
     }
 
     *chan = (SndChannelPtr)calloc(1, sizeof(SndChannel));
-    if (!*chan) return -108;
+    if (!*chan)
+        return -108;
 
     SndVoice *v = &s_voices[vi];
     memset(v, 0, sizeof(*v));
-    v->vol_l    = 1.0f;
-    v->vol_r    = 1.0f;
+    v->vol_l = 1.0f;
+    v->vol_r = 1.0f;
     v->rate_mul = 1.0;
-    v->rate     = 1.0;
-    v->active   = 0;
+    v->rate = 1.0;
+    v->active = 0;
     v->src_channels = 1;
     v->callback = userRoutine;
-    v->chan     = *chan;
+    v->chan = *chan;
 
     /* Store voice index in nextChan (we're not using it for actual linking) */
     (*chan)->nextChan = (struct SndChannel *)(intptr_t)vi;
-    (*chan)->callBack  = userRoutine;
-    (*chan)->userInfo  = 0;
+    (*chan)->callBack = userRoutine;
+    (*chan)->userInfo = 0;
 
     return 0;
 }
 
-OSErr SndDisposeChannel(SndChannelPtr chan, Boolean quietNow) {
-    if (!chan) return 0;
+OSErr SndDisposeChannel(SndChannelPtr chan, Boolean quietNow)
+{
+    if (!chan)
+        return 0;
     int vi = voice_for_chan(chan);
-    if (vi >= 0 && s_audio_mutex) {
+    if (vi >= 0 && s_audio_mutex)
+    {
         SDL_LockMutex(s_audio_mutex);
-        s_voices[vi].active   = 0;
-        s_voices[vi].samples  = NULL;
-        s_voices[vi].chan     = NULL;  /* mark slot as reusable */
+        s_voices[vi].active = 0;
+        s_voices[vi].samples = NULL;
+        s_voices[vi].chan = NULL; /* mark slot as reusable */
         SDL_UnlockMutex(s_audio_mutex);
     }
     free(chan);
@@ -2016,158 +2326,190 @@ OSErr SndDisposeChannel(SndChannelPtr chan, Boolean quietNow) {
 }
 
 /* -------- Parse Mac SoundHeader and start playback -------- */
-static void voice_play_buffer(SndVoice *v, const uint8_t *snd_hdr) {
-    if (!snd_hdr) return;
+static void voice_play_buffer(SndVoice *v, const uint8_t *snd_hdr)
+{
+    if (!snd_hdr)
+        return;
 
     /* Read SoundHeader fields (big-endian) */
-    uint32_t length    = ((uint32_t)snd_hdr[4]<<24)|((uint32_t)snd_hdr[5]<<16)|
-                         ((uint32_t)snd_hdr[6]<<8 )|snd_hdr[7];
-    uint32_t rate_fx   = ((uint32_t)snd_hdr[8]<<24)|((uint32_t)snd_hdr[9]<<16)|
-                         ((uint32_t)snd_hdr[10]<<8)|snd_hdr[11];
-    uint32_t loop_start= ((uint32_t)snd_hdr[12]<<24)|((uint32_t)snd_hdr[13]<<16)|
-                         ((uint32_t)snd_hdr[14]<<8 )|snd_hdr[15];
-    uint32_t loop_end  = ((uint32_t)snd_hdr[16]<<24)|((uint32_t)snd_hdr[17]<<16)|
-                         ((uint32_t)snd_hdr[18]<<8 )|snd_hdr[19];
-    uint8_t  encode    = snd_hdr[20];
+    uint32_t length = ((uint32_t)snd_hdr[4] << 24) | ((uint32_t)snd_hdr[5] << 16) |
+                      ((uint32_t)snd_hdr[6] << 8) | snd_hdr[7];
+    uint32_t rate_fx = ((uint32_t)snd_hdr[8] << 24) | ((uint32_t)snd_hdr[9] << 16) |
+                       ((uint32_t)snd_hdr[10] << 8) | snd_hdr[11];
+    uint32_t loop_start = ((uint32_t)snd_hdr[12] << 24) | ((uint32_t)snd_hdr[13] << 16) |
+                          ((uint32_t)snd_hdr[14] << 8) | snd_hdr[15];
+    uint32_t loop_end = ((uint32_t)snd_hdr[16] << 24) | ((uint32_t)snd_hdr[17] << 16) |
+                        ((uint32_t)snd_hdr[18] << 8) | snd_hdr[19];
+    uint8_t encode = snd_hdr[20];
 
     double src_rate = (double)rate_fx / 65536.0;
-    if (src_rate < 100.0) src_rate = 22050.0;  /* sanity check */
+    if (src_rate < 100.0)
+        src_rate = 22050.0; /* sanity check */
 
-    v->src_rate   = (uint32_t)src_rate;
-    v->rate       = src_rate / (double)s_output_rate * v->rate_mul;
+    v->src_rate = (uint32_t)src_rate;
+    v->rate = src_rate / (double)s_output_rate * v->rate_mul;
     v->loop_start = loop_start;
-    v->loop_end   = loop_end;
-    v->pos        = 0.0;
+    v->loop_end = loop_end;
+    v->pos = 0.0;
 
-    if (encode == 0x00) {
+    if (encode == 0x00)
+    {
         /* stdSH: 8-bit mono samples at offset 22 */
-        v->samples     = (const uint8_t *)(snd_hdr + 22);
+        v->samples = (const uint8_t *)(snd_hdr + 22);
         v->num_samples = length;
-        v->is16bit     = 0;
-        v->active      = 1;
-    } else if (encode == 0xFF) {
+        v->is16bit = 0;
+        v->active = 1;
+    }
+    else if (encode == 0xFF)
+    {
         /* extSH: sample data begins at offset 64.
          * numChannels (big-endian uint32) at bytes 4-7.
          * numFrames (big-endian uint32) at bytes 22-25 is the frame count.
          * sampleSize (big-endian uint16) at bytes 48-49 gives bits per sample.
          * Note: offset 4 is numChannels (not a usable frame count), and
          * offset 44 is AESRecording (not sampleSize) — do not read from there. */
-        uint32_t num_channels = ((uint32_t)snd_hdr[4]<<24)|((uint32_t)snd_hdr[5]<<16)|
-                                ((uint32_t)snd_hdr[6]<<8 )|snd_hdr[7];
-        uint32_t num_frames  = ((uint32_t)snd_hdr[22]<<24)|((uint32_t)snd_hdr[23]<<16)|
-                               ((uint32_t)snd_hdr[24]<<8 )|snd_hdr[25];
+        uint32_t num_channels = ((uint32_t)snd_hdr[4] << 24) | ((uint32_t)snd_hdr[5] << 16) |
+                                ((uint32_t)snd_hdr[6] << 8) | snd_hdr[7];
+        uint32_t num_frames = ((uint32_t)snd_hdr[22] << 24) | ((uint32_t)snd_hdr[23] << 16) |
+                              ((uint32_t)snd_hdr[24] << 8) | snd_hdr[25];
         uint16_t sample_size = ((uint16_t)snd_hdr[48] << 8) | snd_hdr[49];
-        v->samples     = (const uint8_t *)(snd_hdr + 64);
+        v->samples = (const uint8_t *)(snd_hdr + 64);
         v->num_samples = num_frames;
-        v->is16bit     = (sample_size == 16) ? 1 : 0;
+        v->is16bit = (sample_size == 16) ? 1 : 0;
         v->src_channels = (num_channels > 0 && num_channels <= 8) ? (int)num_channels : 1;
-        v->active      = 1;
+        v->active = 1;
         LOG_DEBUG("LOG: extSH sound: numChannels=%u numFrames=%u sampleSize=%u is16bit=%d rate=%.1fHz\n",
-               num_channels, num_frames, sample_size, v->is16bit, src_rate);
-    } else {
+                  num_channels, num_frames, sample_size, v->is16bit, src_rate);
+    }
+    else
+    {
         /* cmpSH or other - not supported */
         v->is16bit = 0;
         v->src_channels = 1;
-        v->active  = 0;
+        v->active = 0;
     }
 }
 
-OSErr SndDoImmediate(SndChannelPtr chan, const SndCommand *cmd) {
-    if (!chan || !cmd) return 0;
+OSErr SndDoImmediate(SndChannelPtr chan, const SndCommand *cmd)
+{
+    if (!chan || !cmd)
+        return 0;
     int vi = voice_for_chan(chan);
-    if (vi < 0) return 0;
+    if (vi < 0)
+        return 0;
     SndVoice *v = &s_voices[vi];
 
-    if (s_audio_mutex) SDL_LockMutex(s_audio_mutex);
+    if (s_audio_mutex)
+        SDL_LockMutex(s_audio_mutex);
 
-    switch (cmd->cmd & 0x7FFF) {  /* strip high bit (data-offset flag) */
-        case 3: /* quietCmd */
-            v->active = 0;
-            break;
-        case 4: /* flushCmd */
-            v->active = 0;
-            v->callback_pending = 0;
-            break;
-        case 46: /* volumeCmd */
-            /* param2: hi 16 bits = left, lo 16 bits = right (range 0-0x0100 = 0.0-1.0) */
-            {
-                uint16_t vl = (uint16_t)((cmd->param2 >> 16) & 0xFFFF);
-                uint16_t vr = (uint16_t)( cmd->param2        & 0xFFFF);
-                /* Mono mix: average L+R; 0x0100 = full volume */
-                v->vol_l = (float)vl / 256.0f;
-                v->vol_r = (float)vr / 256.0f;
-                /* For mono output use average */
-                if (v->vol_l == 0 && v->vol_r > 0) v->vol_l = v->vol_r;
-                if (v->vol_r == 0 && v->vol_l > 0) v->vol_r = v->vol_l;
-            }
-            break;
-        case 82: /* rateCmd */
-            if (cmd->param2 > 0) {
-                v->rate_mul = (double)cmd->param2 / 65536.0;
+    switch (cmd->cmd & 0x7FFF)
+    {       /* strip high bit (data-offset flag) */
+    case 3: /* quietCmd */
+        v->active = 0;
+        break;
+    case 4: /* flushCmd */
+        v->active = 0;
+        v->callback_pending = 0;
+        break;
+    case 46: /* volumeCmd */
+        /* param2: hi 16 bits = left, lo 16 bits = right (range 0-0x0100 = 0.0-1.0) */
+        {
+            uint16_t vl = (uint16_t)((cmd->param2 >> 16) & 0xFFFF);
+            uint16_t vr = (uint16_t)(cmd->param2 & 0xFFFF);
+            /* Mono mix: average L+R; 0x0100 = full volume */
+            v->vol_l = (float)vl / 256.0f;
+            v->vol_r = (float)vr / 256.0f;
+            /* For mono output use average */
+            if (v->vol_l == 0 && v->vol_r > 0)
+                v->vol_l = v->vol_r;
+            if (v->vol_r == 0 && v->vol_l > 0)
+                v->vol_r = v->vol_l;
+        }
+        break;
+    case 82: /* rateCmd */
+        if (cmd->param2 > 0)
+        {
+            v->rate_mul = (double)cmd->param2 / 65536.0;
+            v->rate = (double)v->src_rate / (double)s_output_rate * v->rate_mul;
+        }
+        break;
+    case 85: /* getRateCmd */
+        /* param2 is pointer to UInt32 to receive the rate */
+        if (cmd->param2)
+        {
+            uint32_t *dest = (uint32_t *)(intptr_t)cmd->param2;
+            *dest = (uint32_t)(v->src_rate * 65536.0);
+        }
+        break;
+    case 86: /* rateMultiplierCmd */
+        if (cmd->param2 > 0)
+        {
+            v->rate_mul = (double)cmd->param2 / 65536.0;
+            if (v->src_rate > 0)
                 v->rate = (double)v->src_rate / (double)s_output_rate * v->rate_mul;
-            }
-            break;
-        case 85: /* getRateCmd */
-            /* param2 is pointer to UInt32 to receive the rate */
-            if (cmd->param2) {
-                uint32_t *dest = (uint32_t *)(intptr_t)cmd->param2;
-                *dest = (uint32_t)(v->src_rate * 65536.0);
-            }
-            break;
-        case 86: /* rateMultiplierCmd */
-            if (cmd->param2 > 0) {
-                v->rate_mul = (double)cmd->param2 / 65536.0;
-                if (v->src_rate > 0)
-                    v->rate = (double)v->src_rate / (double)s_output_rate * v->rate_mul;
-            }
-            break;
-        case 81: /* bufferCmd - immediate version plays right away */
-            if (cmd->param2) {
-                voice_play_buffer(v, (const uint8_t *)(intptr_t)cmd->param2);
-            }
-            break;
-        default:
-            break;
+        }
+        break;
+    case 81: /* bufferCmd - immediate version plays right away */
+        if (cmd->param2)
+        {
+            voice_play_buffer(v, (const uint8_t *)(intptr_t)cmd->param2);
+        }
+        break;
+    default:
+        break;
     }
 
-    if (s_audio_mutex) SDL_UnlockMutex(s_audio_mutex);
+    if (s_audio_mutex)
+        SDL_UnlockMutex(s_audio_mutex);
     return 0;
 }
 
-OSErr SndDoCommand(SndChannelPtr chan, const SndCommand *cmd, Boolean noWait) {
-    if (!chan || !cmd) return 0;
+OSErr SndDoCommand(SndChannelPtr chan, const SndCommand *cmd, Boolean noWait)
+{
+    if (!chan || !cmd)
+        return 0;
     int vi = voice_for_chan(chan);
-    if (vi < 0) return 0;
+    if (vi < 0)
+        return 0;
     SndVoice *v = &s_voices[vi];
 
-    if (s_audio_mutex) SDL_LockMutex(s_audio_mutex);
+    if (s_audio_mutex)
+        SDL_LockMutex(s_audio_mutex);
 
-    switch (cmd->cmd & 0x7FFF) {
-        case 81: /* bufferCmd */
-            if (cmd->param2) {
-                voice_play_buffer(v, (const uint8_t *)(intptr_t)cmd->param2);
-            }
-            break;
-        case 13: /* callBackCmd */
-            /* Schedule callback when current sound finishes */
-            v->callback_pending = 1;
-            v->callback_param1  = cmd->param1;
-            break;
-        default:
-            /* Delegate to SndDoImmediate for other commands */
-            if (s_audio_mutex) SDL_UnlockMutex(s_audio_mutex);
-            return SndDoImmediate(chan, cmd);
+    switch (cmd->cmd & 0x7FFF)
+    {
+    case 81: /* bufferCmd */
+        if (cmd->param2)
+        {
+            voice_play_buffer(v, (const uint8_t *)(intptr_t)cmd->param2);
+        }
+        break;
+    case 13: /* callBackCmd */
+        /* Schedule callback when current sound finishes */
+        v->callback_pending = 1;
+        v->callback_param1 = cmd->param1;
+        break;
+    default:
+        /* Delegate to SndDoImmediate for other commands */
+        if (s_audio_mutex)
+            SDL_UnlockMutex(s_audio_mutex);
+        return SndDoImmediate(chan, cmd);
     }
 
-    if (s_audio_mutex) SDL_UnlockMutex(s_audio_mutex);
+    if (s_audio_mutex)
+        SDL_UnlockMutex(s_audio_mutex);
     return 0;
 }
 
-OSErr SndChannelStatus(SndChannelPtr chan, short theLength, SCStatusPtr theStatus) {
-    if (theStatus) memset(theStatus, 0, theLength);
-    if (!chan) return 0;
+OSErr SndChannelStatus(SndChannelPtr chan, short theLength, SCStatusPtr theStatus)
+{
+    if (theStatus)
+        memset(theStatus, 0, theLength);
+    if (!chan)
+        return 0;
     int vi = voice_for_chan(chan);
-    if (vi >= 0 && theStatus && theLength >= 4) {
+    if (vi >= 0 && theStatus && theLength >= 4)
+    {
         /* scChannelBusy = 0x0001 */
         if (s_voices[vi].active)
             ((uint8_t *)theStatus)[3] |= 0x01;
@@ -2176,16 +2518,20 @@ OSErr SndChannelStatus(SndChannelPtr chan, short theLength, SCStatusPtr theStatu
 }
 
 /* -------- Process pending callbacks (called from main thread) -------- */
-static void sdl_audio_process_callbacks(void) {
-    if (!s_audio_mutex) return;
+static void sdl_audio_process_callbacks(void)
+{
+    if (!s_audio_mutex)
+        return;
     SDL_LockMutex(s_audio_mutex);
-    for (int vi = 0; vi < s_voice_count; vi++) {
+    for (int vi = 0; vi < s_voice_count; vi++)
+    {
         SndVoice *v = &s_voices[vi];
-        if (v->callback_pending == 2 && v->callback && v->chan) {
+        if (v->callback_pending == 2 && v->callback && v->chan)
+        {
             SndCallBackProcPtr cb = v->callback;
             SndChannelPtr chan = v->chan;
             SndCommand cmd;
-            cmd.cmd    = 13; /* callBackCmd */
+            cmd.cmd = 13; /* callBackCmd */
             cmd.param1 = v->callback_param1;
             cmd.param2 = 0;
             v->callback_pending = 0;
@@ -2197,34 +2543,42 @@ static void sdl_audio_process_callbacks(void) {
     SDL_UnlockMutex(s_audio_mutex);
 }
 
-NumVersion SndSoundManagerVersion(void) {
+NumVersion SndSoundManagerVersion(void)
+{
     /* Return version 3.6 - "HQ mode" threshold is 0x03600000 */
     NumVersion v;
-    v.majorRev       = 3;
+    v.majorRev = 3;
     v.minorAndBugRev = 0x60;
-    v.stage          = 0x80; /* final */
-    v.nonRelRev      = 0;
+    v.stage = 0x80; /* final */
+    v.nonRelRev = 0;
     return v;
 }
 
-OSErr GetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr) {
+OSErr GetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr)
+{
     (void)ci;
-    if (selector == 'srat' && infoPtr) {
+    if (selector == 'srat' && infoPtr)
+    {
         /* siSampleRate: return 22050 Hz as 16.16 fixed point */
         *(uint32_t *)infoPtr = (uint32_t)(22050.0 * 65536.0);
-    } else if (selector == 'srav' && infoPtr) {
+    }
+    else if (selector == 'srav' && infoPtr)
+    {
         /* siSampleRateAvailable: return a SoundInfoList with our supported rate.
          * The game iterates rates.infoHandle entries looking for its desired rate,
          * then calls DisposeHandle(rates.infoHandle). We must allocate a real Handle. */
         SoundInfoList *sil = (SoundInfoList *)infoPtr;
         /* Allocate a handle with one UnsignedFixed (22050 Hz) */
         Handle h = NewHandle(sizeof(UnsignedFixed));
-        if (h && *h) {
+        if (h && *h)
+        {
             UnsignedFixed rate22k = (UnsignedFixed)(22050.0 * 65536.0);
             memcpy(*h, &rate22k, sizeof(rate22k));
             sil->count = 1;
             sil->infoHandle = h;
-        } else {
+        }
+        else
+        {
             sil->count = 0;
             sil->infoHandle = NewHandle(0); /* empty but valid handle */
         }
@@ -2232,14 +2586,19 @@ OSErr GetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr) {
     return 0;
 }
 
-OSErr SetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr) {
-    (void)ci; (void)selector; (void)infoPtr;
+OSErr SetSoundOutputInfo(ComponentInstance ci, OSType selector, void *infoPtr)
+{
+    (void)ci;
+    (void)selector;
+    (void)infoPtr;
     return 0;
 }
 
 /* Component (FindNextComponent) - return non-NULL so SetGameVolume proceeds */
-Component FindNextComponent(Component aComponent, ComponentDescription *looking) {
-    (void)aComponent; (void)looking;
+Component FindNextComponent(Component aComponent, ComponentDescription *looking)
+{
+    (void)aComponent;
+    (void)looking;
     /* Return a fake non-NULL component so the game enters the sound rate setup */
     return (Component)(intptr_t)1;
 }
@@ -2251,16 +2610,18 @@ Component FindNextComponent(Component aComponent, ComponentDescription *looking)
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 #endif
-void set_wasm_master_volume(float vol) {
-    if (vol < 0.0f) vol = 0.0f;
-    if (vol > 1.0f) vol = 1.0f;
+void set_wasm_master_volume(float vol)
+{
+    if (vol < 0.0f)
+        vol = 0.0f;
+    if (vol > 1.0f)
+        vol = 1.0f;
     s_master_volume = vol;
 }
 
 /* ============================================================
  * End SDL2 Sound Manager
  * ============================================================ */
-
 
 /* ============================================================
  * WASM / Emscripten main loop support
@@ -2277,8 +2638,10 @@ static int s_initialized = 0;
 static int s_editorLaunchChecked = 0;
 
 /* Called once per frame by Emscripten */
-static void emscripten_main_loop(void) {
-    if (!s_initialized) return;
+static void emscripten_main_loop(void)
+{
+    if (!s_initialized)
+        return;
     extern int gGameOn;
     extern int gExit;
     /* On the very first tick after Init() completes, check if an editor
@@ -2286,9 +2649,11 @@ static void emscripten_main_loop(void) {
      * from JavaScript in onRuntimeInitialized).  Doing this here – rather
      * than from JS – avoids the timing race where the JS setTimeout(0)
      * fires before main()/Init() has finished. */
-    if (!s_editorLaunchChecked) {
+    if (!s_editorLaunchChecked)
+    {
         s_editorLaunchChecked = 1;
-        if (!gGameOn && gEditorLaunchOptions.enabled && gEditorLaunchOptions.autoStart) {
+        if (!gGameOn && gEditorLaunchOptions.enabled && gEditorLaunchOptions.autoStart)
+        {
             EM_ASM({ console.log('[WASM] Editor test-drive auto-start on first tick'); });
             StartGame(1);
             return; /* StartGame → LoadLevel sets gGameOn; next tick will run GameFrame */
@@ -2296,14 +2661,18 @@ static void emscripten_main_loop(void) {
     }
     /* Process pending sound callbacks */
     sdl_audio_process_callbacks();
-    if (gExit) {
+    if (gExit)
+    {
         emscripten_cancel_main_loop();
         Exit();
         return;
     }
     if (gGameOn)
+    {
         GameFrame();
-    else {
+    }
+    else
+    {
         Eventloop();
         /* In WASM, the canvas must be refreshed every animation frame.
          * Eventloop() only calls Blit2Screen() when responding to an event
@@ -2314,13 +2683,17 @@ static void emscripten_main_loop(void) {
 }
 
 /* WASM entry point - called from JS after page loads */
-int main(int argc, char *argv[]) {
-    (void)argc; (void)argv;
+int main(int argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
     EM_ASM({ console.log('[WASM] Reckless Drivin WASM starting up...'); });
     Init();
     EM_ASM({ console.log('[WASM] Init() complete – entering main loop'); });
     s_initialized = 1;
-    /* 0 = use browser's requestAnimationFrame (60fps), simulate_infinite_loop=1 */
+    /* Use the browser's requestAnimationFrame pacing and let the renderer be
+     * driven once per animation frame.  This avoids the desktop-style spin loop
+     * that can leave the canvas stale while audio/input continue uninterrupted. */
     emscripten_set_main_loop(emscripten_main_loop, 0, 1);
     return 0;
 }
@@ -2354,11 +2727,14 @@ static int parse_int_arg(const char *text, int *out_value)
     char *end_ptr = NULL;
     long value;
 
-    if (!text || !*text) return 0;
+    if (!text || !*text)
+        return 0;
 
     value = strtol(text, &end_ptr, 10);
-    if (!end_ptr || *end_ptr != '\0') return 0;
-    if (value < INT_MIN || value > INT_MAX) return 0;
+    if (!end_ptr || *end_ptr != '\0')
+        return 0;
+    if (value < INT_MIN || value > INT_MAX)
+        return 0;
 
     *out_value = (int)value;
     return 1;
@@ -2366,25 +2742,39 @@ static int parse_int_arg(const char *text, int *out_value)
 
 static UInt32 parse_forced_addon_mask(const char *name)
 {
-    if (!name) return 0;
-    if (strcmp(name, "lock") == 0) return kAddOnLock;
-    if (strcmp(name, "cop") == 0 || strcmp(name, "police-jammer") == 0) return kAddOnCop;
-    if (strcmp(name, "turbo") == 0 || strcmp(name, "turbo-engine") == 0) return kAddOnTurbo;
-    if (strcmp(name, "spikes") == 0) return kAddOnSpikes;
+    if (!name)
+        return 0;
+    if (strcmp(name, "lock") == 0)
+        return kAddOnLock;
+    if (strcmp(name, "cop") == 0 || strcmp(name, "police-jammer") == 0)
+        return kAddOnCop;
+    if (strcmp(name, "turbo") == 0 || strcmp(name, "turbo-engine") == 0)
+        return kAddOnTurbo;
+    if (strcmp(name, "spikes") == 0)
+        return kAddOnSpikes;
     return 0;
 }
 
 static UInt32 parse_bonus_roll_mask(const char *name)
 {
-    if (!name) return 0;
-    if (strcmp(name, "lock") == 0) return kBonusRollLock;
-    if (strcmp(name, "mines") == 0 || strcmp(name, "mine") == 0) return kBonusRollMines;
-    if (strcmp(name, "missiles") == 0 || strcmp(name, "missile") == 0) return kBonusRollMissiles;
-    if (strcmp(name, "spikes") == 0) return kBonusRollSpikes;
-    if (strcmp(name, "cop") == 0 || strcmp(name, "police-jammer") == 0) return kBonusRollCop;
-    if (strcmp(name, "turbo") == 0 || strcmp(name, "turbo-engine") == 0) return kBonusRollTurbo;
-    if (strcmp(name, "score") == 0 || strcmp(name, "award") == 0) return kBonusRollScore;
-    if (strcmp(name, "extra-life") == 0 || strcmp(name, "life") == 0) return kBonusRollExtraLife;
+    if (!name)
+        return 0;
+    if (strcmp(name, "lock") == 0)
+        return kBonusRollLock;
+    if (strcmp(name, "mines") == 0 || strcmp(name, "mine") == 0)
+        return kBonusRollMines;
+    if (strcmp(name, "missiles") == 0 || strcmp(name, "missile") == 0)
+        return kBonusRollMissiles;
+    if (strcmp(name, "spikes") == 0)
+        return kBonusRollSpikes;
+    if (strcmp(name, "cop") == 0 || strcmp(name, "police-jammer") == 0)
+        return kBonusRollCop;
+    if (strcmp(name, "turbo") == 0 || strcmp(name, "turbo-engine") == 0)
+        return kBonusRollTurbo;
+    if (strcmp(name, "score") == 0 || strcmp(name, "award") == 0)
+        return kBonusRollScore;
+    if (strcmp(name, "extra-life") == 0 || strcmp(name, "life") == 0)
+        return kBonusRollExtraLife;
     return 0;
 }
 
@@ -2394,12 +2784,15 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
     int has_any = 0;
     int i;
 
-    for (i = 1; i < argc; i++) {
+    for (i = 1; i < argc; i++)
+    {
         int parsed_value;
         UInt32 parsed_mask;
 
-        if (strcmp(argv[i], "--level") == 0) {
-            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value)) {
+        if (strcmp(argv[i], "--level") == 0)
+        {
+            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value))
+            {
                 fprintf(stderr, "[RecklessDrivin] Invalid value for --level\n");
                 return 0;
             }
@@ -2410,8 +2803,10 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
             i++;
             continue;
         }
-        if (strcmp(argv[i], "--start-y") == 0) {
-            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value)) {
+        if (strcmp(argv[i], "--start-y") == 0)
+        {
+            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value))
+            {
                 fprintf(stderr, "[RecklessDrivin] Invalid value for --start-y\n");
                 return 0;
             }
@@ -2422,8 +2817,10 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
             i++;
             continue;
         }
-        if (strcmp(argv[i], "--object-group-start-y") == 0) {
-            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value)) {
+        if (strcmp(argv[i], "--object-group-start-y") == 0)
+        {
+            if (i + 1 >= argc || !parse_int_arg(argv[i + 1], &parsed_value))
+            {
                 fprintf(stderr, "[RecklessDrivin] Invalid value for --object-group-start-y\n");
                 return 0;
             }
@@ -2434,13 +2831,16 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
             i++;
             continue;
         }
-        if (strcmp(argv[i], "--force-addon") == 0) {
-            if (i + 1 >= argc) {
+        if (strcmp(argv[i], "--force-addon") == 0)
+        {
+            if (i + 1 >= argc)
+            {
                 fprintf(stderr, "[RecklessDrivin] Missing value for --force-addon\n");
                 return 0;
             }
             parsed_mask = parse_forced_addon_mask(argv[i + 1]);
-            if (!parsed_mask) {
+            if (!parsed_mask)
+            {
                 fprintf(stderr, "[RecklessDrivin] Unknown addon for --force-addon: %s\n", argv[i + 1]);
                 return 0;
             }
@@ -2450,13 +2850,16 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
             i++;
             continue;
         }
-        if (strcmp(argv[i], "--disable-addon") == 0 || strcmp(argv[i], "--disable-roll") == 0) {
-            if (i + 1 >= argc) {
+        if (strcmp(argv[i], "--disable-addon") == 0 || strcmp(argv[i], "--disable-roll") == 0)
+        {
+            if (i + 1 >= argc)
+            {
                 fprintf(stderr, "[RecklessDrivin] Missing value for %s\n", argv[i]);
                 return 0;
             }
             parsed_mask = parse_bonus_roll_mask(argv[i + 1]);
-            if (!parsed_mask) {
+            if (!parsed_mask)
+            {
                 fprintf(stderr, "[RecklessDrivin] Unknown bonus roll for %s: %s\n", argv[i], argv[i + 1]);
                 return 0;
             }
@@ -2468,11 +2871,13 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
         }
     }
 
-    if (out_options) *out_options = options;
+    if (out_options)
+        *out_options = options;
     return has_any;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     tEditorLaunchOptions editor_launch_options;
     int auto_start_editor_launch = parse_editor_launch_options(argc, argv, &editor_launch_options);
 #ifdef __ANDROID__
@@ -2488,12 +2893,14 @@ int main(int argc, char *argv[]) {
      * has a chance to run). */
     {
         const char *storage = SDL_AndroidGetInternalStoragePath();
-        if (storage) {
+        if (storage)
+        {
             /* Build full path: internal_storage/resources.dat
              * Allocate dynamically to handle any path length. */
             size_t len = SDL_strlen(storage) + SDL_strlen("/resources.dat") + 1;
             char *res_path = (char *)SDL_malloc(len);
-            if (res_path) {
+            if (res_path)
+            {
                 SDL_snprintf(res_path, len, "%s/resources.dat", storage);
                 Pomme_LoadResourceFile(res_path);
                 SDL_free(res_path);
@@ -2502,15 +2909,30 @@ int main(int argc, char *argv[]) {
     }
 #endif /* __ANDROID__ */
     Init();
-    if (auto_start_editor_launch) {
+    if (auto_start_editor_launch)
+    {
         SetEditorLaunchOptions(&editor_launch_options);
         rd_start_editor_test_drive();
     }
-    while (!gExit) {
-        if (gGameOn)
-            GameFrame();
-        else
-            Eventloop();
+    {
+        Uint32 frame_start;
+        while (!gExit)
+        {
+            frame_start = SDL_GetTicks();
+            if (gGameOn)
+                GameFrame();
+            else
+                Eventloop();
+            /* Sleep for the remainder of a ~16 ms frame budget so the CPU
+             * is not pegged at 100 %.  VSync in SDL_RenderPresent already
+             * synchronises to the display; this prevents the spin loop from
+             * burning CPU between renders and causing thermal throttling. */
+            {
+                Uint32 elapsed = SDL_GetTicks() - frame_start;
+                if (elapsed < 16)
+                    SDL_Delay(16 - elapsed);
+            }
+        }
     }
     Exit();
     return 0;

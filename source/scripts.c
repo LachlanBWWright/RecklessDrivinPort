@@ -98,6 +98,9 @@ static void CallScriptChangedHook(tObject *theObj, int oldScriptId, int newScrip
 static void CallDespawnHook(tObject *theObj, const char *reason);
 static void CallSpawnedChildHook(tObject *parentObj, tObject *childObj);
 static void CallSpawnedByHook(tObject *childObj, tObject *parentObj);
+static void CallPickupHook(tObject *theObj, tObject *playerObj);
+static void CallLevelHookWithObject(const char *hookName, tObject *argObj);
+static void CallLevelHookWithInteger(const char *hookName, int value);
 static void ClearObjectRuntimeState(tObject *theObj, int clearLuaState);
 #endif
 
@@ -1453,6 +1456,81 @@ static void CallLevelHook(const char *hookName, float dt)
 		CallLevelHookForScript(gCurrentLevelScriptId, hookName, dt);
 }
 
+static void CallLevelHookWithObjectForScript(int scriptId, const char *hookName, tObject *argObj)
+{
+	if(!scriptId)
+		return;
+	tLoadedScript *script = FindLoadedScript(scriptId);
+	if(!script || !script->state)
+		return;
+	lua_State *L = script->state;
+	lua_getglobal(L, hookName);
+	if(!lua_isfunction(L, -1))
+	{
+		lua_pop(L, 1);
+		return;
+	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
+	gCurrentScriptObject = nil;
+	gScriptSpawnCount = 0;
+	PushContextTable(L);
+	if(argObj)
+		PushObjectTable(L, argObj, true);
+	else
+		lua_pushnil(L);
+	if(lua_pcall(L, 2, 0, 0) != LUA_OK)
+	{
+		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", scriptId, hookName, lua_tostring(L, -1));
+		lua_pop(L, 1);
+	}
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
+}
+
+static void CallLevelHookWithObject(const char *hookName, tObject *argObj)
+{
+	CallLevelHookWithObjectForScript(gGlobalLevelScriptId, hookName, argObj);
+	if(gCurrentLevelScriptId && gCurrentLevelScriptId != gGlobalLevelScriptId)
+		CallLevelHookWithObjectForScript(gCurrentLevelScriptId, hookName, argObj);
+}
+
+static void CallLevelHookWithIntegerForScript(int scriptId, const char *hookName, int value)
+{
+	if(!scriptId)
+		return;
+	tLoadedScript *script = FindLoadedScript(scriptId);
+	if(!script || !script->state)
+		return;
+	lua_State *L = script->state;
+	lua_getglobal(L, hookName);
+	if(!lua_isfunction(L, -1))
+	{
+		lua_pop(L, 1);
+		return;
+	}
+	tObject *prevObject = gCurrentScriptObject;
+	int prevSpawnCount = gScriptSpawnCount;
+	gCurrentScriptObject = nil;
+	gScriptSpawnCount = 0;
+	PushContextTable(L);
+	lua_pushinteger(L, value);
+	if(lua_pcall(L, 2, 0, 0) != LUA_OK)
+	{
+		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", scriptId, hookName, lua_tostring(L, -1));
+		lua_pop(L, 1);
+	}
+	gCurrentScriptObject = prevObject;
+	gScriptSpawnCount = prevSpawnCount;
+}
+
+static void CallLevelHookWithInteger(const char *hookName, int value)
+{
+	CallLevelHookWithIntegerForScript(gGlobalLevelScriptId, hookName, value);
+	if(gCurrentLevelScriptId && gCurrentLevelScriptId != gGlobalLevelScriptId)
+		CallLevelHookWithIntegerForScript(gCurrentLevelScriptId, hookName, value);
+}
+
 static void CallHook(tObject *theObj, const char *hookName, float dt)
 {
 	if(!theObj || !theObj->scriptId)
@@ -1524,6 +1602,11 @@ static void CallSpawnedChildHook(tObject *parentObj, tObject *childObj)
 static void CallSpawnedByHook(tObject *childObj, tObject *parentObj)
 {
 	CallObjectHookWithObjects(childObj, "onSpawnedBy", parentObj);
+}
+
+static void CallPickupHook(tObject *theObj, tObject *playerObj)
+{
+	CallObjectHookWithObjects(theObj, "onPickup", playerObj);
 }
 
 static void CallScriptChangedHook(tObject *theObj, int oldScriptId, int newScriptId)
@@ -1879,6 +1962,31 @@ void Script_OnLevelTick(float dt)
 #endif
 }
 
+void Script_OnLevelComplete(void)
+{
+#ifdef HAVE_LUA_SCRIPTING
+	CallLevelHook("onLevelComplete", 0);
+#endif
+}
+
+void Script_OnPlayerRespawn(tObject *playerObj)
+{
+#ifdef HAVE_LUA_SCRIPTING
+	CallLevelHookWithObject("onPlayerRespawn", playerObj);
+#else
+	(void)playerObj;
+#endif
+}
+
+void Script_OnAddOnAward(int roll)
+{
+#ifdef HAVE_LUA_SCRIPTING
+	CallLevelHookWithInteger("onAddOnAward", roll);
+#else
+	(void)roll;
+#endif
+}
+
 void Script_OnSpawn(tObject *theObj)
 {
 #ifdef HAVE_LUA_SCRIPTING
@@ -1952,6 +2060,16 @@ void Script_OnOffscreen(tObject *theObj)
 #endif
 }
 
+void Script_OnPickup(tObject *theObj, tObject *playerObj)
+{
+#ifdef HAVE_LUA_SCRIPTING
+	CallPickupHook(theObj, playerObj);
+#else
+	(void)theObj;
+	(void)playerObj;
+#endif
+}
+
 void Script_ClearObjectState(tObject *theObj)
 {
 #ifdef HAVE_LUA_SCRIPTING
@@ -1961,6 +2079,21 @@ void Script_ClearObjectState(tObject *theObj)
 	ClearObjectRuntimeState(theObj, true);
 #else
 	(void)theObj;
+#endif
+}
+
+void Script_LinkSpawnedChild(tObject *parentObj, tObject *childObj)
+{
+#ifdef HAVE_LUA_SCRIPTING
+	if(!parentObj || !childObj || !ObjectIsLive(parentObj) || !ObjectIsLive(childObj))
+		return;
+	childObj->scriptOwnerObjectId = parentObj->scriptObjectId;
+	childObj->scriptOwnerScriptId = parentObj->scriptId;
+	CallSpawnedChildHook(parentObj, childObj);
+	CallSpawnedByHook(childObj, parentObj);
+#else
+	(void)parentObj;
+	(void)childObj;
 #endif
 }
 
@@ -2008,5 +2141,4 @@ int Script_DrainDeferredRemoval(tObject *theObj)
 	RemoveObject(theObj);
 	return true;
 }
-
 

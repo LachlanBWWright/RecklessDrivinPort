@@ -57,11 +57,25 @@ Scripts may define these functions:
 
 - `onSpawn(self, ctx)`
 - `onTick(self, ctx)`
-- `onCollision(self, ctx, other)`
-- `onDamage(self, ctx, amount)`
+- `onCollision(self, ctx, other, collision)`
+- `onDamage(self, ctx, amount, source)`
 - `onDeath(self, ctx)`
+- `onDespawn(self, ctx, reason)`
+- `onScriptChanged(self, ctx, oldScriptId, newScriptId)`
+- `onSpawnedChild(self, ctx, child)`
+- `onSpawnedBy(self, ctx, parent)`
+- `onSchedule(self, ctx, name)`
+- `onTimer(self, ctx, name)`
+- `onPlayerNear(self, ctx, distance)`
+- `onPlayerFar(self, ctx, distance)`
 - `onAnimationEnd(self, ctx)`
 - `onOffscreen(self, ctx)`
+- `onPickup(self, ctx, player)`
+- `onLevelStart(ctx)`
+- `onLevelTick(ctx, dt)`
+- `onLevelComplete(ctx)`
+- `onPlayerRespawn(ctx, player)`
+- `onAddOnAward(ctx, roll)`
 
 Missing hooks are allowed. No hook means the script has no effect for that event.
 

@@ -489,7 +489,24 @@ export class EditorObjectTypesSectionComponent implements OnChanges {
   getSelectedScriptHookLabels(): string[] {
     const script = this.selectedScript;
     if (!script) return [];
-    const hooks = ['onSpawn', 'onTick', 'onCollision', 'onDamage', 'onDeath', 'onAnimationEnd', 'onOffscreen'];
+    const hooks = [
+      'onSpawn',
+      'onTick',
+      'onCollision',
+      'onDamage',
+      'onDeath',
+      'onDespawn',
+      'onScriptChanged',
+      'onSpawnedChild',
+      'onSpawnedBy',
+      'onSchedule',
+      'onTimer',
+      'onPlayerNear',
+      'onPlayerFar',
+      'onAnimationEnd',
+      'onOffscreen',
+      'onPickup',
+    ];
     return hooks.filter((hook) => new RegExp(`\\bfunction\\s+${hook}\\s*\\(`).test(script.source));
   }
 

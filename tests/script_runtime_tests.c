@@ -774,6 +774,7 @@ void test_RemainingHooksAndAPIs(void)
 		"s2_fired = 0\n"
 		"near_count = 0\n"
 		"far_count = 0\n"
+		"pickup_player_type = 0\n"
 		"exist_obj = false\n"
 		"exist_snd = false\n"
 		"exist_frm = false\n"
@@ -850,6 +851,9 @@ void test_RemainingHooksAndAPIs(void)
 		"function onPlayerFar(self, ctx, dist)\n"
 		"  far_count = far_count + 1\n"
 		"end\n"
+		"function onPickup(self, ctx, player)\n"
+		"  pickup_player_type = player:typeId()\n"
+		"end\n"
 		"function onTick(self, ctx, dt)\n"
 		"  if dt == 99.0 then\n"
 		"    self:remove()\n"
@@ -867,16 +871,31 @@ void test_RemainingHooksAndAPIs(void)
 		// Script 103: Global Level Script
 		"level_start_global = 0\n"
 		"level_tick_global = 0.0\n"
+		"level_complete_global = 0\n"
+		"respawn_type_global = 0\n"
+		"addon_roll_global = -1\n"
 		"function onLevelStart(ctx)\n"
 		"  level_start_global = level_start_global + 1\n"
 		"end\n"
 		"function onLevelTick(ctx, dt)\n"
 		"  level_tick_global = level_tick_global + dt\n"
+		"end\n"
+		"function onLevelComplete(ctx)\n"
+		"  level_complete_global = level_complete_global + 1\n"
+		"end\n"
+		"function onPlayerRespawn(ctx, player)\n"
+		"  respawn_type_global = player:typeId()\n"
+		"end\n"
+		"function onAddOnAward(ctx, roll)\n"
+		"  addon_roll_global = roll\n"
 		"end\n",
 
 		// Script 104: Level 1 specific script
 		"level_start_spec = 0\n"
 		"level_tick_spec = 0.0\n"
+		"level_complete_spec = 0\n"
+		"respawn_type_spec = 0\n"
+		"addon_roll_spec = -1\n"
 		"lvl_num = 0\n"
 		"lvl_res_id = 0\n"
 		"lvl_end_y = 0.0\n"
@@ -888,6 +907,15 @@ void test_RemainingHooksAndAPIs(void)
 		"end\n"
 		"function onLevelTick(ctx, dt)\n"
 		"  level_tick_spec = level_tick_spec + dt\n"
+		"end\n"
+		"function onLevelComplete(ctx)\n"
+		"  level_complete_spec = level_complete_spec + 1\n"
+		"end\n"
+		"function onPlayerRespawn(ctx, player)\n"
+		"  respawn_type_spec = player:typeId()\n"
+		"end\n"
+		"function onAddOnAward(ctx, roll)\n"
+		"  addon_roll_spec = roll\n"
 		"end\n"
 	};
 
@@ -1042,6 +1070,19 @@ void test_RemainingHooksAndAPIs(void)
 	double tick_spec = lua_tonumber(L_spec, -1);
 	lua_pop(L_spec, 1);
 	assert(fabs(tick_spec - 0.5) < 0.001);
+
+	Script_OnPickup(parent, player);
+	assert(GetLuaGlobalInt(L1, "pickup_player_type") == 100);
+
+	Script_OnLevelComplete();
+	Script_OnPlayerRespawn(player);
+	Script_OnAddOnAward(5);
+	assert(GetLuaGlobalInt(L_global, "level_complete_global") == 1);
+	assert(GetLuaGlobalInt(L_spec, "level_complete_spec") == 1);
+	assert(GetLuaGlobalInt(L_global, "respawn_type_global") == 100);
+	assert(GetLuaGlobalInt(L_spec, "respawn_type_spec") == 100);
+	assert(GetLuaGlobalInt(L_global, "addon_roll_global") == 5);
+	assert(GetLuaGlobalInt(L_spec, "addon_roll_spec") == 5);
 
 	// Lifecycle remove and kill checks
 	Script_OnTick(parent, 99.0f);

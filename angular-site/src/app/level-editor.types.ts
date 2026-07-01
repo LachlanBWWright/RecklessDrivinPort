@@ -165,8 +165,12 @@ export type ScriptHookId =
   | 'onPlayerFar'
   | 'onAnimationEnd'
   | 'onOffscreen'
+  | 'onPickup'
   | 'onLevelStart'
-  | 'onLevelTick';
+  | 'onLevelTick'
+  | 'onLevelComplete'
+  | 'onPlayerRespawn'
+  | 'onAddOnAward';
 
 export interface ScriptDefinition {
   id: number;

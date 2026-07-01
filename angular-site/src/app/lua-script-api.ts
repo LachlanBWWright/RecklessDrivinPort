@@ -127,6 +127,13 @@ export const LUA_HOOK_COMPLETIONS: readonly LuaApiCompletion[] = [
     apply: 'function onOffscreen(self, ctx)\n  \nend',
   },
   {
+    label: 'onPickup',
+    type: 'hook',
+    detail: 'function onPickup(self, ctx, player)',
+    documentation: 'Runs on a bonus or add-on object when the player collects it.',
+    apply: 'function onPickup(self, ctx, player)\n  \nend',
+  },
+  {
     label: 'onLevelStart',
     type: 'hook',
     detail: 'function onLevelStart(ctx)',
@@ -139,6 +146,27 @@ export const LUA_HOOK_COMPLETIONS: readonly LuaApiCompletion[] = [
     detail: 'function onLevelTick(ctx, dt)',
     documentation: 'Runs once per gameplay frame for global and selected-level scripts.',
     apply: 'function onLevelTick(ctx, dt)\n  \nend',
+  },
+  {
+    label: 'onLevelComplete',
+    type: 'hook',
+    detail: 'function onLevelComplete(ctx)',
+    documentation: 'Runs once when the player reaches the level finish.',
+    apply: 'function onLevelComplete(ctx)\n  \nend',
+  },
+  {
+    label: 'onPlayerRespawn',
+    type: 'hook',
+    detail: 'function onPlayerRespawn(ctx, player)',
+    documentation: 'Runs after the player object is recreated following a death.',
+    apply: 'function onPlayerRespawn(ctx, player)\n  \nend',
+  },
+  {
+    label: 'onAddOnAward',
+    type: 'hook',
+    detail: 'function onAddOnAward(ctx, roll)',
+    documentation: 'Runs when an add-on pickup awards a native add-on roll.',
+    apply: 'function onAddOnAward(ctx, roll)\n  \nend',
   },
 ];
 

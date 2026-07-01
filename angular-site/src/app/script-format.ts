@@ -36,8 +36,12 @@ const LUA_HOOKS: readonly ScriptHookId[] = [
   'onPlayerFar',
   'onAnimationEnd',
   'onOffscreen',
+  'onPickup',
   'onLevelStart',
   'onLevelTick',
+  'onLevelComplete',
+  'onPlayerRespawn',
+  'onAddOnAward',
 ];
 
 const DISALLOWED_LUA_PATTERNS: readonly { pattern: RegExp; label: string }[] = [

@@ -395,6 +395,7 @@ static int BonusRollIsAllowed(int roll)
 
 static void ApplyBonusRoll(int roll)
 {
+	Script_OnAddOnAward(roll);
 	switch(roll)
 	{
 		case 0:
@@ -472,6 +473,7 @@ static void ApplyBonusRoll(int roll)
 void BonusObject(tObject *theObj)
 {
 	tObjectTypePtr objType=theObj->type;
+	Script_OnPickup(theObj, gPlayerObj);
 	if((*objType).flags2&kObjectAddOnFlag)
 	{
 		int candidates[8];
