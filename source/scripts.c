@@ -39,6 +39,9 @@
 #define kLuaObjectStateGlobal "__recklessObjectState"
 #define kLuaScriptStateGlobal "__recklessScriptState"
 #define kLuaLevelStateGlobal "__recklessLevelState"
+#define kLuaObjectMetatableGlobal "__recklessObjectMetatable"
+#define kLuaObjectWrappersGlobal "__recklessObjectWrappers"
+#define kLuaContextGlobal "__recklessContext"
 
 typedef struct {
 	SInt16 objectTypeId;
@@ -61,6 +64,7 @@ typedef struct {
 typedef struct {
 	tObject *object;
 	int scriptId;
+	int nextForObject;
 	char name[kMaxScriptTimerName];
 	float remaining;
 	float interval;
@@ -605,10 +609,38 @@ static int PushSpawnResult(lua_State *L, tObject *spawned)
 
 static tScriptTimer *FindScriptTimer(tObject *theObj, const char *name)
 {
-	for(int i = 0; i < kMaxScriptTimers; i++)
-		if(gScriptTimers[i].active && gScriptTimers[i].object == theObj && strncmp(gScriptTimers[i].name, name, kMaxScriptTimerName) == 0)
-			return &gScriptTimers[i];
+	int slot = theObj ? theObj->scriptTimerHead : 0;
+	while(slot)
+	{
+		tScriptTimer *timer = &gScriptTimers[slot - 1];
+		if(timer->active && strncmp(timer->name, name, kMaxScriptTimerName) == 0)
+			return timer;
+		slot = timer->nextForObject;
+	}
 	return nil;
+}
+
+static void DeactivateScriptTimer(tScriptTimer *timer)
+{
+	if(!timer || !timer->active)
+		return;
+	tObject *theObj = timer->object;
+	int timerSlot = (int)(timer - gScriptTimers) + 1;
+	if(theObj)
+	{
+		int *link = &theObj->scriptTimerHead;
+		while(*link)
+		{
+			tScriptTimer *linkedTimer = &gScriptTimers[*link - 1];
+			if(*link == timerSlot)
+			{
+				*link = linkedTimer->nextForObject;
+				break;
+			}
+			link = &linkedTimer->nextForObject;
+		}
+	}
+	memset(timer, 0, sizeof(*timer));
 }
 
 static tScriptTimer *FindOrCreateScriptTimer(tObject *theObj, const char *name)
@@ -623,8 +655,11 @@ static tScriptTimer *FindOrCreateScriptTimer(tObject *theObj, const char *name)
 			memset(&gScriptTimers[i], 0, sizeof(gScriptTimers[i]));
 			gScriptTimers[i].object = theObj;
 			gScriptTimers[i].scriptId = theObj ? theObj->scriptId : 0;
+			gScriptTimers[i].nextForObject = theObj ? theObj->scriptTimerHead : 0;
 			strncpy(gScriptTimers[i].name, name, kMaxScriptTimerName - 1);
 			gScriptTimers[i].active = true;
+			if(theObj)
+				theObj->scriptTimerHead = i + 1;
 			return &gScriptTimers[i];
 		}
 	}
@@ -633,16 +668,27 @@ static tScriptTimer *FindOrCreateScriptTimer(tObject *theObj, const char *name)
 
 static void ClearObjectScriptTimers(tObject *theObj)
 {
-	for(int i = 0; i < kMaxScriptTimers; i++)
-		if(gScriptTimers[i].object == theObj)
-			memset(&gScriptTimers[i], 0, sizeof(gScriptTimers[i]));
+	int slot = theObj ? theObj->scriptTimerHead : 0;
+	while(slot)
+	{
+		tScriptTimer *timer = &gScriptTimers[slot - 1];
+		int next = timer->nextForObject;
+		memset(timer, 0, sizeof(*timer));
+		slot = next;
+	}
+	if(theObj)
+		theObj->scriptTimerHead = 0;
 }
 
 static tScriptProximityWatcher *FindOrCreateProximityWatcher(tObject *theObj)
 {
-	for(int i = 0; i < kMaxScriptProximityWatchers; i++)
-		if(gScriptProximityWatchers[i].active && gScriptProximityWatchers[i].object == theObj)
-			return &gScriptProximityWatchers[i];
+	if(theObj && theObj->scriptProximityWatcher)
+	{
+		tScriptProximityWatcher *watcher = &gScriptProximityWatchers[theObj->scriptProximityWatcher - 1];
+		if(watcher->active && watcher->object == theObj)
+			return watcher;
+		theObj->scriptProximityWatcher = 0;
+	}
 	for(int i = 0; i < kMaxScriptProximityWatchers; i++)
 	{
 		if(!gScriptProximityWatchers[i].active)
@@ -651,6 +697,8 @@ static tScriptProximityWatcher *FindOrCreateProximityWatcher(tObject *theObj)
 			gScriptProximityWatchers[i].object = theObj;
 			gScriptProximityWatchers[i].scriptId = theObj ? theObj->scriptId : 0;
 			gScriptProximityWatchers[i].active = true;
+			if(theObj)
+				theObj->scriptProximityWatcher = i + 1;
 			return &gScriptProximityWatchers[i];
 		}
 	}
@@ -659,9 +707,12 @@ static tScriptProximityWatcher *FindOrCreateProximityWatcher(tObject *theObj)
 
 static void ClearObjectProximityWatcher(tObject *theObj)
 {
-	for(int i = 0; i < kMaxScriptProximityWatchers; i++)
-		if(gScriptProximityWatchers[i].object == theObj)
-			memset(&gScriptProximityWatchers[i], 0, sizeof(gScriptProximityWatchers[i]));
+	if(!theObj || !theObj->scriptProximityWatcher)
+		return;
+	tScriptProximityWatcher *watcher = &gScriptProximityWatchers[theObj->scriptProximityWatcher - 1];
+	if(watcher->object == theObj)
+		memset(watcher, 0, sizeof(*watcher));
+	theObj->scriptProximityWatcher = 0;
 }
 
 static int LuaCtxSetTimer(lua_State *L)
@@ -701,7 +752,7 @@ static int LuaCtxClearTimer(lua_State *L)
 	const char *name = luaL_checkstring(L, 2);
 	tScriptTimer *timer = FindScriptTimer(gCurrentScriptObject, name);
 	if(timer)
-		memset(timer, 0, sizeof(*timer));
+		DeactivateScriptTimer(timer);
 	return 0;
 }
 
@@ -1227,15 +1278,9 @@ static void RegisterConstants(lua_State *L)
 	lua_setglobal(L, "RoadSide");
 }
 
-static void PushObjectTable(lua_State *L, tObject *theObj, int selfTable)
+static void CreateObjectMethodsTable(lua_State *L)
 {
 	lua_newtable(L);
-	lua_pushlightuserdata(L, theObj);
-	lua_setfield(L, -2, "__object");
-	lua_pushinteger(L, theObj ? theObj->scriptObjectId : 0);
-	lua_setfield(L, -2, "__objectId");
-	if(selfTable)
-	{
 		RegisterMethod(L, "x", LuaSelfX);
 		RegisterMethod(L, "y", LuaSelfY);
 		RegisterMethod(L, "setPosition", LuaSelfSetPosition);
@@ -1275,10 +1320,35 @@ static void PushObjectTable(lua_State *L, tObject *theObj, int selfTable)
 		RegisterMethod(L, "addChild", LuaSelfAddChild);
 		RegisterMethod(L, "removeChild", LuaSelfRemoveChild);
 		RegisterMethod(L, "childCount", LuaSelfChildCount);
-	}
 }
 
-static void PushContextTable(lua_State *L)
+static void PushObjectTable(lua_State *L, tObject *theObj, int selfTable)
+{
+	int objectId = theObj ? theObj->scriptObjectId : 0;
+	lua_getglobal(L, kLuaObjectWrappersGlobal);
+	lua_pushinteger(L, objectId);
+	lua_gettable(L, -2);
+	if(!lua_istable(L, -1))
+	{
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_pushlightuserdata(L, theObj);
+		lua_setfield(L, -2, "__object");
+		lua_pushinteger(L, objectId);
+		lua_setfield(L, -2, "__objectId");
+		if(selfTable)
+		{
+			lua_getglobal(L, kLuaObjectMetatableGlobal);
+			lua_setmetatable(L, -2);
+		}
+		lua_pushinteger(L, objectId);
+		lua_pushvalue(L, -2);
+		lua_settable(L, -4);
+	}
+	lua_remove(L, -2);
+}
+
+static void CreateContextTable(lua_State *L)
 {
 	lua_newtable(L);
 	RegisterMethod(L, "log", LuaLog);
@@ -1323,6 +1393,11 @@ static void PushContextTable(lua_State *L)
 	RegisterMethod(L, "setLevelState", LuaCtxSetLevelState);
 }
 
+static void PushContextTable(lua_State *L)
+{
+	lua_getglobal(L, kLuaContextGlobal);
+}
+
 static lua_State *CreateScriptState(void)
 {
 	lua_State *L = luaL_newstate();
@@ -1340,6 +1415,16 @@ static lua_State *CreateScriptState(void)
 	lua_pushcfunction(L, LuaLog); lua_setglobal(L, "log");
 	lua_pushcfunction(L, LuaLog); lua_setglobal(L, "print");
 	RegisterConstants(L);
+	CreateObjectMethodsTable(L);
+	lua_newtable(L);
+	lua_pushvalue(L, -2);
+	lua_setfield(L, -2, "__index");
+	lua_setglobal(L, kLuaObjectMetatableGlobal);
+	lua_pop(L, 1);
+	lua_newtable(L);
+	lua_setglobal(L, kLuaObjectWrappersGlobal);
+	CreateContextTable(L);
+	lua_setglobal(L, kLuaContextGlobal);
 	return L;
 }
 
@@ -1841,9 +1926,17 @@ static void CallPlayerProximityHook(tObject *theObj, const char *hookName, float
 
 static void UpdateObjectScriptTimers(tObject *theObj, float dt)
 {
-	for(int i = 0; i < kMaxScriptTimers; i++)
+	int timerSlots[kMaxScriptTimers];
+	int timerCount = 0;
+	int slot = theObj ? theObj->scriptTimerHead : 0;
+	while(slot && timerCount < kMaxScriptTimers)
 	{
-		tScriptTimer *timer = &gScriptTimers[i];
+		timerSlots[timerCount++] = slot;
+		slot = gScriptTimers[slot - 1].nextForObject;
+	}
+	for(int i = 0; i < timerCount; i++)
+	{
+		tScriptTimer *timer = &gScriptTimers[timerSlots[i] - 1];
 		if(!timer->active || timer->object != theObj)
 			continue;
 		timer->remaining -= dt;
@@ -1859,12 +1952,12 @@ static void UpdateObjectScriptTimers(tObject *theObj, float dt)
 				if(repeating)
 					timer->remaining = interval > 0 ? interval : 0;
 				else
-					memset(timer, 0, sizeof(*timer));
+					DeactivateScriptTimer(timer);
 				CallScheduleHook(theObj, name);
 			}
 			else
 			{
-				memset(timer, 0, sizeof(*timer));
+				DeactivateScriptTimer(timer);
 				CallTimerHook(theObj, name);
 			}
 		}
@@ -1873,21 +1966,18 @@ static void UpdateObjectScriptTimers(tObject *theObj, float dt)
 
 static void UpdateObjectProximityWatcher(tObject *theObj)
 {
-	if(!gPlayerObj)
+	if(!gPlayerObj || !theObj || !theObj->scriptProximityWatcher)
 		return;
-	for(int i = 0; i < kMaxScriptProximityWatchers; i++)
-	{
-		tScriptProximityWatcher *watcher = &gScriptProximityWatchers[i];
-		if(!watcher->active || watcher->object != theObj)
-			continue;
-		float distance = VEC2D_Value(VEC2D_Difference(theObj->pos, gPlayerObj->pos));
-		int isNear = distance <= watcher->radius;
-		if(isNear && !watcher->wasNear)
-			CallPlayerProximityHook(theObj, "onPlayerNear", distance);
-		else if(!isNear && watcher->wasNear)
-			CallPlayerProximityHook(theObj, "onPlayerFar", distance);
-		watcher->wasNear = isNear;
-	}
+	tScriptProximityWatcher *watcher = &gScriptProximityWatchers[theObj->scriptProximityWatcher - 1];
+	if(!watcher->active || watcher->object != theObj)
+		return;
+	float distance = VEC2D_Value(VEC2D_Difference(theObj->pos, gPlayerObj->pos));
+	int isNear = distance <= watcher->radius;
+	if(isNear && !watcher->wasNear)
+		CallPlayerProximityHook(theObj, "onPlayerNear", distance);
+	else if(!isNear && watcher->wasNear)
+		CallPlayerProximityHook(theObj, "onPlayerFar", distance);
+	watcher->wasNear = isNear;
 }
 #endif
 
@@ -2129,6 +2219,14 @@ static void ClearObjectRuntimeState(tObject *theObj, int clearLuaState)
 			lua_settable(L, -3);
 		}
 		lua_pop(L, 1);
+		lua_getglobal(L, kLuaObjectWrappersGlobal);
+		if(lua_istable(L, -1))
+		{
+			lua_pushinteger(L, theObj->scriptObjectId);
+			lua_pushnil(L);
+			lua_settable(L, -3);
+		}
+		lua_pop(L, 1);
 	}
 }
 #endif
@@ -2141,4 +2239,3 @@ int Script_DrainDeferredRemoval(tObject *theObj)
 	RemoveObject(theObj);
 	return true;
 }
-

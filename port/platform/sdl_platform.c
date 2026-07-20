@@ -31,6 +31,8 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/threading_primitives.h>
+#include <emscripten/webaudio.h>
 #endif
 
 /* ============================================================
@@ -1989,7 +1991,16 @@ typedef struct SndVoice
 /* One mixer voice per SndChannel */
 static SndVoice s_voices[MAX_SND_CHANNELS];
 static int s_voice_count = 0; /* high-water mark of allocated slots */
+#ifdef __EMSCRIPTEN__
+static emscripten_lock_t s_audio_lock = EMSCRIPTEN_LOCK_T_STATIC_INITIALIZER;
+static int s_audio_lock_ready = 0;
+static EMSCRIPTEN_WEBAUDIO_T s_audio_context = 0;
+static EMSCRIPTEN_WEBAUDIO_T s_audio_worklet_node = 0;
+#define AUDIO_WORKLET_STACK_SIZE (64 * 1024)
+static uint8_t s_audio_worklet_stack[AUDIO_WORKLET_STACK_SIZE] __attribute__((aligned(16)));
+#else
 static SDL_mutex *s_audio_mutex = NULL;
+#endif
 static int s_audio_open = 0;
 /* Actual output sample rate reported by SDL after SDL_OpenAudio.  Initialized
  * to the requested rate so rate calculations are safe before audio opens. */
@@ -2007,6 +2018,28 @@ static int s_output_sample_bytes = 2;
 /* Master volume scalar (0.0 -- 1.0).  Exposed to JavaScript via
  * set_wasm_master_volume() so the browser UI slider can control it. */
 static float s_master_volume = 1.0f;
+
+static int audio_mixer_lock(void)
+{
+#ifdef __EMSCRIPTEN__
+    if (!s_audio_lock_ready)
+        return 0;
+    return emscripten_lock_busyspin_wait_acquire(&s_audio_lock, 1.0);
+#else
+    if (!s_audio_mutex)
+        return 0;
+    return SDL_LockMutex(s_audio_mutex) == 0;
+#endif
+}
+
+static void audio_mixer_unlock(void)
+{
+#ifdef __EMSCRIPTEN__
+    emscripten_lock_release(&s_audio_lock);
+#else
+    SDL_UnlockMutex(s_audio_mutex);
+#endif
+}
 
 /* -------- Helper: get voice index for a channel -------- */
 static int voice_for_chan(SndChannelPtr chan)
@@ -2071,9 +2104,8 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len)
         return;
     memset(stream, 0, (size_t)len);
 
-    if (!s_audio_mutex)
+    if (!audio_mixer_lock())
         return;
-    SDL_LockMutex(s_audio_mutex);
 
     for (int vi = 0; vi < s_voice_count; vi++)
     {
@@ -2172,14 +2204,149 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len)
         }
     }
 
-    SDL_UnlockMutex(s_audio_mutex);
+    audio_mixer_unlock();
 }
+
+#ifdef __EMSCRIPTEN__
+static bool wasm_audio_process(int numInputs, const AudioSampleFrame *inputs,
+                               int numOutputs, AudioSampleFrame *outputs,
+                               int numParams, const AudioParamFrame *params,
+                               void *userData)
+{
+    (void)numInputs;
+    (void)inputs;
+    (void)numParams;
+    (void)params;
+    (void)userData;
+    if (numOutputs < 1)
+        return true;
+
+    AudioSampleFrame *output = &outputs[0];
+    int channels = output->numberOfChannels;
+    int frames = output->samplesPerChannel;
+    memset(output->data, 0, (size_t)channels * (size_t)frames * sizeof(float));
+    if (!audio_mixer_lock())
+        return true;
+
+    for (int vi = 0; vi < s_voice_count; vi++)
+    {
+        SndVoice *v = &s_voices[vi];
+        if (!v->active || !v->samples || v->num_samples == 0)
+            continue;
+        uint32_t end_pos = v->num_samples;
+        for (int i = 0; i < frames; i++)
+        {
+            uint32_t idx = (uint32_t)v->pos;
+            if (idx >= end_pos)
+            {
+                v->active = 0;
+                if (v->callback_pending == 1)
+                    v->callback_pending = 2;
+                break;
+            }
+            double frac = v->pos - (double)idx;
+            uint32_t idx1 = idx + 1 < end_pos ? idx + 1 : idx;
+            int s0 = sample_frame_mono(v, idx);
+            int s1 = sample_frame_mono(v, idx1);
+            float sample = (float)(s0 + frac * (s1 - s0)) / 32768.0f;
+            sample *= v->vol_l * s_master_volume;
+            for (int ch = 0; ch < channels; ch++)
+            {
+                float *dst = &output->data[ch * frames + i];
+                float sum = *dst + sample;
+                *dst = sum > 1.0f ? 1.0f : sum < -1.0f ? -1.0f : sum;
+            }
+            v->pos += v->rate;
+        }
+    }
+    audio_mixer_unlock();
+    return true;
+}
+
+static void wasm_audio_processor_created(EMSCRIPTEN_WEBAUDIO_T audioContext,
+                                         bool success, void *userData)
+{
+    (void)userData;
+    if (!success)
+    {
+        fprintf(stderr, "[AudioWorklet] Failed to create processor\n");
+        return;
+    }
+    int outputChannelCounts[1] = { 2 };
+    EmscriptenAudioWorkletNodeCreateOptions options = {
+        .numberOfInputs = 0,
+        .numberOfOutputs = 1,
+        .outputChannelCounts = outputChannelCounts,
+        .channelCount = 2,
+        .channelCountMode = WEBAUDIO_CHANNEL_COUNT_MODE_EXPLICIT,
+        .channelInterpretation = WEBAUDIO_CHANNEL_INTERPRETATION_SPEAKERS
+    };
+    s_audio_worklet_node = emscripten_create_wasm_audio_worklet_node(
+        audioContext, "reckless-drivin-mixer", &options, wasm_audio_process, NULL);
+    if (!s_audio_worklet_node)
+    {
+        fprintf(stderr, "[AudioWorklet] Failed to create output node\n");
+        return;
+    }
+    emscripten_audio_node_connect(s_audio_worklet_node, audioContext, 0, 0);
+}
+
+static void wasm_audio_thread_started(EMSCRIPTEN_WEBAUDIO_T audioContext,
+                                      bool success, void *userData)
+{
+    (void)userData;
+    if (!success)
+    {
+        fprintf(stderr, "[AudioWorklet] Failed to start audio thread\n");
+        return;
+    }
+    WebAudioWorkletProcessorCreateOptions options = {
+        .name = "reckless-drivin-mixer"
+    };
+    emscripten_create_wasm_audio_worklet_processor_async(
+        audioContext, &options, wasm_audio_processor_created, NULL);
+}
+#endif
 
 /* -------- Open SDL audio device -------- */
 static void sdl_audio_open(void)
 {
     if (s_audio_open)
         return;
+#ifdef __EMSCRIPTEN__
+    emscripten_lock_init(&s_audio_lock);
+    s_audio_lock_ready = 1;
+    EmscriptenWebAudioCreateAttributes attributes = {
+        .latencyHint = "interactive",
+        .sampleRate = 0,
+        .renderSizeHint = AUDIO_CONTEXT_RENDER_SIZE_DEFAULT
+    };
+    s_audio_context = emscripten_create_audio_context(&attributes);
+    if (!s_audio_context)
+    {
+        fprintf(stderr, "[AudioWorklet] Failed to create audio context\n");
+        return;
+    }
+    s_output_rate = emscripten_audio_context_sample_rate(s_audio_context);
+    s_output_channels = 2;
+    s_output_format = AUDIO_F32SYS;
+    s_output_sample_bytes = 4;
+    emscripten_start_wasm_audio_worklet_thread_async(
+        s_audio_context, s_audio_worklet_stack, sizeof(s_audio_worklet_stack),
+        wasm_audio_thread_started, NULL);
+    EM_ASM({
+        const context = emscriptenGetAudioObject($0);
+        const resume = () => {
+            if (context && context.state !== 'running') context.resume();
+        };
+        for (const type of ['keydown', 'mousedown', 'touchstart']) {
+            document.addEventListener(type, resume, { once: true, passive: true });
+        }
+    }, s_audio_context);
+    s_audio_open = 1;
+    LOG_DEBUG("[AudioWorklet] Audio opened: %d Hz, stereo float32\n", s_output_rate);
+    return;
+#else
     s_audio_mutex = SDL_CreateMutex();
 
     SDL_AudioSpec want, got;
@@ -2241,6 +2408,7 @@ static void sdl_audio_open(void)
     SDL_PauseAudio(0); /* start playback */
     LOG_DEBUG("[SDL] Audio opened: %d Hz (requested %d Hz), format=%d (%d bytes), ch=%d\n",
               got.freq, want.freq, got.format, s_output_sample_bytes, got.channels);
+#endif
 }
 
 /* ============================================================
@@ -2313,13 +2481,12 @@ OSErr SndDisposeChannel(SndChannelPtr chan, Boolean quietNow)
     if (!chan)
         return 0;
     int vi = voice_for_chan(chan);
-    if (vi >= 0 && s_audio_mutex)
+    if (vi >= 0 && audio_mixer_lock())
     {
-        SDL_LockMutex(s_audio_mutex);
         s_voices[vi].active = 0;
         s_voices[vi].samples = NULL;
         s_voices[vi].chan = NULL; /* mark slot as reusable */
-        SDL_UnlockMutex(s_audio_mutex);
+        audio_mixer_unlock();
     }
     free(chan);
     return 0;
@@ -2399,8 +2566,8 @@ OSErr SndDoImmediate(SndChannelPtr chan, const SndCommand *cmd)
         return 0;
     SndVoice *v = &s_voices[vi];
 
-    if (s_audio_mutex)
-        SDL_LockMutex(s_audio_mutex);
+    if (!audio_mixer_lock())
+        return 0;
 
     switch (cmd->cmd & 0x7FFF)
     {       /* strip high bit (data-offset flag) */
@@ -2459,8 +2626,7 @@ OSErr SndDoImmediate(SndChannelPtr chan, const SndCommand *cmd)
         break;
     }
 
-    if (s_audio_mutex)
-        SDL_UnlockMutex(s_audio_mutex);
+    audio_mixer_unlock();
     return 0;
 }
 
@@ -2473,8 +2639,8 @@ OSErr SndDoCommand(SndChannelPtr chan, const SndCommand *cmd, Boolean noWait)
         return 0;
     SndVoice *v = &s_voices[vi];
 
-    if (s_audio_mutex)
-        SDL_LockMutex(s_audio_mutex);
+    if (!audio_mixer_lock())
+        return 0;
 
     switch (cmd->cmd & 0x7FFF)
     {
@@ -2491,13 +2657,11 @@ OSErr SndDoCommand(SndChannelPtr chan, const SndCommand *cmd, Boolean noWait)
         break;
     default:
         /* Delegate to SndDoImmediate for other commands */
-        if (s_audio_mutex)
-            SDL_UnlockMutex(s_audio_mutex);
+        audio_mixer_unlock();
         return SndDoImmediate(chan, cmd);
     }
 
-    if (s_audio_mutex)
-        SDL_UnlockMutex(s_audio_mutex);
+    audio_mixer_unlock();
     return 0;
 }
 
@@ -2520,9 +2684,8 @@ OSErr SndChannelStatus(SndChannelPtr chan, short theLength, SCStatusPtr theStatu
 /* -------- Process pending callbacks (called from main thread) -------- */
 static void sdl_audio_process_callbacks(void)
 {
-    if (!s_audio_mutex)
+    if (!audio_mixer_lock())
         return;
-    SDL_LockMutex(s_audio_mutex);
     for (int vi = 0; vi < s_voice_count; vi++)
     {
         SndVoice *v = &s_voices[vi];
@@ -2535,12 +2698,13 @@ static void sdl_audio_process_callbacks(void)
             cmd.param1 = v->callback_param1;
             cmd.param2 = 0;
             v->callback_pending = 0;
-            SDL_UnlockMutex(s_audio_mutex);
+            audio_mixer_unlock();
             cb(chan, &cmd);
-            SDL_LockMutex(s_audio_mutex);
+            if (!audio_mixer_lock())
+                return;
         }
     }
-    SDL_UnlockMutex(s_audio_mutex);
+    audio_mixer_unlock();
 }
 
 NumVersion SndSoundManagerVersion(void)

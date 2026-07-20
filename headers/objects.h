@@ -121,6 +121,8 @@ typedef struct{
 	int scriptOwnerObjectId;
 	int scriptOwnerScriptId;
 	int scriptRemoveRequested;
+	int scriptTimerHead;
+	int scriptProximityWatcher;
 	tObjectTypePtr type;
 	void *shooter;
 	tInputData input;

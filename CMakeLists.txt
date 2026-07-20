@@ -230,7 +230,9 @@ if(EMSCRIPTEN)
         "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive]"
         "-s ASYNCIFY=1"
         "-s ASYNCIFY_STACK_SIZE=1048576"
-        "--use-port=contrib.lua"
+        "-s AUDIO_WORKLET=1"
+        "-s WASM_WORKERS=1"
+        "-pthread"
         "--preload-file ${CMAKE_SOURCE_DIR}/port/resources/resources.dat@/resources.dat"
     )
 
@@ -241,6 +243,7 @@ if(EMSCRIPTEN)
     string(JOIN " " EMSCRIPTEN_FLAGS_STR ${EMSCRIPTEN_FLAGS})
 
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${EMSCRIPTEN_FLAGS_STR}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
 
     # For WASM, update the resource path to the virtual FS
     add_compile_definitions(RESOURCES_DAT_PATH="/resources.dat")
@@ -268,7 +271,19 @@ else()
 endif()
 
 if(EMSCRIPTEN)
-    target_compile_options(${GAME_TARGET} PRIVATE "--use-port=contrib.lua")
+    set(LUA_RUNTIME_SRC_DIR "${CMAKE_SOURCE_DIR}/emsdk/upstream/emscripten/cache/ports/contrib.lua/lua-5.5.0/src")
+    if(NOT EXISTS "${LUA_RUNTIME_SRC_DIR}/lua.h")
+        message(FATAL_ERROR "Lua source code not found at ${LUA_RUNTIME_SRC_DIR}. Run an Emscripten build once to populate the contrib.lua port cache.")
+    endif()
+    file(GLOB LUA_RUNTIME_SOURCES CONFIGURE_DEPENDS "${LUA_RUNTIME_SRC_DIR}/*.c")
+    list(REMOVE_ITEM LUA_RUNTIME_SOURCES
+        "${LUA_RUNTIME_SRC_DIR}/lua.c"
+        "${LUA_RUNTIME_SRC_DIR}/luac.c"
+    )
+    add_library(lua_runtime_static STATIC ${LUA_RUNTIME_SOURCES})
+    target_include_directories(lua_runtime_static PUBLIC ${LUA_RUNTIME_SRC_DIR})
+    target_include_directories(${GAME_TARGET} PRIVATE ${LUA_RUNTIME_SRC_DIR})
+    target_link_libraries(${GAME_TARGET} lua_runtime_static)
 endif()
 
 # ============================================================
@@ -405,4 +420,3 @@ if(SCRIPTING_TESTS)
 
     target_link_libraries(script_runtime_tests lua_static m)
 endif()
-
