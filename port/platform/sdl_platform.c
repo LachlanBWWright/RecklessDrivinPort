@@ -2855,10 +2855,13 @@ int main(int argc, char *argv[])
     Init();
     EM_ASM({ console.log('[WASM] Init() complete – entering main loop'); });
     s_initialized = 1;
-    /* Use the browser's requestAnimationFrame pacing and let the renderer be
-     * driven once per animation frame.  This avoids the desktop-style spin loop
-     * that can leave the canvas stale while audio/input continue uninterrupted. */
+    /* Keep the fixed-step game logic at 60 FPS even on high-refresh displays.
+     * requestAnimationFrame follows the host monitor refresh (120/144 Hz), which
+     * would otherwise accelerate the original 60 FPS gameplay timing.  Emscripten's
+     * explicit timeout mode gives us the standard 1000/60 ms frame cadence while
+     * yielding back to the browser between ticks. */
     emscripten_set_main_loop(emscripten_main_loop, 0, 1);
+    emscripten_set_main_loop_timing(EM_TIMING_SETTIMEOUT, 1000 / 60);
     return 0;
 }
 
