@@ -31,8 +31,18 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#if __has_include(<emscripten/threading_primitives.h>)
 #include <emscripten/threading_primitives.h>
+#define RD_EMSCRIPTEN_HAS_THREADING_PRIMITIVES 1
+#else
+#define RD_EMSCRIPTEN_HAS_THREADING_PRIMITIVES 0
+#endif
+#if __has_include(<emscripten/webaudio.h>)
 #include <emscripten/webaudio.h>
+#define RD_EMSCRIPTEN_HAS_WEBAUDIO 1
+#else
+#define RD_EMSCRIPTEN_HAS_WEBAUDIO 0
+#endif
 #endif
 
 /* ============================================================
@@ -1991,7 +2001,7 @@ typedef struct SndVoice
 /* One mixer voice per SndChannel */
 static SndVoice s_voices[MAX_SND_CHANNELS];
 static int s_voice_count = 0; /* high-water mark of allocated slots */
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && RD_EMSCRIPTEN_HAS_THREADING_PRIMITIVES
 static emscripten_lock_t s_audio_lock = EMSCRIPTEN_LOCK_T_STATIC_INITIALIZER;
 static int s_audio_lock_ready = 0;
 static EMSCRIPTEN_WEBAUDIO_T s_audio_context = 0;
@@ -2021,7 +2031,7 @@ static float s_master_volume = 1.0f;
 
 static int audio_mixer_lock(void)
 {
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && RD_EMSCRIPTEN_HAS_THREADING_PRIMITIVES
     if (!s_audio_lock_ready)
         return 0;
     return emscripten_lock_busyspin_wait_acquire(&s_audio_lock, 1.0);
@@ -2034,7 +2044,7 @@ static int audio_mixer_lock(void)
 
 static void audio_mixer_unlock(void)
 {
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && RD_EMSCRIPTEN_HAS_THREADING_PRIMITIVES
     emscripten_lock_release(&s_audio_lock);
 #else
     SDL_UnlockMutex(s_audio_mutex);
@@ -2207,7 +2217,7 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len)
     audio_mixer_unlock();
 }
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && RD_EMSCRIPTEN_HAS_WEBAUDIO
 static bool wasm_audio_process(int numInputs, const AudioSampleFrame *inputs,
                                int numOutputs, AudioSampleFrame *outputs,
                                int numParams, const AudioParamFrame *params,
@@ -2313,7 +2323,7 @@ static void sdl_audio_open(void)
 {
     if (s_audio_open)
         return;
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && RD_EMSCRIPTEN_HAS_WEBAUDIO && RD_EMSCRIPTEN_HAS_THREADING_PRIMITIVES
     emscripten_lock_init(&s_audio_lock);
     s_audio_lock_ready = 1;
     EmscriptenWebAudioCreateAttributes attributes = {

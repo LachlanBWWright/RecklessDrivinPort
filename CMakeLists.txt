@@ -227,14 +227,39 @@ if(EMSCRIPTEN)
         "-s INITIAL_MEMORY=67108864"
         "-s WASM=1"
         "-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap]"
-        "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive]"
+        "-s EXPORTED_FUNCTIONS=[_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive]"
         "-s ASYNCIFY=1"
         "-s ASYNCIFY_STACK_SIZE=1048576"
-        "-s AUDIO_WORKLET=1"
-        "-s WASM_WORKERS=1"
         "-pthread"
         "--preload-file ${CMAKE_SOURCE_DIR}/port/resources/resources.dat@/resources.dat"
     )
+
+    # Newer Emscripten SDKs support audio worklet and worker mode, but older 3.1.x
+    # toolchains reject those settings. Keep the modern code path when available and
+    # fall back to the SDL audio loop in sdl_platform.c for older installs.
+    execute_process(
+        COMMAND ${CMAKE_C_COMPILER} -s AUDIO_WORKLET=1 -c -x c /dev/null -o /tmp/rd_audio_worklet_check.o
+        RESULT_VARIABLE _rd_has_audio_worklet
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    if(_rd_has_audio_worklet EQUAL 0)
+        list(APPEND EMSCRIPTEN_FLAGS "-s AUDIO_WORKLET=1")
+    else()
+        message(STATUS "Emscripten SDK does not support AUDIO_WORKLET; using SDL audio fallback")
+    endif()
+
+    execute_process(
+        COMMAND ${CMAKE_C_COMPILER} -s WASM_WORKERS=1 -c -x c /dev/null -o /tmp/rd_wasm_workers_check.o
+        RESULT_VARIABLE _rd_has_wasm_workers
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    if(_rd_has_wasm_workers EQUAL 0)
+        list(APPEND EMSCRIPTEN_FLAGS "-s WASM_WORKERS=1")
+    else()
+        message(STATUS "Emscripten SDK does not support WASM_WORKERS; running in single-threaded browser mode")
+    endif()
 
     if(EXISTS "${CMAKE_SOURCE_DIR}/port/wasm/shell.html")
         set(EMSCRIPTEN_FLAGS ${EMSCRIPTEN_FLAGS} "--shell-file ${CMAKE_SOURCE_DIR}/port/wasm/shell.html")
