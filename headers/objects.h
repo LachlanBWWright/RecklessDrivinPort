@@ -101,13 +101,17 @@ typedef tObjectType *tObjectTypePtr;
 typedef struct{
 	void *next,*prev;
 	t2DPoint pos;
+	t2DPoint previousRenderPos;
 	t2DPoint velo;
 	float dir;
+	float previousRenderDir;
 	float rotVelo;
 	float slide;	
 	float throttle,steering;
 	float frameDuration;
 	float jumpVelo,jumpHeight;
+	float previousRenderJumpHeight;
+	int renderStateValid;
 	float damage;
 	int target;
 	int control;
@@ -164,6 +168,12 @@ extern float gPlayerSlide[4];
 extern int gNumMissiles,gNumMines;
 extern float gXDriftPos,gYDriftPos,gXFrontDriftPos,gYFrontDriftPos,gZoomVelo;
 extern float gSpikeFrame;
+extern float gRenderInterpolationAlpha;
+
+t2DPoint RenderObjectPosition(const tObject *theObj);
+float RenderObjectDirection(const tObject *theObj);
+float RenderObjectJumpHeight(const tObject *theObj);
+float RenderZoomVelocity(void);
 
 void MoveObjects();
 tObject *NewObject(tObject *,SInt16);

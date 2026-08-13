@@ -220,6 +220,8 @@ interface EmscriptenModuleInterface {
     disabledBonusRollMask: number,
   ) => void;
   _rd_start_editor_test_drive?: () => void;
+  /** Suspend or resume all gameplay work while the editor is visible. */
+  _rd_set_runtime_paused?: (paused: number) => void;
   /** Pause the Emscripten main loop before a restart. */
   pauseMainLoop?: () => void;
   /** Resume the Emscripten main loop after a pause. */

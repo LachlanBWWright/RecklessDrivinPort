@@ -2800,11 +2800,23 @@ void set_wasm_master_volume(float vol)
 
 static int s_initialized = 0;
 static int s_editorLaunchChecked = 0;
+static int s_runtimePaused = 0;
 
-/* Called once per frame by Emscripten */
+EMSCRIPTEN_KEEPALIVE
+void rd_set_runtime_paused(int paused)
+{
+    s_runtimePaused = paused != 0;
+    if (!s_runtimePaused)
+        ResumeFrameCount();
+}
+
+/* Called once per browser presentation opportunity. Gameplay scheduling is
+ * independent of requestAnimationFrame and remains fixed at 60 Hz. */
 static void emscripten_main_loop(void)
 {
     if (!s_initialized)
+        return;
+    if (s_runtimePaused)
         return;
     extern int gGameOn;
     extern int gExit;
@@ -2833,7 +2845,7 @@ static void emscripten_main_loop(void)
     }
     if (gGameOn)
     {
-        GameFrame();
+        GameLoopTick();
     }
     else
     {
@@ -2855,9 +2867,9 @@ int main(int argc, char *argv[])
     Init();
     EM_ASM({ console.log('[WASM] Init() complete – entering main loop'); });
     s_initialized = 1;
-    /* Use the browser's requestAnimationFrame pacing and let the renderer be
-     * driven once per animation frame.  This avoids the desktop-style spin loop
-     * that can leave the canvas stale while audio/input continue uninterrupted. */
+    /* requestAnimationFrame drives presentation only. GameLoopTick converts
+     * elapsed time into fixed 60 Hz simulation steps and interpolates rendering,
+     * so high-refresh displays cannot accelerate gameplay. */
     emscripten_set_main_loop(emscripten_main_loop, 0, 1);
     return 0;
 }
@@ -3084,7 +3096,7 @@ int main(int argc, char *argv[])
         {
             frame_start = SDL_GetTicks();
             if (gGameOn)
-                GameFrame();
+                GameLoopTick();
             else
                 Eventloop();
             /* Sleep for the remainder of a ~16 ms frame budget so the CPU

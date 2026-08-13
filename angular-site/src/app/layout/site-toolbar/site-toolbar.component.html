@@ -45,7 +45,7 @@
         </div>
 
         @if (hasEditorData) {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="!m-0 h-11 w-[180px] self-center max-[900px]:w-[150px] [&_.mat-mdc-form-field-flex]:h-11 [&_.mat-mdc-form-field-infix]:min-h-11 [&_.mat-mdc-form-field-infix]:py-2.5 [&_.mat-mdc-form-field-subscript-wrapper]:!hidden [&_.mat-mdc-text-field-wrapper]:h-11">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="!m-0 h-11 w-[180px] self-center max-[900px]:w-[150px] [&_.mat-mdc-form-field-flex]:h-11 [&_.mat-mdc-form-field-infix]:!flex [&_.mat-mdc-form-field-infix]:min-h-11 [&_.mat-mdc-form-field-infix]:!items-center [&_.mat-mdc-form-field-infix]:!py-0 [&_.mat-mdc-form-field-subscript-wrapper]:!hidden [&_.mat-mdc-select-trigger]:!h-full [&_.mat-mdc-text-field-wrapper]:h-11">
           <mat-select
             [value]="selectedLevelId"
             (valueChange)="selectLevel.emit($event)"

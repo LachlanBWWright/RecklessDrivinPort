@@ -24,6 +24,7 @@ interface EmscriptenModuleLike {
     disabledBonusRollMask: number,
   ) => void;
   _rd_start_editor_test_drive?: () => void;
+  _rd_set_runtime_paused?: (paused: number) => void;
 }
 
 interface EmscriptenSdlAudioLike {
@@ -528,11 +529,13 @@ export function syncGameLoopWithActiveTab(app: App): void {
   const gameAudio = mod as EmscriptenModuleLike & EmscriptenSdlAudioLike;
   try {
     if (app.activeTab() === 'editor') {
+      mod._rd_set_runtime_paused?.(1);
       mod.pauseMainLoop?.();
       mod.canvas?.blur();
       mod._set_wasm_master_volume?.(0);
       void gameAudio.SDL2?.audioContext?.suspend?.();
     } else {
+      mod._rd_set_runtime_paused?.(0);
       mod.resumeMainLoop?.();
       mod._set_wasm_master_volume?.(app.masterVolume() / 100.0);
       void gameAudio.SDL2?.audioContext?.resume?.();

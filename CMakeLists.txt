@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(RecklessDrivin C)
 
+include(CTest)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -98,6 +100,7 @@ endif()
 set(GAME_SOURCES
     source/error.c
     source/gameendseq.c
+    source/frame_scheduler.c
     source/gameframe.c
     source/gameinitexit.c
 
@@ -129,6 +132,18 @@ set(GAME_SOURCES
     source/textfx.c
     source/byteswap_packs.c
 )
+
+if(BUILD_TESTING AND NOT ANDROID AND NOT EMSCRIPTEN)
+    add_executable(frame_scheduler_tests
+        tests/frame_scheduler_tests.c
+        source/frame_scheduler.c
+    )
+    target_include_directories(frame_scheduler_tests PRIVATE headers)
+    if(NOT MSVC)
+        target_link_libraries(frame_scheduler_tests m)
+    endif()
+    add_test(NAME frame_scheduler COMMAND frame_scheduler_tests)
+endif()
 
 # source/main.c provides void main() for the original Mac build.
 # For PORT_SDL2 builds, sdl_platform.c provides int main() (or SDL_main on Android).
@@ -227,7 +242,7 @@ if(EMSCRIPTEN)
         "-s INITIAL_MEMORY=67108864"
         "-s WASM=1"
         "-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap]"
-        "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive]"
+        "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive,_rd_set_runtime_paused]"
         "-s ASYNCIFY=1"
         "-s ASYNCIFY_STACK_SIZE=1048576"
         "-s AUDIO_WORKLET=1"

@@ -7,7 +7,7 @@ void main()
 {
 	Init();
 	while(!gExit) 
-		if(gGameOn) GameFrame();
+		if(gGameOn) GameLoopTick();
 		else Eventloop();
 	Exit();
 }

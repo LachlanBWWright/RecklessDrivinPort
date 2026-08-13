@@ -4,6 +4,7 @@
 extern int gEndGame;
 
 void InitFrameCount();
+void GameLoopTick();
 void GameFrame();
 void PauseFrameCount();
 void ResumeFrameCount();

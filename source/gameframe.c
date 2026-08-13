@@ -10,86 +10,89 @@
 #include "packs.h"
 #include "random.h"
 #include "scripts.h"
-#ifdef PORT_SDL2
-#include <SDL2/SDL.h>
-#endif
+#include "frame_scheduler.h"
 
-#define kCalcFPMS (kCalcFPS / (float)1000000)
-#define kGraphFrameCount 12
 #define kDisplayScoreIncr 360
 #define kZoomAcceleration 80.0
 
 #define kExtraLiveScore 5000
 #define kPenaltyTime 0	 // penalty seconds for loosing a life.
 #define kMinCopDist 1200 // minumum distance resurrecting player has from cops in pixels
-UInt64 gStartMS, gPauseMS, gLastGraphFrameMS[kGraphFrameCount];
 unsigned long gFrameCount, gGraphFrameCount;
 int gEndGame;
+float gRenderInterpolationAlpha;
+
+static FrameScheduler gFrameScheduler;
+static float gPreviousZoomVelo;
+
+static float InterpolateFloat(float previous, float current)
+{
+	return previous + (current - previous) * gRenderInterpolationAlpha;
+}
+
+t2DPoint RenderObjectPosition(const tObject *theObj)
+{
+	if (!theObj->renderStateValid)
+		return theObj->pos;
+	return P2D(InterpolateFloat(theObj->previousRenderPos.x, theObj->pos.x),
+			   InterpolateFloat(theObj->previousRenderPos.y, theObj->pos.y));
+}
+
+float RenderObjectDirection(const tObject *theObj)
+{
+	float difference;
+	if (!theObj->renderStateValid)
+		return theObj->dir;
+	difference = atan2(sin(theObj->dir - theObj->previousRenderDir),
+					   cos(theObj->dir - theObj->previousRenderDir));
+	return theObj->previousRenderDir + difference * gRenderInterpolationAlpha;
+}
+
+float RenderObjectJumpHeight(const tObject *theObj)
+{
+	if (!theObj->renderStateValid)
+		return theObj->jumpHeight;
+	return InterpolateFloat(theObj->previousRenderJumpHeight, theObj->jumpHeight);
+}
+
+float RenderZoomVelocity(void)
+{
+	if (!gCameraObj || !gCameraObj->renderStateValid)
+		return gZoomVelo;
+	return InterpolateFloat(gPreviousZoomVelo, gZoomVelo);
+}
+
+static void CapturePreviousRenderState(void)
+{
+	tObject *theObj = (tObject *)gFirstObj->next;
+	while (theObj != gFirstObj)
+	{
+		theObj->previousRenderPos = theObj->pos;
+		theObj->previousRenderDir = theObj->dir;
+		theObj->previousRenderJumpHeight = theObj->jumpHeight;
+		theObj->renderStateValid = true;
+		theObj = (tObject *)theObj->next;
+	}
+	gPreviousZoomVelo = gZoomVelo;
+}
 
 void InitFrameCount()
 {
 	gFrameCount = 0;
-	gStartMS = GetMSTime();
+	gGraphFrameCount = 0;
+	gRenderInterpolationAlpha = 0.0f;
+	FrameScheduler_Reset(&gFrameScheduler, GetMSTime());
+	CapturePreviousRenderState();
 }
 
 void PauseFrameCount()
 {
-	gPauseMS = GetMSTime();
 }
 
 void ResumeFrameCount()
 {
-	gStartMS += GetMSTime() - gPauseMS;
-}
-
-static inline Boolean CheckFrameTime()
-{
-	unsigned long optFrameCount;
-	UInt64 curMS;
-
-	curMS = GetMSTime() - gStartMS;
-	optFrameCount = curMS * kCalcFPMS;
-	if (gFrameCount > optFrameCount)
-	{
-		// AddFloatToMessageBuffer("\x05FPS: ",(float)1000000/((curMS-gLastGraphFrameMS[0])/kGraphFrameCount));
-		BlockMoveData(gLastGraphFrameMS + 1, gLastGraphFrameMS, sizeof(UInt64) * (kGraphFrameCount - 1));
-		gLastGraphFrameMS[kGraphFrameCount - 1] = curMS;
-		return true;
-	}
-	return false;
-}
-
-static inline void CheckTimeSkip(void)
-{
-	unsigned long optFrameCount;
-	UInt64 curMS;
-#ifdef PORT_SDL2
-	/* 2 ms threshold below which we skip the SDL_Delay to avoid adding
-	 * unnecessary latency on the last busy-wait iteration */
-#define kMinSleepThreshUS ((UInt64)2000)
-#endif
-	do
-	{
-		curMS = GetMSTime() - gStartMS;
-		optFrameCount = curMS * kCalcFPMS;
-#ifdef PORT_SDL2
-		/* Sleep for the bulk of the remaining time instead of 1 ms busy-waits */
-		if (gFrameCount > optFrameCount)
-		{
-			UInt64 nextFrameUS = (UInt64)(gFrameCount / kCalcFPMS);
-			UInt64 remainUS = (curMS < nextFrameUS) ? nextFrameUS - curMS : 0;
-			if (remainUS > kMinSleepThreshUS)
-			{
-				Uint32 sleepMS = (Uint32)((remainUS - kMinSleepThreshUS) / 1000);
-				if (sleepMS > 16)
-					sleepMS = 16;
-				if (sleepMS >= 1)
-					SDL_Delay(sleepMS);
-			}
-		}
-#undef kMinSleepThreshUS
-#endif
-	} while (gFrameCount > optFrameCount);
+	/* Blocking menus and fades are not simulation time. */
+	FrameScheduler_Reset(&gFrameScheduler, GetMSTime());
 }
 
 t2DPoint GetUniquePos(SInt16 minOffs, SInt16 maxOffs, float *objDir, int *dir);
@@ -317,42 +320,7 @@ void PlayerHandling()
 
 void GameFrame()
 {
-#ifdef PORT_SDL2
-#ifndef __EMSCRIPTEN__
-	/* Log every 180 frames (~3 seconds) so user can see the game is running */
-	if (gFrameCount % 180 == 0)
-	{
-		LOG_DEBUG("LOG: GameFrame count=%lu graphFrames=%lu\n",
-				  gFrameCount, gGraphFrameCount);
-	}
-	/* Throttle game-logic to real-time so gFrameCount cannot race arbitrarily
-	 * far ahead of optFrameCount.  Sleep for the actual remaining time rather
-	 * than a fixed 1 ms so we don't still spin at ~1000 calls/sec. */
-	{
-		UInt64 curMS = GetMSTime() - gStartMS;
-		unsigned long targetCount = (unsigned long)(curMS * kCalcFPMS);
-		if (gFrameCount > targetCount + 1)
-		{
-			/* Compute how many microseconds until the next expected frame */
-			UInt64 nextFrameUS = (UInt64)(gFrameCount / kCalcFPMS);
-			if (nextFrameUS > curMS)
-			{
-				Uint32 sleepMS = (Uint32)((nextFrameUS - curMS) / 1000);
-				if (sleepMS < 1)
-					sleepMS = 1;
-				if (sleepMS > 16)
-					sleepMS = 16; /* cap to one display frame */
-				SDL_Delay(sleepMS);
-			}
-			else
-			{
-				SDL_Delay(1);
-			}
-			return;
-		}
-	}
-#endif
-#endif
+	CapturePreviousRenderState();
 	LOG_DEBUG("LOG: GF-A MoveObjects\n");
 	fflush(stdout);
 	MoveObjects();
@@ -361,24 +329,22 @@ void GameFrame()
 	fflush(stdout);
 	PlayerHandling();
 	gFrameCount++;
-#ifdef __EMSCRIPTEN__
-	/* The browser already paces the wasm loop via requestAnimationFrame.
-	 * Rendering every loop tick keeps the canvas smooth instead of letting the
-	 * desktop-style time-skip logic stall the presentation path. */
-	LOG_DEBUG("LOG: GF-C RenderFrame\n");
-	fflush(stdout);
-	RenderFrame();
-	gGraphFrameCount++;
-#else
-	if (CheckFrameTime())
-	{
-		LOG_DEBUG("LOG: GF-C RenderFrame\n");
-		fflush(stdout);
-		RenderFrame();
-		gGraphFrameCount++;
-		CheckTimeSkip();
-	}
-#endif
 	if (gEndGame)
 		EndGame();
+}
+
+void GameLoopTick()
+{
+	FrameSchedule schedule = FrameScheduler_Advance(&gFrameScheduler, GetMSTime());
+	int step;
+
+	for (step = 0; step < schedule.simulationSteps && !gEndGame; step++)
+		GameFrame();
+
+	if (!gGameOn || gEndGame)
+		return;
+
+	gRenderInterpolationAlpha = schedule.interpolationAlpha;
+	RenderFrame();
+	gGraphFrameCount++;
 }

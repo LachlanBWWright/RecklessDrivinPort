@@ -638,15 +638,17 @@ void DrawSpriteLayerZoomed(float xDrawStart,float yDrawStart,float zoom,float ti
 	float maxDrawOffs=128*invZoom;
 	while(theObj!=gLastVisObj)
 	{
+		t2DPoint renderPos=RenderObjectPosition(theObj);
+		float renderJumpHeight=RenderObjectJumpHeight(theObj);
 		if(theObj->layer==layer)
-			if(theObj->frame&&!theObj->jumpHeight)
+			if(theObj->frame&&!renderJumpHeight)
 			{
-				float x=(theObj->pos.x-xDrawStart)*invZoom;
-				float y=(yDrawStart-theObj->pos.y)*invZoom;
+				float x=(renderPos.x-xDrawStart)*invZoom;
+				float y=(yDrawStart-renderPos.y)*invZoom;
 				if((y>-maxDrawOffs)&&(y<gYSize+maxDrawOffs))
 				{
 					float objTide=((*gRoadInfo).water&&(*theObj->type).flags2&kObjectFloating)?1+tide*0.5+tide*VEC2D_Value(theObj->velo)*0.04:1;
-					DrawSprite(theObj->frame,x,y,theObj->dir,objTide*invZoom);
+					DrawSprite(theObj->frame,x,y,RenderObjectDirection(theObj),objTide*invZoom);
 				}
 			}
 		theObj=(tObject*)theObj->next;
@@ -660,20 +662,23 @@ void DrawSpriteLayerBlurZoomed(float xDrawStart,float yDrawStart,float zoom,floa
 	float maxDrawOffs=128*invZoom;
 	while(theObj!=gLastVisObj)
 	{
+		t2DPoint renderPos=RenderObjectPosition(theObj);
+		float renderJumpHeight=RenderObjectJumpHeight(theObj);
 		if(theObj->layer==layer)
-			if(theObj->frame&&!theObj->jumpHeight)
+			if(theObj->frame&&!renderJumpHeight)
 			{
-				float x=(theObj->pos.x-xDrawStart)*invZoom;
-				float y=(yDrawStart-theObj->pos.y)*invZoom;
+				float x=(renderPos.x-xDrawStart)*invZoom;
+				float y=(yDrawStart-renderPos.y)*invZoom;
 				if((y>-maxDrawOffs)&&(y<gYSize+maxDrawOffs))
 				{
 					t2DPoint velDiff=VEC2D_Difference(gCameraObj->velo,theObj->velo);
 					float objTide=((*gRoadInfo).water&&(*theObj->type).flags2&kObjectFloating)?1+tide*0.5+tide*VEC2D_Value(theObj->velo)*0.04:1;
-					DrawSprite(theObj->frame,x,y,theObj->dir,objTide*invZoom);
+					float renderDir=RenderObjectDirection(theObj);
+					DrawSprite(theObj->frame,x,y,renderDir,objTide*invZoom);
 					if(velDiff.x*velDiff.x+velDiff.y*velDiff.y>35*35)
 					{
 						t2DPoint fuzzPos=VEC2D_Scale(velDiff,kFrameDuration*kScale*0.2);
-						DrawSpriteTranslucent(theObj->frame,x+fuzzPos.x,y+fuzzPos.y,theObj->dir-theObj->rotVelo*kFrameDuration,objTide*invZoom);					
+						DrawSpriteTranslucent(theObj->frame,x+fuzzPos.x,y+fuzzPos.y,renderDir-theObj->rotVelo*kFrameDuration,objTide*invZoom);
 					}
 				}
 			}
@@ -695,12 +700,14 @@ void DrawSpritesZoomed(float xDrawStart,float yDrawStart,float zoom)
 	theObj=gFirstVisObj;
 	while(theObj!=gLastVisObj)
 	{
-		if(theObj->frame&&theObj->jumpHeight)
+		t2DPoint renderPos=RenderObjectPosition(theObj);
+		float renderJumpHeight=RenderObjectJumpHeight(theObj);
+		if(theObj->frame&&renderJumpHeight)
 		{
-			float x=(theObj->pos.x-xDrawStart)*invZoom;
-			float y=(yDrawStart-theObj->pos.y)*invZoom;
+			float x=(renderPos.x-xDrawStart)*invZoom;
+			float y=(yDrawStart-renderPos.y)*invZoom;
 			if((y>-256)&&(y<gYSize+256))
-				DrawSprite(theObj->frame,x,y,theObj->dir,(theObj->jumpHeight*0.18+1)*invZoom);
+				DrawSprite(theObj->frame,x,y,RenderObjectDirection(theObj),(renderJumpHeight*0.18+1)*invZoom);
 		}
 		theObj=(tObject*)theObj->next;
 	}
@@ -708,9 +715,11 @@ void DrawSpritesZoomed(float xDrawStart,float yDrawStart,float zoom)
 
 void RenderFrame()
 {
-	float zoom=0.5+gZoomVelo/kZoomVeloFactor+gCameraObj->jumpHeight*0.05;
-	float xDrawStart=gCameraObj->pos.x-gXSize*kXCameraScreenPos*zoom;
-	float yDrawStart=gCameraObj->pos.y+gYSize*kYCameraScreenPos*zoom;
+	t2DPoint cameraPos=RenderObjectPosition(gCameraObj);
+	float cameraJumpHeight=RenderObjectJumpHeight(gCameraObj);
+	float zoom=0.5+RenderZoomVelocity()/kZoomVeloFactor+cameraJumpHeight*0.05;
+	float xDrawStart=cameraPos.x-gXSize*kXCameraScreenPos*zoom;
+	float yDrawStart=cameraPos.y+gYSize*kYCameraScreenPos*zoom;
 	int preSpecBlit=gScreenBlitSpecial;
 	if(gFinishDelay)
 		yDrawStart=gLevelData->levelEnd+gYSize*kYCameraScreenPos*zoom;

@@ -44,6 +44,7 @@ describe('App', () => {
     let resumeCount = 0;
     let suspendCount = 0;
     let audioResumeCount = 0;
+    const runtimePausedValues: number[] = [];
     const volumeValues: number[] = [];
 
     if (!frameWindow) {
@@ -56,6 +57,9 @@ describe('App', () => {
       },
       resumeMainLoop: () => {
         resumeCount += 1;
+      },
+      _rd_set_runtime_paused: (paused: number) => {
+        runtimePausedValues.push(paused);
       },
       _set_wasm_master_volume: (value: number) => {
         volumeValues.push(value);
@@ -80,11 +84,13 @@ describe('App', () => {
       expect(resumeCount).toBe(0);
       expect(suspendCount).toBe(1);
       expect(volumeValues).toContain(0);
+      expect(runtimePausedValues).toContain(1);
 
       app.runtime.setTab('game');
       expect(resumeCount).toBe(1);
       expect(audioResumeCount).toBe(1);
       expect(volumeValues).toContain(app.masterVolume() / 100);
+      expect(runtimePausedValues).toContain(0);
     } finally {
       frame.remove();
     }
