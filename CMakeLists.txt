@@ -286,18 +286,32 @@ else()
 endif()
 
 if(EMSCRIPTEN)
-    set(LUA_RUNTIME_SRC_DIR "${CMAKE_SOURCE_DIR}/emsdk/upstream/emscripten/cache/ports/contrib.lua/lua-5.5.0/src")
-    if(NOT EXISTS "${LUA_RUNTIME_SRC_DIR}/lua.h")
-        message(FATAL_ERROR "Lua source code not found at ${LUA_RUNTIME_SRC_DIR}. Run an Emscripten build once to populate the contrib.lua port cache.")
+    # Build a pinned Lua release with the same -pthread/atomics flags as the
+    # game. Emscripten's prebuilt contrib.lua archive is single-threaded and
+    # cannot be linked into this shared-memory WASM target. Fetching the source
+    # also avoids relying on an installation-specific, pre-populated SDK cache.
+    include(FetchContent)
+    if(POLICY CMP0135)
+        cmake_policy(SET CMP0135 NEW)
     endif()
-    file(GLOB LUA_RUNTIME_SOURCES CONFIGURE_DEPENDS "${LUA_RUNTIME_SRC_DIR}/*.c")
-    list(REMOVE_ITEM LUA_RUNTIME_SOURCES
-        "${LUA_RUNTIME_SRC_DIR}/lua.c"
-        "${LUA_RUNTIME_SRC_DIR}/luac.c"
+    FetchContent_Declare(lua_source
+        URL https://www.lua.org/ftp/lua-5.5.0.tar.gz
+        URL_HASH SHA512=3253d2cdc929da6438095a30d66ef16a1abdbb0ada8fee238705b3b38492f14be9553640fdca6b25661e01155ba5582032e0a2ef064e4c283e85efc0a128cabe
     )
+    FetchContent_GetProperties(lua_source)
+    if(NOT lua_source_POPULATED)
+        FetchContent_Populate(lua_source)
+    endif()
+    set(LUA_RUNTIME_SRC_DIR "${lua_source_SOURCE_DIR}/src")
+    set(LUA_RUNTIME_SOURCES
+        lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c
+        lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c
+        lundump.c lvm.c lzio.c lauxlib.c lbaselib.c lcorolib.c ldblib.c liolib.c
+        lmathlib.c loadlib.c loslib.c lstrlib.c ltablib.c lutf8lib.c linit.c
+    )
+    list(TRANSFORM LUA_RUNTIME_SOURCES PREPEND "${LUA_RUNTIME_SRC_DIR}/")
     add_library(lua_runtime_static STATIC ${LUA_RUNTIME_SOURCES})
-    target_include_directories(lua_runtime_static PUBLIC ${LUA_RUNTIME_SRC_DIR})
-    target_include_directories(${GAME_TARGET} PRIVATE ${LUA_RUNTIME_SRC_DIR})
+    target_include_directories(lua_runtime_static PUBLIC "${LUA_RUNTIME_SRC_DIR}")
     target_link_libraries(${GAME_TARGET} lua_runtime_static)
 endif()
 
