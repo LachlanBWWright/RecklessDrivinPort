@@ -287,9 +287,8 @@ endif()
 
 if(EMSCRIPTEN)
     # Build a pinned Lua release with the same -pthread/atomics flags as the
-    # game. Emscripten's prebuilt contrib.lua archive is single-threaded and
-    # cannot be linked into this shared-memory WASM target. Fetching the source
-    # also avoids relying on an installation-specific, pre-populated SDK cache.
+    # game. Fetching the source avoids relying on an installation-specific,
+    # pre-populated SDK cache.
     include(FetchContent)
     if(POLICY CMP0135)
         cmake_policy(SET CMP0135 NEW)

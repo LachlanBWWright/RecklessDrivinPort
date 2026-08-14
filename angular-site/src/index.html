@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <title>Reckless Drivin' – WebAssembly Port</title>
     <base href="./" />
+    <!-- GitHub Pages cannot emit COOP/COEP headers itself. Load this before Angular
+         so the threaded WASM build is isolated on the service-worker-controlled reload. -->
+    <script src="coi-serviceworker.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
