@@ -183,6 +183,10 @@ static void sdl_output_to_game_xy(int px, int py, int *gx, int *gy)
 /* Returns the bitmask of game keys activated by a normalised touch at (nx,ny) */
 static int touch_pos_to_keymask(float nx, float ny)
 {
+    /* Pause button in top-right corner */
+    if (ny <= 0.15f && nx >= 0.82f)
+        return (1 << kPause);
+
     if (ny < TC_Y_TOP)
         return 0;
 
@@ -270,6 +274,208 @@ int SDL_Platform_GetTouchKey(int element)
     if (element < 0 || element >= kNumElements)
         return 0;
     return s_touch_key_state[element];
+}
+
+void SDL_Platform_SetTouchKey(int element, int pressed)
+{
+    if (element < 0 || element >= kNumElements)
+        return;
+    s_touch_key_state[element] = pressed ? 1 : 0;
+    if (pressed)
+        s_touch_controls_active = 1;
+}
+
+void SDL_Platform_SetTouchControlsActive(int active)
+{
+    s_touch_controls_active = active ? 1 : 0;
+}
+
+/* ============================================================
+ * Gamepad / Joystick Support
+ * ============================================================ */
+static SDL_GameController *s_controller = NULL;
+
+void SDL_Platform_InitGamepad(void)
+{
+    int num_joysticks = SDL_NumJoysticks();
+    for (int i = 0; i < num_joysticks; i++)
+    {
+        if (SDL_IsGameController(i))
+        {
+            s_controller = SDL_GameControllerOpen(i);
+            if (s_controller)
+            {
+                LOG_DEBUG("[SDL] GameController opened on init: %s\n", SDL_GameControllerName(s_controller));
+                break;
+            }
+        }
+    }
+}
+
+void SDL_Platform_HandleControllerAdded(int which)
+{
+    if (!s_controller)
+    {
+        s_controller = SDL_GameControllerOpen(which);
+        if (s_controller)
+        {
+            LOG_DEBUG("[SDL] GameController connected: %s\n", SDL_GameControllerName(s_controller));
+        }
+    }
+}
+
+void SDL_Platform_HandleControllerRemoved(int which)
+{
+    if (s_controller)
+    {
+        SDL_Joystick *joy = SDL_GameControllerGetJoystick(s_controller);
+        if (joy && SDL_JoystickInstanceID(joy) == which)
+        {
+            SDL_GameControllerClose(s_controller);
+            s_controller = NULL;
+            /* Attempt to switch to another connected controller if any */
+            for (int i = 0; i < SDL_NumJoysticks(); i++)
+            {
+                if (SDL_IsGameController(i))
+                {
+                    s_controller = SDL_GameControllerOpen(i);
+                    if (s_controller)
+                        break;
+                }
+            }
+        }
+    }
+}
+
+int SDL_Platform_GetGamepadKey(int element)
+{
+    if (!s_controller && SDL_NumJoysticks() > 0)
+    {
+        for (int i = 0; i < SDL_NumJoysticks(); i++)
+        {
+            if (SDL_IsGameController(i))
+            {
+                s_controller = SDL_GameControllerOpen(i);
+                if (s_controller) break;
+            }
+        }
+    }
+    if (!s_controller)
+        return 0;
+
+    Sint16 stick_x = SDL_GameControllerGetAxis(s_controller, SDL_CONTROLLER_AXIS_LEFTX);
+    Sint16 stick_y = SDL_GameControllerGetAxis(s_controller, SDL_CONTROLLER_AXIS_LEFTY);
+    Sint16 trig_l = SDL_GameControllerGetAxis(s_controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+    Sint16 trig_r = SDL_GameControllerGetAxis(s_controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+
+    const Sint16 deadzone = 10000;
+    const Sint16 trig_thresh = 8000;
+
+    switch (element)
+    {
+    case kForward:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_DPAD_UP) ||
+            SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_A) ||
+            trig_r > trig_thresh ||
+            stick_y < -deadzone)
+            return 1;
+        break;
+
+    case kBackward:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN) ||
+            stick_y > deadzone)
+            return 1;
+        break;
+
+    case kLeft:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) ||
+            stick_x < -deadzone)
+            return 1;
+        break;
+
+    case kRight:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) ||
+            stick_x > deadzone)
+            return 1;
+        break;
+
+    case kKickdown:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_LEFTSTICK) ||
+            SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_RIGHTSTICK))
+            return 1;
+        break;
+
+    case kBrake:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_B) ||
+            trig_l > trig_thresh)
+            return 1;
+        break;
+
+    case kFire:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_X) ||
+            SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER))
+            return 1;
+        break;
+
+    case kMissile:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_Y) ||
+            SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))
+            return 1;
+        break;
+
+    case kPause:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_START))
+            return 1;
+        break;
+
+    case kAbort:
+        if (SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_BACK) ||
+            SDL_GameControllerGetButton(s_controller, SDL_CONTROLLER_BUTTON_GUIDE))
+            return 1;
+        break;
+
+    default:
+        break;
+    }
+    return 0;
+}
+
+int SDL_Platform_GamepadAnyButton(void)
+{
+    if (!s_controller && SDL_NumJoysticks() > 0)
+    {
+        for (int i = 0; i < SDL_NumJoysticks(); i++)
+        {
+            if (SDL_IsGameController(i))
+            {
+                s_controller = SDL_GameControllerOpen(i);
+                if (s_controller) break;
+            }
+        }
+    }
+    if (!s_controller)
+        return 0;
+
+    for (int b = 0; b < SDL_CONTROLLER_BUTTON_MAX; b++)
+    {
+        if (SDL_GameControllerGetButton(s_controller, (SDL_GameControllerButton)b))
+            return 1;
+    }
+    if (SDL_GameControllerGetAxis(s_controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 8000 ||
+        SDL_GameControllerGetAxis(s_controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 8000)
+        return 1;
+    return 0;
+}
+
+void SDL_Platform_Rumble(float lMag, float rMag, float duration)
+{
+    if (!s_controller)
+        return;
+    Uint16 low_freq = (Uint16)(lMag > 1.0f ? 65535 : (lMag < 0.0f ? 0 : (lMag * 65535.0f)));
+    Uint16 high_freq = (Uint16)(rMag > 1.0f ? 65535 : (rMag < 0.0f ? 0 : (rMag * 65535.0f)));
+    Uint32 duration_ms = (Uint32)(duration * 1000.0f);
+    if (duration_ms < 10) duration_ms = 10;
+    SDL_GameControllerRumble(s_controller, low_freq, high_freq, duration_ms);
 }
 
 /* ---- Touch overlay drawing helpers ---- */
@@ -518,6 +724,27 @@ static void sdl_render_touch_overlay(void)
     tc_fill_nrect(w, h, TC_ACT_MX, TC_ACT_MY, 1.0f, 1.0f);
     SDL_SetRenderDrawColor(s_renderer, 120, 255, 140, ico_alpha);
     tc_draw_arrow_up(msl_cx, drv_cy, act_hw, act_hh);
+
+    /* ---- PAUSE button (top right) ---- */
+    pressed = s_touch_key_state[kPause];
+    SDL_SetRenderDrawColor(s_renderer, 60, 60, 70, pressed ? bg_active : bg_idle);
+    tc_fill_nrect(w, h, 0.85f, 0.02f, 0.98f, 0.12f);
+    SDL_SetRenderDrawColor(s_renderer, 220, 220, 240, ico_alpha);
+    tc_draw_nrect(w, h, 0.85f, 0.02f, 0.98f, 0.12f);
+    {
+        int p_cx = (int)(0.915f * w);
+        int p_cy = (int)(0.07f * h);
+        int bar_w = (int)(0.012f * w);
+        if (bar_w < 3) bar_w = 3;
+        int bar_h = (int)(0.04f * h);
+        if (bar_h < 8) bar_h = 8;
+        int gap = (int)(0.012f * w);
+        if (gap < 4) gap = 4;
+        SDL_Rect bar1 = { p_cx - gap - bar_w / 2, p_cy - bar_h / 2, bar_w, bar_h };
+        SDL_Rect bar2 = { p_cx + gap - bar_w / 2, p_cy - bar_h / 2, bar_w, bar_h };
+        SDL_RenderFillRect(s_renderer, &bar1);
+        SDL_RenderFillRect(s_renderer, &bar2);
+    }
 
     /* ---- Button borders (white translucent outlines) ---- */
     SDL_SetRenderDrawColor(s_renderer, 255, 255, 255, 90);
@@ -1125,11 +1352,21 @@ void SDL_Platform_SetPalette(int index, int count, UInt16 *rgbValues)
 
 void InitScreen(int unused)
 {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0)
+    Uint32 init_flags = SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK;
+#ifndef __EMSCRIPTEN__
+    init_flags |= SDL_INIT_HAPTIC;
+#endif
+    if (SDL_Init(init_flags) < 0)
     {
-        fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
-        exit(1);
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0)
+        {
+            fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+            exit(1);
+        }
     }
+
+    /* Initialize gamepad */
+    SDL_Platform_InitGamepad();
 
     /* Initialize audio subsystem */
     sdl_audio_open();
@@ -1219,9 +1456,20 @@ void InitScreen(int unused)
 
     gScreenMode = kScreenSuspended;
 
-    /* Enable touch controls if any touch device is present (e.g. Android) */
+    /* Enable touch controls if running on a mobile / touch device without a physical keyboard */
 #ifdef __ANDROID__
     s_touch_controls_active = 1; /* always active on Android */
+#elif defined(__EMSCRIPTEN__)
+    {
+        int is_mobile_no_keyboard = EM_ASM_INT({
+            var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            var isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+            var isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            return (isMobileUA || (hasTouch && isCoarse)) ? 1 : 0;
+        });
+        if (is_mobile_no_keyboard || SDL_GetNumTouchDevices() > 0 || getenv("SDL_TOUCH_CONTROLS"))
+            s_touch_controls_active = 1;
+    }
 #else
     if (SDL_GetNumTouchDevices() > 0 || getenv("SDL_TOUCH_CONTROLS"))
         s_touch_controls_active = 1;
@@ -1263,6 +1511,11 @@ void ScreenMode(int mode)
         break;
     case kScreenStopped:
         /* Clean up SDL resources */
+        if (s_controller)
+        {
+            SDL_GameControllerClose(s_controller);
+            s_controller = NULL;
+        }
         if (s_texture)
         {
             SDL_DestroyTexture(s_texture);
@@ -1444,6 +1697,12 @@ void Blit2Screen(void)
             case SDL_FINGERUP:
                 sdl_touch_finger_event(ev.tfinger.fingerId,
                                        ev.tfinger.x, ev.tfinger.y, 0);
+                break;
+            case SDL_CONTROLLERDEVICEADDED:
+                SDL_Platform_HandleControllerAdded(ev.cdevice.which);
+                break;
+            case SDL_CONTROLLERDEVICEREMOVED:
+                SDL_Platform_HandleControllerRemoved(ev.cdevice.which);
                 break;
             default:
                 break;
@@ -1823,6 +2082,54 @@ Boolean WaitNextEvent(short eventMask, EventRecord *theEvent, long sleep, void *
             }
             theEvent->when = SDL_GetTicks();
             return 1;
+
+        case SDL_CONTROLLERDEVICEADDED:
+            SDL_Platform_HandleControllerAdded(ev.cdevice.which);
+            break;
+
+        case SDL_CONTROLLERDEVICEREMOVED:
+            SDL_Platform_HandleControllerRemoved(ev.cdevice.which);
+            break;
+
+        case SDL_CONTROLLERBUTTONDOWN:
+            switch (ev.cbutton.button)
+            {
+            case SDL_CONTROLLER_BUTTON_A:
+            case SDL_CONTROLLER_BUTTON_START:
+                theEvent->what = keyDown;
+                theEvent->message = 's' | ((UInt32)0x01 << 8); /* 's' key / start game */
+                theEvent->when = SDL_GetTicks();
+                return 1;
+            case SDL_CONTROLLER_BUTTON_B:
+            case SDL_CONTROLLER_BUTTON_BACK:
+                theEvent->what = keyDown;
+                theEvent->message = 0x1B | ((UInt32)0x35 << 8); /* Escape / abort */
+                theEvent->when = SDL_GetTicks();
+                return 1;
+            case SDL_CONTROLLER_BUTTON_X:
+                theEvent->what = keyDown;
+                theEvent->message = 'c' | ((UInt32)0x08 << 8); /* Scores */
+                theEvent->when = SDL_GetTicks();
+                return 1;
+            case SDL_CONTROLLER_BUTTON_Y:
+                theEvent->what = keyDown;
+                theEvent->message = 'h' | ((UInt32)0x04 << 8); /* Help */
+                theEvent->when = SDL_GetTicks();
+                return 1;
+            case SDL_CONTROLLER_BUTTON_DPAD_UP:
+                theEvent->what = keyDown;
+                theEvent->message = ((UInt32)0x7E << 8);
+                theEvent->when = SDL_GetTicks();
+                return 1;
+            case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+                theEvent->what = keyDown;
+                theEvent->message = ((UInt32)0x7D << 8);
+                theEvent->when = SDL_GetTicks();
+                return 1;
+            default:
+                break;
+            }
+            break;
 
         default:
             break;
@@ -2808,6 +3115,18 @@ void rd_set_runtime_paused(int paused)
     s_runtimePaused = paused != 0;
     if (!s_runtimePaused)
         ResumeFrameCount();
+}
+
+EMSCRIPTEN_KEEPALIVE
+void rd_set_touch_key(int element, int pressed)
+{
+    SDL_Platform_SetTouchKey(element, pressed);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void rd_set_touch_controls_active(int active)
+{
+    SDL_Platform_SetTouchControlsActive(active);
 }
 
 /* Called once per browser presentation opportunity. Gameplay scheduling is

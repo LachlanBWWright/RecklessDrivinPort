@@ -1,0 +1,56 @@
+<app-editor-sidebar>
+  <div class="flex shrink-0 items-start justify-between gap-3 px-4 pt-4 pb-1">
+    <div class="min-w-0 flex-1">
+      <div
+        class="text-base font-bold text-[var(--text)]"
+        matTooltip="Pack 136 (kPackTx16 - 16-bit RGB555) &amp; shared road definitions from Pack 135"
+      >
+        Road &amp; Background Tile Editor
+      </div>
+    </div>
+    <button
+      mat-icon-button
+      color="primary"
+      [disabled]="workerBusy"
+      matTooltip="Upload a PNG to add a new 128×128 tile image"
+      (click)="addTileImage.emit()"
+    >
+      <mat-icon>add_photo_alternate</mat-icon>
+    </button>
+  </div>
+
+  <app-editor-sidebar-scroll class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
+    <div class="flex shrink-0 items-center justify-between pt-1">
+      <span class="text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]"
+        >Road Records · {{ roadInfoOptions.length }}</span
+      >
+      <button
+        mat-icon-button
+        color="primary"
+        (click)="createRoadInfo.emit()"
+        [disabled]="workerBusy"
+        matTooltip="Create a new road"
+      >
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+    <app-editor-tiles-sidebar-lists
+      [roadInfoOptions]="roadInfoOptions"
+      [selectedRoadInfoId]="selectedRoadInfoId"
+      [tileTileEntries]="tileTileEntries"
+      [totalTileCount]="totalTileCount"
+      [selectedTileId]="selectedTileId"
+      [workerBusy]="workerBusy"
+      [getRoadDeleteTooltip]="getRoadDeleteTooltip"
+      [canDeleteRoadInfo]="canDeleteRoadInfo"
+      [getTileDataUrl]="getTileDataUrl"
+      [getTileDeleteTooltip]="getTileDeleteTooltip"
+      [canDeleteTileImage]="canDeleteTileImage"
+      (selectedRoadInfo)="selectedRoadInfo.emit($event)"
+      (deletedRoadInfo)="deletedRoadInfo.emit($event)"
+      (createRoadInfo)="createRoadInfo.emit()"
+      (selectedTile)="selectedTile.emit($event)"
+      (deletedTile)="deletedTile.emit($event)"
+    />
+  </app-editor-sidebar-scroll>
+</app-editor-sidebar>

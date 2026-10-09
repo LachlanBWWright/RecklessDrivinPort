@@ -30,6 +30,11 @@ type EntryForm = FormGroup<{
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorObjectGroupsSectionComponent implements OnChanges {
+  objectGroupClass(id: number): string {
+    return this.selectedObjectGroupId === id
+      ? 'border-[color:rgba(66,165,245,0.55)] bg-[color:rgba(66,165,245,0.16)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]'
+      : '';
+  }
   @Input() objectGroups: ObjectGroupDefinition[] = [];
   @Input() selectedObjectGroupId: number | null = null;
   @Input() availableTypeIds: number[] = [];
@@ -75,6 +80,9 @@ export class EditorObjectGroupsSectionComponent implements OnChanges {
   }
 
   constructor() {
+    this.objectGroupClass = this.objectGroupClass.bind(this);
+    this.trackGroup = this.trackGroup.bind(this);
+    this.trackEntry = this.trackEntry.bind(this);
     this.entryForms.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
       this.emitEntryChanges();
     });

@@ -1,0 +1,23 @@
+<div [formGroup]="canvasForm">
+  <mat-form-field
+    appearance="outline"
+    subscriptSizing="dynamic"
+    class="mb-0 min-w-[100px] max-w-[120px] flex-[1_1_0]"
+  >
+    <mat-label>Time Limit</mat-label>
+    <input
+      matInput
+      class="text-right"
+      type="text"
+      formControlName="editTimeText"
+      inputmode="numeric"
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="Time limit in seconds"
+      (focus)="focus.emit()"
+      (blur)="blur.emit()"
+      (keydown)="$event.stopPropagation()"
+      (keydown.enter)="commit.emit(); $event.preventDefault()"
+    />
+  </mat-form-field>
+</div>

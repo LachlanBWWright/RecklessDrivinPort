@@ -19,6 +19,7 @@ import {
   dispatchWorker as dispatchWorkerHelper,
   clearCustomResources as clearCustomResourcesHelper,
   initPackWorker as initPackWorkerHelper,
+  resetPackWorker as resetPackWorkerHelper,
   loadWasmScript as loadWasmScriptHelper,
   onCustomResourcesFileSelected as onCustomResourcesFileSelectedHelper,
   mountCustomResourcesFs as mountCustomResourcesFsHelper,
@@ -48,6 +49,7 @@ export function createRuntimeActions(app: App): {
   downloadEditedResources(stripScripts?: boolean): Promise<void>;
   saveEditedResourcesToGame(stripScripts?: boolean): Promise<void>;
   initPackWorker(): void;
+  resetPackWorker(): void;
   dispatchWorker<T>(cmd: string, payload?: unknown, transferables?: Transferable[]): Promise<T>;
   setupEmscriptenModule(): void;
   loadWasmScript(): void;
@@ -101,6 +103,7 @@ export function createRuntimeActions(app: App): {
     saveEditedResourcesToGame: (stripScripts?: boolean) =>
       saveEditedResourcesToGameHelper(app, stripScripts),
     initPackWorker: bindAppAction(app, initPackWorkerHelper),
+    resetPackWorker: bindAppAction(app, resetPackWorkerHelper),
     dispatchWorker: <T>(cmd: string, payload?: unknown, transferables?: Transferable[]) =>
       dispatchWorkerHelper<T>(app, cmd, payload, transferables),
     setupEmscriptenModule: bindAppAction(app, setupEmscriptenModuleHelper),

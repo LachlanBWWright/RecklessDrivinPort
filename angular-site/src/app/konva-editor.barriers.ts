@@ -47,7 +47,10 @@ export function buildBarriers(
   barrierWorldGroup: Konva.Group | null,
   barrierLayer: Konva.Layer | null,
   roadSegs: readonly { v0: number; v1: number; v2: number; v3: number }[],
-  cssW: number, cssH: number, logicalW: number, logicalH: number,
+  cssW: number,
+  cssH: number,
+  logicalW: number,
+  logicalH: number,
   zoom: number,
   panY: number,
 ): void {
@@ -65,13 +68,13 @@ export function buildBarriers(
   // segments that are near the viewport.  This reduces the polyline from O(all
   // segments) down to O(viewport) — a major performance improvement for long
   // roads (e.g. 3000 segments at zoom=1 → only ~400 visible at any one time).
-  const visHalfH = (cssH / sy) / 2;
-  const visMinY  = panY - visHalfH - BARRIER_CULL_MARGIN * 2;  // world Y
-  const visMaxY  = panY + visHalfH + BARRIER_CULL_MARGIN * 2;
+  const visHalfH = cssH / sy / 2;
+  const visMinY = panY - visHalfH - BARRIER_CULL_MARGIN * 2; // world Y
+  const visMaxY = panY + visHalfH + BARRIER_CULL_MARGIN * 2;
 
   // Convert world-Y range to segment indices (each segment spans 2 world-Y units)
   const segFirst = Math.max(0, Math.floor(visMinY / 2));
-  const segLast  = Math.min(roadSegs.length - 1, Math.ceil(visMaxY / 2));
+  const segLast = Math.min(roadSegs.length - 1, Math.ceil(visMaxY / 2));
 
   const leftPoints: number[] = [];
   const rightPoints: number[] = [];

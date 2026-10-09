@@ -1,0 +1,19 @@
+<ng-container [formGroup]="form">
+  <tr>
+    <td class="w-[190px] text-white/80" [matTooltip]="tooltip">{{ field }}</td>
+    <td>
+      @if (isWater) {
+        <input class="h-[18px] w-[18px] align-middle" type="checkbox" [formControlName]="field" />
+      } @else {
+        <mat-form-field
+          appearance="outline"
+          subscriptSizing="dynamic"
+          class="mb-0 w-[140px]"
+          [matTooltip]="tooltip"
+        >
+          <input matInput type="number" [step]="step" [formControlName]="field" />
+        </mat-form-field>
+      }
+    </td>
+  </tr>
+</ng-container>

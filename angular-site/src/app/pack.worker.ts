@@ -272,13 +272,22 @@ self.addEventListener('message', (event: MessageEvent) => {
       }
 
       case 'APPLY_SCRIPTS': {
-        const { scripts, bindings, levelBindings = [] } = payload as {
+        const {
+          scripts,
+          bindings,
+          levelBindings = [],
+        } = payload as {
           scripts: ScriptDefinition[];
           bindings: ScriptBinding[];
           levelBindings?: LevelScriptBinding[];
         };
         resources = applyScriptResources(resources, scripts, bindings, levelBindings);
-        const { scripts: nextScripts, scriptBindings, levelScriptBindings, scriptIssues } = extractAll();
+        const {
+          scripts: nextScripts,
+          scriptBindings,
+          levelScriptBindings,
+          scriptIssues,
+        } = extractAll();
         self.postMessage({
           id,
           ok: true,

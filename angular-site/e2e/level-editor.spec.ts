@@ -53,7 +53,7 @@ test.describe('Editor with default resources loaded', () => {
     await page.getByRole('button', { name: /load default/i }).click();
     // Wait for the worker to finish — the busy spinner disappears and a level
     // select dropdown appears
-    await expect(page.locator('mat-spinner')).not.toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('#panel-editor mat-spinner')).not.toBeVisible({ timeout: 30_000 });
   });
 
   test('level selector appears after loading', async ({ page }) => {
@@ -70,21 +70,36 @@ test.describe('Editor with default resources loaded', () => {
   test('can create and edit a Lua script in the Object Types modal editor', async ({ page }) => {
     await page.getByRole('button', { name: /object types/i }).click();
     await page.getByRole('button', { name: /new script/i }).click();
-    await page.getByRole('button', { name: /edit script/i }).click();
 
     const dialog = page.locator('app-lua-script-editor-dialog');
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('.cm-editor')).toBeVisible();
-    await expect(dialog.getByText(/ctx Methods/i)).toBeVisible();
+    await expect(dialog.locator('app-lua-script-api-panel aside > .overflow-y-auto').getByRole('button', { name: /^ctx Methods 40$/ })).toBeVisible();
 
     const nameInput = dialog.getByLabel(/script name/i);
     await nameInput.fill('E2E Script');
     await expect(nameInput).toHaveValue('E2E Script');
-    await dialog.getByRole('button', { name: /^save$/i }).click();
+    await dialog.getByRole('button', { name: 'Apply to resource pack', exact: true }).click();
 
     await expect(dialog).not.toBeVisible();
     await page.getByRole('button', { name: /edit script/i }).click();
     await expect(dialog.getByLabel(/script name/i)).toHaveValue('E2E Script');
+  });
+
+  test('Lua API panel has an independently scrollable lifecycle list', async ({ page }) => {
+    await page.getByRole('button', { name: /object types/i }).click();
+    await page.getByRole('button', { name: /new script/i }).click();
+
+    const dialog = page.locator('app-lua-script-editor-dialog');
+    const apiPanel = dialog.locator('app-lua-script-api-panel');
+    await expect(apiPanel).toBeVisible();
+    const scrollMetrics = await apiPanel.locator('aside > .overflow-y-auto').evaluate((element) => ({
+      overflowY: getComputedStyle(element).overflowY,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    }));
+    expect(scrollMetrics.overflowY).toBe('auto');
+    expect(scrollMetrics.scrollHeight).toBeGreaterThanOrEqual(scrollMetrics.clientHeight);
   });
 });
 
@@ -103,7 +118,7 @@ test.describe('Number input editing (InputValueDirective fix)', () => {
     await page.goto('/');
     await page.getByRole('button', { name: /level editor/i }).click();
     await page.getByRole('button', { name: /load default/i }).click();
-    await expect(page.locator('mat-spinner')).not.toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('#panel-editor mat-spinner')).not.toBeVisible({ timeout: 30_000 });
     await page.getByRole('button', { name: /properties/i }).click();
     await expect(page.locator('mat-select[aria-label="Shared road selector"]')).toBeVisible();
   });

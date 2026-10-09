@@ -1,0 +1,25 @@
+<div class="fixed inset-0 z-[270] flex items-center justify-center bg-black/70 p-4">
+  <mat-card class="w-full max-w-[620px] border border-[var(--border)] bg-[var(--surface)]"
+    ><mat-card-header
+      ><mat-card-title>Preview Selected Level</mat-card-title
+      ><mat-card-subtitle>
+        @if (selectedLevelId !== null) {
+          Level {{ levelDisplayNum(selectedLevelId) }} (Pack {{ selectedLevelId }})
+        }
+      </mat-card-subtitle></mat-card-header
+    ><mat-card-content
+      ><p>
+        This preview uses your current editor resources.dat state and restarts directly into this
+        level.
+      </p>
+      <mat-checkbox [checked]="stripScripts" (change)="stripScriptsChange.emit($event.checked)"
+        >Strip scripting resources for this preview</mat-checkbox
+      ></mat-card-content
+    ><mat-card-actions align="end"
+      ><button mat-button (click)="close.emit()">Cancel</button
+      ><button mat-raised-button color="primary" (click)="confirm.emit()">
+        Start Preview
+      </button></mat-card-actions
+    ></mat-card
+  >
+</div>

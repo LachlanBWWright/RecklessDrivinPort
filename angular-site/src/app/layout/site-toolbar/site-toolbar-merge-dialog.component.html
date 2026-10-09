@@ -1,0 +1,30 @@
+<div class="fixed inset-0 z-[260] flex items-center justify-center bg-black/70 p-4">
+  <mat-card class="w-full max-w-[680px] border border-[var(--border)] bg-[var(--surface)]">
+    <mat-card-header
+      ><mat-card-title>Merge Uploaded resources.dat</mat-card-title
+      ><mat-card-subtitle>{{ pendingMergeFile?.name }}</mat-card-subtitle></mat-card-header
+    >
+    <mat-card-content
+      ><p>
+        Choose which categories from the uploaded file should override the currently loaded editor
+        data.
+      </p>
+      <app-site-toolbar-merge-options
+        [options]="mergeOptions"
+        (optionsChange)="optionsChange.emit($event)"
+      />
+      @if (mergeOptions.levels) {
+        <app-site-toolbar-merge-levels
+          [selectedLevelIds]="mergeOptions.levelResourceIds ?? []"
+          (selectedLevelIdsChange)="levelIdsChange.emit($event)"
+        />
+      }
+    </mat-card-content>
+    <mat-card-actions align="end"
+      ><button mat-button (click)="close.emit()">Cancel</button
+      ><button mat-raised-button color="primary" (click)="confirm.emit()">
+        Merge Selected
+      </button></mat-card-actions
+    >
+  </mat-card>
+</div>

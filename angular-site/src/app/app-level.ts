@@ -1,11 +1,23 @@
 import type { LevelProperties, ParsedLevel, RoadInfoData } from './level-editor.service';
 import type { App } from './app';
-import { cloneRoadInfoData, saveLevelProperties, setLevelRoadInfo, setSelectedRoadInfo } from './app-road-editing';
+import {
+  cloneRoadInfoData,
+  saveLevelProperties,
+  setLevelRoadInfo,
+  setSelectedRoadInfo,
+} from './app-road-editing';
 
 export const MAX_TIME_VALUE = 65535;
 
 /** Texture fields stored in road info data that correspond to asset references. */
-export type RoadTextureField = 'backgroundTex' | 'foregroundTex' | 'roadLeftBorder' | 'roadRightBorder' | 'marks' | 'tracks' | 'skidSound';
+export type RoadTextureField =
+  | 'backgroundTex'
+  | 'foregroundTex'
+  | 'roadLeftBorder'
+  | 'roadRightBorder'
+  | 'marks'
+  | 'tracks'
+  | 'skidSound';
 
 declare module './app' {
   interface App {
@@ -73,7 +85,9 @@ export function selectLevel(app: App, id: number, options?: { preserveView?: boo
   app.marks.set([...level.marks]);
   app.selectedMarkIndex.set(null);
   app.editTrackUp.set(level.trackUp.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })));
-  app.editTrackDown.set(level.trackDown.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })));
+  app.editTrackDown.set(
+    level.trackDown.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })),
+  );
   app.dragTrackWaypoint.set(null);
   if (!preserveView) {
     resetViewToRoad(app, level);
@@ -159,7 +173,8 @@ export function onRoadInfoInput(
     'water',
   ]);
   const currentId = assetFields.has(field) ? app.selectedRoadInfoId() : app.editRoadInfo();
-  const current = currentId !== null ? cloneRoadInfoData(app, app.roadInfoDataMap.get(currentId)) : null;
+  const current =
+    currentId !== null ? cloneRoadInfoData(app, app.roadInfoDataMap.get(currentId)) : null;
   if (currentId === null || current === null) return;
   const next = { ...current };
   app._pushUndo('props');
@@ -215,7 +230,8 @@ export function onTimeLimitChange(app: App, value: number): void {
  */
 export function onRoadTexturePick(app: App, field: RoadTextureField, value: number): void {
   const currentId = app.selectedRoadInfoId();
-  const current = currentId !== null ? cloneRoadInfoData(app, app.roadInfoDataMap.get(currentId)) : null;
+  const current =
+    currentId !== null ? cloneRoadInfoData(app, app.roadInfoDataMap.get(currentId)) : null;
   if (currentId === null || current === null) return;
   app._pushUndo('props');
   const next = { ...current, [field]: value };
@@ -230,11 +246,19 @@ export function onRoadTexturePick(app: App, field: RoadTextureField, value: numb
   app.markPropertiesDirty();
 }
 
-export function onPropertiesTabInput(app: App, e: { field: keyof LevelProperties; event: Event }): void {
+export function onPropertiesTabInput(
+  app: App,
+  e: { field: keyof LevelProperties; event: Event },
+): void {
   onPropsInput(app, e.field, e.event);
 }
 
-export function onObjGroupInput(app: App, index: number, field: 'resID' | 'numObjs', value: number): void {
+export function onObjGroupInput(
+  app: App,
+  index: number,
+  field: 'resID' | 'numObjs',
+  value: number,
+): void {
   const groups = [...app.editObjectGroups()];
   if (index < 0 || index >= groups.length) return;
   groups[index] = { ...groups[index], [field]: value };

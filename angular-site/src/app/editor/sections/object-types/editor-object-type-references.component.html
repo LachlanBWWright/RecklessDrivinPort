@@ -1,0 +1,26 @@
+<app-editor-detail-card>
+  <div [formGroup]="form">
+  <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">
+    References
+  </div>
+  <div class="grid min-h-0 grid-cols-2 gap-3 max-[1200px]:grid-cols-1">
+    @for (field of fields; track field.field) {
+      <mat-form-field appearance="outline" [matTooltip]="fieldTooltips[field.field]">
+        <mat-label>{{ field.label }}</mat-label>
+        <mat-select [formControlName]="field.field">
+          <mat-select-trigger>{{ label(field, getValue(field.field)) }}</mat-select-trigger>
+          <mat-option [value]="field.kind === 'object' && field.field === 'deathObj' ? -1 : 0">
+            {{ field.emptyLabel }}
+          </mat-option>
+          @for (option of options(field); track option.id) {
+            <mat-option [value]="option.id">{{ option.label }}</mat-option>
+          }
+          @if (hasCustom(field)) {
+            <app-editor-reference-custom-option [option]="customOption(field)" />
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+  </div>
+</div>
+</app-editor-detail-card>

@@ -1,0 +1,77 @@
+<div class="flex items-start gap-2 px-3.5 py-3">
+  <button
+    type="button"
+    class="min-w-0 flex-1 rounded-lg text-left transition hover:bg-white/[0.03]"
+    (click)="selectSlot.emit(slot.slotIndex)"
+  >
+    <span
+      class="flex items-center gap-2 text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-[var(--muted)]"
+    >
+      <span>Slot {{ slot.slotIndex }}</span>
+      <span
+        class="rounded-full bg-white/[0.06] px-2 py-0.5 text-[0.66rem] tracking-[0.06em] text-[var(--on-surface)]"
+        >{{ slot.numObjs }} max</span
+      >
+    </span>
+    <span
+      class="mt-1 block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.9rem] font-semibold text-[var(--on-surface)]"
+      >{{ getObjectGroupLabel(slot.resID) }}</span
+    >
+    <span class="mt-1 block text-[0.72rem] text-[var(--muted)]">
+      @if (canPreviewObjectGroupSlot(slot.slotIndex)) {
+        Spawn Y sample: {{ previewStartY }} → {{ levelEnd }}
+      } @else {
+        Definition unavailable for preview.
+      }
+    </span>
+    @if (isGeneratedObjectGroupPreviewEnabled(slot.slotIndex)) {
+      <span
+        class="mt-1 inline-flex rounded-full bg-[color:rgba(77,208,225,0.12)] px-2 py-0.5 text-[0.66rem] font-semibold tracking-[0.05em] text-[#4dd0e1]"
+      >
+        {{
+          showGeneratedObjectGroupPreviews ? 'Sample visible on canvas' : 'Sample ready (hidden)'
+        }}
+      </span>
+    }
+
+    <app-editor-object-group-slot-preview
+      [slot]="slot"
+      [getPreviewEntries]="getPreviewEntries"
+      [trackPreviewEntry]="trackPreviewEntry"
+      [getTypeLabel]="getTypeLabel"
+      [getRelativeOddsLabel]="getRelativeOddsLabel"
+      [getPreviewRotationDegrees]="getPreviewRotationDegrees"
+      [getPreviewSpriteRotationDegrees]="getPreviewSpriteRotationDegrees"
+      [getSpriteUrl]="getSpriteUrl"
+      [getPreviewOverflowCount]="getPreviewOverflowCount"
+    />
+  </button>
+
+  <div class="flex shrink-0 items-center gap-1 pt-0.5">
+    <button
+      mat-icon-button
+      type="button"
+      color="primary"
+      (click)="regeneratePreviewForSlot(slot.slotIndex)"
+      [disabled]="!canPreviewObjectGroupSlot(slot.slotIndex)"
+      matTooltip="Generate a fresh in-game sample for this slot"
+    >
+      <mat-icon>refresh</mat-icon>
+    </button>
+    <button
+      mat-icon-button
+      type="button"
+      class="!flex !h-8 !w-8 items-center justify-center"
+      (click)="selectSlot.emit(slot.slotIndex)"
+      [matTooltip]="selectedObjectGroupSlotIndex === slot.slotIndex ? 'Collapse' : 'Expand'"
+    >
+      <mat-icon
+        class="!flex !h-[18px] !w-[18px] !text-[18px] items-center justify-center !leading-none text-[var(--muted)] transition-transform duration-200"
+        [style.transform]="
+          selectedObjectGroupSlotIndex === slot.slotIndex ? 'rotate(90deg)' : 'rotate(0deg)'
+        "
+        >chevron_right</mat-icon
+      >
+    </button>
+  </div>
+</div>

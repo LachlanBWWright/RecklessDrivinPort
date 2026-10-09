@@ -1,0 +1,19 @@
+<app-editor-detail-card>
+  <div [formGroup]="form">
+  <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">
+    Sprite frame
+  </div>
+  <mat-form-field appearance="outline" class="w-full max-w-[520px]">
+    <mat-label>Sprite Frame</mat-label>
+    <mat-select formControlName="frame">
+      <mat-select-trigger>{{ getFrameLabel(value) }}</mat-select-trigger>
+      @for (frame of frames; track frame.id) {
+        <mat-option [value]="frame.id">{{ getFrameLabel(frame.id) }}</mat-option>
+      }
+      @if (hasCustom) {
+        <mat-option [value]="value">#{{ value }} (custom)</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</div>
+</app-editor-detail-card>

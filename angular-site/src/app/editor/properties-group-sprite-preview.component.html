@@ -1,0 +1,9 @@
+<span class="flex min-w-0 items-center justify-end gap-1 overflow-hidden" aria-hidden="true">
+  @for (typeRes of typeResIds; track typeRes) {
+    <span class="h-[18px] w-[18px] shrink-0 overflow-hidden rounded border border-white/20">
+      @if (getSpriteUrl(typeRes); as url) {
+        <img class="h-full w-full object-contain" [src]="url" alt="" />
+      }
+    </span>
+  }
+</span>

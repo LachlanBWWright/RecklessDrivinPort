@@ -1,0 +1,12 @@
+@if (issues.length > 0) {
+  <div class="rounded-[10px] border border-amber-400/30 bg-amber-500/10 p-3">
+    <div class="mb-2 text-[0.78rem] font-bold text-amber-200">Diagnostics</div>
+    <div class="flex flex-col gap-1">
+      @for (issue of issues; track $index) {
+        <div class="text-[0.78rem] text-amber-100">
+          {{ issue.line === null ? '' : 'Line ' + issue.line + ': ' }}{{ issue.message }}
+        </div>
+      }
+    </div>
+  </div>
+}

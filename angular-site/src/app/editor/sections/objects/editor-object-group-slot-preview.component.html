@@ -1,0 +1,39 @@
+@if (slot.group; as group) {
+  <span class="mt-2 flex flex-wrap items-center gap-1.5">
+    @for (entry of getPreviewEntries(group, 3); track trackPreviewEntry($index, entry)) {
+      <span
+        class="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-[var(--surface2)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+        [matTooltip]="
+          getTypeLabel(entry.typeRes) +
+          ' · ' +
+          getRelativeOddsLabel(group.entries, entry) +
+          ' · ' +
+          (entry.dir < 0 ? 'auto' : getPreviewRotationDegrees(entry.dir).toFixed(0) + '°')
+        "
+      >
+        @if (getSpriteUrl(entry.typeRes); as url) {
+          <img
+            [src]="url"
+            class="block h-full w-full object-contain [image-rendering:pixelated]"
+            [style.transform]="'rotate(' + getPreviewSpriteRotationDegrees(entry.dir) + 'deg)'"
+            [style.transformOrigin]="'50% 50%'"
+            alt=""
+          />
+        } @else {
+          <span
+            class="flex h-full w-full items-center justify-center rounded text-[0.68rem] font-extrabold text-[var(--muted)]"
+            [style.transform]="'rotate(' + getPreviewSpriteRotationDegrees(entry.dir) + 'deg)'"
+          >
+            #
+          </span>
+        }
+      </span>
+    }
+    @if (getPreviewOverflowCount(group, 3) > 0) {
+      <span
+        class="inline-flex h-9 min-w-9 items-center justify-center rounded-md border border-dashed border-white/10 bg-white/[0.03] px-2 text-[0.68rem] font-bold text-[var(--muted)]"
+        >+{{ getPreviewOverflowCount(group, 3) }}</span
+      >
+    }
+  </span>
+}

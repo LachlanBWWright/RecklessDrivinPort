@@ -16,38 +16,21 @@ import type {
   ObjectTypeDefinition,
   ParsedLevel,
   LevelScriptBinding,
+  ScriptBinding,
   ObjectGroupRef,
   RoadInfoData,
   RoadInfoOption,
   ScriptDefinition,
 } from '../level-editor.service';
-import {
-  LuaScriptEditorDialogComponent,
-  type LuaScriptEditorDialogResult,
+import type { RoadInfoFormModel, RoadField } from './road-info-form.component';
+import type {
+  LuaScriptEditorChange,
+  LuaScriptEditorDialogResult,
+  LuaScriptEditorDialogData,
 } from './lua-script-editor-dialog.component';
 
-type RoadField = Exclude<keyof RoadInfoData, 'id'>;
 type RoadFieldValue = number | boolean;
 type RoadInfoFormField = Exclude<keyof RoadInfoFormModel, 'water'>;
-
-type RoadInfoFormModel = {
-  friction: FormControl<number | null>;
-  airResistance: FormControl<number | null>;
-  backResistance: FormControl<number | null>;
-  tolerance: FormControl<number | null>;
-  deathOffs: FormControl<number | null>;
-  water: FormControl<boolean>;
-  xDrift: FormControl<number | null>;
-  yDrift: FormControl<number | null>;
-  xFrontDrift: FormControl<number | null>;
-  yFrontDrift: FormControl<number | null>;
-  trackSlide: FormControl<number | null>;
-  dustSlide: FormControl<number | null>;
-  dustColor: FormControl<number | null>;
-  filler: FormControl<number | null>;
-  filler2: FormControl<number | null>;
-  slideFriction: FormControl<number | null>;
-};
 
 interface SpriteFrameInfo {
   id: number;
@@ -90,6 +73,8 @@ export class PropertiesTabComponent implements OnChanges {
   @Input() propertiesDirty = false;
   @Input() workerBusy = false;
   @Input() scripts: ScriptDefinition[] | undefined = [];
+  @Input() scriptBindings: ScriptBinding[] | undefined = [];
+  @Input() levelResourceIds: readonly number[] = [];
   @Input() levelScriptBindings: LevelScriptBinding[] | undefined = [];
   @Input() objectTypes: ObjectTypeDefinition[] = [];
   @Input() spriteFrames: SpriteFrameInfo[] = [];
@@ -107,7 +92,7 @@ export class PropertiesTabComponent implements OnChanges {
     scriptId: number | null;
   }>();
   @Output() createLevelScript = new EventEmitter<number>();
-  @Output() scriptSave = new EventEmitter<LuaScriptEditorDialogResult>();
+  @Output() scriptSave = new EventEmitter<LuaScriptEditorChange>();
 
   readonly roadInfoForm = new FormGroup<RoadInfoFormModel>({
     friction: new FormControl<number | null>(null),
@@ -229,7 +214,10 @@ export class PropertiesTabComponent implements OnChanges {
   }
 
   levelScriptBindingFor(levelResourceId: number): LevelScriptBinding | null {
-    return this.levelScriptBindingList.find((binding) => binding.levelResourceId === levelResourceId) ?? null;
+    return (
+      this.levelScriptBindingList.find((binding) => binding.levelResourceId === levelResourceId) ??
+      null
+    );
   }
 
   levelScriptFor(levelResourceId: number): ScriptDefinition | null {
@@ -252,21 +240,11 @@ export class PropertiesTabComponent implements OnChanges {
     this.createLevelScript.emit(levelResourceId);
   }
 
-  openLevelScriptEditor(levelResourceId: number): void {
+  async openLevelScriptEditor(levelResourceId: number): Promise<void> {
+    const { LuaScriptEditorDialogComponent } = await import('./lua-script-editor-dialog.component');
     const script = this.levelScriptFor(levelResourceId);
     if (!script) return;
-    const dialogRef = this.dialog.open<
-      LuaScriptEditorDialogComponent,
-      {
-        script: ScriptDefinition;
-        objectTypeId: number;
-        objectTypes: readonly ObjectTypeDefinition[];
-        spriteFrames: readonly SpriteFrameInfo[];
-        audioEntries: readonly AudioEntryInfo[];
-        issues: readonly [];
-      },
-      LuaScriptEditorDialogResult
-    >(LuaScriptEditorDialogComponent, {
+    const dialogRef = this.dialog.open<InstanceType<typeof LuaScriptEditorDialogComponent>, LuaScriptEditorDialogData, LuaScriptEditorDialogResult>(LuaScriptEditorDialogComponent, {
       width: 'min(1680px, calc(100vw - 16px))',
       height: 'min(980px, calc(100vh - 16px))',
       maxWidth: '100vw',
@@ -274,6 +252,10 @@ export class PropertiesTabComponent implements OnChanges {
       disableClose: true,
       data: {
         script,
+        scripts: this.scripts ?? [script],
+        scriptBindings: this.scriptBindings ?? [],
+        levelScriptBindings: this.levelScriptBindings ?? [],
+        levelResourceIds: this.levelResourceIds,
         objectTypeId: 0,
         objectTypes: this.objectTypes,
         spriteFrames: this.spriteFrames,

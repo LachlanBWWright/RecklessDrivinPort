@@ -1,0 +1,23 @@
+<mat-form-field
+  appearance="outline"
+  subscriptSizing="dynamic"
+  class="!m-0 w-full self-center"
+>
+  <mat-select
+    [value]="selectedLevelId"
+    (valueChange)="selectLevel.emit($event)"
+    [disabled]="workerBusy || parsedLevels.length === 0"
+    aria-label="Level selector"
+  >
+    <mat-select-trigger>
+      @if (selectedLevelId !== null) {
+        Level {{ levelDisplayNum(selectedLevelId) }}
+      }
+    </mat-select-trigger>
+    @for (level of parsedLevels; track level.resourceId) {
+      <mat-option [value]="level.resourceId"
+        >Level {{ levelDisplayNum(level.resourceId) }}</mat-option
+      >
+    }
+  </mat-select>
+</mat-form-field>

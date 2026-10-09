@@ -1,0 +1,26 @@
+<span class="inline-flex min-w-0 items-center gap-2">
+  @if (option; as road) {
+    @if (road.previewUrl) {
+      <img
+        class="h-4 max-h-3 w-8 max-w-7 shrink-0 rounded border border-[var(--border)] object-cover"
+        [src]="road.previewUrl"
+        [alt]="'Road info ' + road.id"
+      />
+    } @else {
+      <span
+        class="h-4 max-h-3 w-8 max-w-7 shrink-0 rounded border border-[var(--border)]"
+        [style.background]="
+          road.water
+            ? 'linear-gradient(135deg,var(--success),var(--track-up))'
+            : 'linear-gradient(135deg,var(--surface4),var(--surface2))'
+        "
+      ></span>
+    }
+    <span>{{ road.label }}</span>
+  } @else {
+    <span
+      class="h-4 max-h-3 w-8 max-w-7 shrink-0 rounded border border-[var(--border)] bg-[linear-gradient(135deg,var(--surface4),var(--surface2))]"
+    ></span>
+    <span>Road {{ fallbackId }}</span>
+  }
+</span>

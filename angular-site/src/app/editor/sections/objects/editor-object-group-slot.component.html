@@ -1,0 +1,50 @@
+<section
+  class="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+  [ngClass]="
+    selectedObjectGroupSlotIndex === slot.slotIndex
+      ? 'bg-[color:rgba(66,165,245,0.12)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]'
+      : ''
+  "
+>
+  <app-editor-object-group-slot-header
+    [slot]="slot"
+    [selectedObjectGroupSlotIndex]="selectedObjectGroupSlotIndex"
+    [getObjectGroupLabel]="getObjectGroupLabel"
+    [canPreviewObjectGroupSlot]="canPreviewObjectGroupSlot"
+    [previewStartY]="previewStartY"
+    [levelEnd]="levelEnd"
+    [showGeneratedObjectGroupPreviews]="showGeneratedObjectGroupPreviews"
+    [isGeneratedObjectGroupPreviewEnabled]="isGeneratedObjectGroupPreviewEnabled"
+    [regeneratePreviewForSlot]="regeneratePreviewForSlot"
+    [getGeneratedObjectGroupPreviewCount]="getGeneratedObjectGroupPreviewCount"
+    [getPreviewEntries]="getPreviewEntries"
+    [trackPreviewEntry]="trackPreviewEntry"
+    [getTypeLabel]="getTypeLabel"
+    [getRelativeOddsLabel]="getRelativeOddsLabel"
+    [getPreviewRotationDegrees]="getPreviewRotationDegrees"
+    [getPreviewSpriteRotationDegrees]="getPreviewSpriteRotationDegrees"
+    [getSpriteUrl]="getSpriteUrl"
+    [getPreviewOverflowCount]="getPreviewOverflowCount"
+    (selectSlot)="selectSlot.emit($event)"
+  />
+
+  <app-editor-object-group-slot-detail
+    [slot]="slot"
+    [selectedObjectGroupSlotIndex]="selectedObjectGroupSlotIndex"
+    [getObjectGroupLabel]="getObjectGroupLabel"
+    [canPreviewObjectGroupSlot]="canPreviewObjectGroupSlot"
+    [isGeneratedObjectGroupPreviewEnabled]="isGeneratedObjectGroupPreviewEnabled"
+    [getGeneratedObjectGroupPreviewCount]="getGeneratedObjectGroupPreviewCount"
+    [toggleGeneratedPreviewForSlot]="toggleGeneratedPreviewForSlot"
+    [getPreviewEntries]="getPreviewEntries"
+    [trackPreviewEntry]="trackPreviewEntry"
+    [getTypeLabel]="getTypeLabel"
+    [getRelativeOddsLabel]="getRelativeOddsLabel"
+    [getPreviewRotationDegrees]="getPreviewRotationDegrees"
+    [getPreviewSpriteRotationDegrees]="getPreviewSpriteRotationDegrees"
+    [getSpriteUrl]="getSpriteUrl"
+    [getPreviewOverflowCount]="getPreviewOverflowCount"
+    [getOffsetSummary]="getOffsetSummary"
+    [trackGroupEntry]="trackGroupEntry"
+  />
+</section>

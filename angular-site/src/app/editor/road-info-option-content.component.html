@@ -1,0 +1,19 @@
+<span class="inline-flex min-w-0 items-center gap-2">
+  @if (option.previewUrl) {
+    <img
+      class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover"
+      [src]="option.previewUrl"
+      [alt]="'Road info ' + option.id"
+    />
+  } @else {
+    <span
+      class="h-6 w-12 shrink-0 rounded border border-white/20"
+      [style.background]="
+        option.water
+          ? 'linear-gradient(135deg,#0a7a1e,#354ab5)'
+          : 'linear-gradient(135deg,#555,#2c2c2c)'
+      "
+    ></span>
+  }
+  <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ option.label }}</span>
+</span>

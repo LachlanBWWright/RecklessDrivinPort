@@ -35,6 +35,12 @@ export class MarksEditorComponent implements OnChanges {
   @Output() markSelected = new EventEmitter<number>();
   @Output() markFieldInput = new EventEmitter<{ idx: number; field: MarkField; value: number }>();
 
+  markRowClass(index: number): string {
+    return this.selectedMarkIndex === index
+      ? '[&_td]:bg-red-600/15 [&_td]:text-[var(--on-surface)]'
+      : '';
+  }
+
   readonly markForm = new FormGroup({
     x1: new FormControl<number | null>(null),
     y1: new FormControl<number | null>(null),

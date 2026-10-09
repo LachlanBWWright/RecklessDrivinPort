@@ -1,0 +1,26 @@
+<mat-select-trigger>
+  @if (selected; as road) {
+    <span class="inline-flex w-full min-w-0 items-center gap-2">
+      @if (road.previewUrl) {
+        <img
+          class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover"
+          [src]="road.previewUrl"
+          [alt]="'Road info ' + road.id"
+        />
+      } @else {
+        <span
+          class="h-6 w-12 shrink-0 rounded border border-white/20"
+          [style.background]="waterBackground(road.water)"
+        ></span>
+      }
+      <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ road.label }}</span>
+    </span>
+  } @else {
+    <span class="inline-flex w-full min-w-0 items-center gap-2">
+      <span
+        class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"
+      ></span>
+      <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Road {{ value }}</span>
+    </span>
+  }
+</mat-select-trigger>

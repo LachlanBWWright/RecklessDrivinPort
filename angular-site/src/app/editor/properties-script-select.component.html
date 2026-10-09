@@ -1,0 +1,7 @@
+<mat-select [value]="value" [disabled]="disabled" (valueChange)="valueChange.emit($event)"
+  ><mat-select-trigger>{{ label }}</mat-select-trigger
+  ><mat-option [value]="null">None</mat-option>
+  @for (script of scripts; track script.id) {
+    <mat-option [value]="script.id">#{{ script.id }} · {{ script.name }}</mat-option>
+  }
+</mat-select>

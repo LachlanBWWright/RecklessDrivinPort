@@ -1,4 +1,4 @@
-import { computed, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, computed, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type {
   ParsedLevel,
@@ -31,6 +31,7 @@ const DEFAULT_EDITOR_TEST_DRIVE_START_Y = 500;
 
 /** Shared UI and editing state for the root app. */
 export class AppStateBase {
+  readonly changeDetector = inject(ChangeDetectorRef);
   readonly typePalette = OBJ_PALETTE.map((hex, typeId) => ({ hex, typeId }));
   /** Convert a level resource ID (140-149) to a human-readable level number (1-10). */
   readonly levelDisplayNum = levelDisplayNum;

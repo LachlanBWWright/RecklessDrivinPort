@@ -1,410 +1,57 @@
-<mat-card class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]">
+<mat-card
+  class="flex min-h-0 w-full flex-1 flex-col rounded-b-lg border border-[var(--border)] bg-[var(--surface)]"
+>
   <mat-card-content class="!flex !min-h-0 !flex-1 !flex-col !p-0">
     @if (objectTypes.length > 0) {
-      <div class="flex min-h-0 flex-1 gap-6 overflow-hidden max-[1200px]:flex-col">
-        <aside class="custom-scrollbar m-4 mr-0 flex min-h-0 min-w-0 basis-[340px] flex-col gap-3 overflow-hidden rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)),var(--bg)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] max-[1200px]:mr-4 max-[1200px]:basis-auto">
-          <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-1">
-            <div class="min-w-0 flex-1">
-              <div class="text-base font-bold text-[var(--text)]" matTooltip="Pack 128 (kPackObTy) - reusable object definitions used by placed objects and object groups">Object Type Editor</div>
-              <div class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">{{ objectTypes.length }} definitions</div>
-            </div>
-            <button mat-icon-button color="primary" (click)="addType.emit()" [disabled]="workerBusy" matTooltip="Create a new type">
-              <mat-icon>add</mat-icon>
-            </button>
-          </div>
-
-          <div class="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pb-4">
-            @for (type of objectTypes; track trackType($index, type)) {
-              <button
-                class="flex w-full items-center gap-3 rounded-[10px] border border-transparent bg-[var(--surface2)] px-3 py-2.5 text-left transition duration-100 ease-out hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]"
-                [ngClass]="selectedObjectTypeId === type.typeRes ? 'border-[color:rgba(66,165,245,0.55)] bg-[color:rgba(66,165,245,0.16)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]' : ''"
-                (click)="selectedObjectTypeIdChange.emit(type.typeRes)">
-                <span class="grid h-[52px] w-[52px] shrink-0 place-items-center overflow-hidden rounded-[10px] border border-white/10 bg-white/[0.04]">
-                  @if (getSpriteUrl(type.frame); as url) {
-                    <img [src]="url" class="block h-full w-full object-contain" [style.imageRendering]="'pixelated'" alt="" />
-                  } @else {
-                    <span class="text-[0.8rem] font-bold text-[var(--muted)]">{{ type.frame }}</span>
-                  }
-                </span>
-                <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span class="text-[0.94rem] font-bold">Type #{{ type.typeRes }}</span>
-                  <span class="text-[0.76rem] text-[var(--muted)]">{{ getFrameLabel(type.frame) }}</span>
-                  <span class="text-[0.76rem] text-[var(--muted)]">{{ type.width.toFixed(1) }}×{{ type.length.toFixed(1) }} m</span>
-                </span>
-                <mat-icon class="!h-[18px] !w-[18px] !text-[18px] shrink-0 text-[var(--muted)] opacity-85">chevron_right</mat-icon>
-              </button>
-            }
-          </div>
-
-        </aside>
+      <div class="flex h-full min-h-0 flex-1 gap-6 overflow-hidden max-[1200px]:flex-col">
+        <app-editor-object-types-list
+          [objectTypes]="objectTypes"
+          [selectedObjectTypeId]="selectedObjectTypeId"
+          [workerBusy]="workerBusy"
+          [getSpriteUrl]="getSpriteUrl"
+          [getFrameLabel]="getFrameLabel"
+          (addType)="addType.emit()"
+          (selectType)="selectedObjectTypeIdChange.emit($event)"
+        />
 
         @if (selectedType; as type) {
-          <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-[14px] overflow-y-auto px-4 py-4 pr-1 max-[1200px]:px-3 max-[1200px]:py-3">
-            <div class="flex items-start justify-between gap-[18px] max-[1200px]:flex-col">
-              <div>
-                <h4 class="text-base font-bold text-[var(--on-surface)]">Type #{{ type.typeRes }}</h4>
-                <p class="max-w-[760px] text-[0.85rem] text-[var(--muted)]">
-                  This definition controls the sprite frame, animation, collision, physics, scoring, and special gameplay flags.
-                </p>
-              </div>
-              <div class="flex flex-wrap justify-end gap-2 max-[1200px]:justify-start">
-                <button mat-raised-button color="primary" (click)="addType.emit()" [disabled]="workerBusy">
-                  <mat-icon>add</mat-icon> Add Type
-                </button>
-                <button mat-stroked-button color="warn" (click)="deleteType.emit(type.typeRes)" [disabled]="workerBusy">
-                  <mat-icon>delete</mat-icon> Delete Type
-                </button>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-[minmax(180px,260px)_minmax(0,1fr)] items-start gap-4 max-[1200px]:grid-cols-1">
-              <div class="relative w-full max-w-[260px] max-[1200px]:max-w-[320px]">
-                @if (getSpriteUrl(getPreviewFrameId(type)); as url) {
-                  <img [src]="url" class="aspect-square w-full rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_25%_25%,rgba(144,202,249,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),var(--surface2)] object-contain shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]" [style.imageRendering]="'pixelated'" alt="object type preview" />
-                } @else {
-                  <div class="flex aspect-square w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_25%_25%,rgba(144,202,249,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),var(--surface2)] font-semibold text-[var(--muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                    <mat-icon>photo_library</mat-icon>
-                    <span>Preview unavailable</span>
-                  </div>
-                }
-                @if (hasPreviewFrameControls(type)) {
-                  <button
-                    mat-icon-button
-                    class="!absolute !left-[10px] !top-1/2 !flex !h-[38px] !w-[38px] !min-h-[38px] !min-w-[38px] !-translate-y-1/2 !items-center !justify-center !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !p-0 !shadow-[0_4px_18px_rgba(0,0,0,0.24)]"
-                    [disabled]="workerBusy"
-                    aria-label="Previous preview frame"
-                    matTooltip="Previous frame"
-                    (click)="stepPreviewFrame(type.typeRes, -1)">
-                    <mat-icon class="!flex !h-[20px] !w-[20px] !items-center !justify-center !text-[20px] !leading-none">chevron_left</mat-icon>
-                  </button>
-                  <button
-                    mat-icon-button
-                    class="!absolute !right-[10px] !top-1/2 !flex !h-[38px] !w-[38px] !min-h-[38px] !min-w-[38px] !-translate-y-1/2 !items-center !justify-center !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !p-0 !shadow-[0_4px_18px_rgba(0,0,0,0.24)]"
-                    [disabled]="workerBusy"
-                    aria-label="Next preview frame"
-                    matTooltip="Next frame"
-                    (click)="stepPreviewFrame(type.typeRes, 1)">
-                    <mat-icon class="!flex !h-[20px] !w-[20px] !items-center !justify-center !text-[20px] !leading-none">chevron_right</mat-icon>
-                  </button>
-                }
-              </div>
-              <mat-card class="self-stretch !border !border-[var(--border)] !bg-[var(--surface3)]">
-                <mat-card-content class="!px-3.5 !py-2.5">
-                  <p class="m-0 text-[0.82rem] leading-[1.7] text-[var(--on-surface)] [&_strong]:font-semibold [&_strong]:text-[var(--muted)]">
-                    <strong>Preview</strong> {{ getFrameLabel(getPreviewFrameId(type)) }}<br>
-                    <strong>Base</strong> {{ getFrameLabel(type.frame) }}<br>
-                    <strong>Collision</strong> {{ type.width.toFixed(1) }}×{{ type.length.toFixed(1) }} m<br>
-                    <strong>Sprite</strong> referenced from Pack 129 / 137
-                  </p>
-                </mat-card-content>
-              </mat-card>
-            </div>
-
-            <div class="flex min-h-0 flex-col gap-3" [formGroup]="typeForm">
-              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
-                <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Sprite frame</div>
-                <mat-form-field appearance="outline" class="w-full max-w-[520px]" [matTooltip]="fieldTooltips.frame">
-                  <mat-label>Sprite Frame</mat-label>
-                  <mat-select
-                    panelClass="max-h-[320px] [&_.mat-mdc-option]:!min-h-9"
-                    formControlName="frame">
-                    <mat-select-trigger>
-                      {{ getFrameLabel(typeForm.controls.frame.value ?? type.frame) }}
-                    </mat-select-trigger>
-                    @for (frame of spriteFrames; track trackFrame($index, frame)) {
-                      <mat-option [value]="frame.id">{{ getFrameLabel(frame.id) }}</mat-option>
-                    }
-                    @if (hasCustomFrame(typeForm.controls.frame.value ?? type.frame)) {
-                      <mat-option [value]="typeForm.controls.frame.value ?? type.frame">#{{ typeForm.controls.frame.value ?? type.frame }} (custom)</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-              </div>
-
-              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
-                <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Core data</div>
-                <div class="grid min-h-0 grid-cols-2 gap-3 max-[1200px]:grid-cols-1">
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.numFrames">
-                    <mat-label>Frame Count</mat-label>
-                    <input
-                      matInput
-                      type="number"
-                      inputmode="numeric"
-                      formControlName="numFrames"
-                    />
-                    <mat-hint>Raw `numFrames` encoding from the game</mat-hint>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.frameDuration">
-                    <mat-label>Frame Duration</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="frameDuration" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.mass">
-                    <mat-label>Mass</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="mass" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.maxEngineForce">
-                    <mat-label>Engine Force</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="maxEngineForce" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.maxNegEngineForce">
-                    <mat-label>Reverse Force</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="maxNegEngineForce" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.friction">
-                    <mat-label>Friction</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="friction" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.steering">
-                    <mat-label>Steering</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="steering" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.wheelWidth">
-                    <mat-label>Wheel Width</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="wheelWidth" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.wheelLength">
-                    <mat-label>Wheel Length</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="wheelLength" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.width">
-                    <mat-label>Collision Width</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="width" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.length">
-                    <mat-label>Collision Length</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="length" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.score">
-                    <mat-label>Score</mat-label>
-                    <input matInput type="number" inputmode="numeric" formControlName="score" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.maxDamage">
-                    <mat-label>Max Damage</mat-label>
-                    <input matInput type="number" inputmode="decimal" formControlName="maxDamage" />
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.weaponInfo">
-                    <mat-label>Weapon Info</mat-label>
-                    <input matInput type="number" inputmode="numeric" formControlName="weaponInfo" />
-                  </mat-form-field>
-                </div>
-              </div>
-
-              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
-                <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">References</div>
-                <div class="grid min-h-0 grid-cols-2 gap-3 max-[1200px]:grid-cols-1">
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.deathObj">
-                    <mat-label>Death Object</mat-label>
-                    <mat-select formControlName="deathObj">
-                      <mat-select-trigger>
-                        <span class="inline-flex w-full min-w-0 items-center gap-2">
-                          @if (getObjectTypePreviewUrl(typeForm.controls.deathObj.value ?? type.deathObj); as url) {
-                            <img class="h-7 w-7 shrink-0 rounded border border-white/20 bg-white/[0.04] object-contain [image-rendering:pixelated]" [src]="url" [alt]="'Object type ' + (typeForm.controls.deathObj.value ?? type.deathObj)" />
-                          } @else {
-                            <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04]">
-                              <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">block</mat-icon>
-                            </span>
-                          }
-                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }}</span>
-                        </span>
-                      </mat-select-trigger>
-                      <mat-option [value]="-1">
-                        <span class="inline-flex min-w-0 items-center gap-2">
-                          <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04]">
-                            <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">block</mat-icon>
-                          </span>
-                          <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">None</span>
-                        </span>
-                      </mat-option>
-                      @for (refType of objectTypes; track trackType($index, refType)) {
-                        <mat-option [value]="refType.typeRes">
-                          <span class="inline-flex min-w-0 items-center gap-2">
-                            @if (getObjectTypePreviewUrl(refType.typeRes); as url) {
-                              <img class="h-7 w-7 shrink-0 rounded border border-white/20 bg-white/[0.04] object-contain [image-rendering:pixelated]" [src]="url" [alt]="'Object type ' + refType.typeRes" />
-                            } @else {
-                              <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04] text-[0.68rem] font-bold text-[var(--muted)]">{{ refType.frame }}</span>
-                            }
-                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(refType.typeRes) }}</span>
-                          </span>
-                        </mat-option>
-                      }
-                      @if ((typeForm.controls.deathObj.value ?? type.deathObj) !== -1 && hasCustomObjectType(typeForm.controls.deathObj.value ?? type.deathObj)) {
-                        <mat-option [value]="typeForm.controls.deathObj.value ?? type.deathObj">
-                          <span class="inline-flex min-w-0 items-center gap-2">
-                            <span class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 bg-white/[0.04] text-[0.68rem] font-bold text-[var(--muted)]">{{ typeForm.controls.deathObj.value ?? type.deathObj }}</span>
-                            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ getObjectTypeLabel(typeForm.controls.deathObj.value ?? type.deathObj) }} (custom)</span>
-                          </span>
-                        </mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.creationSound">
-                    <mat-label>Creation Sound</mat-label>
-                    <mat-select formControlName="creationSound">
-                      <mat-select-trigger>{{ getSoundLabel(typeForm.controls.creationSound.value ?? type.creationSound) }}</mat-select-trigger>
-                      <mat-option [value]="0">None</mat-option>
-                      @for (sound of audioEntries; track sound.id) {
-                        @if (sound.id !== 0) {
-                        <mat-option [value]="sound.id">{{ getSoundLabel(sound.id) }}</mat-option>
-                        }
-                      }
-                      @if ((typeForm.controls.creationSound.value ?? type.creationSound) !== 0 && hasCustomSound(typeForm.controls.creationSound.value ?? type.creationSound)) {
-                        <mat-option [value]="typeForm.controls.creationSound.value ?? type.creationSound">{{ getSoundLabel(typeForm.controls.creationSound.value ?? type.creationSound) }} (custom)</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.otherSound">
-                    <mat-label>Other Sound</mat-label>
-                    <mat-select formControlName="otherSound">
-                      <mat-select-trigger>{{ getSoundLabel(typeForm.controls.otherSound.value ?? type.otherSound) }}</mat-select-trigger>
-                      <mat-option [value]="0">None</mat-option>
-                      @for (sound of audioEntries; track sound.id) {
-                        @if (sound.id !== 0) {
-                        <mat-option [value]="sound.id">{{ getSoundLabel(sound.id) }}</mat-option>
-                        }
-                      }
-                      @if ((typeForm.controls.otherSound.value ?? type.otherSound) !== 0 && hasCustomSound(typeForm.controls.otherSound.value ?? type.otherSound)) {
-                        <mat-option [value]="typeForm.controls.otherSound.value ?? type.otherSound">{{ getSoundLabel(typeForm.controls.otherSound.value ?? type.otherSound) }} (custom)</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" [matTooltip]="fieldTooltips.weaponObj">
-                    <mat-label>Weapon Object</mat-label>
-                    <mat-select formControlName="weaponObj">
-                      <mat-select-trigger>{{ (typeForm.controls.weaponObj.value ?? type.weaponObj) === 0 ? 'None' : getObjectTypeLabel(typeForm.controls.weaponObj.value ?? type.weaponObj) }}</mat-select-trigger>
-                      <mat-option [value]="0">None</mat-option>
-                      @for (refType of objectTypes; track trackType($index, refType)) {
-                        @if (refType.typeRes !== 0) {
-                          <mat-option [value]="refType.typeRes">{{ getObjectTypeLabel(refType.typeRes) }}</mat-option>
-                        }
-                      }
-                      @if ((typeForm.controls.weaponObj.value ?? type.weaponObj) !== 0 && hasCustomObjectType(typeForm.controls.weaponObj.value ?? type.weaponObj)) {
-                        <mat-option [value]="typeForm.controls.weaponObj.value ?? type.weaponObj">{{ getObjectTypeLabel(typeForm.controls.weaponObj.value ?? type.weaponObj) }} (custom)</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                </div>
-              </div>
-
-              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
-                <div class="mb-3 flex items-center justify-between gap-3">
-                  <div class="text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Scripting</div>
-                  <div class="flex flex-wrap gap-2">
-                    <button mat-stroked-button type="button" [disabled]="workerBusy" (click)="createAndOpenScriptEditor(type.typeRes)">
-                      <mat-icon>add_circle</mat-icon> New Script
-                    </button>
-                    <button mat-flat-button type="button" [disabled]="workerBusy || !selectedScript" (click)="openSelectedScriptEditor()">
-                      <mat-icon>edit</mat-icon> Edit Script
-                    </button>
-                  </div>
-                </div>
-                <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 max-[1200px]:grid-cols-1">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Bound Script</mat-label>
-                    <mat-select
-                      [value]="selectedScriptBinding?.scriptId ?? null"
-                      (valueChange)="scriptBindingChange.emit({ typeRes: type.typeRes, scriptId: $event })">
-                      <mat-option [value]="null">None</mat-option>
-                      @for (script of scriptList; track script.id) {
-                        <mat-option [value]="script.id">{{ getScriptLabel(script.id) }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                  @if (selectedScript; as script) {
-                    <div class="flex min-w-0 flex-col gap-2 text-[0.82rem]">
-                      <div class="font-semibold text-[var(--text)]">{{ script.name || 'Unnamed script' }}</div>
-                      <div class="text-[var(--muted)]">Validation: {{ getSelectedScriptValidationLabel() }}</div>
-                    </div>
-                  }
-                </div>
-
-                @if (selectedScript; as script) {
-                  <div class="mt-3 flex flex-col gap-2">
-                    @if (getSelectedScriptHookLabels().length > 0) {
-                      <div class="flex flex-wrap gap-1.5">
-                        @for (hook of getSelectedScriptHookLabels(); track hook) {
-                          <span class="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[0.72rem] text-[var(--text)]">{{ hook }}</span>
-                        }
-                      </div>
-                    }
-                    @if (getIssuesForSelectedScript().length > 0) {
-                      <div class="rounded-[10px] border border-amber-400/30 bg-amber-500/10 p-3">
-                        <div class="mb-2 text-[0.78rem] font-bold text-amber-200">Diagnostics</div>
-                        <div class="flex flex-col gap-1">
-                          @for (issue of getIssuesForSelectedScript(); track $index) {
-                            <div class="text-[0.78rem] text-amber-100">{{ issue.line === null ? '' : 'Line ' + issue.line + ': ' }}{{ issue.message }}</div>
-                          }
-                        </div>
-                      </div>
-                    }
-                  </div>
-                } @else {
-                  <div class="text-[0.82rem] text-[var(--muted)]">No script bound. Existing object behavior remains unchanged.</div>
-                }
-              </div>
-
-              <div class="rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),rgba(255,255,255,0.015)] p-[14px]">
-                <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Flags</div>
-                <div class="grid grid-cols-2 gap-[14px] max-[1200px]:grid-cols-1">
-                  <div class="min-w-0">
-                    <div class="mb-2.5 text-[0.84rem] font-bold text-[var(--text)]">flags</div>
-                    <div class="grid grid-cols-2 gap-x-3 gap-y-2 max-[1200px]:grid-cols-1">
-                      @for (flag of flagOptions.flags; track flag.bit; let i = $index) {
-                        <mat-checkbox
-                          [formControl]="flagForms.flags.controls[i]"
-                          [matTooltip]="flag.hint"
-                        >
-                          {{ flag.label }}
-                        </mat-checkbox>
-                      }
-                    </div>
-                  </div>
-
-                  <div class="min-w-0">
-                    <div class="mb-2.5 text-[0.84rem] font-bold text-[var(--text)]">flags2</div>
-                    <div class="grid grid-cols-2 gap-x-3 gap-y-2 max-[1200px]:grid-cols-1">
-                      @for (flag of flagOptions.flags2; track flag.bit; let i = $index) {
-                        <mat-checkbox
-                          [formControl]="flagForms.flags2.controls[i]"
-                          [matTooltip]="flag.hint"
-                        >
-                          {{ flag.label }}
-                        </mat-checkbox>
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <app-editor-object-type-detail
+            [type]="type"
+            [workerBusy]="workerBusy"
+            [getSpriteUrl]="getSpriteUrl"
+            [getPreviewFrameId]="getPreviewFrameId"
+            [hasPreviewFrameControls]="hasPreviewFrameControls"
+            [getFrameLabel]="getFrameLabel"
+            [typeForm]="typeForm"
+            [spriteFrames]="spriteFrames"
+            [fieldTooltips]="fieldTooltips"
+            [objectTypes]="objectTypes"
+            [audioEntries]="audioEntries"
+            [getObjectTypeLabel]="getObjectTypeLabel"
+            [getSoundLabel]="getSoundLabel"
+            [scripts]="scriptList"
+            [scriptBindings]="scriptBindings ?? []"
+            [scriptIssues]="scriptIssues ?? []"
+            [flagOptions]="flagOptions"
+            [flagForms]="flagForms"
+            (addType)="addType.emit()"
+            (deleteType)="deleteType.emit($event)"
+            (frameStep)="stepPreviewFrame(type.typeRes, $event)"
+            (scriptBindingChange)="scriptBindingChange.emit($event)"
+            (createScript)="createAndOpenScriptEditor($event)"
+            (openScript)="openSelectedScriptEditor()"
+          />
         } @else {
-          <div class="custom-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-[14px] overflow-y-auto px-4 py-4 pr-1 max-[1200px]:px-3 max-[1200px]:py-3">
-            <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
-              <p class="text-[0.85rem] text-[var(--muted)]">Select an object type from the list.</p>
-            </div>
-          </div>
+          <app-editor-object-type-empty />
         }
       </div>
-
     } @else {
       <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
         <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">category</mat-icon>
-        <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">Object type definitions from Pack 128 (kPackObTy) will appear here once a resources.dat is loaded.</p>
+        <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">
+          Object type definitions from Pack 128 (kPackObTy) will appear here once a resources.dat is
+          loaded.
+        </p>
       </div>
     }
   </mat-card-content>

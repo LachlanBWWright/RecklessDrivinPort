@@ -53,7 +53,8 @@ void FFBJolt(float lMag,float rMag,float duration)
 		gFFBBlock=gFrameCount+duration*kCalcFPS;
 	}
 #else
-	(void)lMag; (void)rMag; (void)duration;
+	extern void SDL_Platform_Rumble(float lMag, float rMag, float duration);
+	SDL_Platform_Rumble(lMag, rMag, duration);
 #endif
 }
 
@@ -68,7 +69,8 @@ void FFBDirect(float lMag,float rMag)
 		iS2F_SimpleDirectControl(giShockList[0],&directCmd);
 	}
 #else
-	(void)lMag; (void)rMag;
+	extern void SDL_Platform_Rumble(float lMag, float rMag, float duration);
+	SDL_Platform_Rumble(lMag, rMag, 0.1f);
 #endif
 }
 
@@ -82,6 +84,9 @@ void FFBStop()
 		directCmd.rightMotorMagnitude=0;
 		iS2F_SimpleDirectControl(giShockList[0],&directCmd);
 	}
+#else
+	extern void SDL_Platform_Rumble(float lMag, float rMag, float duration);
+	SDL_Platform_Rumble(0.0f, 0.0f, 0.0f);
 #endif
 }
 
@@ -270,6 +275,11 @@ int GetElement(int element)
 		extern int SDL_Platform_GetTouchKey(int element);
 		if (SDL_Platform_GetTouchKey(element)) return true;
 	}
+	/* Gamepad controls */
+	{
+		extern int SDL_Platform_GetGamepadKey(int element);
+		if (SDL_Platform_GetGamepadKey(element)) return true;
+	}
 #endif
 #ifndef PORT_SDL2
 	if(gInputHID&&element<=kMissile)
@@ -295,12 +305,18 @@ int GetElementHIDOnly(int element)
 
 int ContinuePress()
 {
+#ifdef PORT_SDL2
+	extern int SDL_Platform_GamepadAnyButton(void);
+	if (SDL_Platform_GamepadAnyButton()) return true;
+#endif
+#ifndef PORT_SDL2
 	if(gInputHID)
 		if(GetElementHIDOnly(kForward)
 			||GetElementHIDOnly(kKickdown)
 			||GetElementHIDOnly(kFire)
 			||GetElementHIDOnly(kMissile))
 				return true;
+#endif
 	return false;
 }
 

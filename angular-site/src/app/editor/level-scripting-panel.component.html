@@ -1,0 +1,44 @@
+<div class="mb-3 rounded-md border border-[var(--border)] bg-[var(--surface2)] p-3">
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <h4 class="m-0 text-[0.88rem] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">
+      Level Scripting
+    </h4>
+    <span class="text-[0.78rem] text-[var(--muted)]">Stored in ScLv bindings</span>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <mat-form-field appearance="outline" class="min-w-[220px] flex-1">
+      <mat-label>Level {{ levelNum }} script</mat-label>
+      <mat-select
+        [value]="binding?.scriptId ?? null"
+        [disabled]="workerBusy"
+        (selectionChange)="bindingChange.emit($event.value)"
+      >
+        <mat-select-trigger>{{ scriptName }}</mat-select-trigger>
+        <mat-option [value]="null">None</mat-option>
+        @for (script of scripts; track script.id) {
+          <mat-option [value]="script.id">#{{ script.id }} · {{ script.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <button
+      mat-stroked-button
+      type="button"
+      class="!h-14"
+      [disabled]="workerBusy"
+      (click)="createScript.emit()"
+    >
+      <mat-icon>add</mat-icon>
+      New
+    </button>
+    <button
+      mat-flat-button
+      type="button"
+      class="!h-14"
+      [disabled]="workerBusy || !binding"
+      (click)="openScript.emit()"
+    >
+      <mat-icon>code</mat-icon>
+      Edit
+    </button>
+  </div>
+</div>

@@ -1,0 +1,47 @@
+<div
+  class="flex flex-col gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+  [formGroup]="entryForm"
+>
+  <div
+    class="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-2.5 max-[900px]:grid-cols-1"
+  >
+    <div
+      class="whitespace-nowrap text-[0.78rem] font-extrabold uppercase tracking-[0.08em] text-[var(--muted)]"
+    >
+      #{{ index }}
+    </div>
+    <app-editor-object-group-type-select
+      [form]="entryForm"
+      [availableTypeIds]="availableTypeIds"
+      [getSpriteUrl]="getSpriteUrl"
+      [getObjTypeDimensionLabel]="getObjTypeDimensionLabel"
+    />
+    <button
+      mat-icon-button
+      color="warn"
+      (click)="deleteEntry.emit({ groupId, entryIndex: index })"
+      [disabled]="workerBusy"
+    >
+      <mat-icon>delete</mat-icon>
+    </button>
+  </div>
+  <div class="grid grid-cols-4 items-start gap-2.5 max-[900px]:grid-cols-1">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0"
+      ><mat-label>minOffs</mat-label
+      ><input matInput type="number" inputmode="numeric" formControlName="minOffs"
+    /></mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0"
+      ><mat-label>maxOffs</mat-label
+      ><input matInput type="number" inputmode="numeric" formControlName="maxOffs"
+    /></mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0"
+      ><mat-label>probility</mat-label
+      ><input matInput type="number" inputmode="numeric" formControlName="probility"
+    /></mat-form-field>
+    <app-editor-object-group-entry-direction
+      [control]="entryForm.controls.dir"
+      [getDirArrowRotation]="getDirArrowRotation.bind(this)"
+      [isAutoDir]="isAutoDir.bind(this)"
+    />
+  </div>
+</div>

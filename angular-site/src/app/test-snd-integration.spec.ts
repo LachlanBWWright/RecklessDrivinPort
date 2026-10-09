@@ -6,7 +6,9 @@ import { packHandleDecompress } from './lzrw.service';
 import { decompressedPackEntries } from './pack-parser.service';
 
 function findPack(id: number): Uint8Array | null {
-  const buf = new Uint8Array(readFileSync(new URL('../../../port/resources/resources.dat', import.meta.url)));
+  const buf = new Uint8Array(
+    readFileSync(new URL('../../../port/resources/resources.dat', import.meta.url)),
+  );
   const HEADER_SIZE = 16;
   let offset = 0;
   while (offset + HEADER_SIZE <= buf.length) {
@@ -51,17 +53,17 @@ function parseTSoundFull(bytes: Uint8Array) {
   const sampleRateFixed = view.getUint32(hdrOff + 8, false);
   const sampleRate = sampleRateFixed / 65536;
   const encode = view.getUint8(hdrOff + 20);
-  
+
   let numFrames: number;
   let pcmOffset: number;
   let sampleSize: number;
-  
+
   if (encode === 0x00) {
     // stdSH: 8-bit mono PCM
     numFrames = view.getUint32(hdrOff + 4, false);
     pcmOffset = hdrOff + 22;
     sampleSize = 8;
-  } else if (encode === 0xFF) {
+  } else if (encode === 0xff) {
     // extSH: multi-channel 16-bit PCM
     // numChannels at hdrOff+4, numFrames at hdrOff+22, sampleSize at hdrOff+48
     if (hdrOff + 64 > bytes.length) return null;
@@ -71,7 +73,7 @@ function parseTSoundFull(bytes: Uint8Array) {
   } else {
     return null;
   }
-  
+
   return { numVariants, hdrOff, sampleRate, encode, numFrames, pcmOffset, sampleSize };
 }
 
@@ -93,7 +95,9 @@ describe('tSound full parsing', () => {
       if (info) {
         const durationS = info.numFrames / info.sampleRate;
         const durationMs = Math.round(durationS * 1000);
-        console.log(`Sound #${e.id}: encode=0x${info.encode.toString(16)} ${info.sampleRate.toFixed(1)}Hz ${info.sampleSize}bit ${info.numFrames}samples = ${durationMs}ms`);
+        console.log(
+          `Sound #${e.id}: encode=0x${info.encode.toString(16)} ${info.sampleRate.toFixed(1)}Hz ${info.sampleSize}bit ${info.numFrames}samples = ${durationMs}ms`,
+        );
         expect(durationS).toBeGreaterThan(0);
         expect(info.sampleRate).toBeGreaterThan(0);
       } else {

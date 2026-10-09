@@ -63,16 +63,6 @@
   --mat-expansion-header-text-color: var(--muted);
 }
 
-.mat-mdc-slider {
-  --mdc-slider-active-track-color: var(--accent);
-  --mdc-slider-inactive-track-color: var(--surface4);
-  --mdc-slider-handle-color: var(--accent);
-  --mdc-slider-hover-handle-color: var(--accent);
-  --mdc-slider-focus-handle-color: var(--accent-light);
-  --mdc-slider-with-tick-marks-active-container-color: var(--accent);
-  --mdc-slider-with-tick-marks-inactive-container-color: var(--surface4);
-}
-
 .mat-mdc-progress-bar {
   --mdc-linear-progress-active-indicator-color: var(--accent);
   --mdc-linear-progress-track-color: var(--surface3);
@@ -159,30 +149,5 @@
 
   canvas:focus {
     outline: none;
-  }
-}
-
-@layer utilities {
-  .custom-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: var(--surface4) var(--bg);
-  }
-
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: var(--bg);
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: var(--surface4);
-    border-radius: 4px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: var(--muted);
   }
 }

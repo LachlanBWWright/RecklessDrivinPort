@@ -24,6 +24,11 @@ export type DrawMode = 'none' | 'freehand' | 'straight' | 'curve';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorCanvasComponent implements OnChanges {
+  canvasCursor(): string {
+    if (this.isDragging || this.dragTrackWaypoint) return 'grabbing';
+    if (this.hoverTrackWaypoint || this.spaceDown) return 'grab';
+    return 'default';
+  }
   @Input() objects: ObjectPos[] = [];
   @Input() selectedObjIndex: number | null = null;
   @Input() marks: MarkSeg[] = [];

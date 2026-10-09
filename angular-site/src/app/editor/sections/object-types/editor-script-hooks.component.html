@@ -1,0 +1,9 @@
+@if (hooks.length > 0) {
+  <div class="flex flex-wrap gap-1.5">
+    @for (hook of hooks; track hook) {
+      <span class="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[var(--text)]">{{
+        hook
+      }}</span>
+    }
+  </div>
+}

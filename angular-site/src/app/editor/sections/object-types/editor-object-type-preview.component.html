@@ -1,0 +1,51 @@
+<div
+  class="grid grid-cols-[minmax(180px,260px)_minmax(0,1fr)] items-start gap-4 max-[1200px]:grid-cols-1"
+>
+  <div class="relative w-full max-w-[260px] max-[1200px]:max-w-[320px]">
+    @if (spriteUrl) {
+      <img
+        [src]="spriteUrl"
+        class="aspect-square w-full rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_25%_25%,rgba(144,202,249,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0)),var(--surface2)] object-contain shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+        [style.imageRendering]="'pixelated'"
+        alt="object type preview"
+      />
+    } @else {
+      <div
+        class="flex aspect-square w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[var(--surface2)] font-semibold text-[var(--muted)]"
+      >
+        <mat-icon>photo_library</mat-icon>
+        <span>Preview unavailable</span>
+      </div>
+    }
+    @if (hasFrameControls) {
+      <button
+        mat-icon-button
+        class="!absolute !left-[10px] !top-1/2 !flex !h-[38px] !w-[38px] !-translate-y-1/2 !items-center !justify-center !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !p-0"
+        [disabled]="workerBusy"
+        aria-label="Previous preview frame"
+        (click)="frameStep.emit(-1)"
+      >
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="!absolute !right-[10px] !top-1/2 !flex !h-[38px] !w-[38px] !-translate-y-1/2 !items-center !justify-center !rounded-full !border !border-white/15 !bg-[rgba(15,18,26,0.72)] !p-0"
+        [disabled]="workerBusy"
+        aria-label="Next preview frame"
+        (click)="frameStep.emit(1)"
+      >
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    }
+  </div>
+  <mat-card class="self-stretch !border !border-[var(--border)] !bg-[var(--surface3)]">
+    <mat-card-content class="!px-3.5 !py-2.5">
+      <p class="m-0 text-[0.82rem] leading-[1.7] text-[var(--on-surface)]">
+        <strong>Preview</strong> {{ frameLabel(previewFrame) }}<br />
+        <strong>Base</strong> {{ frameLabel(type.frame) }}<br />
+        <strong>Collision</strong> {{ type.width.toFixed(1) }}×{{ type.length.toFixed(1) }} m<br />
+        <strong>Sprite</strong> referenced from Pack 129 / 137
+      </p>
+    </mat-card-content>
+  </mat-card>
+</div>

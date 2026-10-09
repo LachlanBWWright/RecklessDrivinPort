@@ -1,0 +1,35 @@
+<mat-form-field appearance="outline" class="w-full text-[0.85rem]">
+  <mat-label>Type ID</mat-label>
+  <mat-select
+    formControlName="typeRes"
+    panelClass="max-w-[min(calc(100vw-32px),520px)] [&_.mat-mdc-option_.mdc-list-item__primary-text]:block [&_.mat-mdc-option_.mdc-list-item__primary-text]:w-full [&_.mat-mdc-option_.mdc-list-item__primary-text]:overflow-hidden [&_.mat-mdc-option]:!h-[30px] [&_.mat-mdc-option]:!min-h-[30px] [&_.mat-mdc-option]:items-center"
+  >
+    <mat-select-trigger>
+      <span
+        class="flex h-[1.375rem] max-h-[1.375rem] w-full min-w-0 items-center justify-start gap-3 overflow-hidden"
+      >
+        <span>{{ currentType }}</span>
+        <span
+          class="ml-auto flex h-full min-w-0 max-w-full flex-[0_1_auto] items-center justify-end overflow-hidden"
+        >
+          <app-object-type-preview
+            [typeRes]="currentType"
+            [getSpriteUrl]="getSpriteUrl"
+            [getFallbackColor]="getFallbackColor"
+          />
+        </span>
+      </span>
+    </mat-select-trigger>
+    @for (typeId of availableTypeIds; track typeId) {
+      <app-editor-object-type-option
+        [typeRes]="typeId"
+        [getSpriteUrl]="getSpriteUrl"
+        [getFallbackColor]="getFallbackColor"
+      />
+    }
+    @if (hasCustomType) {
+      <mat-option [value]="currentType">{{ currentType }} (custom)</mat-option>
+    }
+  </mat-select>
+  <mat-hint>128 = player car</mat-hint>
+</mat-form-field>

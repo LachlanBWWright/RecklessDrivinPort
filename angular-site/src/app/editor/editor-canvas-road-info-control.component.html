@@ -1,0 +1,22 @@
+<div [formGroup]="canvasForm">
+  <mat-form-field
+    appearance="outline"
+    subscriptSizing="dynamic"
+    class="mb-0 min-w-[140px] max-w-[220px] flex-[1_1_0]"
+  >
+    <mat-label>Road Info</mat-label>
+    <mat-select formControlName="roadInfo" aria-label="Road info selector">
+      <mat-select-trigger>
+        <app-editor-road-option-preview
+          [option]="getRoadInfoOption(canvasForm.controls.roadInfo.value ?? editRoadInfo)"
+          [fallbackId]="canvasForm.controls.roadInfo.value ?? editRoadInfo"
+        />
+      </mat-select-trigger>
+      @for (option of roadInfoOptions; track option.id) {
+        <mat-option [value]="option.id">
+          <app-editor-road-option-preview [option]="option" />
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</div>

@@ -1,0 +1,18 @@
+<div class="ml-2 flex items-center gap-1.5">
+  <span class="mr-1 text-[0.82rem] text-[var(--muted)]">Level</span>
+  @for (level of parsedLevels; track level.resourceId) {
+    <button
+      mat-mini-fab
+      [color]="selectedLevelId === level.resourceId ? 'primary' : undefined"
+      [ngClass]="
+        selectedLevelId === level.resourceId
+          ? '!border-transparent !bg-[var(--accent)] !text-white'
+          : ''
+      "
+      (click)="selectLevel.emit(level.resourceId)"
+      [matTooltip]="'Level ' + levelDisplayNum(level.resourceId)"
+    >
+      {{ levelDisplayNum(level.resourceId) }}
+    </button>
+  }
+</div>

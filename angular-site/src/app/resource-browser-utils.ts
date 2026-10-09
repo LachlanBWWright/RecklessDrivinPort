@@ -1,6 +1,9 @@
 import { resultFromThrowable } from './result-helpers';
 
-const canvasToDataUrl = resultFromThrowable((canvas: HTMLCanvasElement) => canvas.toDataURL(), 'Failed to encode canvas');
+const canvasToDataUrl = resultFromThrowable(
+  (canvas: HTMLCanvasElement) => canvas.toDataURL(),
+  'Failed to encode canvas',
+);
 
 export function renderIconResource(bytes: Uint8Array | null) {
   if (typeof document === 'undefined' || !bytes || bytes.length < 128) return null;

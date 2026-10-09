@@ -1,0 +1,45 @@
+<div
+  class="flex cursor-pointer select-none items-center gap-2.5 border-b border-white/[0.04] border-l-[3px] px-2.5 py-1.5 pl-3 text-[0.82rem] transition"
+  [ngClass]="
+    selected
+      ? 'border-l-red-600 bg-red-600/20'
+      : 'border-l-transparent hover:border-l-red-400/40 hover:bg-white/5 active:bg-red-500/10'
+  "
+  (click)="selectedChange.emit()"
+  [matTooltip]="
+    'Object #' + index + ' · TypeRes ' + object.typeRes + ' · (' + object.x + ', ' + object.y + ')'
+  "
+>
+  <span
+    class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-[var(--surface3)]"
+  >
+    @if (getSpriteUrl(object.typeRes); as url) {
+      <img
+        [src]="url"
+        class="h-full w-full object-contain [image-rendering:pixelated]"
+        width="36"
+        height="36"
+        alt=""
+      />
+    } @else {
+      <span
+        class="flex h-full w-full items-center justify-center rounded text-[0.7rem] font-bold text-black/50"
+        [style.background]="getFallbackColor(object.typeRes)"
+        >T</span
+      >
+    }
+  </span>
+  <span class="flex min-w-0 flex-1 items-center gap-2"
+    ><span class="min-w-8 font-bold text-[var(--muted)]">#{{ index }}</span
+    ><span class="min-w-10 text-[var(--accent2)]">T{{ object.typeRes }}</span
+    ><span
+      class="overflow-hidden text-ellipsis whitespace-nowrap text-[0.73rem] text-[var(--muted)]"
+      >({{ object.x }}, {{ object.y }})</span
+    ></span
+  >
+  <mat-icon
+    class="!h-4 !w-4 !text-base shrink-0 text-[var(--muted)]"
+    [ngClass]="selected ? 'opacity-100 !text-[var(--accent)]' : 'opacity-25'"
+    >chevron_right</mat-icon
+  >
+</div>

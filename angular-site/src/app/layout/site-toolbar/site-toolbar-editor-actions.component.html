@@ -1,0 +1,130 @@
+<div class="flex min-w-0 flex-wrap items-center gap-2 px-4 py-2">
+  <button
+    mat-button
+    class="!min-h-11 !whitespace-nowrap !rounded-none !border-b-4 !border-b-transparent !px-4 !text-[0.9rem] !font-semibold !tracking-[0.02em] hover:!text-[var(--on-surface)] [&_mat-icon]:!h-[18px] [&_mat-icon]:!w-[18px] [&_mat-icon]:!text-[18px]"
+    style="color: var(--muted)"
+    (click)="tabChange.emit()"
+  >
+    <mat-icon>arrow_back</mat-icon>
+    <span>Back to Game</span>
+  </button>
+
+  <div class="flex min-w-0 flex-wrap items-center gap-2">
+    <input
+      #fileInput
+      type="file"
+      accept=".dat"
+      (change)="resourceFileSelected.emit($event)"
+      [disabled]="workerBusy"
+      style="display: none"
+    />
+    <input
+      #projectInput
+      type="file"
+      accept=".zip,.lua-project.zip"
+      (change)="importLuaProject.emit($event)"
+      [disabled]="workerBusy"
+      style="display: none"
+    />
+    @if (!hasEditorData) {
+      <button
+        mat-stroked-button
+        class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+        (click)="loadDefaultResources.emit()"
+        [disabled]="workerBusy"
+      >
+        <mat-icon>cloud_download</mat-icon> <span>Load Default</span>
+      </button>
+      <button
+        mat-stroked-button
+        type="button"
+        class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+        (click)="fileInput.click()"
+        [disabled]="workerBusy"
+      >
+        <mat-icon>folder_open</mat-icon> <span>Upload resources.dat</span>
+      </button>
+    } @else {
+      <button
+        mat-stroked-button
+        type="button"
+        class="!h-11 !min-h-11 !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+        (click)="fileInput.click()"
+        [disabled]="workerBusy"
+      >
+        <mat-icon>merge_type</mat-icon> <span>Merge resources.dat</span>
+      </button>
+      <button
+        mat-stroked-button
+        class="!h-11 !min-h-11 !border-[var(--accent2)] !text-[var(--accent2)] hover:!bg-[color:rgba(66,165,245,0.12)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]"
+        (click)="previewSelectedLevel.emit()"
+        [disabled]="workerBusy || selectedLevelId === null"
+      >
+        <mat-icon>play_arrow</mat-icon> <span>Preview</span>
+      </button>
+      <button
+        mat-stroked-button
+        class="!h-11 !min-h-11 !border-[var(--danger)] !text-[var(--danger)] hover:!bg-[color:rgba(239,83,80,0.08)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]"
+        (click)="clearEditorFile.emit()"
+        [disabled]="workerBusy"
+      >
+        <mat-icon>delete</mat-icon> <span>Clear File</span>
+      </button>
+      <button
+        mat-raised-button
+        class="!h-11 !min-h-11 !bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+        (click)="launchDownload.emit()"
+        [disabled]="workerBusy"
+      >
+        <mat-icon>download</mat-icon> <span>Download</span>
+      </button>
+      <button mat-stroked-button type="button" class="!h-11 !min-h-11" [disabled]="!hasEditorData || workerBusy" (click)="openLuaEditor.emit()"><mat-icon>code</mat-icon><span>Lua editor</span></button>
+      <button
+        mat-stroked-button
+        type="button"
+        class="!h-11 !min-h-11 !border-[var(--accent2)] !text-[var(--accent2)] hover:!bg-[color:rgba(66,165,245,0.12)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]"
+        (click)="exportLuaProject.emit()"
+        [disabled]="workerBusy"
+      >
+        <mat-icon>code</mat-icon> <span>Export Lua project</span>
+      </button>
+      <button
+        mat-stroked-button
+        type="button"
+        class="!h-11 !min-h-11 !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+        (click)="projectInput.click()"
+        [disabled]="workerBusy"
+      >
+        <mat-icon>folder_open</mat-icon> <span>Import Lua project</span>
+      </button>
+    }
+  </div>
+
+  <div
+    class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 max-[980px]:ml-0 max-[980px]:justify-start"
+  >
+    <div
+      class="flex items-center gap-2.5 text-[0.82rem]"
+      [ngClass]="editorError ? 'text-[var(--danger)]' : ''"
+    >
+      @if (workerBusy) {
+        <mat-spinner diameter="18" class="inline-block"></mat-spinner>
+        <span class="text-[0.85rem] text-[var(--muted)]">Processing…</span>
+      }
+      @if (editorError) {
+        <span class="flex items-center gap-1 text-[var(--danger)]">
+          <mat-icon>warning</mat-icon> {{ editorError }}
+        </span>
+      }
+    </div>
+
+    @if (hasEditorData) {
+      <app-site-toolbar-level-selector
+        [selectedLevelId]="selectedLevelId"
+        [parsedLevels]="parsedLevels"
+        [workerBusy]="workerBusy"
+        (selectLevel)="selectLevel.emit($event)"
+      />
+    }
+  </div>
+</div>

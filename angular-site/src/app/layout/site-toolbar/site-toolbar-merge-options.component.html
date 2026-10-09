@@ -1,0 +1,25 @@
+<div class="grid gap-2 sm:grid-cols-2">
+  <mat-checkbox [checked]="options.levels" (change)="setOption('levels', $event.checked)"
+    >Levels</mat-checkbox
+  ><mat-checkbox [checked]="options.objectTypes" (change)="setOption('objectTypes', $event.checked)"
+    >Object Types</mat-checkbox
+  ><mat-checkbox
+    [checked]="options.objectGroups"
+    (change)="setOption('objectGroups', $event.checked)"
+    >Object Groups</mat-checkbox
+  ><mat-checkbox [checked]="options.roadInfo" (change)="setOption('roadInfo', $event.checked)"
+    >Road Info</mat-checkbox
+  ><mat-checkbox [checked]="options.sprites" (change)="setOption('sprites', $event.checked)"
+    >Sprites</mat-checkbox
+  ><mat-checkbox [checked]="options.tiles" (change)="setOption('tiles', $event.checked)"
+    >Tiles</mat-checkbox
+  ><mat-checkbox [checked]="options.audio" (change)="setOption('audio', $event.checked)"
+    >Audio</mat-checkbox
+  ><mat-checkbox [checked]="options.screens" (change)="setOption('screens', $event.checked)"
+    >Screens and Icons</mat-checkbox
+  ><mat-checkbox [checked]="options.strings" (change)="setOption('strings', $event.checked)"
+    >String resources</mat-checkbox
+  ><mat-checkbox [checked]="options.other" (change)="setOption('other', $event.checked)"
+    >Other resource types</mat-checkbox
+  >
+</div>

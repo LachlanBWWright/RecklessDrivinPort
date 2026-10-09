@@ -17,6 +17,30 @@ import {
 
 import type { App } from './app';
 
+function iconDimension(type: string): number {
+  return type === 'ICL8' ? 32 : 16;
+}
+
+async function applyColorIconMask(
+  app: App,
+  canvas: HTMLCanvasElement,
+  type: string,
+  id: number,
+): Promise<void> {
+  const monoType = monoMaskTypeForColorIcon(type);
+  if (!monoType) return;
+  const result = await app.runtime.dispatchWorker<{ bytes: ArrayBuffer | null }>(
+    'GET_RESOURCE_RAW',
+    {
+      type: monoType,
+      id,
+    },
+  );
+  if (result.bytes) {
+    applyMonoMask(canvas, new Uint8Array(result.bytes), iconDimension(type), iconDimension(type));
+  }
+}
+
 export {
   addAudioEntry,
   exportAudioWav,
@@ -165,10 +189,7 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
         if (isPackedPictType(type)) {
           const packedDecodeResult = packHandleDecompress(bytes);
           packedDecodeResult.match(
-            (decoded) => {
-              maybePushCandidate(decoded);
-              return decoded;
-            },
+            (decoded) => (maybePushCandidate(decoded), decoded),
             () => bytes,
           );
         }
@@ -212,24 +233,7 @@ export async function selectIconEntry(host: App, type: string, id: number): Prom
       const bytes = new Uint8Array(result.bytes);
       const canvas = decodeResourceByType(type, bytes);
       if (canvas && (normalizedType === 'ICL8' || normalizedType === 'ICS8')) {
-        const monoType = monoMaskTypeForColorIcon(normalizedType);
-        if (monoType) {
-          const monoResult: { bytes: ArrayBuffer | null } = await host.runtime.dispatchWorker(
-            'GET_RESOURCE_RAW',
-            {
-              type: monoType,
-              id,
-            },
-          );
-          if (monoResult.bytes) {
-            applyMonoMask(
-              canvas,
-              new Uint8Array(monoResult.bytes),
-              normalizedType === 'ICL8' ? 32 : 16,
-              normalizedType === 'ICL8' ? 32 : 16,
-            );
-          }
-        }
+        await applyColorIconMask(host, canvas, normalizedType, id);
       }
       host.iconPreviewCanvas.set(canvas);
       if (canvas) {
@@ -658,32 +662,13 @@ export async function loadAllIconThumbnails(host: App): Promise<void> {
         canvas = decodeResourceByType(entry.type, bytes);
         const normalized = normalizeResourceType(entry.type);
         if (canvas && (normalized === 'ICL8' || normalized === 'ICS8')) {
-          const monoType = monoMaskTypeForColorIcon(normalized);
-          if (!monoType) {
-            host.iconCanvasMap.set(key, canvas);
-            host._iconDataUrls.delete(key);
-            continue;
-          }
-          const monoResult: RawResult = await host.runtime.dispatchWorker<RawResult>(
-            'GET_RESOURCE_RAW',
-            {
-              type: monoType,
-              id: entry.id,
-            },
-          );
-          if (monoResult.bytes) {
-            applyMonoMask(
-              canvas,
-              new Uint8Array(monoResult.bytes),
-              normalized === 'ICL8' ? 32 : 16,
-              normalized === 'ICL8' ? 32 : 16,
-            );
-          }
+          await applyColorIconMask(host, canvas, normalized, entry.id);
         }
       }
       if (canvas) {
         host.iconCanvasMap.set(key, canvas);
         host._iconDataUrls.delete(key);
+        host.iconThumbnailsVersion.update((version) => version + 1);
       }
     } catch {
       /* ignore */

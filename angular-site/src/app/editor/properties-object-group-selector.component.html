@@ -1,0 +1,29 @@
+<mat-form-field appearance="outline" class="w-full min-w-0 self-stretch">
+  <mat-label>Group type</mat-label>
+  <mat-select
+    [value]="group.resID"
+    [disabled]="disabled"
+    (selectionChange)="valueChange.emit($event.value)"
+  >
+    <mat-select-trigger>
+      <span class="flex w-full min-w-0 items-center justify-between gap-2">
+        <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+          label
+        }}</span>
+        <app-properties-group-sprite-preview
+          [typeResIds]="getSprites(group.resID)"
+          [getSpriteUrl]="getSpriteUrl"
+        />
+      </span>
+    </mat-select-trigger>
+    <mat-option [value]="0">0 · empty slot</mat-option>
+    @for (definition of definitions; track definition.id) {
+      @if (definition.id !== 0) {
+        <mat-option [value]="definition.id">#{{ definition.id }}</mat-option>
+      }
+    }
+    @if (hasCustomValue) {
+      <mat-option [value]="group.resID">#{{ group.resID }} (custom)</mat-option>
+    }
+  </mat-select>
+</mat-form-field>

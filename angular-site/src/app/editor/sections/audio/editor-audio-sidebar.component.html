@@ -1,0 +1,39 @@
+<app-editor-sidebar>
+  <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-1">
+    <div class="min-w-0 flex-1">
+      <div
+        class="text-base font-bold text-[var(--text)]"
+        matTooltip="Pack 134 (kPackSnds - Mac OS 'snd ' format)"
+      >
+        Sound Editor
+      </div>
+      <div
+        class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]"
+      >
+        {{ audioEntries.length }} entries
+      </div>
+    </div>
+    <button
+      mat-icon-button
+      color="primary"
+      [disabled]="workerBusy"
+      matTooltip="Upload a WAV file to add a new sound"
+      (click)="addAudioEntry.emit()"
+    >
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+
+  <app-editor-sidebar-scroll
+    class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pb-4 max-[1100px]:px-3 max-[1100px]:pb-3"
+  >
+    @for (entry of audioEntries; track entry.id) {
+      <app-editor-audio-entry
+        [entry]="entry"
+        [entryClass]="audioEntryClass(entry.id)"
+        [detail]="audioEntryDetail(entry)"
+        (selected)="selectAudioEntry.emit($event)"
+      />
+    }
+  </app-editor-sidebar-scroll>
+</app-editor-sidebar>

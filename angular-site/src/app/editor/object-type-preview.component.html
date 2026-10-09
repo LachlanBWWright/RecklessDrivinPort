@@ -1,0 +1,12 @@
+@if (getSpriteUrl(typeRes); as url) {
+  <img
+    [src]="url"
+    class="block h-full max-h-full max-w-full rounded border border-[var(--border)] bg-[var(--surface2)] object-contain"
+    alt=""
+  />
+} @else {
+  <span
+    class="block aspect-square h-full rounded border border-[var(--border)] bg-[var(--surface2)]"
+    [style.background]="getFallbackColor(typeRes)"
+  ></span>
+}

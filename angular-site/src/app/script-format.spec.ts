@@ -62,7 +62,8 @@ describe('script-format', () => {
           id: 128,
           version: SCRIPT_FORMAT_VERSION,
           name: '',
-          source: 'function onDeath(self, ctx)\n  ctx:spawnObjectType(999, self:x(), self:y(), 1, 12)\n  ctx:playSound(777)\n  os.execute("bad")\nend\n',
+          source:
+            'function onDeath(self, ctx)\n  ctx:spawnObjectType(999, self:x(), self:y(), 1, 12)\n  ctx:playSound(777)\n  os.execute("bad")\nend\n',
         },
       ],
       [{ objectTypeId: 555, scriptId: 777, flags: 0 }],
@@ -112,6 +113,24 @@ describe('script-format', () => {
     const parsedOverrun = parseScriptDefinition(200, overrun);
     expect(parsedOverrun.isErr()).toBe(true);
     expect(parsedOverrun._unsafeUnwrapErr()).toContain('payload overruns resource');
+  });
+
+  it('reports Lua syntax errors with source locations', () => {
+    const issues = validateScripts([
+      {
+        id: 201,
+        version: SCRIPT_FORMAT_VERSION,
+        name: 'Broken',
+        source: 'function onTick(self, ctx)\n  self:setVelocity(1, 0\nend',
+      },
+    ], []);
+
+    const syntaxIssue = issues.find(
+      (issue) => issue.severity === 'error' && issue.line !== null && issue.column !== null,
+    );
+    expect(syntaxIssue?.severity).toBe('error');
+    expect(syntaxIssue?.line).toBeGreaterThan(0);
+    expect(syntaxIssue?.column).toBeGreaterThan(0);
   });
 
   it('flags all disallowed Lua globals during validation', () => {

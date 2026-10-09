@@ -1,0 +1,39 @@
+<div [formGroup]="form">
+  <mat-form-field appearance="outline" class="mb-0 w-full min-w-[290px] max-[900px]:min-w-0">
+    <mat-select
+      panelClass="max-h-[360px] [&_.mat-mdc-option_.mdc-list-item__primary-text]:block [&_.mat-mdc-option_.mdc-list-item__primary-text]:w-full [&_.mat-mdc-option_.mdc-list-item__primary-text]:overflow-hidden [&_.mat-mdc-option]:!min-h-10"
+      formControlName="typeRes"
+    >
+      <mat-select-trigger>
+        <span class="flex w-full min-w-0 items-center gap-2.5 pr-1">
+          <span
+            class="inline-flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-[var(--surface2)]"
+          >
+            @if (getSpriteUrl(typeRes); as url) {
+              <img [src]="url" class="block h-full w-full object-contain" alt="" />
+            } @else {
+              <span class="text-[0.68rem] font-extrabold text-[var(--muted)]">#</span>
+            }
+          </span>
+          <span class="flex min-w-0 flex-1 flex-col gap-px">
+            <span
+              class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.92rem] font-semibold"
+              >{{ getTypeLabel(typeRes) }}</span
+            >
+            <span class="text-[0.7rem] leading-none text-[var(--muted)]">{{
+              getDirectionLabel()
+            }}</span>
+          </span>
+        </span>
+      </mat-select-trigger>
+      @for (id of availableTypeIds; track id) {
+        <mat-option [value]="id">
+          {{ getTypeLabel(id) }}
+        </mat-option>
+      }
+      @if (hasCustomType()) {
+        <mat-option [value]="typeRes">{{ getTypeLabel(typeRes) }} (custom)</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</div>

@@ -1,0 +1,17 @@
+<form
+  class="flex min-w-0 flex-wrap items-center gap-2 overflow-visible py-1.5"
+  [formGroup]="canvasForm"
+>
+  <app-editor-canvas-road-info-control
+    [canvasForm]="canvasForm"
+    [editRoadInfo]="editRoadInfo"
+    [roadInfoOptions]="roadInfoOptions"
+    [getRoadInfoOption]="getRoadInfoOption"
+  />
+  <app-editor-canvas-time-control
+    [canvasForm]="canvasForm"
+    (focus)="timeLimitFocus.emit()"
+    (blur)="timeLimitBlur.emit()"
+    (commit)="timeLimitCommit.emit()"
+  />
+</form>

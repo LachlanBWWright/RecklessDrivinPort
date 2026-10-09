@@ -26,7 +26,7 @@ import {
 } from '../../../object-group-spawn-preview';
 import { worldDirToKonvaRotationDeg } from '../../../object-direction-utils';
 
-interface VisibleObjectGroupSlot {
+export interface VisibleObjectGroupSlot {
   slotIndex: number;
   resID: number;
   numObjs: number;
@@ -180,6 +180,25 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   private enabledGeneratedPreviewSlotIndices = new Set<number>();
   private generatedPreviewSeeds = new Map<number, number>();
   private generatedObjectGroupPreviewObjects: ObjectGroupSpawnPreviewObject[] = [];
+
+  constructor() {
+    this.trackVisibleObjectGroupSlot = this.trackVisibleObjectGroupSlot.bind(this);
+    this.trackGroupEntry = this.trackGroupEntry.bind(this);
+    this.trackPreviewEntry = this.trackPreviewEntry.bind(this);
+    this.getPreviewRotationDegrees = this.getPreviewRotationDegrees.bind(this);
+    this.getPreviewSpriteRotationDegrees = this.getPreviewSpriteRotationDegrees.bind(this);
+    this.getPreviewEntries = this.getPreviewEntries.bind(this);
+    this.getPreviewOverflowCount = this.getPreviewOverflowCount.bind(this);
+    this.isGeneratedObjectGroupPreviewEnabled =
+      this.isGeneratedObjectGroupPreviewEnabled.bind(this);
+    this.getGeneratedObjectGroupPreviewCount = this.getGeneratedObjectGroupPreviewCount.bind(this);
+    this.getObjectGroupLabel = this.getObjectGroupLabel.bind(this);
+    this.getTypeLabel = this.getTypeLabel.bind(this);
+    this.getRelativeOddsLabel = this.getRelativeOddsLabel.bind(this);
+    this.getOffsetSummary = this.getOffsetSummary.bind(this);
+    this.toggleGeneratedPreviewForSlot = this.toggleGeneratedPreviewForSlot.bind(this);
+    this.canPreviewObjectGroupSlot = this.canPreviewObjectGroupSlot.bind(this);
+  }
 
   get enabledGeneratedObjectGroupPreviewCount(): number {
     return this.enabledGeneratedPreviewSlotIndices.size;

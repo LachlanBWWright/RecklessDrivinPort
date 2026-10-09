@@ -1,0 +1,60 @@
+@if (roadInfoOptions.length > 0) {
+  <div class="flex min-h-0 flex-none flex-col gap-2 px-4 pb-1">
+    @for (option of roadInfoOptions; track option.id) {
+      <app-editor-road-info-row
+        [option]="option"
+        [selectedRoadInfoId]="selectedRoadInfoId"
+        [getRoadDeleteTooltip]="getRoadDeleteTooltip"
+        [canDeleteRoadInfo]="canDeleteRoadInfo"
+        (selected)="selectedRoadInfo.emit($event)"
+        (deleted)="deletedRoadInfo.emit($event)"
+      />
+    }
+  </div>
+} @else {
+  <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 py-2 text-center">
+    <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">route</mat-icon>
+    <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">
+      No shared road records are loaded yet.
+    </p>
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="createRoadInfo.emit()"
+      [disabled]="workerBusy"
+    >
+      <mat-icon>add</mat-icon>
+      Create First Road
+    </button>
+  </div>
+}
+
+<div class="h-px shrink-0 bg-[var(--border)]"></div>
+<div class="flex shrink-0 items-center justify-between px-4">
+  <span class="text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]"
+    >Tile Images · {{ totalTileCount }}</span
+  >
+</div>
+
+@if (tileTileEntries.length > 0) {
+  <div class="flex min-h-0 flex-none flex-col gap-2 overflow-y-auto px-4 pb-4">
+    @for (tile of tileTileEntries; track tile.texId) {
+      <app-editor-tile-row
+        [tile]="tile"
+        [selectedTileId]="selectedTileId"
+        [getTileDataUrl]="getTileDataUrl"
+        [getTileDeleteTooltip]="getTileDeleteTooltip"
+        [canDeleteTileImage]="canDeleteTileImage"
+        (selected)="selectedTile.emit($event)"
+        (deleted)="deletedTile.emit($event)"
+      />
+    }
+  </div>
+} @else {
+  <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-0 py-2 text-center">
+    <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">grid_on</mat-icon>
+    <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">
+      Tile images will appear here once road textures are loaded.
+    </p>
+  </div>
+}

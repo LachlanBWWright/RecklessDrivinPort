@@ -1,7 +1,5 @@
 import {
   LevelEditorService,
-  applyScriptResources,
-  extractScriptResources,
   parseLevelEntry,
   parseMarkSegs,
   serializeLevelProperties,
@@ -9,22 +7,17 @@ import {
   serializeLevelTrack,
   serializeLevelRoadSegs,
   serializeMarkSegs,
-  stripScriptResources,
 } from './level-editor.service';
 import { encodePackHandle, parsePackHandle } from './pack-parser.service';
-import {
-  LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
-  LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE,
-  SCRIPT_FORMAT_VERSION,
-  serializeLevelScriptBindings,
-} from './script-format';
 
-function makeLevelEntry(overrides: Partial<{
-  roadInfo: number;
-  time: number;
-  xStartPos: number;
-  levelEnd: number;
-}> = {}): Uint8Array {
+function makeLevelEntry(
+  overrides: Partial<{
+    roadInfo: number;
+    time: number;
+    xStartPos: number;
+    levelEnd: number;
+  }> = {},
+): Uint8Array {
   const { roadInfo = 1, time = 600, xStartPos = 100, levelEnd = 50000 } = overrides;
   // tLevelData (48 bytes) + trackUp count=0 (4) + trackDown count=0 (4) + objCount=0 (4) + roadLen=0 (4)
   const buf = new Uint8Array(64);
@@ -95,8 +88,8 @@ describe('parseLevelEntry', () => {
     view.setInt32(60, 123, false); // obj.x
     view.setInt32(64, 456, false); // obj.y
     view.setFloat32(68, 1.5, false); // obj.dir
-    view.setInt16(72, 200, false);   // obj.typeRes
-    view.setUint32(76, 0, false);   // roadLen = 0
+    view.setInt16(72, 200, false); // obj.typeRes
+    view.setUint32(76, 0, false); // roadLen = 0
     const result = parseLevelEntry(buf);
     expect(result.isOk()).toBe(true);
     if (result.isOk()) {
@@ -137,7 +130,13 @@ describe('parseMarkSegs', () => {
 describe('serializeLevelProperties', () => {
   it('patches tLevelData fields in-place', () => {
     const entry = makeLevelEntry({ roadInfo: 1, time: 600 });
-    const patched = serializeLevelProperties(entry, { roadInfo: 7, time: 300, xStartPos: 50, levelEnd: 12345, objectGroups: [] });
+    const patched = serializeLevelProperties(entry, {
+      roadInfo: 7,
+      time: 300,
+      xStartPos: 50,
+      levelEnd: 12345,
+      objectGroups: [],
+    });
     const view = new DataView(patched.buffer);
     expect(view.getInt16(0, false)).toBe(7);
     expect(view.getUint16(2, false)).toBe(300);
@@ -147,7 +146,13 @@ describe('serializeLevelProperties', () => {
 
   it('does not modify the original entry', () => {
     const entry = makeLevelEntry({ roadInfo: 5 });
-    serializeLevelProperties(entry, { roadInfo: 99, time: 0, xStartPos: 0, levelEnd: 0, objectGroups: [] });
+    serializeLevelProperties(entry, {
+      roadInfo: 99,
+      time: 0,
+      xStartPos: 0,
+      levelEnd: 0,
+      objectGroups: [],
+    });
     expect(new DataView(entry.buffer).getInt16(0, false)).toBe(5);
   });
 });
@@ -195,9 +200,7 @@ describe('LevelEditorService', () => {
   });
 
   it('applySpriteByte patches correct asset', () => {
-    const resources = [
-      { type: 'PPic', id: 1, data: new Uint8Array([0, 1, 2, 3]) },
-    ];
+    const resources = [{ type: 'PPic', id: 1, data: new Uint8Array([0, 1, 2, 3]) }];
     const result = svc.applySpriteByte(resources, 1, 2, 0xff);
     expect(result[0].data[2]).toBe(0xff);
     expect(result[0].data[1]).toBe(1); // unchanged
@@ -230,15 +233,17 @@ describe('LevelEditorService', () => {
     const objectType = new Uint8Array(64);
     const view = new DataView(objectType.buffer);
     view.setInt16(20, 321, false); // frame
-    view.setUint16(22, 4, false);  // numFrames
+    view.setUint16(22, 4, false); // numFrames
     view.setFloat32(40, 36, false); // width
     view.setFloat32(44, 52, false); // length
 
-    const resources = [{
-      type: 'Pack',
-      id: 128,
-      data: encodePackHandle([{ id: 150, data: objectType }], 128),
-    }];
+    const resources = [
+      {
+        type: 'Pack',
+        id: 128,
+        data: encodePackHandle([{ id: 150, data: objectType }], 128),
+      },
+    ];
 
     const defs = svc.extractObjectTypeDefinitions(resources);
     expect(defs.get(150)).toEqual({
@@ -279,11 +284,13 @@ describe('LevelEditorService', () => {
     view.setUint16(12, 0x07e0, false); // r=1, g=31, b=0 (green-dominant)
     view.setUint16(14, 0x001f, false); // r=0, g=0, b=31 (pure blue)
 
-    const resources = [{
-      type: 'Pack',
-      id: 137,
-      data: encodePackHandle([{ id: 321, data: sprite }], 137),
-    }];
+    const resources = [
+      {
+        type: 'Pack',
+        id: 137,
+        data: encodePackHandle([{ id: 321, data: sprite }], 137),
+      },
+    ];
 
     const decoded = svc.decodeSpriteFrame(resources, 321);
     expect(decoded?.width).toBe(2);
@@ -304,17 +311,16 @@ describe('LevelEditorService', () => {
     sprite[10] = 11;
     sprite[11] = 12;
 
-    const resources = [{
-      type: 'Pack',
-      id: 129,
-      data: encodePackHandle([{ id: 7, data: sprite }], 129),
-    }];
+    const resources = [
+      {
+        type: 'Pack',
+        id: 129,
+        data: encodePackHandle([{ id: 7, data: sprite }], 129),
+      },
+    ];
 
     const pixels = new Uint8ClampedArray([
-      255, 0, 0, 0,
-      0, 255, 0, 255,
-      0, 0, 255, 255,
-      0, 0, 0, 255,
+      255, 0, 0, 0, 0, 255, 0, 255, 0, 0, 255, 255, 0, 0, 0, 255,
     ]);
 
     const updated = svc.applySpritePackPixels(resources, 7, 8, pixels);
@@ -339,16 +345,16 @@ describe('serializeMarkSegs', () => {
     const buf = serializeMarkSegs(marks);
     expect(buf.length).toBe(16);
     const view = new DataView(buf.buffer);
-    expect(view.getFloat32(0,  false)).toBeCloseTo(10);
-    expect(view.getFloat32(4,  false)).toBeCloseTo(20);
-    expect(view.getFloat32(8,  false)).toBeCloseTo(30);
+    expect(view.getFloat32(0, false)).toBeCloseTo(10);
+    expect(view.getFloat32(4, false)).toBeCloseTo(20);
+    expect(view.getFloat32(8, false)).toBeCloseTo(30);
     expect(view.getFloat32(12, false)).toBeCloseTo(40);
   });
 
   it('round-trips through parseMarkSegs (integer values representable exactly as float32)', () => {
     const orig = [
       { x1: -100, y1: 200, x2: 300, y2: -400 },
-      { x1: 0,    y1: 0,   x2: 1,   y2: 1    },
+      { x1: 0, y1: 0, x2: 1, y2: 1 },
     ];
     const serialized = serializeMarkSegs(orig);
     const parsed = parseMarkSegs(serialized);
@@ -375,9 +381,7 @@ describe('serializeLevelTrack round-trip', () => {
       { x: 10, y: 200, flags: 1, velo: 1.5 },
       { x: 20, y: 400, flags: 2, velo: 2.5 },
     ];
-    const trackDown = [
-      { x: -10, y: 100, flags: 0, velo: 0.5 },
-    ];
+    const trackDown = [{ x: -10, y: 100, flags: 0, velo: 0.5 }];
     const serialized = serializeLevelTrack(entry, trackUp, trackDown);
     const parsed = parseLevelEntry(serialized);
     expect(parsed.isOk()).toBe(true);
@@ -395,7 +399,8 @@ describe('serializeLevelTrack round-trip', () => {
   it('allows replacing both tracks with empty arrays', () => {
     const base = makeLevelEntry();
     // First add some tracks
-    const withTracks = serializeLevelTrack(base,
+    const withTracks = serializeLevelTrack(
+      base,
       [{ x: 1, y: 2, flags: 0, velo: 0 }],
       [{ x: 3, y: 4, flags: 0, velo: 0 }],
     );
@@ -464,136 +469,5 @@ describe('serializeLevelRoadSegs round-trip', () => {
     expect(parsed.value.trackUp.length).toBe(1);
     expect(parsed.value.roadSegs.length).toBe(1);
     expect(parsed.value.roadSegs[0].v0).toBe(100);
-  });
-});
-
-import { rgb565ToRgba, rgbaToRgb555 } from './level-editor.service';
-
-describe('rgb565ToRgba', () => {
-  it('converts pure red (0xF800) to [255, 0, 0, 255]', () => {
-    const [r, g, b, a] = rgb565ToRgba(0xF800);
-    expect(r).toBe(255);
-    expect(g).toBe(0);
-    expect(b).toBe(0);
-    expect(a).toBe(255);
-  });
-
-  it('converts pure green (0x07E0) to [0, 255, 0, 255]', () => {
-    const [r, g, b, a] = rgb565ToRgba(0x07E0);
-    expect(r).toBe(0);
-    expect(g).toBe(255);
-    expect(b).toBe(0);
-    expect(a).toBe(255);
-  });
-
-  it('converts pure blue (0x001F) to [0, 0, 255, 255]', () => {
-    const [r, g, b, a] = rgb565ToRgba(0x001F);
-    expect(r).toBe(0);
-    expect(g).toBe(0);
-    expect(b).toBe(255);
-    expect(a).toBe(255);
-  });
-
-  it('converts black (0x0000) to [0, 0, 0, 255]', () => {
-    const [r, g, b, a] = rgb565ToRgba(0x0000);
-    expect(r).toBe(0);
-    expect(g).toBe(0);
-    expect(b).toBe(0);
-    expect(a).toBe(255);
-  });
-
-  it('converts white (0xFFFF) to [255, 255, 255, 255]', () => {
-    const [r, g, b, a] = rgb565ToRgba(0xFFFF);
-    expect(r).toBe(255);
-    expect(g).toBe(255);
-    expect(b).toBe(255);
-    expect(a).toBe(255);
-  });
-});
-
-describe('rgbaToRgb555', () => {
-  it('converts pure red (255, 0, 0) to 0x7C00', () => {
-    expect(rgbaToRgb555(255, 0, 0)).toBe(0x7C00);
-  });
-
-  it('converts pure green (0, 255, 0) to 0x03E0', () => {
-    expect(rgbaToRgb555(0, 255, 0)).toBe(0x03E0);
-  });
-
-  it('converts pure blue (0, 0, 255) to 0x001F', () => {
-    expect(rgbaToRgb555(0, 0, 255)).toBe(0x001F);
-  });
-
-  it('converts black (0, 0, 0) to 0x0000', () => {
-    expect(rgbaToRgb555(0, 0, 0)).toBe(0x0000);
-  });
-
-  it('converts white (255, 255, 255) to 0x7FFF', () => {
-    expect(rgbaToRgb555(255, 255, 255)).toBe(0x7FFF);
-  });
-
-  it('r5g5b5 channels are all 5-bit (0-31)', () => {
-    for (let i = 0; i < 256; i += 16) {
-      const val = rgbaToRgb555(i, i, i);
-      expect(val).toBeGreaterThanOrEqual(0);
-      expect(val).toBeLessThanOrEqual(0x7FFF);
-    }
-  });
-});
-
-describe('script resource helpers', () => {
-  it('round-trips scripts and bindings through resources', () => {
-    const resources = applyScriptResources(
-      [],
-      [
-        {
-          id: 128,
-          version: SCRIPT_FORMAT_VERSION,
-          name: 'Ambush',
-          source: 'function onTick(self, ctx)\n  self:setInput(1.0, 0.65)\nend\n',
-        },
-      ],
-      [{ objectTypeId: 200, scriptId: 128, flags: 0 }],
-    );
-
-    const extracted = extractScriptResources(resources);
-    expect(extracted.scripts).toEqual([
-      {
-        id: 128,
-        version: SCRIPT_FORMAT_VERSION,
-        name: 'Ambush',
-        source: 'function onTick(self, ctx)\n  self:setInput(1.0, 0.65)\nend\n',
-      },
-    ]);
-    expect(extracted.bindings).toEqual([{ objectTypeId: 200, scriptId: 128, flags: 0 }]);
-    expect(extracted.levelBindings).toEqual([]);
-    expect(extracted.issues).toEqual([]);
-  });
-
-  it('strips only scripting resources', () => {
-    const resources = applyScriptResources(
-      [{ type: 'Pack', id: 140, data: new Uint8Array([1, 2, 3]) }],
-      [
-        {
-          id: 128,
-          version: SCRIPT_FORMAT_VERSION,
-          name: 'Ambush',
-          source: 'function onTick(self, ctx)\nend\n',
-        },
-      ],
-      [{ objectTypeId: 200, scriptId: 128, flags: 0 }],
-    );
-    resources.push({
-      type: LEVEL_SCRIPT_BINDINGS_RESOURCE_TYPE,
-      id: LEVEL_SCRIPT_BINDINGS_RESOURCE_ID,
-      data: serializeLevelScriptBindings([{ levelResourceId: 140, scriptId: 128, flags: 0 }]),
-    });
-
-    const stripped = stripScriptResources(resources);
-
-    expect(stripped).toEqual([{ type: 'Pack', id: 140, data: new Uint8Array([1, 2, 3]) }]);
-    expect(extractScriptResources(stripped).scripts).toEqual([]);
-    expect(extractScriptResources(stripped).bindings).toEqual([]);
-    expect(extractScriptResources(stripped).levelBindings).toEqual([]);
   });
 });

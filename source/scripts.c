@@ -232,19 +232,60 @@ static tObject *CheckObjectArg(lua_State *L, int index)
 	return theObj;
 }
 
+static void WriteLuaJsonString(const char *text)
+{
+    fputc('"', stderr);
+    for(const unsigned char *cursor = (const unsigned char *)(text ? text : ""); *cursor; cursor++)
+    {
+        if(*cursor == '"' || *cursor == '\\')
+            fprintf(stderr, "\\%c", *cursor);
+        else if(*cursor < 32)
+            fprintf(stderr, "\\u%04x", (unsigned int)*cursor);
+        else
+            fputc(*cursor, stderr);
+    }
+    fputc('"', stderr);
+}
+
+static void ReportLuaError(int scriptId, const char *hookName, lua_State *L)
+{
+    fprintf(stderr, "RECKLESS_LUA_ERROR {\"scriptId\":%d,\"hook\":", scriptId);
+    WriteLuaJsonString(hookName);
+    fprintf(stderr, ",\"message\":");
+    WriteLuaJsonString(lua_tostring(L, -1));
+    fprintf(stderr, "}\n");
+}
+
+static int ScriptTraceback(lua_State *L)
+{
+    const char *message = lua_tostring(L, 1);
+    luaL_traceback(L, L, message ? message : "Lua raised a non-string error", 1);
+    return 1;
+}
+
+static int ScriptPCall(lua_State *L, int arguments, int results)
+{
+    int functionIndex = lua_gettop(L) - arguments;
+    lua_pushcfunction(L, ScriptTraceback);
+    lua_insert(L, functionIndex);
+    int status = lua_pcall(L, arguments, results, functionIndex);
+    lua_remove(L, functionIndex);
+    return status;
+}
+
 static int LuaLog(lua_State *L)
 {
-	int argc = lua_gettop(L);
-	LOG_DEBUG("LOG: [Lua]");
-	for(int i = 1; i <= argc; i++)
-	{
-		size_t len = 0;
-		const char *text = luaL_tolstring(L, i, &len);
-		LOG_DEBUG(" %.*s", (int)len, text ? text : "");
-		lua_pop(L, 1);
-	}
-	LOG_DEBUG("\n");
-	return 0;
+    int argc = lua_gettop(L);
+    printf("[Lua]");
+    for(int i = 1; i <= argc; i++)
+    {
+        size_t length = 0;
+        const char *text = luaL_tolstring(L, i, &length);
+        printf(" %.*s", (int)length, text ? text : "");
+        lua_pop(L, 1);
+    }
+    printf("\n");
+    return 0;
 }
 
 static int LuaSelfX(lua_State *L) { lua_pushnumber(L, CheckObjectArg(L, 1)->pos.x); return 1; }
@@ -1471,9 +1512,9 @@ static int LoadScriptResource(int scriptId)
 	}
 	char chunkName[48];
 	snprintf(chunkName, sizeof(chunkName), "Scrp #%d", scriptId);
-	if(luaL_loadbuffer(L, (const char*)data + sourceOffset, sourceLength, chunkName) != LUA_OK || lua_pcall(L, 0, 0, 0) != LUA_OK)
+	if(luaL_loadbuffer(L, (const char*)data + sourceOffset, sourceLength, chunkName) != LUA_OK || ScriptPCall(L, 0, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d load error: %s\n", scriptId, lua_tostring(L, -1));
+		ReportLuaError(scriptId, "load", L);
 		lua_close(L);
 		ReleaseResource(resource);
 		return -1;
@@ -1516,17 +1557,17 @@ static void CallLevelHookForScript(int scriptId, const char *hookName, float dt)
 	if(strcmp(hookName, "onLevelTick") == 0)
 	{
 		lua_pushnumber(L, dt);
-		if(lua_pcall(L, 2, 0, 0) != LUA_OK)
+		if(ScriptPCall(L, 2, 0) != LUA_OK)
 		{
-			LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", scriptId, hookName, lua_tostring(L, -1));
+			ReportLuaError(scriptId, hookName, L);
 			lua_pop(L, 1);
 		}
 	}
 	else
 	{
-		if(lua_pcall(L, 1, 0, 0) != LUA_OK)
+		if(ScriptPCall(L, 1, 0) != LUA_OK)
 		{
-			LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", scriptId, hookName, lua_tostring(L, -1));
+			ReportLuaError(scriptId, hookName, L);
 			lua_pop(L, 1);
 		}
 	}
@@ -1564,9 +1605,9 @@ static void CallLevelHookWithObjectForScript(int scriptId, const char *hookName,
 		PushObjectTable(L, argObj, true);
 	else
 		lua_pushnil(L);
-	if(lua_pcall(L, 2, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 2, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", scriptId, hookName, lua_tostring(L, -1));
+		ReportLuaError(scriptId, hookName, L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1600,9 +1641,9 @@ static void CallLevelHookWithIntegerForScript(int scriptId, const char *hookName
 	gScriptSpawnCount = 0;
 	PushContextTable(L);
 	lua_pushinteger(L, value);
-	if(lua_pcall(L, 2, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 2, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", scriptId, hookName, lua_tostring(L, -1));
+		ReportLuaError(scriptId, hookName, L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1637,9 +1678,9 @@ static void CallHook(tObject *theObj, const char *hookName, float dt)
 	PushObjectTable(L, theObj, true);
 	PushContextTable(L);
 	lua_pushnumber(L, dt);
-	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 3, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", theObj->scriptId, hookName, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, hookName, L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1670,9 +1711,9 @@ static void CallObjectHookWithObjects(tObject *theObj, const char *hookName, tOb
 		PushObjectTable(L, argObj, true);
 	else
 		lua_pushnil(L);
-	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 3, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", theObj->scriptId, hookName, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, hookName, L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1716,9 +1757,9 @@ static void CallScriptChangedHook(tObject *theObj, int oldScriptId, int newScrip
 	PushContextTable(L);
 	lua_pushinteger(L, oldScriptId);
 	lua_pushinteger(L, newScriptId);
-	if(lua_pcall(L, 4, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 4, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d onScriptChanged error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, "onScriptChanged", L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1746,9 +1787,9 @@ static void CallDespawnHook(tObject *theObj, const char *reason)
 	PushObjectTable(L, theObj, true);
 	PushContextTable(L);
 	lua_pushstring(L, reason ? reason : "remove");
-	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 3, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d onDespawn error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, "onDespawn", L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1782,9 +1823,9 @@ static void CallCollisionHook(tObject *theObj, tObject *otherObj)
 	lua_newtable(L);
 	lua_pushstring(L, "object");
 	lua_setfield(L, -2, "kind");
-	if(lua_pcall(L, 4, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 4, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d onCollision error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, "onCollision", L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1816,9 +1857,9 @@ static float CallDamageHook(tObject *theObj, float amount, tObject *sourceObj)
 		PushObjectTable(L, sourceObj, true);
 	else
 		lua_pushnil(L);
-	if(lua_pcall(L, 4, 1, 0) != LUA_OK)
+	if(ScriptPCall(L, 4, 1) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d onDamage error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, "onDamage", L);
 		lua_pop(L, 1);
 		gCurrentScriptObject = prevObject;
 		gScriptSpawnCount = prevSpawnCount;
@@ -1855,9 +1896,9 @@ static void CallTimerHook(tObject *theObj, const char *name)
 	PushObjectTable(L, theObj, true);
 	PushContextTable(L);
 	lua_pushstring(L, name);
-	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 3, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d onTimer error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, "onTimer", L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1885,9 +1926,9 @@ static void CallScheduleHook(tObject *theObj, const char *name)
 	PushObjectTable(L, theObj, true);
 	PushContextTable(L);
 	lua_pushstring(L, name);
-	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 3, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d onSchedule error: %s\n", theObj->scriptId, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, "onSchedule", L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;
@@ -1915,9 +1956,9 @@ static void CallPlayerProximityHook(tObject *theObj, const char *hookName, float
 	PushObjectTable(L, theObj, true);
 	PushContextTable(L);
 	lua_pushnumber(L, distance);
-	if(lua_pcall(L, 3, 0, 0) != LUA_OK)
+	if(ScriptPCall(L, 3, 0) != LUA_OK)
 	{
-		LOG_DEBUG("LOG: Lua script #%d %s error: %s\n", theObj->scriptId, hookName, lua_tostring(L, -1));
+		ReportLuaError(theObj->scriptId, hookName, L);
 		lua_pop(L, 1);
 	}
 	gCurrentScriptObject = prevObject;

@@ -1,0 +1,25 @@
+<app-editor-sidebar>
+  <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-1">
+    <div class="min-w-0 flex-1">
+      <div class="text-base font-bold text-[var(--text)]">Screens &amp; HUD Icons Editor</div>
+      <div
+        class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]"
+      >
+        {{ entries.length }} resources
+      </div>
+    </div>
+    <button mat-icon-button color="primary" [disabled]="workerBusy" (click)="addEntry.emit()">
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+  <app-editor-sidebar-scroll class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pb-4">
+    @for (icon of entries; track icon.id + icon.type) {
+      <app-editor-screen-list-item
+        [icon]="icon"
+        [selected]="selectedId === icon.id && selectedType === icon.type"
+        [getIconThumbDataUrl]="getIconThumbDataUrl"
+        (selectedChange)="selectedChange.emit($event)"
+      />
+    }
+  </app-editor-sidebar-scroll>
+</app-editor-sidebar>

@@ -45,14 +45,28 @@ export function handleTrackContextMenuAtWorld(app: App, wx: number, wy: number) 
 
   let nearestSegDistUp = Infinity;
   for (let i = 0; i < trackUp.length - 1; i++) {
-    const d = distToSegment2d(wx, wy, trackUp[i].x, trackUp[i].y, trackUp[i + 1].x, trackUp[i + 1].y);
+    const d = distToSegment2d(
+      wx,
+      wy,
+      trackUp[i].x,
+      trackUp[i].y,
+      trackUp[i + 1].x,
+      trackUp[i + 1].y,
+    );
     if (d < nearestSegDistUp) nearestSegDistUp = d;
   }
   if (trackUp.length === 1) nearestSegDistUp = dist2d(trackUp[0].x, trackUp[0].y, wx, wy);
 
   let nearestSegDistDown = Infinity;
   for (let i = 0; i < trackDown.length - 1; i++) {
-    const d = distToSegment2d(wx, wy, trackDown[i].x, trackDown[i].y, trackDown[i + 1].x, trackDown[i + 1].y);
+    const d = distToSegment2d(
+      wx,
+      wy,
+      trackDown[i].x,
+      trackDown[i].y,
+      trackDown[i + 1].x,
+      trackDown[i + 1].y,
+    );
     if (d < nearestSegDistDown) nearestSegDistDown = d;
   }
   if (trackDown.length === 1) nearestSegDistDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
