@@ -1,6 +1,6 @@
 # Reckless Drivin' — WebAssembly Port
 
-> A fan-made SDL2 / Emscripten port of the classic Mac OS 9 racing game **Reckless Drivin'** by Jonas Echterhoff.
+> A WebAssembly port of the classic Mac OS 9 racing game **Reckless Drivin'** by Jonas Echterhoff.
 
 **Play online:** [https://lachlanbwwright.github.io/RecklessDrivinPort/](https://lachlanbwwright.github.io/RecklessDrivinPort/)
 
