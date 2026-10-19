@@ -1,0 +1,22 @@
+@if (selectedObjectGroupSlotIndex === slot.slotIndex) {
+  <div class="border-t border-t-[var(--border)] px-3.5 py-3">
+    <app-editor-object-group-slot-group
+      [slot]="slot"
+      [getObjectGroupLabel]="getObjectGroupLabel"
+      [canPreviewObjectGroupSlot]="canPreviewObjectGroupSlot"
+      [isGeneratedObjectGroupPreviewEnabled]="isGeneratedObjectGroupPreviewEnabled"
+      [getGeneratedObjectGroupPreviewCount]="getGeneratedObjectGroupPreviewCount"
+      [toggleGeneratedPreviewForSlot]="toggleGeneratedPreviewForSlot"
+      [getPreviewEntries]="getPreviewEntries"
+      [trackPreviewEntry]="trackPreviewEntry"
+      [getTypeLabel]="getTypeLabel"
+      [getRelativeOddsLabel]="getRelativeOddsLabel"
+      [getPreviewRotationDegrees]="getPreviewRotationDegrees"
+      [getPreviewSpriteRotationDegrees]="getPreviewSpriteRotationDegrees"
+      [getSpriteUrl]="getSpriteUrl"
+      [getPreviewOverflowCount]="getPreviewOverflowCount"
+      [getOffsetSummary]="getOffsetSummary"
+      [trackGroupEntry]="trackGroupEntry"
+    />
+  </div>
+}

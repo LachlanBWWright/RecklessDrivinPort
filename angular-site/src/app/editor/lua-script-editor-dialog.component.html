@@ -1,66 +1,166 @@
-<div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="flex flex-wrap items-start justify-between gap-4 px-6 pt-5">
-    <div class="min-w-0">
-      <h2 mat-dialog-title class="!m-0 !p-0">Lua Script</h2>
-      <div class="mt-1 text-[0.82rem] text-[var(--muted)]">
-        #{{ data.script.id }} · {{ boundObjectTypeLabel }} · {{ validationLabel }}
+<div class="lua-editor-dialog flex h-full min-h-0 flex-col overflow-hidden">
+  <div class="flex flex-none items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+    <div>
+      <h2 mat-dialog-title class="!m-0 !p-0 !text-xl">Lua Project</h2>
+      <div class="text-xs text-[var(--muted)]" role="status" aria-live="polite">
+        {{ validationLabel }} @if (analysisPending) { · Checking… }
+        @if (isDirty) { · Unapplied changes }
+        @if (draftStatus) { · {{ draftStatus }} }
       </div>
     </div>
-    <button mat-icon-button type="button" aria-label="Close" (click)="cancel()">
-      <mat-icon>close</mat-icon>
-    </button>
+    <button mat-icon-button type="button" aria-label="Close Lua editor" (click)="cancel()"><mat-icon>close</mat-icon></button>
   </div>
 
-  <div class="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden px-6 pb-0">
-    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-1 w-full flex-none">
-      <mat-label>Script Name</mat-label>
-      <input matInput [formControl]="nameControl" />
+  @if (availableDraft) {
+    <div class="flex flex-none flex-wrap items-center gap-2 bg-amber-300/10 px-4 py-2 text-sm" role="status">
+      A saved draft is available for this resource pack.
+      <button mat-button (click)="restoreDraft()">Restore draft</button>
+      <button mat-button (click)="discardStoredDraft()">Discard saved draft</button>
+    </div>
+  }
+  @if (importPreview) {
+    <section class="max-h-[40vh] flex-none overflow-auto border-b border-white/10 bg-[var(--surface2)] p-4" aria-label="Import preview">
+      <div class="flex flex-wrap items-center gap-3">
+        <strong>Review import</strong>
+        <button mat-flat-button (click)="acceptImport()">Import into draft</button>
+        <button mat-button (click)="dismissImport()">Cancel import</button>
+      </div>
+      <p class="text-sm">This replaces the draft project. Applied resources stay unchanged until you apply the draft.</p>
+      @for (entry of importPreview.scripts; track entry.id) {
+        @if (entry.action !== 'unchanged') { <div class="text-sm">{{ entry.action }} · #{{ entry.id }} {{ entry.name }}</div> }
+      }
+      @for (binding of importPreview.bindings; track $index) { <div class="text-sm">{{ binding }}</div> }
+      @for (warning of importPreview.warnings; track $index) { <div class="text-sm text-amber-200">{{ warning }}</div> }
+      @for (issue of importPreview.issues; track $index) { <div class="text-sm text-amber-200">Script #{{ issue.scriptId }}: {{ issue.message }}</div> }
+    </section>
+  }
+  <div class="flex flex-none flex-wrap items-center gap-1 border-b border-white/10 px-3 py-1">
+    <button mat-button (click)="createScript()">New</button>
+    <button mat-button [disabled]="scripts.length === 0" (click)="createScript(true)">Duplicate</button>
+    <button mat-button [disabled]="scripts.length === 0" (click)="pendingDelete = !pendingDelete">Delete</button>
+    <button mat-button (click)="fileInput.click()">Import .lua / ZIP</button>
+    <input #fileInput type="file" accept=".lua,.zip" hidden (change)="importFile($event)" />
+    <button mat-button (click)="exportProject()">Export project</button>
+    <button mat-button [disabled]="scripts.length === 0" (click)="exportFile()">Export .lua</button>
+    <button mat-button [attr.aria-expanded]="panelVisible" (click)="panelVisible = !panelVisible">{{ panelVisible ? 'Hide panel' : 'Show panel' }}</button>
+  </div>
+  @if (pendingDelete) {
+    <div class="flex flex-none flex-wrap items-center gap-2 bg-red-300/10 px-4 py-2 text-sm">
+      Delete script #{{ activeScriptId }} and remove {{ activeBindingCount }} binding(s)?
+      <button mat-button (click)="deleteActiveScript()">Delete and unbind</button>
+      <button mat-button (click)="pendingDelete = false">Keep script</button>
+    </div>
+  }
+  @if (status) { <div class="flex-none px-4 py-1 text-sm text-amber-200" role="status">{{ status }}</div> }
+  <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full flex-none">
+      <mat-label>Script name · #{{ activeScriptId }}</mat-label>
+      <input matInput [formControl]="nameControl" [readonly]="scripts.length === 0" />
     </mat-form-field>
-
-    <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] gap-4 overflow-hidden max-[900px]:grid-cols-1">
-      <div class="flex min-h-0 min-w-0 flex-col overflow-hidden">
-        <div #editorHost class="lua-editor-host"></div>
-      </div>
-
-      <aside class="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto overflow-x-hidden pr-1">
-        <section class="rounded-lg border border-white/10 p-3">
-          <div class="mb-2 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">Diagnostics</div>
-          @if (hasIssues) {
-            <div class="flex flex-col gap-2">
-              @for (issue of currentIssues; track $index) {
-                <div class="text-[0.78rem]" [class.text-red-300]="issue.severity === 'error'" [class.text-amber-200]="issue.severity === 'warning'">
-                  {{ issue.line === null ? '' : 'Line ' + issue.line + ': ' }}{{ issue.message }}
-                </div>
-              }
-            </div>
-          } @else {
-            <div class="text-[0.78rem] text-[var(--muted)]">No diagnostics.</div>
+    <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden lg:flex-row">
+      <div class="flex min-h-[220px] min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
+        <div class="flex flex-none gap-1 overflow-x-auto border-b border-white/10 pb-1" role="tablist" aria-label="Lua project scripts" (keydown)="onTabKey($event)">
+          @for (script of scripts; track script.id) {
+            <button mat-button type="button" role="tab" [id]="'lua-tab-' + script.id"
+              [attr.aria-selected]="script.id === activeScriptId" aria-controls="lua-editor-document"
+              [attr.tabindex]="script.id === activeScriptId ? 0 : -1"
+              [style.color]="script.id === activeScriptId ? 'var(--accent)' : null" (click)="selectScript(script.id)">
+              {{ scriptTabName(script) }}
+              @if (scriptHasIssues(script)) { <span class="text-red-300" aria-label="has errors">!</span> }
+              @if (scriptHasChanges(script)) { <span aria-label="modified">●</span> }
+            </button>
           }
-        </section>
-
-        @for (group of apiGroups; track group.id) {
-          <section class="rounded-lg border border-white/10 p-3">
-            <div class="mb-2 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">{{ group.label }}</div>
-            <div class="flex flex-col gap-1.5">
-              @for (completion of group.completions; track completion.label) {
-                <button
-                  mat-button
-                  type="button"
-                  class="!h-auto !min-w-0 !justify-start !whitespace-normal !px-2 !py-1.5 !text-left"
-                  [matTooltip]="completion.documentation"
-                  (click)="useSnippet(completion.apply)">
-                  <span class="whitespace-normal break-words font-mono text-[0.76rem] leading-snug">{{ completion.detail }}</span>
-                </button>
-              }
-            </div>
-          </section>
+        </div>
+        <div #editorHost id="lua-editor-document" class="lua-editor-host" role="tabpanel" [attr.aria-labelledby]="scripts.length ? 'lua-tab-' + activeScriptId : null"></div>
+        @if (signature) {
+          <div class="flex-none overflow-x-auto border-t border-white/10 bg-[var(--surface2)] px-3 py-2 font-mono text-xs" role="status" aria-live="polite">
+            {{ signature.name }}(@for (parameter of signature.parameters; track $index) {<span [class.text-[var(--accent)]]="$index === signature.activeParameter" [class.font-bold]="$index === signature.activeParameter">{{ parameter }}</span>@if (!$last) {, }})
+            <span class="ml-3 font-sans text-[var(--muted)]">{{ signature.documentation }}</span>
+          </div>
         }
-      </aside>
+        <div class="flex-none px-2 pt-1 text-[0.68rem] text-[var(--muted)]">Tab: complete / next argument · Shift+Tab: previous argument · F12: definition · Ctrl/Cmd+S: apply · Ctrl/Cmd+Shift+S: save draft · Alt+←/→: script</div>
+      </div>
+      @if (panelVisible) {
+        <aside class="flex min-h-0 max-h-[35vh] w-full flex-none flex-col overflow-hidden rounded-xl border border-white/10 lg:max-h-none lg:w-[360px]" aria-label="Lua tools">
+          <div class="flex flex-none flex-wrap gap-1 border-b border-white/10 p-1">
+            @for (tool of ['api', 'problems', 'outline', 'search', 'bindings', 'console']; track tool) {
+              <button mat-button class="!min-w-0 !px-2 !text-xs" [attr.aria-pressed]="panel === tool" (click)="selectPanel(tool)">{{ tool }}@if (tool === 'problems') { ({{ allIssues.length }}) }</button>
+            }
+          </div>
+          @switch (panel) {
+            @case ('api') {
+              <app-lua-script-api-panel [apiGroups]="apiGroups" [currentIssues]="currentIssues" (useSnippet)="useSnippet($event)" (issueSelected)="jumpToIssue($event)" />
+            }
+            @case ('problems') {
+              <div class="min-h-0 flex-1 overflow-auto p-2">
+                @for (issue of allIssues; track $index) {
+                  <button type="button" class="mb-2 block w-full rounded border border-white/10 p-2 text-left text-sm" [class.text-red-300]="issue.severity === 'error'" (click)="jumpToIssue(issue)">
+                    {{ issueCategory(issue) }} · {{ issue.severity }} · #{{ issue.scriptId }}@if (issue.line) { :{{ issue.line }} }<br />{{ issue.message }}
+                  </button>
+                } @empty { <p class="text-sm">No project problems.</p> }
+              </div>
+            }
+            @case ('outline') {
+              <div class="min-h-0 flex-1 overflow-auto p-2">
+                @for (symbol of outline; track symbol.from) { <button mat-button class="!block !w-full !text-left" (click)="jumpTo(activeScriptId, symbol.from)">{{ symbol.name }}({{ symbol.parameters.join(', ') }})</button> }
+                @empty { <p class="text-sm">No named functions in this script.</p> }
+              </div>
+            }
+            @case ('search') {
+              <div class="min-h-0 flex-1 overflow-auto p-2">
+                <label class="text-sm" for="lua-project-search">Search all scripts</label>
+                <input id="lua-project-search" class="my-2 w-full rounded bg-[var(--surface)] p-2" [value]="searchQuery" (input)="updateSearch($event)" />
+                @for (result of searchResults; track $index) {
+                  <button type="button" class="mb-2 block w-full rounded border border-white/10 p-2 text-left text-xs" (click)="jumpTo(result.scriptId, result.from, searchQuery.length)">
+                    #{{ result.scriptId }} {{ result.name }}:{{ result.line }}<pre class="overflow-hidden text-ellipsis">{{ result.text }}</pre>
+                  </button>
+                }
+                @if (searchResults.length === 200) { <p class="text-xs">Showing the first 200 matches. Narrow your search for more.</p> }
+              </div>
+            }
+            @case ('bindings') {
+              <div class="min-h-0 flex-1 overflow-auto p-2 text-sm">
+                <p>Assign scripts to objects and levels. Existing binding flags are preserved.</p>
+                @for (type of data.objectTypes; track type.typeRes) {
+                  <label class="my-2 block">Object #{{ type.typeRes }}
+                    <select class="block w-full rounded bg-[var(--surface)] p-2" [value]="bindingValue('object', type.typeRes)" (change)="setBinding('object', type.typeRes, $event)">
+                      <option value="">Unbound</option>@for (script of scripts; track script.id) { <option [value]="script.id">#{{ script.id }} {{ script.name }}</option> }
+                    </select>
+                  </label>
+                }
+                @for (id of bindingLevelIds; track id) {
+                  <label class="my-2 block">{{ id === 0 ? 'All levels' : 'Level #' + id }}
+                    <select class="block w-full rounded bg-[var(--surface)] p-2" [value]="bindingValue('level', id)" (change)="setBinding('level', id, $event)">
+                      <option value="">Unbound</option>@for (script of scripts; track script.id) { <option [value]="script.id">#{{ script.id }} {{ script.name }}</option> }
+                    </select>
+                  </label>
+                }
+              </div>
+            }
+            @case ('console') {
+              <div class="min-h-0 flex-1 overflow-auto p-2">
+                <button mat-button (click)="runtimeEntries.set([])">Clear console</button>
+                @for (entry of runtimeEntries(); track entry.id) {
+                  <button type="button" class="mb-2 block w-full rounded border border-white/10 p-2 text-left text-xs" [class.text-red-300]="entry.error" (click)="jumpToRuntime(entry)">
+                    @if (entry.scriptId !== null) { Script #{{ entry.scriptId }} · {{ entry.hook }} }<pre class="whitespace-pre-wrap break-words">{{ entry.message }}</pre>
+                  </button>
+                } @empty { <p class="text-sm">Lua logs and runtime failures from the game appear here. Click an error to open its script.</p> }
+              </div>
+            }
+          }
+        </aside>
+      }
     </div>
   </div>
-
-  <mat-dialog-actions align="end" class="!px-6 !pb-5">
-    <button mat-button type="button" (click)="cancel()">Cancel</button>
-    <button mat-flat-button color="primary" type="button" (click)="save()">Save</button>
+  <mat-dialog-actions align="end" class="flex-none !border-t !border-white/10 !px-3 !py-2">
+    <button mat-button type="button" (click)="cancel()">Discard / close</button>
+    <button mat-button type="button" (click)="saveDraftAndClose()">Save draft &amp; close</button>
+    <button mat-flat-button color="primary" type="button" [disabled]="!canSave || analysisPending || importPreview !== null" (click)="save()">Apply to resource pack</button>
+    @if (data.levelResourceIds?.length) {
+      <select aria-label="Level to test Lua scripts" class="mx-2 rounded bg-[var(--surface2)] p-2 text-sm" [value]="testLevelId" (change)="setTestLevel($event)">
+        @for (id of data.levelResourceIds; track id) { <option [value]="id">Test level #{{ id }}</option> }
+      </select>
+      <button mat-button [disabled]="!canSave || analysisPending || importPreview !== null" (click)="save(true)">Apply &amp; test</button>
+    }
   </mat-dialog-actions>
 </div>

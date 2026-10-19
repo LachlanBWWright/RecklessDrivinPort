@@ -29,7 +29,13 @@ export class ImagePreviewComponent implements OnChanges {
 
   private imageWidth = 0;
   private imageHeight = 0;
-  private dragStart: { pointerId: number; x: number; y: number; panX: number; panY: number } | null = null;
+  private dragStart: {
+    pointerId: number;
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+  } | null = null;
 
   get imageTransform(): string {
     return `translate(calc(-50% + ${this.panX}px), calc(-50% + ${this.panY}px)) scale(${this.zoom})`;

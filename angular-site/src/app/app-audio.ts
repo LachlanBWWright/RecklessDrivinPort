@@ -10,7 +10,9 @@ export function setAudioPlayerVolume(app: App, pct: number): void {
 
 export function ensureAudioCtx(app: App): AudioContext {
   if (!app._audioCtx) {
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const Ctx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) {
       throw new Error('AudioContext not supported in this browser');
     }

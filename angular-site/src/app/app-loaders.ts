@@ -29,6 +29,9 @@ const dispatchWorkerResult = <T>(
 ) => resultFromPromise(app.runtime.dispatchWorker<T>(type, payload, transfer), fallback);
 
 export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName: string) {
+  if (app.hasEditorData()) {
+    app.runtime.resetPackWorker();
+  }
   app.workerBusy.set(true);
   app.resourcesStatus.set(`Parsing ${sourceName}…`);
   app.editorError.set('');
@@ -57,6 +60,7 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
       app.editorError.set(error);
       app.resourcesStatus.set('Failed to parse resources.');
       app.workerBusy.set(false);
+      app.changeDetector.detectChanges();
       return null;
     },
   );
@@ -106,6 +110,8 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
   app.hasEditorData.set(true);
   const statusMsg = `Loaded ${result.levels.length} level(s) and ${result.sprites.length} sprite(s) from ${sourceName}.`;
   app.resourcesStatus.set(statusMsg);
+  app.workerBusy.set(false);
+  app.changeDetector.detectChanges();
   app.snackBar.open(`✓ ${statusMsg}`, 'OK', {
     duration: 4000,
     panelClass: [
@@ -136,7 +142,6 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
   void app.media.loadAudioEntries();
   void app.media.loadIconEntries();
   void app.media.selectResource('STR#', 128);
-  app.workerBusy.set(false);
 }
 
 export function failEditor(app: App, message: string, status?: string): void {

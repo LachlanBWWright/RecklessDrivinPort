@@ -38,3 +38,30 @@ export function applyBackgroundTransform(
   bgImageNode.scaleX(sx);
   bgImageNode.scaleY(sy);
 }
+
+export async function updateOffscreenBackground(
+  stage: Konva.Stage | null,
+  bgImageNode: Konva.Image | null,
+  bgLayer: Konva.Layer | null,
+  logicalW: number,
+  logicalH: number,
+  zoom: number,
+  panX: number,
+  panY: number,
+  cssW: number,
+  cssH: number,
+  drawFn: (ctx: CanvasRenderingContext2D, logicalW: number, logicalH: number) => void,
+  desiredDpr?: number,
+): Promise<ImageBitmap | null> {
+  if (!stage || !bgImageNode || !bgLayer) return null;
+  const dpr = desiredDpr ?? Math.max(1, Math.floor(window.devicePixelRatio || 1));
+  const bitmapResult = await createOffscreenBitmap(drawFn, logicalW, logicalH, dpr);
+  if (!bitmapResult.isOk()) return null;
+  const bitmap = bitmapResult.value;
+  bgImageNode.image(bitmap);
+  bgImageNode.width(logicalW);
+  bgImageNode.height(logicalH);
+  applyBackgroundTransform(bgImageNode, zoom, panX, panY, cssW, cssH, logicalW, logicalH);
+  bgLayer.draw();
+  return bitmap;
+}

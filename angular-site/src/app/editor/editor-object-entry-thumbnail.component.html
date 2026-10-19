@@ -1,0 +1,10 @@
+@if (url) {
+  <img
+    [src]="url"
+    class="block h-full w-full object-contain"
+    [style.imageRendering]="'pixelated'"
+    alt=""
+  />
+} @else {
+  <span class="text-[0.68rem] font-extrabold text-[var(--muted)]">{{ fallbackText }}</span>
+}

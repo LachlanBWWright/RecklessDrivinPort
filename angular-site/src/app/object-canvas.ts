@@ -1,18 +1,33 @@
 import type {
   ObjectGroupSpawnPreviewObject,
-  ParsedLevel,
   TrackMidpointRef,
   TrackWaypointRef,
 } from './level-editor.service';
-import {
-  computeFramedWorldRect,
+import { worldDirToCanvasRotationRad } from './object-direction-utils';
+import type { App } from './app';
+export {
   drawMarksOnCanvas,
   drawObjectRoadPreviewCached,
   drawObjectTrackOverlay,
-  getObjTypeDimensionLabel,
 } from './app-helpers';
-import { worldDirToCanvasRotationRad } from './object-direction-utils';
-import type { App } from './app';
+export {
+  addObject,
+  applyObjEdit,
+  duplicateSelectedObject,
+  getObjectTypeDimensionLabelForApp as getObjectTypeDimensionLabel,
+  hideAllObjectTypes,
+  insertBetweenClosestSegment,
+  insertWaypointAfter,
+  onObjDirDegInput,
+  onObjTypeResChange,
+  removeSelectedObject,
+  saveLevelObjects,
+  saveTrack,
+  selectObject,
+  showAllObjectTypes,
+  toggleTypeVisibility,
+} from './object-canvas-editing';
+import { insertBetweenClosestSegment, selectObject } from './object-canvas-editing';
 
 export interface RoadTheme {
   bg: string;
@@ -122,19 +137,17 @@ export const BASE_HIT_RADIUS = 8;
 export const MIN_START_MARKER_HIT_RADIUS = 14;
 export const BASE_START_MARKER_HIT_RADIUS = 10;
 
-type TrackPoint = { x: number; y: number; flags: number; velo: number };
-
-function getObjectCanvas(): HTMLCanvasElement | null {
+export function getObjectCanvas(): HTMLCanvasElement | null {
   const element = document.getElementById('object-canvas');
   return element instanceof HTMLCanvasElement ? element : null;
 }
 
-function getKonvaContainer(): HTMLElement | null {
+export function getKonvaContainer(): HTMLElement | null {
   const element = document.getElementById('konva-container');
   return element instanceof HTMLElement ? element : null;
 }
 
-function drawObjectGroupSpawnPreviewObjects(
+export function drawObjectGroupSpawnPreviewObjects(
   ctx: CanvasRenderingContext2D,
   app: App,
   previewObjects: readonly ObjectGroupSpawnPreviewObject[],
@@ -231,7 +244,7 @@ export function distToSegment2d(
   return dist2d(px, py, ax + t * dx, ay + t * dy);
 }
 
-function drawMarkingRangeOverlay(
+export function drawMarkingRangeOverlay(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
@@ -289,239 +302,6 @@ function drawMarkingRangeOverlay(
   drawMarker(clampedStartY, start, startY < 0 ? 'top' : startY > height ? 'bottom' : 'none');
   drawMarker(clampedEndY, end, endY < 0 ? 'top' : endY > height ? 'bottom' : 'none');
   ctx.restore();
-}
-
-export function insertBetweenClosestSegment(
-  points: readonly TrackPoint[],
-  wx: number,
-  wy: number,
-): TrackPoint[] {
-  const newPoint = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
-  if (points.length === 0) return [newPoint];
-  if (points.length === 1) return [...points, newPoint];
-  const copy = [...points];
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < copy.length - 1; i++) {
-    const d = distToSegment2d(wx, wy, copy[i].x, copy[i].y, copy[i + 1].x, copy[i + 1].y);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
-  }
-  copy.splice(bestIdx + 1, 0, newPoint);
-  return copy;
-}
-
-export function selectObject(app: App, index: number, centerCanvas = false): void {
-  app.selectedObjIndex.set(index);
-  if (app._barrierDrawing) {
-    app._barrierDrawing = false;
-    app._barrierDrawPath = [];
-  }
-  const container = getKonvaContainer();
-  if (container) container.style.cursor = 'default';
-  app.konva.clearBarrierDrawPreview();
-  const objs = app.objects();
-  if (index < 0 || index >= objs.length) return;
-  const obj = objs[index];
-  app.editObjX.set(obj.x);
-  app.editObjY.set(obj.y);
-  app.editObjDir.set(obj.dir);
-  app.editObjTypeRes.set(obj.typeRes);
-  if (centerCanvas) {
-    app.canvasPanX.set(obj.x);
-    app.canvasPanY.set(obj.y);
-  }
-}
-
-export function onObjDirDegInput(app: App, value: string): void {
-  const deg = parseFloat(value);
-  if (Number.isNaN(deg)) return;
-  const rad = (deg * Math.PI) / 180;
-  app.editObjDir.set(Math.atan2(Math.sin(rad), Math.cos(rad)));
-  applyObjEdit(app);
-}
-
-export function onObjTypeResChange(app: App, typeRes: number): void {
-  app.editObjTypeRes.set(typeRes);
-  applyObjEdit(app);
-}
-
-export function applyObjEdit(app: App): void {
-  const idx = app.selectedObjIndex();
-  if (idx === null) return;
-  const objs = [...app.objects()];
-  if (idx < 0 || idx >= objs.length) return;
-  app._pushUndo('objects');
-  objs[idx] = {
-    x: app.editObjX(),
-    y: app.editObjY(),
-    dir: app.editObjDir(),
-    typeRes: app.editObjTypeRes(),
-  };
-  app.objects.set(objs);
-}
-
-export function addObject(app: App): void {
-  app._pushUndo('objects');
-  const objs = [...app.objects()];
-  objs.push({
-    x: Math.round(app.canvasPanX()),
-    y: Math.round(app.canvasPanY()),
-    dir: 0,
-    typeRes: app.placementObjTypeRes(),
-  });
-  app.objects.set(objs);
-  selectObject(app, objs.length - 1);
-}
-
-export function duplicateSelectedObject(app: App): void {
-  const idx = app.selectedObjIndex();
-  if (idx === null) return;
-  const objs = [...app.objects()];
-  if (idx < 0 || idx >= objs.length) return;
-  app._pushUndo('objects');
-  const original = objs[idx];
-  objs.push({ ...original, x: original.x + 50 });
-  app.objects.set(objs);
-  selectObject(app, objs.length - 1);
-}
-
-export function toggleTypeVisibility(app: App, typeId: number): void {
-  const next = new Set(app.visibleTypeFilter());
-  if (next.has(typeId)) next.delete(typeId);
-  else next.add(typeId);
-  app.visibleTypeFilter.set(next);
-}
-
-export function showAllObjectTypes(app: App): void {
-  app.visibleTypeFilter.set(
-    new Set(app.typePalette.map((item: { typeId: number }) => item.typeId)),
-  );
-}
-
-export function hideAllObjectTypes(app: App): void {
-  app.visibleTypeFilter.set(new Set());
-}
-
-export function getObjectTypeDimensionLabel(app: App, typeRes: number): string {
-  return getObjTypeDimensionLabel(app.objectTypeDefinitionMap, typeRes);
-}
-
-export function removeSelectedObject(app: App): void {
-  const idx = app.selectedObjIndex();
-  if (idx === null) return;
-  app._pushUndo('objects');
-  const objs = app
-    .objects()
-    .filter((_: { x: number; y: number; dir: number; typeRes: number }, i: number) => i !== idx);
-  app.objects.set(objs);
-  app.selectedObjIndex.set(objs.length > 0 ? Math.min(idx, objs.length - 1) : null);
-}
-
-export function insertWaypointAfter(app: App, track: 'up' | 'down', segIdx: number): void {
-  const source = track === 'up' ? app.editTrackUp() : app.editTrackDown();
-  if (segIdx < 0 || segIdx >= source.length - 1) return;
-  const cur = source[segIdx];
-  const next = source[segIdx + 1];
-  const inserted = {
-    x: Math.round((cur.x + next.x) / 2),
-    y: Math.round((cur.y + next.y) / 2),
-    flags: 0,
-    velo: 0,
-  };
-  app._pushUndo('tracks');
-  const copy = [...source];
-  copy.splice(segIdx + 1, 0, inserted);
-  if (track === 'up') app.editTrackUp.set(copy);
-  else app.editTrackDown.set(copy);
-  app.hoverTrackMidpoint.set(null);
-  app._roadOffscreenKey = '';
-  app.snackBar.open(`Inserted ${track} waypoint at midpoint.`, undefined, { duration: 1500 });
-}
-
-export async function saveLevelObjects(app: App): Promise<void> {
-  const id = app.selectedLevelId();
-  if (id === null) return;
-  try {
-    app.workerBusy.set(true);
-    const result: { levels: ParsedLevel[] } = await app.runtime.dispatchWorker('APPLY_OBJECTS', {
-      resourceId: id,
-      objects: app.objects(),
-    });
-    app.applyLevelsResult(result.levels, {
-      preserveCanvasView: true,
-      refreshSelectedLevelState: false,
-    });
-    const msg = `Saved ${app.objects().length} objects for level ${id - 139}.`;
-    app.resourcesStatus.set(msg);
-    app.snackBar.open(`✓ ${msg}`, 'OK', {
-      duration: 3000,
-      panelClass: [
-        '[&_.mdc-snackbar__surface]:!border',
-        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
-        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
-        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
-      ],
-    });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Save failed';
-    app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
-      duration: 5000,
-      panelClass: [
-        '[&_.mdc-snackbar__surface]:!border',
-        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
-        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
-        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
-      ],
-    });
-  } finally {
-    app.workerBusy.set(false);
-  }
-}
-
-export async function saveTrack(app: App): Promise<void> {
-  const id = app.selectedLevelId();
-  if (id === null) return;
-  try {
-    app.workerBusy.set(true);
-    const result: { levels: ParsedLevel[] } = await app.runtime.dispatchWorker('APPLY_TRACK', {
-      resourceId: id,
-      trackUp: app.editTrackUp(),
-      trackDown: app.editTrackDown(),
-    });
-    app.applyLevelsResult(result.levels, {
-      preserveCanvasView: true,
-      refreshSelectedLevelState: false,
-    });
-    const msg = `Saved track waypoints for level ${id - 139}.`;
-    app.resourcesStatus.set(msg);
-    app.snackBar.open(`✓ ${msg}`, 'OK', {
-      duration: 3000,
-      panelClass: [
-        '[&_.mdc-snackbar__surface]:!border',
-        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
-        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
-        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
-      ],
-    });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Track save failed';
-    app.editorError.set(msg);
-    app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
-      duration: 5000,
-      panelClass: [
-        '[&_.mdc-snackbar__surface]:!border',
-        '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
-        '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
-        '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
-      ],
-    });
-  } finally {
-    app.workerBusy.set(false);
-  }
 }
 
 export function worldToCanvas(app: App, wx: number, wy: number): [number, number] {
@@ -864,456 +644,12 @@ export function onCanvasContextMenu(app: App, event: MouseEvent): void {
   app._roadOffscreenKey = '';
 }
 
-export function onCanvasKeyDown(app: App, event: KeyboardEvent): void {
-  if (event.key === ' ') {
-    app.spaceDown.set(true);
-    app.konva.setPanMode(true);
-    const container = getKonvaContainer();
-    if (container) container.style.cursor = 'grab';
-    event.preventDefault();
-    return;
-  }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
-    event.preventDefault();
-    app.undo();
-    return;
-  }
-  if (
-    (event.ctrlKey || event.metaKey) &&
-    (event.key.toLowerCase() === 'y' || (event.key.toLowerCase() === 'z' && event.shiftKey))
-  ) {
-    event.preventDefault();
-    app.redo();
-    return;
-  }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
-    event.preventDefault();
-    duplicateSelectedObject(app);
-    return;
-  }
-  if (event.key === 'Delete' || event.key === 'Backspace') {
-    event.preventDefault();
-    removeSelectedObject(app);
-    return;
-  }
-  if (app.showMarks() && event.key === 'n' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-    event.preventDefault();
-    if (app._hasColocatedNubs()) {
-      app._splitCollocatedMarkNubs();
-    } else {
-      app._joinAdjacentMarkNubs();
-    }
-    return;
-  }
-  const panStep = 50 / app.canvasZoom();
-  if (event.key === 'ArrowUp') {
-    event.preventDefault();
-    app.canvasPanY.update((y: number) => y + panStep);
-  }
-  if (event.key === 'ArrowDown') {
-    event.preventDefault();
-    app.canvasPanY.update((y: number) => y - panStep);
-  }
-  if (event.key === 'ArrowLeft') {
-    event.preventDefault();
-    app.canvasPanX.update((x: number) => x - panStep);
-  }
-  if (event.key === 'ArrowRight') {
-    event.preventDefault();
-    app.canvasPanX.update((x: number) => x + panStep);
-  }
-}
-
-export function onCanvasKeyUp(app: App, event: KeyboardEvent): void {
-  if (event.key !== ' ') return;
-  app.spaceDown.set(false);
-  app.konva.setPanMode(false);
-  const container = getKonvaContainer();
-  if (container) container.style.cursor = app.drawMode() !== 'none' ? 'crosshair' : 'default';
-  if (app._isPanning) {
-    app._isPanning = false;
-    app.isPanning.set(false);
-  }
-}
-
-export function onCanvasWheel(app: App, event: WheelEvent): void {
-  event.preventDefault();
-  const oldZoom = app.canvasZoom();
-  let delta = event.deltaY;
-  if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL) {
-    delta /= 4;
-  } else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-    delta *= 120;
-  }
-  const nextZoom = Math.min(10, Math.max(0.1, oldZoom * (1 - delta * 0.001)));
-  if (Math.abs(nextZoom - oldZoom) < 1e-6) return;
-
-  const [wx, wy] = canvasToWorld(app, event.offsetX, event.offsetY);
-  const canvas = getObjectCanvas();
-  const width = canvas?.width ?? 900;
-  const height = canvas?.height ?? 700;
-  const scale = getCanvasScale();
-  const lx = event.offsetX * scale;
-  const ly = event.offsetY * scale;
-  app.canvasZoom.set(nextZoom);
-  app.canvasPanX.set(wx - (lx - width / 2) / nextZoom);
-  app.canvasPanY.set(wy + (ly - height / 2) / nextZoom);
-}
-
-export function resetView(app: App): void {
-  const level = app.selectedLevel();
-  if (level) {
-    app.resetViewToRoad(level);
-    return;
-  }
-  app.canvasZoom.set(1.5);
-  app.canvasPanX.set(0);
-  app.canvasPanY.set(0);
-}
-
-export function frameAllObjects(app: App): void {
-  const objs = app.objects();
-  if (objs.length === 0) {
-    resetView(app);
-    return;
-  }
-  const xs = objs.map((obj: { x: number }) => obj.x);
-  const ys = objs.map((obj: { y: number }) => obj.y);
-  const canvas = getObjectCanvas();
-  const framed = computeFramedWorldRect(
-    canvas?.width ?? 600,
-    canvas?.height ?? 500,
-    Math.min(...xs),
-    Math.max(...xs),
-    Math.min(...ys),
-    Math.max(...ys),
-  );
-  app.canvasZoom.set(framed.zoom);
-  app.canvasPanX.set(framed.panX);
-  app.canvasPanY.set(framed.panY);
-}
-
-export function centerOnSelectedObject(app: App): void {
-  const idx = app.selectedObjIndex();
-  if (idx === null) return;
-  const obj = app.objects()[idx];
-  if (!obj) return;
-  app.canvasPanX.set(obj.x);
-  app.canvasPanY.set(obj.y);
-}
-
-export function redrawObjectCanvas(app: App): void {
-  const canvas = getObjectCanvas();
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  const width = canvas.width;
-  const height = canvas.height;
-  const zoom = app.canvasZoom();
-  const panX = app.canvasPanX();
-  const panY = app.canvasPanY();
-  const objs = app.objects();
-  const selIdx = app.selectedObjIndex();
-  const visibleTypes = app.visibleTypeFilter();
-  const level = app.selectedLevel();
-  const barrierDrawLock = app.drawMode() !== 'none';
-
-  ctx.clearRect(0, 0, width, height);
-
-  const roadInfo = level?.properties.roadInfo ?? 0;
-  const theme = ROAD_THEMES[roadInfo] ?? DEFAULT_ROAD_THEME;
-  ctx.fillStyle = theme.bg;
-  ctx.fillRect(0, 0, width, height);
-
-  if (app.showGrid()) {
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-    ctx.lineWidth = 1;
-    const gridStep = 100;
-    const gridStepPx = gridStep * zoom;
-    if (gridStepPx > 8) {
-      const startWorldX = panX - width / (2 * zoom);
-      const startWorldY = panY - height / (2 * zoom);
-      const endWorldX = panX + width / (2 * zoom);
-      const endWorldY = panY + height / (2 * zoom);
-      const firstX = Math.floor(startWorldX / gridStep) * gridStep;
-      const firstY = Math.floor(startWorldY / gridStep) * gridStep;
-      ctx.beginPath();
-      for (let gx = firstX; gx <= endWorldX; gx += gridStep) {
-        const [cx] = worldToCanvas(app, gx, 0);
-        ctx.moveTo(cx, 0);
-        ctx.lineTo(cx, height);
-      }
-      for (let gy = firstY; gy <= endWorldY; gy += gridStep) {
-        const [, cy] = worldToCanvas(app, 0, gy);
-        ctx.moveTo(0, cy);
-        ctx.lineTo(width, cy);
-      }
-      ctx.stroke();
-    }
-  }
-
-  if (level && app.showRoad()) {
-    drawObjectRoadPreviewCached(
-      app,
-      app,
-      document,
-      ctx,
-      level,
-      theme,
-      width,
-      height,
-      zoom,
-      panX,
-      panY,
-      `${level.resourceId}|${width}|${height}|${zoom.toFixed(3)}|${panX.toFixed(0)}|${app.roadTexturesVersion()}|${app.roadInfoVersion()}|${app.roadSegsVersion()}`,
-    );
-  }
-
-  if (!level || level.roadSegs.length === 0) {
-    const [ox, oy] = worldToCanvas(app, 0, 0);
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(ox, 0);
-    ctx.lineTo(ox, height);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, oy);
-    ctx.lineTo(width, oy);
-    ctx.stroke();
-  }
-
-  if (level && app.showTrackOverlay()) {
-    drawObjectTrackOverlay(
-      ctx,
-      (x, y) => worldToCanvas(app, x, y),
-      zoom,
-      barrierDrawLock,
-      app.dragTrackWaypoint(),
-      app.hoverTrackWaypoint(),
-      app.hoverTrackMidpoint(),
-      app.editTrackUp(),
-      app.editTrackDown(),
-    );
-  }
-
-  if (level && app.showMarks()) {
-    drawMarksOnCanvas(
-      ctx,
-      (x, y) => worldToCanvas(app, x, y),
-      app.marks(),
-      app.selectedMarkIndex(),
-      app._konvaInitialized && !barrierDrawLock,
-      app.markCreateMode(),
-      barrierDrawLock,
-      app._pendingMarkPoints,
-      app._markCreateHoverPoint,
-    );
-  }
-
-  const preview = app.markingPreview();
-  if (preview.length > 0) {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(66,165,245,0.85)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 3]);
-    for (const mark of preview) {
-      const [x1, y1] = worldToCanvas(app, mark.x1, mark.y1);
-      const [x2, y2] = worldToCanvas(app, mark.x2, mark.y2);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-    ctx.restore();
-  }
-
-  const markingRangePreview = app.markingRangePreview();
-  const objectGroupRangePreview = app.objectGroupRangePreview();
-  const activeRangePreview = markingRangePreview ?? objectGroupRangePreview;
-  if (level && activeRangePreview) {
-    drawMarkingRangeOverlay(
-      ctx,
-      width,
-      height,
-      (worldY) => worldToCanvas(app, 0, worldY)[1],
-      activeRangePreview,
-      markingRangePreview === null
-        ? { stroke: 'rgba(77,208,225,0.72)', fill: 'rgba(77,208,225,0.96)' }
-        : { stroke: 'rgba(255,214,102,0.65)', fill: 'rgba(255,214,102,0.95)' },
-    );
-  }
-
-  if (level && app.showBarriers() && level.roadSegs.length > 0) {
-    const segs = level.roadSegs;
-    const sampleStep = Math.max(1, Math.floor(segs.length / 20));
-    const panYQ = Math.round(panY / 8) * 8;
-    let barrierKey = `${level.resourceId}:${app.roadSegsVersion()}:${segs.length}:${zoom.toFixed(2)}:${panYQ}`;
-    for (let i = 0; i < segs.length; i += sampleStep) {
-      const s = segs[i];
-      barrierKey += `:${s.v0},${s.v1},${s.v2},${s.v3}`;
-    }
-    if (barrierKey !== app._lastBarriersSerialized) {
-      app._lastBarriersSerialized = barrierKey;
-      app.konva.setBarriers(segs, zoom, panY);
-    }
-  } else if (app._lastBarriersSerialized !== '') {
-    app._lastBarriersSerialized = '';
-    app.konva.clearBarriers();
-  }
-
-  const baseRadius = Math.min(20, Math.max(5, 8 * zoom));
-  const labelFont = `${Math.max(9, 10 * zoom)}px monospace`;
-  const objsVisible = app.showObjects();
-  for (let i = 0; i < objs.length; i++) {
-    const obj = objs[i];
-    const typeIdx = ((obj.typeRes % OBJ_PALETTE.length) + OBJ_PALETTE.length) % OBJ_PALETTE.length;
-    const isFilteredOut = !visibleTypes.has(typeIdx) || !objsVisible;
-    if (isFilteredOut && i !== selIdx) continue;
-    const [cx, cy] = worldToCanvas(app, obj.x, obj.y);
-    if (cx < -50 || cx > width + 50 || cy < -50 || cy > height + 50) continue;
-
-    ctx.globalAlpha = isFilteredOut ? 0.3 : 1.0;
-    const color = OBJ_PALETTE[typeIdx] ?? '#888888';
-    const previewCanvas = app.getObjectSpritePreview(obj.typeRes);
-    const drawWidth = previewCanvas
-      ? Math.max(MIN_HIT_RADIUS * 2, previewCanvas.width * zoom)
-      : baseRadius * 2.5;
-    const drawHeight = previewCanvas
-      ? Math.max(MIN_HIT_RADIUS * 2, previewCanvas.height * zoom)
-      : baseRadius * 2.5;
-    const isPlayerCar = obj.typeRes === PLAYER_CAR_TYPE_RES;
-    const isSel = i === selIdx;
-
-    if (previewCanvas) {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(worldDirToCanvasRotationRad(obj.dir));
-      ctx.drawImage(previewCanvas, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-      ctx.restore();
-    } else {
-      ctx.fillStyle = isPlayerCar ? '#ffe082' : color;
-      ctx.beginPath();
-      ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    if (isPlayerCar) {
-      ctx.fillStyle = '#ffe082';
-      ctx.font = `${Math.max(10, 12 * zoom)}px sans-serif`;
-      ctx.fillText('★', cx - 6, cy - drawHeight / 2 - 4);
-    }
-
-    if (zoom > 0.35 || isSel) {
-      ctx.fillStyle = isSel ? '#ffffff' : 'rgba(220,220,220,0.85)';
-      ctx.font = labelFont;
-      ctx.fillText(`#${i} T${obj.typeRes}`, cx + drawWidth / 2 + 4, cy + 4);
-    }
-    ctx.globalAlpha = 1.0;
-  }
-
-  const objectGroupSpawnPreviewObjects = app.objectGroupSpawnPreviewObjects();
-  if (objectGroupSpawnPreviewObjects.length > 0) {
-    drawObjectGroupSpawnPreviewObjects(
-      ctx,
-      app,
-      objectGroupSpawnPreviewObjects,
-      width,
-      height,
-      zoom,
-      visibleTypes,
-    );
-  }
-
-  const [originX, originY] = worldToCanvas(app, 0, 0);
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.beginPath();
-  ctx.arc(originX, originY, 3, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (level) {
-    const startX = app.editXStartPos();
-    const [startCanvasX, startCanvasY] = worldToCanvas(app, startX, 0);
-    if (
-      startCanvasX > -20 &&
-      startCanvasX < width + 20 &&
-      startCanvasY > -20 &&
-      startCanvasY < height + 20
-    ) {
-      const zf = Math.min(zoom, 2);
-      const poleHeight = 20 * zf;
-      const flagTip = 10 * zf;
-      const flagMid = 14 * zf;
-      const flagBottom = 8 * zf;
-      ctx.strokeStyle = app._draggingStartMarker ? '#ffffff' : '#00e5ff';
-      ctx.fillStyle = app._draggingStartMarker ? '#ffffff' : '#00e5ff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(startCanvasX, startCanvasY);
-      ctx.lineTo(startCanvasX, startCanvasY - poleHeight);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(startCanvasX, startCanvasY - poleHeight);
-      ctx.lineTo(startCanvasX + flagTip, startCanvasY - flagMid);
-      ctx.lineTo(startCanvasX, startCanvasY - flagBottom);
-      ctx.closePath();
-      ctx.fill();
-      if (zoom > 0.4) {
-        ctx.font = `${Math.max(9, 10 * zoom)}px monospace`;
-        ctx.fillStyle = app._draggingStartMarker ? '#ffffff' : '#00e5ff';
-        ctx.fillText(`START X=${startX}`, startCanvasX + 6, startCanvasY - poleHeight - 2);
-      }
-    }
-  }
-
-  const liveFinishY = app.editLevelEnd();
-  if (level && liveFinishY >= 0) {
-    const [, finishCanvasY] = worldToCanvas(app, 0, liveFinishY);
-    if (finishCanvasY > -2 && finishCanvasY < height + 2) {
-      ctx.strokeStyle = app._draggingFinishLine ? '#ffffff' : '#f9a825';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([10, 6]);
-      ctx.beginPath();
-      ctx.moveTo(0, finishCanvasY);
-      ctx.lineTo(width, finishCanvasY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = app._draggingFinishLine ? '#ffffff' : '#f9a825';
-      ctx.font = `${Math.max(9, 11 * zoom)}px monospace`;
-      ctx.fillText(`FINISH Y=${liveFinishY}`, 6, finishCanvasY - 4);
-    }
-  }
-
-  app.initKonvaIfNeeded();
-  app.konva.setTransform(zoom, panX, panY);
-  app.konva.setObjects(
-    objsVisible && !barrierDrawLock ? objs : [],
-    selIdx,
-    visibleTypes,
-    OBJ_PALETTE,
-    (typeRes: number) => app.getObjectSpritePreview(typeRes),
-    zoom,
-    panX,
-    panY,
-  );
-  if (level && app.showTrackOverlay() && !barrierDrawLock) {
-    const up = app.showTrackUp() ? app.editTrackUp() : [];
-    const down = app.showTrackDown() ? app.editTrackDown() : [];
-    app.konva.setTrackWaypoints(up, down, zoom, panX, panY);
-  } else {
-    app.konva.clearTrackWaypoints();
-  }
-  if (level && app.showMarks() && !barrierDrawLock) {
-    app.konva.setMarks(app.marks(), app.selectedMarkIndex(), zoom, panX, panY);
-  } else {
-    app.konva.clearMarks();
-  }
-  if (level && !barrierDrawLock) {
-    app.konva.setFinishLine(liveFinishY, zoom, panX, panY);
-  } else {
-    app.konva.clearFinishLine();
-  }
-  app.konva.flush();
-}
+export {
+  onCanvasKeyDown,
+  onCanvasKeyUp,
+  onCanvasWheel,
+  resetView,
+  frameAllObjects,
+  centerOnSelectedObject,
+} from './object-canvas-navigation';
+export { redrawObjectCanvas } from './object-canvas-rendering';

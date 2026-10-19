@@ -11,6 +11,21 @@ import type { App } from './app';
 import { decodeSpritePreviewsInBackground } from './app-loaders';
 import { resultFromPromise } from './result-helpers';
 import { SCRIPT_FORMAT_VERSION, validateScripts } from './script-format';
+export {
+  cloneObjectTypeDefinitions,
+  defaultObjectTypeDefinition,
+  nextObjectTypeId,
+  selectObjectType,
+  selectedObjectType,
+  syncObjectTypeLookup,
+} from './object-type-lookups';
+import {
+  cloneObjectTypeDefinitions,
+  defaultObjectTypeDefinition,
+  nextObjectTypeId,
+  selectedObjectType,
+  syncObjectTypeLookup,
+} from './object-type-lookups';
 
 export function cloneObjectGroupDefinitions(
   app: App,
@@ -168,36 +183,6 @@ export async function saveObjectGroups(app: App): Promise<void> {
   app.workerBusy.set(false);
 }
 
-export function cloneObjectTypeDefinitions(
-  app: App,
-  defs = app.objectTypeDefinitions(),
-): ObjectTypeDefinition[] {
-  return defs.map((def: ObjectTypeDefinition) => ({ ...def }));
-}
-
-export function syncObjectTypeLookup(app: App, defs = app.objectTypeDefinitions()): void {
-  app.objectTypeDefinitionMap.clear();
-  for (const def of defs) app.objectTypeDefinitionMap.set(def.typeRes, def);
-  app.availableTypeIds.set(
-    defs.map((def: ObjectTypeDefinition) => def.typeRes).sort((a: number, b: number) => a - b),
-  );
-}
-
-export function nextObjectTypeId(app: App, defs = app.objectTypeDefinitions()): number {
-  const used = new Set(defs.map((def: ObjectTypeDefinition) => def.typeRes));
-  let candidate = 128;
-  while (used.has(candidate)) candidate++;
-  return candidate;
-}
-
-export function selectedObjectType(app: App): ObjectTypeDefinition | null {
-  const id = app.selectedObjectTypeId();
-  if (id === null) return null;
-  return (
-    app.objectTypeDefinitions().find((def: ObjectTypeDefinition) => def.typeRes === id) ?? null
-  );
-}
-
 export function scheduleObjectTypesAutoSave(app: App): void {
   if (app.objectTypesSaveTimer !== null) clearTimeout(app.objectTypesSaveTimer);
   app.objectTypesSaveTimer = setTimeout(() => {
@@ -213,42 +198,6 @@ export function markObjectTypesDirty(app: App, defs: ObjectTypeDefinition[]): vo
   app.objectTypesDirty.set(true);
   app.objectTypesEditRevision += 1;
   scheduleObjectTypesAutoSave(app);
-}
-
-export function defaultObjectTypeDefinition(
-  app: App,
-  typeRes: number,
-  source?: ObjectTypeDefinition | null,
-): ObjectTypeDefinition {
-  const frameId = source?.frame ?? app.packSpriteFrames()[0]?.id ?? 128;
-  return {
-    typeRes,
-    mass: source?.mass ?? 1,
-    maxEngineForce: source?.maxEngineForce ?? 0,
-    maxNegEngineForce: source?.maxNegEngineForce ?? 0,
-    friction: source?.friction ?? 1,
-    flags: source?.flags ?? 0,
-    deathObj: source?.deathObj ?? -1,
-    frame: frameId,
-    numFrames: source?.numFrames ?? 1,
-    frameDuration: source?.frameDuration ?? 0,
-    wheelWidth: source?.wheelWidth ?? 0,
-    wheelLength: source?.wheelLength ?? 0,
-    steering: source?.steering ?? 0,
-    width: source?.width ?? 0,
-    length: source?.length ?? 0,
-    score: source?.score ?? 0,
-    flags2: source?.flags2 ?? 0,
-    creationSound: source?.creationSound ?? -1,
-    otherSound: source?.otherSound ?? -1,
-    maxDamage: source?.maxDamage ?? 0,
-    weaponObj: source?.weaponObj ?? -1,
-    weaponInfo: source?.weaponInfo ?? -1,
-  };
-}
-
-export function selectObjectType(app: App, typeRes: number): void {
-  app.selectedObjectTypeId.set(typeRes);
 }
 
 export function addObjectType(app: App, duplicateSelected = false): void {
@@ -338,7 +287,11 @@ function nextScriptId(app: App, scripts = scriptDefinitions(app)): number {
   return candidate;
 }
 
-function revalidateScripts(app: App, scripts = scriptDefinitions(app), bindings = scriptBindings(app)): void {
+function revalidateScripts(
+  app: App,
+  scripts = scriptDefinitions(app),
+  bindings = scriptBindings(app),
+): void {
   app.scriptValidationIssues.set(
     validateScripts(scripts, bindings, {
       availableObjectTypeIds: app.objectTypeDefinitions().map((definition) => definition.typeRes),
@@ -362,11 +315,24 @@ function markScriptsDirty(
   scheduleObjectTypesAutoSave(app);
 }
 
+export function replaceLuaProjectScripts(
+  app: App,
+  scripts: ScriptDefinition[],
+  bindings: ScriptBinding[],
+  levelBindings: LevelScriptBinding[],
+): void {
+  markScriptsDirty(app, scripts, bindings, levelBindings);
+}
+
 export function scriptBindingForObjectType(app: App, typeRes: number): ScriptBinding | null {
   return scriptBindings(app).find((binding) => binding.objectTypeId === typeRes) ?? null;
 }
 
-export function setObjectTypeScriptBinding(app: App, typeRes: number, scriptId: number | null): void {
+export function setObjectTypeScriptBinding(
+  app: App,
+  typeRes: number,
+  scriptId: number | null,
+): void {
   const bindings = scriptBindings(app).filter((binding) => binding.objectTypeId !== typeRes);
   if (scriptId !== null) {
     bindings.push({ objectTypeId: typeRes, scriptId, flags: 0 });
@@ -399,12 +365,23 @@ export function createScriptForObjectType(app: App, typeRes: number): void {
   markScriptsDirty(app, scripts, bindings);
 }
 
-export function levelScriptBindingForLevel(app: App, levelResourceId: number): LevelScriptBinding | null {
-  return levelScriptBindings(app).find((binding) => binding.levelResourceId === levelResourceId) ?? null;
+export function levelScriptBindingForLevel(
+  app: App,
+  levelResourceId: number,
+): LevelScriptBinding | null {
+  return (
+    levelScriptBindings(app).find((binding) => binding.levelResourceId === levelResourceId) ?? null
+  );
 }
 
-export function setLevelScriptBinding(app: App, levelResourceId: number, scriptId: number | null): void {
-  const bindings = levelScriptBindings(app).filter((binding) => binding.levelResourceId !== levelResourceId);
+export function setLevelScriptBinding(
+  app: App,
+  levelResourceId: number,
+  scriptId: number | null,
+): void {
+  const bindings = levelScriptBindings(app).filter(
+    (binding) => binding.levelResourceId !== levelResourceId,
+  );
   if (scriptId !== null) {
     bindings.push({ levelResourceId, scriptId, flags: 0 });
   }
@@ -428,7 +405,9 @@ export function createScriptForLevel(app: App, levelResourceId: number): void {
     ].join('\n'),
   };
   const scripts = [...scriptDefinitions(app), script].sort((a, b) => a.id - b.id);
-  const bindings = levelScriptBindings(app).filter((binding) => binding.levelResourceId !== levelResourceId);
+  const bindings = levelScriptBindings(app).filter(
+    (binding) => binding.levelResourceId !== levelResourceId,
+  );
   bindings.push({ levelResourceId, scriptId, flags: 0 });
   markScriptsDirty(app, scripts, [...scriptBindings(app)], bindings);
 }
@@ -442,9 +421,7 @@ export function updateScriptName(app: App, scriptId: number, name: string): void
 
 export function updateScriptSource(app: App, scriptId: number, source: string): void {
   const scripts = scriptDefinitions(app)
-    .map((definition) =>
-      definition.id === scriptId ? { ...definition, source } : definition,
-    )
+    .map((definition) => (definition.id === scriptId ? { ...definition, source } : definition))
     .sort((a, b) => a.id - b.id);
   markScriptsDirty(app, scripts, [...scriptBindings(app)]);
 }
@@ -485,7 +462,9 @@ export async function saveObjectTypes(app: App): Promise<void> {
     }>('APPLY_SCRIPTS', { scripts, bindings, levelBindings }),
     'Script save failed',
   );
-  const result = typeResult.andThen((typeData) => scriptResult.map((scriptData) => ({ typeData, scriptData })));
+  const result = typeResult.andThen((typeData) =>
+    scriptResult.map((scriptData) => ({ typeData, scriptData })),
+  );
   result.match(
     (data) => {
       const defs: ObjectTypeDefinition[] = data.typeData.objectTypesArr
@@ -507,7 +486,9 @@ export async function saveObjectTypes(app: App): Promise<void> {
         app.scheduleObjectTypesAutoSave();
       }
       void decodeSpritePreviewsInBackground(app, data.typeData.objectTypesArr);
-      app.resourcesStatus.set(`Saved ${defs.length} object type(s) and ${data.scriptData.scripts.length} script(s).`);
+      app.resourcesStatus.set(
+        `Saved ${defs.length} object type(s) and ${data.scriptData.scripts.length} script(s).`,
+      );
       app.snackBar.open(`✓ Object types saved`, 'OK', {
         duration: 3000,
         panelClass: [

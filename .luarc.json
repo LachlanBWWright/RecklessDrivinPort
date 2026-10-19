@@ -1,0 +1,32 @@
+{
+  "workspace": {
+    "library": ["./documentation"]
+  },
+  "diagnostics": {
+    "globals": [
+      "onSpawn",
+      "onTick",
+      "onCollision",
+      "onDamage",
+      "onDeath",
+      "onDespawn",
+      "onScriptChanged",
+      "onSpawnedChild",
+      "onSpawnedBy",
+      "onSchedule",
+      "onTimer",
+      "onPlayerNear",
+      "onPlayerFar",
+      "onAnimationEnd",
+      "onOffscreen",
+      "onPickup",
+      "onLevelStart",
+      "onLevelTick",
+      "onLevelComplete",
+      "onPlayerRespawn",
+      "onAddOnAward",
+      "log",
+      "print"
+    ]
+  }
+}

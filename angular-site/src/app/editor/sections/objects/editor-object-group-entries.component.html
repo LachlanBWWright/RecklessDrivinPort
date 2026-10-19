@@ -1,0 +1,32 @@
+@if (slot.group; as group) {
+  <div class="mt-2.5 flex flex-col gap-2">
+    @for (entry of group.entries; track trackGroupEntry($index, entry)) {
+      <div
+        class="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2"
+      >
+        <span
+          class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-[var(--surface2)]"
+        >
+          <app-editor-object-entry-thumbnail [url]="getSpriteUrl(entry.typeRes)" />
+        </span>
+
+        <span class="min-w-0 flex-1">
+          <span
+            class="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.82rem] font-semibold text-[var(--on-surface)]"
+            >{{ getTypeLabel(entry.typeRes) }}</span
+          >
+          <span class="block text-[0.7rem] text-[var(--muted)]">{{ getOffsetSummary(entry) }}</span>
+        </span>
+
+        <span class="shrink-0 text-right">
+          <span class="block text-[0.8rem] font-semibold text-[var(--accent2)]">{{
+            getRelativeOddsLabel(group.entries, entry)
+          }}</span>
+          <span class="block text-[0.68rem] uppercase tracking-[0.08em] text-[var(--muted)]"
+            >w {{ entry.probility }}</span
+          >
+        </span>
+      </div>
+    }
+  </div>
+}

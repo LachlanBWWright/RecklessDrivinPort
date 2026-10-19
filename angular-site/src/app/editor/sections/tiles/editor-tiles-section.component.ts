@@ -73,6 +73,11 @@ export class EditorTilesSectionComponent implements OnChanges {
   });
 
   constructor() {
+    this.getRoadDeleteTooltip = this.getRoadDeleteTooltip.bind(this);
+    this.canDeleteRoadInfo = this.canDeleteRoadInfo.bind(this);
+    this.getTileDataUrl = this.getTileDataUrl.bind(this);
+    this.getTileDeleteTooltip = this.getTileDeleteTooltip.bind(this);
+    this.canDeleteTileImage = this.canDeleteTileImage.bind(this);
     this.roadTextureForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
       this.emitRoadTextureChanges();
     });

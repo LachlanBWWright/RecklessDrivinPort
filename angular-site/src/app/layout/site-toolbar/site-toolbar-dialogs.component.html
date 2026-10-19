@@ -1,0 +1,28 @@
+@if (mergeDialogOpen) {
+  <app-site-toolbar-merge-dialog
+    [pendingMergeFile]="pendingMergeFile"
+    [mergeOptions]="mergeOptions"
+    (optionsChange)="mergeOptionsChange.emit($event)"
+    (levelIdsChange)="mergeLevelIdsChange.emit($event)"
+    (close)="closeMerge.emit()"
+    (confirm)="confirmMerge.emit()"
+  />
+}
+@if (previewDialogOpen) {
+  <app-site-toolbar-preview-dialog
+    [selectedLevelId]="selectedLevelId"
+    [levelDisplayNum]="levelDisplayNum"
+    [stripScripts]="stripScriptsForPreview"
+    (stripScriptsChange)="stripScriptsForPreviewChange.emit($event)"
+    (close)="closePreview.emit()"
+    (confirm)="confirmPreview.emit()"
+  />
+}
+@if (downloadDialogOpen) {
+  <app-site-toolbar-download-dialog
+    [stripScripts]="stripScriptsForDownload"
+    (stripScriptsChange)="stripScriptsForDownloadChange.emit($event)"
+    (close)="closeDownload.emit()"
+    (confirm)="confirmDownload.emit()"
+  />
+}

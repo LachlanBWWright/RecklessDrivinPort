@@ -1,0 +1,97 @@
+@if (selectedAudioId !== null && selectedAudioBytes) {
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden py-1">
+    <h4 class="text-base font-bold text-[var(--on-surface)]">Sound #{{ selectedAudioId }}</h4>
+    @if (selectedAudioSndInfo; as info) {
+      <div class="flex flex-wrap gap-1.5">
+        <span
+          class="inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]"
+          >{{ info.sampleRate | number: '1.0-0' }} Hz</span
+        >
+        <span
+          class="inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]"
+          >{{ info.numChannels === 2 ? 'Stereo' : 'Mono' }}</span
+        >
+        <span
+          class="inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]"
+          >{{ info.numFrames / info.sampleRate | number: '1.1-1' }}s</span
+        >
+        <span
+          class="inline-flex items-center rounded-full bg-[var(--surface3)] px-2.5 py-0.5 text-[0.72rem] font-semibold tracking-[0.02em] text-[var(--on-surface)]"
+        >
+          @if (info.encode === 0) {
+            PCM 8-bit
+          } @else if (info.encode === 255) {
+            PCM 16-bit
+          } @else {
+            encode={{ info.encode }}
+          }
+        </span>
+      </div>
+    }
+    <div class="flex items-center gap-2 rounded-lg bg-white/5 p-4 text-white/50">
+      <mat-icon class="!h-8 !w-8 !text-[32px]">graphic_eq</mat-icon>
+      <span>{{ selectedAudioBytes.length | number }} bytes</span>
+    </div>
+    <div class="flex flex-col gap-2">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <mat-icon class="!h-[18px] !w-[18px] !text-[18px] text-[var(--muted)]">volume_up</mat-icon>
+        <mat-slider min="0" max="100" step="1" discrete class="w-[140px]">
+          <input matSliderThumb [formControl]="audioVolumeControl" />
+        </mat-slider>
+        <span class="min-w-8 text-[0.78rem] text-[var(--muted)]">{{ audioPlayerVolume }}%</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="togglePlayPause.emit()"
+          [disabled]="audioDecodeInProgress || (!audioControllable && !selectedAudioBytes)"
+        >
+          <mat-icon matButtonIcon>{{ audioPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
+          {{ audioPlaying ? 'Pause' : 'Play' }}
+        </button>
+        <div class="inline-flex items-center gap-2">
+          <input
+            type="range"
+            min="0"
+            [max]="audioDuration"
+            step="0.01"
+            [formControl]="audioSeekControl"
+            class="w-[240px]"
+          />
+          <span class="text-[0.78rem] text-[var(--muted)]"
+            >{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span
+          >
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button mat-stroked-button (click)="exportAudioWav.emit()" [disabled]="!selectedAudioBytes">
+          <mat-icon>download</mat-icon> Export WAV
+        </button>
+        <input
+          #audioWavInput
+          type="file"
+          accept="audio/wav,audio/*"
+          style="display: none"
+          (change)="audioWavUpload.emit($event)"
+        />
+        <button
+          mat-stroked-button
+          (click)="audioWavInput.click()"
+          [disabled]="workerBusy"
+          matTooltip="Upload a WAV file to replace this sound"
+        >
+          <mat-icon>upload</mat-icon> Replace WAV
+        </button>
+      </div>
+    </div>
+  </div>
+} @else if (selectedAudioId !== null) {
+  <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
+    <mat-spinner diameter="32"></mat-spinner>
+  </div>
+} @else {
+  <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
+    <p class="text-[0.85rem] text-[var(--muted)]">Select a sound from the list.</p>
+  </div>
+}

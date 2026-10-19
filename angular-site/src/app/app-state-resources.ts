@@ -294,6 +294,8 @@ export class AppStateResources extends AppStateBase {
   iconCanvasMap = new Map<string, HTMLCanvasElement>();
   /** Cached data URLs for icon thumbnails (type:id → data URL). */
   _iconDataUrls = new Map<string, string>();
+  /** Version bumped after asynchronous icon thumbnails are decoded. */
+  iconThumbnailsVersion = signal(0);
   /** Cached data URLs for road texture canvases. Cleared when textures are reloaded. */
   _roadTextureDataUrls = new Map<number, string>();
   /** Cached data URLs for road-info dropdown thumbnails. */

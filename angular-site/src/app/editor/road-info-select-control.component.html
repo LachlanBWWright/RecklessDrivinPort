@@ -1,0 +1,18 @@
+<mat-form-field appearance="outline" class="w-full min-w-0">
+  <mat-label>Shared road</mat-label>
+  <mat-select
+    [value]="value"
+    [disabled]="disabled || !options.length"
+    (selectionChange)="valueChange.emit($event.value)"
+    aria-label="Shared road selector"
+  >
+    <mat-select-trigger>
+      <app-road-info-select-trigger [value]="value" [selected]="selected" />
+    </mat-select-trigger>
+    @for (option of options; track option.id) {
+      <mat-option [value]="option.id">
+        <app-road-info-option-content [option]="option" />
+      </mat-option>
+    }
+  </mat-select>
+</mat-form-field>

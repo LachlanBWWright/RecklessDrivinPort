@@ -104,7 +104,9 @@ export class ResourceDatService {
       });
 
       if ('error' in packedHeader) {
-        return err(`Failed to pack resources.dat header for ${entry.type}#${entry.id}: ${packedHeader.error}`);
+        return err(
+          `Failed to pack resources.dat header for ${entry.type}#${entry.id}: ${packedHeader.error}`,
+        );
       }
 
       packedChunks.push(packedHeader.value, entry.data);

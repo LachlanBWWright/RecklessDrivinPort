@@ -94,7 +94,8 @@ export function redrawMarkCanvas(host: App): void {
           },
         ];
   const { minX, minY, rangeX, rangeY } = markBounds(boundsSource);
-  const toC = (wx: number, wy: number) => markWorldToCanvas(wx, wy, canvas, minX, minY, rangeX, rangeY);
+  const toC = (wx: number, wy: number) =>
+    markWorldToCanvas(wx, wy, canvas, minX, minY, rangeX, rangeY);
 
   for (let i = 0; i < ms.length; i++) {
     const m = ms[i];

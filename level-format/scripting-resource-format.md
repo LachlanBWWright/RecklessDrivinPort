@@ -2,6 +2,13 @@
 
 This document defines the Lua-based scripting resources used by the editor and future native runtime.
 
+## Lua API Contract
+
+The public host API is documented in [`documentation/reckless.d.lua`](../documentation/reckless.d.lua).
+It is a Lua Language Server definition file containing declarations only. Native implementations
+remain in `source/scripts.c`; `scripts/check-lua-api-contract.mjs` verifies that native registrations,
+Angular completions, and documented hooks/methods stay in sync.
+
 ## Compatibility Rule
 
 Scripting data must live only in new resource types or new pack IDs. Existing resource payloads such as `Pack 128` (`kPackObTy`) and `Pack 130` (`kPackOgrp`) must not change. This keeps generated `resources.dat` files parseable by the original game, which can ignore unknown scripting resources.

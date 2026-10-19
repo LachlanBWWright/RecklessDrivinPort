@@ -92,7 +92,7 @@ describe('lzrw3aDecompress', () => {
   it('round-trip with large random-ish data', () => {
     const original = new Uint8Array(1024);
     // Pseudo-random but with some repetition
-    for (let i = 0; i < 1024; i++) original[i] = (i * 7 + (i >> 3)) & 0xFF;
+    for (let i = 0; i < 1024; i++) original[i] = (i * 7 + (i >> 3)) & 0xff;
     const handle = packHandleCompress(original);
     const result = packHandleDecompress(handle);
     expect(result.isOk()).toBe(true);

@@ -1,0 +1,96 @@
+<div class="flex h-full min-h-0 flex-1 gap-6 overflow-hidden max-[1100px]:flex-col">
+  <app-editor-sidebar>
+    <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-1">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 text-base font-bold text-[var(--text)]">
+          <span>Object Group Editor</span>
+          <app-editor-info-button [tooltip]="groupsHelpTooltip" />
+        </div>
+        <div
+          class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]"
+        >
+          {{ objectGroups.length }} definitions
+        </div>
+      </div>
+      <button
+        mat-icon-button
+        color="primary"
+        (click)="addGroup.emit()"
+        [disabled]="workerBusy"
+        matTooltip="Create a new group"
+      >
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+
+    <app-editor-sidebar-scroll
+      class="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-4 pb-4"
+    >
+      @for (group of objectGroups; track group.id) {
+        <app-editor-object-group-list-item
+          [group]="group"
+          [objectGroupClass]="objectGroupClass"
+          (selected)="selectedObjectGroupIdChange.emit($event)"
+        />
+      }
+    </app-editor-sidebar-scroll>
+  </app-editor-sidebar>
+
+  @if (selectedGroup; as group) {
+    <div
+      class="[scrollbar-width:thin] [scrollbar-color:var(--surface4)_var(--bg)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[var(--bg)] [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[var(--surface4)] [&::-webkit-scrollbar-thumb:hover]:bg-[var(--muted)] flex min-h-0 min-w-0 flex-1 flex-col gap-[14px] overflow-y-auto px-4 py-4 pr-1 max-[1100px]:px-3 max-[1100px]:py-3"
+    >
+      <div class="flex items-start justify-between gap-[18px] max-[1100px]:flex-col">
+        <div class="min-w-0 flex-1">
+          <h4 class="text-base font-bold text-[var(--on-surface)]">Group #{{ group.id }}</h4>
+          <p class="mt-1 text-[0.85rem] text-[var(--muted)]">
+            Use the info tooltip for full group spawn semantics and offset rules.
+          </p>
+        </div>
+        <div class="flex flex-wrap justify-end gap-2 max-[1100px]:justify-start">
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="addEntry.emit(group.id)"
+            [disabled]="workerBusy"
+          >
+            <mat-icon>add</mat-icon> Add Entry
+          </button>
+          <button
+            mat-stroked-button
+            color="warn"
+            (click)="deleteGroup.emit(group.id)"
+            [disabled]="workerBusy"
+          >
+            <mat-icon>delete</mat-icon> Delete Group
+          </button>
+        </div>
+      </div>
+
+      @if (group.entries.length > 0) {
+        <app-editor-object-group-entries-list
+          [groupId]="group.id"
+          [entryForms]="entryForms"
+          [availableTypeIds]="availableTypeIds"
+          [getObjTypeDimensionLabel]="getObjTypeDimensionLabel"
+          [getSpriteUrl]="getSpriteUrl"
+          [workerBusy]="workerBusy"
+          [trackEntry]="trackEntry"
+          (deleteEntry)="deleteGroupEntry.emit($event)"
+        />
+      } @else {
+        <div class="flex min-h-[220px] flex-col items-center justify-center text-[var(--muted)]">
+          <p class="text-[0.85rem] text-[var(--muted)]">This group has no entries yet.</p>
+        </div>
+      }
+    </div>
+  } @else {
+    <div
+      class="[scrollbar-width:thin] [scrollbar-color:var(--surface4)_var(--bg)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[var(--bg)] [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[var(--surface4)] [&::-webkit-scrollbar-thumb:hover]:bg-[var(--muted)] flex min-h-0 min-w-0 flex-1 flex-col gap-[14px] overflow-y-auto px-4 py-4 pr-1 max-[1100px]:px-3 max-[1100px]:py-3"
+    >
+      <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
+        <p class="text-[0.85rem] text-[var(--muted)]">Select a group from the list.</p>
+      </div>
+    </div>
+  }
+</div>

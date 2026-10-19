@@ -1,4 +1,6 @@
 import { err, ok, type Result } from 'neverthrow';
+import { parse as parseLua } from 'luaparse';
+import type { Expression, Node } from 'luaparse';
 import type {
   LevelScriptBinding,
   ScriptBinding,
@@ -44,16 +46,65 @@ const LUA_HOOKS: readonly ScriptHookId[] = [
   'onAddOnAward',
 ];
 
-const DISALLOWED_LUA_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
-  { pattern: /\bio\./, label: 'io' },
-  { pattern: /\bos\./, label: 'os' },
-  { pattern: /\bdebug\./, label: 'debug' },
-  { pattern: /\bpackage\./, label: 'package' },
-  { pattern: /\brequire\s*\(/, label: 'require' },
-  { pattern: /\bdofile\s*\(/, label: 'dofile' },
-  { pattern: /\bloadfile\s*\(/, label: 'loadfile' },
-  { pattern: /\bload\s*\(/, label: 'load' },
-];
+const DISALLOWED_LUA_GLOBALS = new Set(['io', 'os', 'debug', 'package']);
+const DISALLOWED_LUA_FUNCTIONS = new Set(['require', 'dofile', 'loadfile', 'load']);
+const OBJECT_TYPE_RESOURCE_METHODS = new Set([
+  'spawnObjectType', 'spawnAt', 'spawnRelative', 'spawnNearPlayer',
+  'spawnOnTrack', 'spawnTrackside', 'fireWeapon',
+]);
+
+function rootIdentifier(expression: Expression): string | null {
+  switch (expression.type) {
+    case 'Identifier':
+      return expression.name;
+    case 'MemberExpression':
+    case 'IndexExpression':
+      return rootIdentifier(expression.base);
+    default:
+      return null;
+  }
+}
+
+function disallowedApiUse(node: Node): { label: string; line: number | null } | null {
+  if (node.type === 'MemberExpression' || node.type === 'IndexExpression') {
+    const root = rootIdentifier(node);
+    if (root && DISALLOWED_LUA_GLOBALS.has(root)) {
+      return { label: root, line: node.loc?.start.line ?? null };
+    }
+  }
+  if (
+    (node.type === 'CallExpression' || node.type === 'TableCallExpression' || node.type === 'StringCallExpression') &&
+    node.base.type === 'Identifier' && DISALLOWED_LUA_FUNCTIONS.has(node.base.name)
+  ) {
+    return { label: node.base.name, line: node.loc?.start.line ?? null };
+  }
+  return null;
+}
+
+function numericValue(expression: Expression): number | null {
+  if (expression.type === 'NumericLiteral') return expression.value;
+  if (expression.type === 'UnaryExpression' && expression.operator === '-' && expression.argument.type === 'NumericLiteral') {
+    return -expression.argument.value;
+  }
+  return null;
+}
+
+function resourceReference(node: Node): { kind: 'object type' | 'sound'; method: string; id: number; line: number | null } | null {
+  if (node.type !== 'CallExpression') return null;
+  const member = node.base.type === 'MemberExpression' ? node.base : null;
+  if (member && (member.indexer !== ':' || member.base.type !== 'Identifier' || member.base.name !== 'ctx')) return null;
+  const method = member?.identifier.name ?? (node.base.type === 'Identifier' ? node.base.name : null);
+  const kind = method === 'playSound' ? 'sound' : OBJECT_TYPE_RESOURCE_METHODS.has(method ?? '') ? 'object type' : null;
+  if (!kind) return null;
+  const id = node.arguments[0] ? numericValue(node.arguments[0]) : null;
+  return id === null ? null : { kind, method: method ?? '', id, line: node.loc?.start.line ?? null };
+}
+
+function isLifecycleHook(node: Node): boolean {
+  if (node.type !== 'FunctionDeclaration' || node.isLocal) return false;
+  const identifier = node.identifier;
+  return identifier?.type === 'Identifier' && LUA_HOOKS.some((hook) => hook === identifier.name);
+}
 
 export function serializeScriptDefinition(script: ScriptDefinition): Uint8Array {
   const nameBytes = TEXT_ENCODER.encode(script.name);
@@ -193,8 +244,22 @@ export interface ScriptValidationContext {
   availableSoundIds?: readonly number[];
 }
 
-function lineForIndex(source: string, index: number): number {
-  return source.slice(0, Math.max(0, index)).split('\n').length;
+function columnForError(value: unknown): number | null {
+  if (!(value instanceof Error)) return null;
+  const location = value.message.match(/^\[(\d+):(\d+)\]/);
+  if (!location) return null;
+  return Number(location[2]) + 1;
+}
+
+function lineForError(value: unknown): number | null {
+  if (!(value instanceof Error)) return null;
+  const location = value.message.match(/^\[(\d+):(\d+)\]/);
+  if (!location) return null;
+  return Number(location[1]);
+}
+
+function messageForError(value: unknown): string {
+  return value instanceof Error ? value.message : 'Lua syntax error.';
 }
 
 export function validateScripts(
@@ -205,10 +270,21 @@ export function validateScripts(
   const issues: ScriptValidationIssue[] = [];
   const scriptIds = new Set<number>();
   const availableScriptIds = new Set<number>();
-  const objectTypeIds = context?.availableObjectTypeIds ? new Set(context.availableObjectTypeIds) : null;
+  const objectTypeIds = context?.availableObjectTypeIds
+    ? new Set(context.availableObjectTypeIds)
+    : null;
   const soundIds = context?.availableSoundIds ? new Set(context.availableSoundIds) : null;
 
   for (const script of scripts) {
+    if (!Number.isInteger(script.id) || script.id < 0 || script.id > 32767) {
+      issues.push({
+        severity: 'error',
+        scriptId: script.id,
+        hook: null,
+        line: null,
+        message: `Script id ${script.id} is outside the supported 16-bit range.`,
+      });
+    }
     if (scriptIds.has(script.id)) {
       issues.push({
         severity: 'error',
@@ -230,6 +306,15 @@ export function validateScripts(
         message: 'Script name is empty.',
       });
     }
+    if (TEXT_ENCODER.encode(script.name).byteLength > 65535) {
+      issues.push({
+        severity: 'error',
+        scriptId: script.id,
+        hook: null,
+        line: null,
+        message: 'Script name exceeds the 65535-byte resource format limit.',
+      });
+    }
     if (script.source.trim().length === 0) {
       issues.push({
         severity: 'error',
@@ -239,48 +324,75 @@ export function validateScripts(
         message: 'Lua source is empty.',
       });
     }
-    if (!LUA_HOOKS.some((hook) => new RegExp(`\\bfunction\\s+${hook}\\s*\\(`).test(script.source))) {
-      issues.push({
-        severity: 'warning',
-        scriptId: script.id,
-        hook: null,
-        line: null,
-        message: 'Script defines no lifecycle hook functions.',
-      });
-    }
-    for (const { pattern, label } of DISALLOWED_LUA_PATTERNS) {
-      const match = pattern.exec(script.source);
-      if (match) {
+    if (script.source.trim().length > 0) {
+      try {
+        const disallowedUses: Array<{ label: string; line: number | null }> = [];
+        const resourceUses: Array<{ kind: 'object type' | 'sound'; method: string; id: number; line: number | null }> = [];
+        const seenDisallowedUses = new Set<string>();
+        let hasLifecycleHook = false;
+        parseLua(script.source, {
+          luaVersion: '5.3',
+          locations: true,
+          onCreateNode: (node) => {
+            const use = disallowedApiUse(node);
+            if (use) {
+              const key = `${use.label}:${use.line ?? 0}`;
+              if (!seenDisallowedUses.has(key)) {
+                seenDisallowedUses.add(key);
+                disallowedUses.push(use);
+              }
+            }
+            const resourceUse = resourceReference(node);
+            if (resourceUse) resourceUses.push(resourceUse);
+            if (isLifecycleHook(node)) hasLifecycleHook = true;
+          },
+        });
+        for (const use of disallowedUses) {
+          issues.push({
+            severity: 'error',
+            scriptId: script.id,
+            hook: null,
+            line: use.line,
+            message: `Lua API '${use.label}' is not available in game scripts.`,
+          });
+        }
+        if (!hasLifecycleHook) {
+          issues.push({
+            severity: 'warning',
+            scriptId: script.id,
+            hook: null,
+            line: null,
+            message: 'Script defines no lifecycle hook functions.',
+          });
+        }
+        for (const use of resourceUses) {
+          if (use.kind === 'object type' && objectTypeIds && !objectTypeIds.has(use.id)) {
+            issues.push({
+              severity: 'warning',
+              scriptId: script.id,
+              hook: null,
+              line: use.line,
+              message: `${use.method} references missing object type ${use.id}.`,
+            });
+          }
+          if (use.kind === 'sound' && soundIds && !soundIds.has(use.id)) {
+            issues.push({
+              severity: 'warning',
+              scriptId: script.id,
+              hook: null,
+              line: use.line,
+              message: `${use.method} references missing sound ${use.id}.`,
+            });
+          }
+        }
+      } catch (error: unknown) {
         issues.push({
           severity: 'error',
           scriptId: script.id,
           hook: null,
-          line: lineForIndex(script.source, match.index),
-          message: `Lua API '${label}' is not available in game scripts.`,
-        });
-      }
-    }
-    for (const match of script.source.matchAll(/\bspawnObjectType\s*\(\s*(-?\d+)/g)) {
-      const objectTypeId = Number.parseInt(match[1] ?? '', 10);
-      if (objectTypeIds && !objectTypeIds.has(objectTypeId)) {
-        issues.push({
-          severity: 'warning',
-          scriptId: script.id,
-          hook: null,
-          line: lineForIndex(script.source, match.index ?? 0),
-          message: `spawnObjectType references missing object type ${objectTypeId}.`,
-        });
-      }
-    }
-    for (const match of script.source.matchAll(/\bplaySound\s*\(\s*(-?\d+)/g)) {
-      const soundId = Number.parseInt(match[1] ?? '', 10);
-      if (soundIds && !soundIds.has(soundId)) {
-        issues.push({
-          severity: 'warning',
-          scriptId: script.id,
-          hook: null,
-          line: lineForIndex(script.source, match.index ?? 0),
-          message: `playSound references missing sound ${soundId}.`,
+          line: lineForError(error),
+          column: columnForError(error),
+          message: messageForError(error),
         });
       }
     }

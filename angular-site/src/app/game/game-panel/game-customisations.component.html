@@ -1,0 +1,214 @@
+<div class="mt-2 border-t border-t-[var(--border)] px-0 pb-0.5 pt-3">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0 flex-1">
+      <div class="text-[0.9rem] font-semibold text-[var(--on-surface)]">Customisations</div>
+      <p class="mt-1 text-[0.78rem] leading-[1.55] text-[var(--muted)]">
+        Apply a preset here, or edit the rows below directly for a custom mix or your own
+        <code>resources.dat</code>.
+      </p>
+    </div>
+    <button
+      mat-raised-button
+      class="!bg-[var(--accent2)] !text-white hover:!bg-[#1e88e5] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+      [disabled]="host.gameRestarting"
+      (click)="host.restartWithStartupOptions.emit({ useLevel: host.editorTestDriveLevelEnabled })"
+      matTooltip="Restart using the current customisations; if level launch is disabled the game starts normally"
+    >
+      @if (host.gameRestarting) {
+        <mat-spinner diameter="16" style="display: inline-block; margin-right: 6px"></mat-spinner>
+      } @else {
+        <mat-icon>restart_alt</mat-icon>
+      }
+      Restart With Customisations
+    </button>
+  </div>
+
+  <div class="mt-5">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div class="min-w-0 max-w-[36rem]">
+        <div class="text-[0.9rem] font-semibold text-[var(--on-surface)]">Custom options</div>
+        <p class="mt-1 text-[0.78rem] leading-[1.5] text-[var(--muted)]">
+          Choose a preset and apply it to the fields below.
+        </p>
+        <p class="mt-1 text-[0.78rem] leading-[1.5] text-[var(--accent2)]">
+          {{ host.pendingCustomOptionsPresetDescription }}
+        </p>
+      </div>
+      <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:items-end">
+        <app-game-custom-options-select
+          [pendingPreset]="host.pendingCustomOptionsPreset"
+          [presets]="host.customOptionsPresetOptions"
+          (pendingPresetChange)="host.pendingCustomOptionsPreset = $event"
+        />
+        <button
+          mat-raised-button
+          class="!h-[56px] !min-h-[56px] !px-6 !bg-[var(--accent2)] !text-white hover:!bg-[#1e88e5] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
+          [disabled]="
+            host.gameRestarting || host.pendingCustomOptionsPreset === host.customOptionsPreset
+          "
+          (click)="host.customOptionsPresetApply.emit(host.pendingCustomOptionsPreset)"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3 grid gap-3 xl:grid-cols-2">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full">
+      <mat-label>Custom resources</mat-label>
+      <input
+        #customResInput
+        type="file"
+        accept=".dat"
+        style="display: none"
+        (change)="host.customResourcesFileSelected.emit($event)"
+      />
+      <mat-select
+        [value]="host.customResourcesPreset"
+        (selectionChange)="host.onCustomResourcesSelection($event.value, customResInput)"
+      >
+        @for (preset of host.customResourcesPresetOptions; track preset.id) {
+          <mat-option
+            [value]="preset.id"
+            [disabled]="preset.id === 'uploaded' && !host.customResourcesLoaded"
+          >
+            {{ preset.label }}
+          </mat-option>
+        }
+        <mat-divider></mat-divider>
+        <mat-option value="upload-custom">
+          <mat-icon>upload_file</mat-icon>
+          Upload custom resources.dat
+        </mat-option>
+        @if (host.customResourcesLoaded) {
+          <mat-option value="clear-custom" class="!text-[var(--danger)]">
+            <mat-icon>delete</mat-icon>
+            Clear custom resources
+          </mat-option>
+        }
+      </mat-select>
+      <mat-hint>{{ host.customResourcesSummary }}</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full">
+      <mat-label>Custom settings preset</mat-label>
+      <mat-select
+        [value]="host.customSettingsPreset"
+        (selectionChange)="host.customSettingsPresetChange.emit($event.value)"
+      >
+        @for (preset of host.customSettingsPresetOptions; track preset.id) {
+          <mat-option [value]="preset.id">{{ preset.label }}</mat-option>
+        }
+      </mat-select>
+      <mat-hint>
+        {{
+host.customSettingsPresetOptions.find((preset) => preset.id === host.customSettingsPreset)?.description
+        }}
+      </mat-hint>
+    </mat-form-field>
+  </div>
+
+  <div class="mt-5 grid gap-4 md:grid-cols-3">
+    <div>
+      <mat-checkbox
+        [checked]="host.editorTestDriveLevelEnabled"
+        (change)="host.editorTestDriveLevelEnabledChange.emit($event.checked)"
+      >
+        Level
+      </mat-checkbox>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mt-2 mb-0 w-full">
+        <mat-label>Level number</mat-label>
+        <input
+          #testDriveLevelInput
+          matInput
+          type="number"
+          min="1"
+          inputmode="numeric"
+          [value]="host.editorTestDriveLevelNumber"
+          (input)="host.editorTestDriveLevelNumberInput.emit(testDriveLevelInput.value)"
+        />
+        <mat-hint>Unchecked starts the game normally.</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <div>
+      <mat-checkbox
+        [checked]="host.editorTestDriveUseStartY"
+        (change)="host.editorTestDriveUseStartYChange.emit($event.checked)"
+      >
+        Override player start Y
+      </mat-checkbox>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mt-2 mb-0 w-full">
+        <mat-label>Player start Y</mat-label>
+        <input
+          #testDriveStartYInput
+          matInput
+          type="number"
+          min="0"
+          inputmode="numeric"
+          [disabled]="!host.editorTestDriveUseStartY"
+          [value]="host.editorTestDriveStartY"
+          (input)="host.editorTestDriveStartYInput.emit(testDriveStartYInput.value)"
+        />
+        <mat-hint>Applied in <code>LoadLevel()</code>.</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <div>
+      <mat-checkbox
+        [checked]="host.editorTestDriveUseObjectGroupStartY"
+        (change)="host.editorTestDriveUseObjectGroupStartYChange.emit($event.checked)"
+      >
+        Override object-group start Y
+      </mat-checkbox>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mt-2 mb-0 w-full">
+        <mat-label>Object-group Y floor</mat-label>
+        <input
+          #testDriveObjectGroupStartYInput
+          matInput
+          type="number"
+          min="0"
+          inputmode="numeric"
+          [disabled]="!host.editorTestDriveUseObjectGroupStartY"
+          [value]="host.editorTestDriveObjectGroupStartY"
+          (input)="
+            host.editorTestDriveObjectGroupStartYInput.emit(testDriveObjectGroupStartYInput.value)
+          "
+        />
+        <mat-hint>Overrides the native <code>GetUniquePos()</code> lower bound.</mat-hint>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <div class="mt-5 grid gap-4 lg:grid-cols-2">
+    <div>
+      <div class="text-[0.8rem] font-semibold text-[var(--on-surface)]">Forced addons</div>
+      <div class="mt-2 grid gap-2 sm:grid-cols-2">
+        @for (option of host.forcedAddonOptions; track option.mask) {
+          <mat-checkbox
+            [checked]="host.hasMask(host.editorTestDriveForcedAddOns, option.mask)"
+            (change)="emitForcedAddon(option.mask, $event.checked)"
+            [matTooltip]="option.description"
+          >
+            {{ option.label }}
+          </mat-checkbox>
+        }
+      </div>
+    </div>
+
+    <div>
+      <div class="text-[0.8rem] font-semibold text-[var(--on-surface)]">Disabled bonus rolls</div>
+      <div class="mt-2 grid gap-2 sm:grid-cols-2">
+        @for (option of host.disabledBonusRollOptions; track option.mask) {
+          <mat-checkbox
+            [checked]="host.hasMask(host.editorTestDriveDisabledBonusRollMask, option.mask)"
+            (change)="emitDisabledBonusRoll(option.mask, $event.checked)"
+          >
+            {{ option.label }}
+          </mat-checkbox>
+        }
+      </div>
+    </div>
+  </div>
+</div>

@@ -4,12 +4,13 @@ import type {
   ObjectTypeDefinition,
   ParsedLevel,
   LevelScriptBinding,
+  ScriptBinding,
   ObjectGroupRef,
   RoadInfoData,
   RoadInfoOption,
   ScriptDefinition,
 } from '../../../level-editor.service';
-import type { LuaScriptEditorDialogResult } from '../../lua-script-editor-dialog.component';
+import type { LuaScriptEditorChange } from '../../lua-script-editor-dialog.component';
 
 interface SpriteFrameInfo {
   id: number;
@@ -45,6 +46,8 @@ export class EditorPropertiesSectionComponent {
   @Input() propertiesDirty = false;
   @Input() workerBusy = false;
   @Input() scripts: ScriptDefinition[] | undefined = [];
+  @Input() scriptBindings: ScriptBinding[] | undefined = [];
+  @Input() levelResourceIds: readonly number[] = [];
   @Input() levelScriptBindings: LevelScriptBinding[] | undefined = [];
   @Input() objectTypes: ObjectTypeDefinition[] = [];
   @Input() spriteFrames: SpriteFrameInfo[] = [];
@@ -65,5 +68,5 @@ export class EditorPropertiesSectionComponent {
     scriptId: number | null;
   }>();
   @Output() createLevelScript = new EventEmitter<number>();
-  @Output() scriptSave = new EventEmitter<LuaScriptEditorDialogResult>();
+  @Output() scriptSave = new EventEmitter<LuaScriptEditorChange>();
 }

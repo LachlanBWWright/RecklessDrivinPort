@@ -1,0 +1,82 @@
+<app-editor-detail-card>
+  <div class="mb-3 flex items-center justify-between gap-3">
+    <div class="text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">
+      Scripting
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="workerBusy"
+        (click)="createScript.emit(typeRes)"
+      >
+        <mat-icon>add_circle</mat-icon> New Script
+      </button>
+      <button
+        mat-flat-button
+        type="button"
+        [disabled]="workerBusy || !selectedScript"
+        (click)="openScript.emit(typeRes)"
+      >
+        <mat-icon>edit</mat-icon> Edit Script
+      </button>
+    </div>
+  </div>
+  <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 max-[1200px]:grid-cols-1">
+    <mat-form-field appearance="outline">
+      <mat-label>Bound Script</mat-label>
+      <mat-select
+        [value]="selectedScriptBinding?.scriptId ?? null"
+        (valueChange)="scriptBindingChange.emit({ typeRes: typeRes, scriptId: $event })"
+      >
+        <mat-option [value]="null">None</mat-option>
+        @for (script of scriptList; track script.id) {
+          <mat-option [value]="script.id">{{ getScriptLabel(script.id) }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    @if (selectedScript; as script) {
+      <div class="flex min-w-0 flex-col gap-2 text-[0.82rem]">
+        <div class="font-semibold text-[var(--text)]">
+          {{ script.name || 'Unnamed script' }}
+        </div>
+        <div class="text-[var(--muted)]">Validation: {{ getSelectedScriptValidationLabel() }}</div>
+      </div>
+    }
+  </div>
+
+  <app-editor-object-type-script-diagnostics
+    [script]="selectedScript"
+    [hooks]="getSelectedScriptHookLabels()"
+    [issues]="getIssuesForSelectedScript()"
+  />
+</app-editor-detail-card>
+
+<app-editor-detail-card>
+  <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">
+    Flags
+  </div>
+  <div class="grid grid-cols-2 gap-[14px] max-[1200px]:grid-cols-1">
+    <div class="min-w-0">
+      <div class="mb-2.5 text-[0.84rem] font-bold text-[var(--text)]">flags</div>
+      <div class="grid grid-cols-2 gap-x-3 gap-y-2 max-[1200px]:grid-cols-1">
+        @for (flag of flagOptions.flags; track flag.bit; let i = $index) {
+          <mat-checkbox [formControl]="flagForms.flags.controls[i]" [matTooltip]="flag.hint">
+            {{ flag.label }}
+          </mat-checkbox>
+        }
+      </div>
+    </div>
+
+    <div class="min-w-0">
+      <div class="mb-2.5 text-[0.84rem] font-bold text-[var(--text)]">flags2</div>
+      <div class="grid grid-cols-2 gap-x-3 gap-y-2 max-[1200px]:grid-cols-1">
+        @for (flag of flagOptions.flags2; track flag.bit; let i = $index) {
+          <mat-checkbox [formControl]="flagForms.flags2.controls[i]" [matTooltip]="flag.hint">
+            {{ flag.label }}
+          </mat-checkbox>
+        }
+      </div>
+    </div>
+  </div>
+</app-editor-detail-card>

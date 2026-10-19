@@ -12,6 +12,9 @@
   (resourceFileSelected)="runtime.onResourceFileSelected($event)"
   (resourceMergeSelected)="runtime.onResourceMergeSelected($event.file, $event.options)"
   (downloadEditedResources)="runtime.downloadEditedResources($event)"
+  (openLuaEditor)="openLuaEditor()"
+  (exportLuaProject)="exportLuaProject()"
+  (importLuaProject)="importLuaProject($event)"
   (clearEditorFile)="runtime.clearEditorResources()"
   (selectLevel)="selectLevel($event)"
   (previewSelectedLevel)="launchSelectedLevelPreview($event.levelResourceId, $event.stripScripts)"
@@ -54,35 +57,25 @@
     (editorTestDriveStartYInput)="setEditorTestDriveStartY($event)"
     (editorTestDriveUseObjectGroupStartYChange)="setEditorTestDriveUseObjectGroupStartY($event)"
     (editorTestDriveObjectGroupStartYInput)="setEditorTestDriveObjectGroupStartY($event)"
-    (editorTestDriveForcedAddonToggle)="toggleEditorTestDriveForcedAddon($event.mask, $event.checked)"
-    (editorTestDriveDisabledBonusRollToggle)="toggleEditorTestDriveDisabledBonusRoll($event.mask, $event.checked)"
+    (editorTestDriveForcedAddonToggle)="
+      toggleEditorTestDriveForcedAddon($event.mask, $event.checked)
+    "
+    (editorTestDriveDisabledBonusRollToggle)="
+      toggleEditorTestDriveDisabledBonusRoll($event.mask, $event.checked)
+    "
   ></app-game-panel>
 
   @if (activeTab() === 'editor') {
-    <section id="panel-editor" role="tabpanel" class="flex w-full min-h-0 flex-1 flex-col overflow-hidden">
-      @if (!hasEditorData() && !workerBusy()) {
-        <mat-card class="w-full border border-dashed border-[var(--border)] bg-[var(--surface)]">
-          <mat-card-content>
-            <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
-              <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">folder_open</mat-icon>
-              <h3 class="text-[1.2rem] font-bold text-[var(--on-surface)]">No data loaded</h3>
-              <p class="max-w-[600px] leading-[1.6] text-[var(--muted)] [&_code]:rounded [&_code]:bg-[var(--surface3)] [&_code]:px-1.5 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-[var(--accent2)]">Load a <code>resources.dat</code> file to begin editing. The default file is served alongside the game.</p>
-            </div>
-          </mat-card-content>
-        </mat-card>
-      }
-
-      @if (workerBusy() && !hasEditorData()) {
-        <mat-card class="w-full border border-dashed border-[var(--border)] bg-[var(--surface)]">
-          <mat-card-content>
-            <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
-              <mat-spinner diameter="40"></mat-spinner>
-              <p class="max-w-[600px] leading-[1.6] text-[var(--on-surface)]">{{ resourcesStatus() }}</p>
-              <p class="text-[0.85rem] text-[var(--muted)]">Decompressing LZRW3-A level packs in background worker…</p>
-            </div>
-          </mat-card-content>
-        </mat-card>
-      }
+    <section
+      id="panel-editor"
+      role="tabpanel"
+      class="flex w-full min-h-0 flex-1 flex-col overflow-hidden"
+    >
+      <app-editor-resource-status-cards
+        [hasData]="hasEditorData()"
+        [busy]="workerBusy()"
+        [status]="resourcesStatus()"
+      />
 
       @if (hasEditorData()) {
         @if (editorSection() === 'properties') {
@@ -98,6 +91,8 @@
             [propertiesDirty]="propertiesDirty()"
             [workerBusy]="workerBusy()"
             [scripts]="scriptDefinitions()"
+            [scriptBindings]="scriptBindings()"
+            [levelResourceIds]="luaLevelResourceIds()"
             [levelScriptBindings]="levelScriptBindings()"
             [objectTypes]="objectTypeDefinitions()"
             [spriteFrames]="packSpriteFrames()"
@@ -105,9 +100,9 @@
             (roadInfoChange)="onRoadInfoChange($event)"
             (roadInfoInput)="onRoadInfoInput($event.field, $event.value)"
             (objGroupInput)="onObjGroupInput($event.index, $event.field, $event.value)"
-            (levelScriptBindingChange)="setLevelScriptBinding($event.levelResourceId, $event.scriptId)"
+            (levelScriptBindingChange)="onLevelScriptBindingChange($event)"
             (createLevelScript)="createScriptForLevel($event)"
-            (scriptSave)="updateScript($event.scriptId, $event.name, $event.source)"
+            (scriptSave)="applyLuaEditorResult($event)"
           ></app-editor-properties-section>
         }
 
@@ -125,7 +120,7 @@
             (deleteGroup)="deleteObjectGroup($event)"
             (addEntry)="addObjectGroupEntry($event)"
             (deleteEntry)="deleteObjectGroupEntry($event.groupId, $event.entryIndex)"
-            (entryInput)="onObjectGroupEntryInput($event.groupId, $event.entryIndex, $event.field, $event.value)"
+            (entryInput)="onObjectGroupEntryChange($event)"
             (saveObjectGroups)="saveObjectGroups()"
           ></app-editor-object-groups-section>
         }
@@ -141,19 +136,21 @@
             [workerBusy]="workerBusy()"
             [scripts]="scriptDefinitions()"
             [scriptBindings]="scriptBindings()"
+            [levelScriptBindings]="levelScriptBindings()"
+            [levelResourceIds]="luaLevelResourceIds()"
             [scriptIssues]="scriptValidationIssues()"
             (selectedObjectTypeIdChange)="selectObjectType($event)"
             (addType)="addObjectType()"
             (deleteType)="deleteObjectType($event)"
             (fieldInput)="onObjectTypeFieldInput($event.typeRes, $event.field, $event.value)"
-            (referenceChange)="onObjectTypeReferenceChange($event.typeRes, $event.field, $event.value)"
-            (flagToggle)="onObjectTypeFlagToggle($event.typeRes, $event.field, $event.bit, $event.checked)"
+            (referenceChange)="onObjectTypeReferenceChangeEvent($event)"
+            (flagToggle)="onObjectTypeFlagToggleEvent($event)"
             (frameChange)="onObjectTypeFrameChange($event.typeRes, $event.frame)"
             (scriptBindingChange)="setObjectTypeScriptBinding($event.typeRes, $event.scriptId)"
             (createScript)="createScriptForObjectType($event)"
             (scriptNameChange)="updateScriptName($event.scriptId, $event.name)"
             (scriptSourceChange)="updateScriptSource($event.scriptId, $event.source)"
-            (scriptSave)="updateScript($event.scriptId, $event.name, $event.source)"
+            (scriptSave)="applyLuaEditorResult($event)"
             (saveObjectTypes)="saveObjectTypes()"
           ></app-editor-object-types-section>
         }
@@ -181,7 +178,7 @@
             [zoom]="canvasZoom()"
             [panX]="canvasPanX()"
             [panY]="canvasPanY()"
-            [scrollYMax]="selectedLevel() ? ((selectedLevel()!.roadSegs.length - 1) * 2 + 500) : 5000"
+            [scrollYMax]="selectedLevel() ? (selectedLevel()!.roadSegs.length - 1) * 2 + 500 : 5000"
             [scrollXMin]="roadXMin()"
             [scrollXMax]="roadXMax()"
             [workerBusy]="workerBusy()"
@@ -189,7 +186,7 @@
             [dragTrackWaypoint]="dragTrackWaypoint()"
             [hoverTrackWaypoint]="hoverTrackWaypoint()"
             [spaceDown]="spaceDown() || isPanning()"
-            [roadMaxY]="selectedLevel() ? (selectedLevel()!.roadSegs.length > 0 ? (selectedLevel()!.roadSegs.length - 1) * 2 : 0) : 0"
+            [roadMaxY]="editorRoadMaxY()"
             [objectCount]="objects().length"
             [hasMarkingPreview]="markingPreview().length > 0"
             [markCreateMode]="markCreateMode()"
@@ -201,7 +198,7 @@
             [editObjTypeRes]="editObjTypeRes()"
             [placementObjTypeRes]="placementObjTypeRes()"
             [availableTypeIds]="availableTypeIds()"
-            [spriteUrl]="selectedObjIndex() !== null ? getSpritePreviewDataUrl(objects()[selectedObjIndex()!].typeRes) : null"
+            [spriteUrl]="selectedObjectSpriteUrl()"
             [getSpriteUrl]="getSpritePreviewDataUrl"
             [getFallbackColor]="getObjFallbackColor"
             [getObjTypeDimensionLabel]="getObjTypeDimensionLabel"
@@ -240,10 +237,10 @@
             (removeMark)="removeSelectedMark()"
             (startMarkCreate)="startMarkCreateMode()"
             (confirmMarkCreate)="confirmMarkCreateMode()"
-            (generateSideMarks)="generateSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset, $event.yFrequency)"
-            (generateCentreMarks)="generateCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashLength, $event.gapLength)"
-            (previewSideMarks)="previewSideRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.inset, $event.yFrequency)"
-            (previewCentreMarks)="previewCentreRoadMarks($event.roadSelection, $event.yStart, $event.yEnd, $event.dashLength, $event.gapLength)"
+            (generateSideMarks)="onGenerateSideRoadMarks($event)"
+            (generateCentreMarks)="onGenerateCentreRoadMarks($event)"
+            (previewSideMarks)="onPreviewSideRoadMarks($event)"
+            (previewCentreMarks)="onPreviewCentreRoadMarks($event)"
             (previewRange)="setMarkingRangePreview($event.yStart, $event.yEnd)"
             (removeMarks)="removeMarksByYRange($event.yStart, $event.yEnd)"
             (clearMarkingPreview)="clearMarkingPreviews()"

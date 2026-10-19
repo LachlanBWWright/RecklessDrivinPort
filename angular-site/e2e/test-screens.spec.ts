@@ -4,7 +4,7 @@ test('Picture resources render in Screens tab without decode stall', async ({ pa
   await page.goto('/');
   await page.getByRole('button', { name: /level editor/i }).click();
   await page.getByRole('button', { name: /load default/i }).click();
-  await expect(page.locator('mat-spinner')).not.toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#panel-editor mat-spinner')).not.toBeVisible({ timeout: 30_000 });
 
   await page
     .getByRole('button', { name: /screens/i })
@@ -50,7 +50,7 @@ test('Screens tab exposes edit actions for both icons and picture resources', as
   await page.goto('/');
   await page.getByRole('button', { name: /level editor/i }).click();
   await page.getByRole('button', { name: /load default/i }).click();
-  await expect(page.locator('mat-spinner')).not.toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#panel-editor mat-spinner')).not.toBeVisible({ timeout: 30_000 });
 
   await page
     .getByRole('button', { name: /screens/i })
@@ -81,7 +81,7 @@ test('PPIC 1006 and 1009 previews decode when present', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /level editor/i }).click();
   await page.getByRole('button', { name: /load default/i }).click();
-  await expect(page.locator('mat-spinner')).not.toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#panel-editor mat-spinner')).not.toBeVisible({ timeout: 30_000 });
   await page
     .getByRole('button', { name: /screens/i })
     .first()
@@ -116,7 +116,7 @@ test('PPIC 1000-1009 previews decode distinctly when present', async ({ page }) 
   await page.goto('/');
   await page.getByRole('button', { name: /level editor/i }).click();
   await page.getByRole('button', { name: /load default/i }).click();
-  await expect(page.locator('mat-spinner')).not.toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#panel-editor mat-spinner')).not.toBeVisible({ timeout: 30_000 });
   await page
     .getByRole('button', { name: /screens/i })
     .first()

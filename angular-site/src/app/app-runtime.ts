@@ -3,7 +3,22 @@ import { App } from './app';
 import type { EditorSection } from './layout/site-toolbar/site-toolbar.component';
 import { MAX_TIME_VALUE } from './app-level';
 import { dist2d, MIN_START_MARKER_HIT_RADIUS, BASE_START_MARKER_HIT_RADIUS } from './object-canvas';
-import { resultFromThrowable } from './result-helpers';
+
+function updateKonvaCursor(app: App, element: HTMLElement): void {
+  element.style.cursor = app.spaceDown()
+    ? 'grab'
+    : app.drawMode() !== 'none'
+      ? 'crosshair'
+      : 'default';
+}
+export { destroyApp, onAfterViewInit, onInit, scheduleCanvasRedraw } from './app-runtime-lifecycle';
+export {
+  formatTime,
+  getEditorSectionIndex,
+  onVolumeChange,
+  setEditorSectionIndex,
+  toggleFullscreen,
+} from './app-runtime-ui';
 
 export const SECTION_ORDER: EditorSection[] = [
   'properties',
@@ -141,11 +156,11 @@ export function initializeKonvaOverlay(app: App): void {
   if (app._konvaInitialized) {
     if (konvaContainer) {
       konvaContainer.style.cssText = `
-        position:absolute; inset:0;
-        overflow:hidden;
-        pointer-events:all;
-        outline:none;
-        cursor:default;
+      position:absolute; inset:0;
+      overflow:hidden;
+      pointer-events:all;
+      outline:none;
+      cursor:default;
       `;
       konvaContainer.style.width = `${cssW}px`;
       konvaContainer.style.height = `${cssH}px`;
@@ -475,12 +490,7 @@ export function initializeKonvaOverlay(app: App): void {
         app._isPanning = false;
         app.isPanning.set(false);
         const kc = document.getElementById('konva-container');
-        if (kc)
-          kc.style.cursor = app.spaceDown()
-            ? 'grab'
-            : app.drawMode() !== 'none'
-              ? 'crosshair'
-              : 'default';
+        if (kc) updateKonvaCursor(app, kc);
       }
       if (app._barrierDrawing) {
         app._barrierDrawing = false;
@@ -492,12 +502,7 @@ export function initializeKonvaOverlay(app: App): void {
           app._applyBarrierDrawPath();
         }
         const kc = document.getElementById('konva-container');
-        if (kc)
-          kc.style.cursor = app.spaceDown()
-            ? 'grab'
-            : app.drawMode() !== 'none'
-              ? 'crosshair'
-              : 'default';
+        if (kc) updateKonvaCursor(app, kc);
       }
       if (app._draggingStartMarker || app._draggingFinishLine) {
         app._draggingStartMarker = false;
@@ -508,84 +513,4 @@ export function initializeKonvaOverlay(app: App): void {
       }
     }
   };
-}
-
-export function destroyApp(app: App): void {
-  const stopAudioResult = resultFromThrowable(
-    (host: App) => host.media.stopAudio(),
-    'Failed to stop audio',
-  )(app);
-  stopAudioResult.match(
-    () => undefined,
-    () => undefined,
-  );
-  if (app.wasmScript?.parentNode) {
-    (app.wasmScript.parentNode as HTMLElement).removeChild(app.wasmScript);
-  }
-  app.wasmScript = null;
-  app.packWorker?.terminate();
-  app.packWorker = null;
-  disconnectKonvaResizeObserver(app);
-  app.konva.destroy();
-  app._konvaInitialized = false;
-}
-
-export function scheduleCanvasRedraw(app: App): void {
-  if (app.activeTab() !== 'editor') return;
-  if (typeof window === 'undefined') {
-    setTimeout(() => app.redrawObjectCanvas(), 0);
-    return;
-  }
-  if (app._pendingRedrawRaf !== null) {
-    window.cancelAnimationFrame(app._pendingRedrawRaf);
-  }
-  app._pendingRedrawRaf = window.requestAnimationFrame(() => {
-    app._pendingRedrawRaf = null;
-    app.redrawObjectCanvas();
-  });
-}
-
-export function onInit(app: App): void {
-  app.runtime.initPackWorker();
-}
-
-export function onAfterViewInit(app: App): void {
-  app.runtime.restartWasmGame();
-}
-
-export function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return '0:00';
-  const s = Math.floor(seconds);
-  const mm = Math.floor(s / 60);
-  const ss = s % 60;
-  return `${mm}:${ss.toString().padStart(2, '0')}`;
-}
-
-export function getEditorSectionIndex(app: App): number {
-  return app.SECTION_ORDER.indexOf(app.editorSection());
-}
-
-export function setEditorSectionIndex(app: App, idx: number): void {
-  const section = app.SECTION_ORDER[idx];
-  if (section) app.runtime.setSection(section);
-}
-
-export function toggleFullscreen(): void {
-  const frame = document.getElementById('game-frame');
-  const frameWindow = frame instanceof HTMLIFrameElement ? frame.contentWindow : null;
-  const canvas = frameWindow?.document.querySelector<HTMLCanvasElement>('#canvas');
-  if (!canvas) {
-    return;
-  }
-  if (document.fullscreenElement) {
-    document.exitFullscreen();
-  } else {
-    canvas.requestFullscreen().catch((err) => console.warn('Fullscreen error:', err));
-  }
-}
-
-export function onVolumeChange(app: App, event: Event): void {
-  const pct = Number.parseInt((event.target as HTMLInputElement).value, 10);
-  app.masterVolume.set(pct);
-  app.runtime.applyVolumeToWasm(pct);
 }

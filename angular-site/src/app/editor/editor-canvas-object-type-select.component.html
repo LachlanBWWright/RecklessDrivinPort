@@ -1,0 +1,36 @@
+<mat-form-field
+  appearance="outline"
+  subscriptSizing="dynamic"
+  class="mb-0 min-w-[150px] max-w-[190px] flex-[0_0_auto]"
+>
+  <mat-label>+ Object</mat-label>
+  <mat-select
+    [value]="selectedTypeId"
+    [disabled]="disabled || availableTypeIds.length === 0"
+    aria-label="Object type to place"
+    (selectionChange)="typeChange.emit($event.value)"
+  >
+    <mat-select-trigger>
+      <span class="inline-flex w-full min-w-0 items-center gap-2">
+        @if (getSpriteUrl(selectedTypeId); as url) {
+          <img
+            class="h-7 w-7 shrink-0 rounded border border-white/20 object-contain"
+            [src]="url"
+            alt=""
+          />
+        } @else {
+          <span
+            class="grid h-7 w-7 shrink-0 place-items-center rounded border border-white/20 text-[0.68rem] font-bold"
+            >{{ selectedTypeId }}</span
+          >
+        }
+        <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+          >Type {{ selectedTypeId }}</span
+        >
+      </span>
+    </mat-select-trigger>
+    @for (typeRes of availableTypeIds; track typeRes) {
+      <app-editor-canvas-type-option [typeRes]="typeRes" [getSpriteUrl]="getSpriteUrl" />
+    }
+  </mat-select>
+</mat-form-field>

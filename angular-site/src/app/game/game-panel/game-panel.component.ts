@@ -1,4 +1,14 @@
-import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  EventEmitter,
+  Input,
+  OnInit,
+  OnDestroy,
+  Output,
+  inject,
+} from '@angular/core';
 import {
   ADDON_COP,
   ADDON_LOCK,
@@ -31,7 +41,9 @@ type CustomResourcesSelectValue = CustomResourcesPresetId | 'upload-custom' | 'c
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class GamePanelComponent {
+export class GamePanelComponent implements OnInit, OnDestroy {
+  private readonly cdr = inject(ChangeDetectorRef);
+
   @Input() activeTab: 'game' | 'editor' = 'game';
   @Input() statusText = '';
   @Input() progressPct = 0;
@@ -108,14 +120,58 @@ export class GamePanelComponent {
     { mask: BONUS_ROLL_EXTRA_LIFE, label: 'Extra life roll' },
   ];
 
+  connectedGamepadName: string | null = null;
+
+  private readonly handleGamepadConnected = (e: Event): void => {
+    const ge = e as GamepadEvent;
+    if (ge.gamepad) {
+      this.connectedGamepadName = ge.gamepad.id || 'Gamepad';
+      this.cdr.markForCheck();
+    }
+  };
+
+  private readonly handleGamepadDisconnected = (): void => {
+    this.checkConnectedGamepads();
+    this.cdr.markForCheck();
+  };
+
+  ngOnInit(): void {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gamepadconnected', this.handleGamepadConnected);
+      window.addEventListener('gamepaddisconnected', this.handleGamepadDisconnected);
+      this.checkConnectedGamepads();
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('gamepadconnected', this.handleGamepadConnected);
+      window.removeEventListener('gamepaddisconnected', this.handleGamepadDisconnected);
+    }
+  }
+
+  private checkConnectedGamepads(): void {
+    if (typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function') {
+      const pads = navigator.getGamepads();
+      for (const pad of pads) {
+        if (pad && pad.connected) {
+          this.connectedGamepadName = pad.id || 'Gamepad';
+          return;
+        }
+      }
+    }
+    this.connectedGamepadName = null;
+  }
+
   hasMask(value: number, mask: number): boolean {
     return (value & mask) !== 0;
   }
 
   get pendingCustomOptionsPresetDescription(): string {
     return (
-      this.customOptionsPresetOptions.find((preset) => preset.id === this.pendingCustomOptionsPreset)
-        ?.description ?? ''
+      this.customOptionsPresetOptions.find(
+        (preset) => preset.id === this.pendingCustomOptionsPreset,
+      )?.description ?? ''
     );
   }
 

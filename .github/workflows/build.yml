@@ -7,20 +7,17 @@ on:
     branches: [ main, master ]
 
 permissions:
-  contents: write    # needed to create releases
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ============================================================
   # Linux native build (SDL2)
   # ============================================================
   build-linux:
-    if: false
     name: Build on Linux (SDL2)
     runs-on: ubuntu-latest
     permissions:
@@ -40,6 +37,9 @@ jobs:
 
       - name: Build
         run: cmake --build build --parallel
+
+      - name: Run native tests
+        run: ctest --test-dir build --output-on-failure
 
       - name: Check binary exists
         run: |
@@ -230,14 +230,12 @@ jobs:
     runs-on: ubuntu-latest
     # only run on the default branch so we don't publish preview builds
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-    # the `github-pages` environment can require manual approval, which
-    # will block the job and make deploys appear to hang.  Remove the
-    # environment or clear any protection rules in the repository settings
-    # if you want automatic publishing.  (We keep the URL output logic for
-    # now, but you can drop the whole `environment` block if you prefer.)
-    # environment:
-    #   name: github-pages
-    #   url: ${{ steps.deployment.outputs.page_url }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
@@ -246,147 +244,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-  # ============================================================
-  # Android APK build with on-screen touch controls
-  # ============================================================
-  build-android:
-    if: false
-    name: Build Android APK (SDL2 + touch controls)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Set up Android SDK environment
-        run: |
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-
-      - name: Install Android NDK and build tools
-        run: |
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "ndk;25.2.9519653" \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            --sdk_root=$ANDROID_HOME
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
-
-      - name: Download SDL2 source
-        run: |
-          SDL2_VERSION=2.28.5
-          wget -q "https://github.com/libsdl-org/SDL/releases/download/release-${SDL2_VERSION}/SDL2-${SDL2_VERSION}.tar.gz"
-          tar xzf "SDL2-${SDL2_VERSION}.tar.gz"
-          echo "SDL2_SOURCE_DIR=$PWD/SDL2-${SDL2_VERSION}" >> $GITHUB_ENV
-
-      - name: Copy resources.dat to Android assets
-        run: |
-          mkdir -p port/android/app/src/main/assets
-          cp port/resources/resources.dat port/android/app/src/main/assets/
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.4'
-
-      - name: Build Android APK (debug)
-        working-directory: port/android
-        run: |
-          gradle assembleDebug \
-            -PSDL2_SOURCE_DIR="$SDL2_SOURCE_DIR" \
-            --no-daemon \
-            --stacktrace
-
-      - name: Verify APK was produced
-        run: |
-          APK=$(find port/android/app/build/outputs/apk -name "*.apk" | head -1)
-          test -n "$APK" && echo "APK: $APK ($(du -sh $APK | cut -f1))" || (echo "APK not found!" && exit 1)
-
-      - name: Upload Android APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: reckless-drivin-android
-          path: port/android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-
-  # ============================================================
-  # Create GitHub Release on push to main/master
-  # ============================================================
-  release:
-    if: false
-    name: Create GitHub Release
-    needs: [build-linux, build-macos, build-windows, build-android]
-    runs-on: ubuntu-latest
-    #if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download Linux artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: reckless-drivin-linux
-          path: release/linux
-
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: reckless-drivin-macos
-          path: release/macos
-
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: reckless-drivin-windows
-          path: release/windows
-
-      - name: Download Android APK artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: reckless-drivin-android
-          path: release/android
-
-      - name: Prepare release assets
-        run: |
-          cp port/resources/resources.dat release/resources.dat
-          cp port/resources/resources.dat release/linux/resources.dat
-          cp port/resources/resources.dat release/macos/resources.dat
-          cp port/resources/resources.dat release/windows/resources.dat
-          cp release/resources.dat release/android/resources.dat
-          chmod +x release/linux/reckless_drivin
-          chmod +x release/macos/reckless_drivin
-          (cd release/linux   && zip -9 ../reckless-drivin-linux.zip reckless_drivin resources.dat)
-          (cd release/macos   && zip -9 ../reckless-drivin-macos.zip reckless_drivin resources.dat)
-          (cd release/windows && zip -9 ../reckless-drivin-windows.zip reckless_drivin.exe resources.dat)
-          (cd release/android && zip -9 ../reckless-drivin-android.zip app-debug.apk resources.dat)
-
-      - name: Create or update release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: "Reckless Drivin' – Latest Build"
-          body: |
-            Automated build from `${{ github.ref_name }}` @ `${{ github.sha }}`.
-
-            Each desktop zip already includes both the game binary and
-            `resources.dat` required to run the game.
-          prerelease: false
-          files: |
-            release/reckless-drivin-linux.zip
-            release/reckless-drivin-macos.zip
-            release/reckless-drivin-windows.zip
-            release/reckless-drivin-android.zip
-            release/android/app-debug.apk
-            release/resources.dat

@@ -4,6 +4,25 @@ import { failEditor, loadResourcesBytes } from './app-loaders';
 import { resultFromPromise } from './result-helpers';
 import type { ResourceMergeOptions } from './resource-merge';
 
+const SUCCESS_SNACKBAR_CLASS = [
+  '[&_.mdc-snackbar__surface]:!border',
+  '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
+  '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
+  '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
+];
+const ERROR_SNACKBAR_CLASS = [
+  '[&_.mdc-snackbar__surface]:!border',
+  '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
+  '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
+  '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
+];
+const WARNING_SNACKBAR_CLASS = [
+  '[&_.mdc-snackbar__surface]:!border',
+  '[&_.mdc-snackbar__surface]:!border-[#8a6d1f]',
+  '[&_.mdc-snackbar__surface]:!bg-[#3f3214]',
+  '[&_.mdc-snackbar__surface]:!text-[#ffe08a]',
+];
+
 export function resetEditorData(app: App): void {
   app.hasEditorData.set(false);
   app.editorError.set('');
@@ -84,6 +103,8 @@ export function resetEditorData(app: App): void {
 }
 
 export async function loadDefaultResources(app: App): Promise<void> {
+  if (app.workerBusy()) return;
+  app.workerBusy.set(true);
   app.editorError.set('');
   app.resourcesStatus.set('Loading default resources.dat…');
   const bytesResult = await app.runtime.readAssetBytes('resources.dat');
@@ -91,6 +112,7 @@ export async function loadDefaultResources(app: App): Promise<void> {
     (bytes) => loadResourcesBytes(app, bytes, 'default resources.dat'),
     (error) => {
       failEditor(app, error, 'Failed to load resources.');
+      app.workerBusy.set(false);
     },
   );
 }
@@ -180,12 +202,7 @@ export async function onResourceMergeSelected(
     'OK',
     {
       duration: 4500,
-      panelClass: [
-        '[&_.mdc-snackbar__surface]:!border',
-        '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
-        '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
-        '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
-      ],
+      panelClass: SUCCESS_SNACKBAR_CLASS,
     },
   );
 }
@@ -194,12 +211,7 @@ export function clearEditorResources(app: App): void {
   resetEditorData(app);
   app.snackBar.open('Editor file cleared', 'OK', {
     duration: 2500,
-    panelClass: [
-      '[&_.mdc-snackbar__surface]:!border',
-      '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
-      '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
-      '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
-    ],
+    panelClass: SUCCESS_SNACKBAR_CLASS,
   });
 }
 
@@ -211,12 +223,7 @@ function warnIfSelectedLevelHasObjectsBeyondFinish(app: App): void {
   app.resourcesStatus.set(warning);
   app.snackBar.open(`⚠ ${warning}`, 'Dismiss', {
     duration: 7000,
-    panelClass: [
-      '[&_.mdc-snackbar__surface]:!border',
-      '[&_.mdc-snackbar__surface]:!border-[#8a6d1f]',
-      '[&_.mdc-snackbar__surface]:!bg-[#3f3214]',
-      '[&_.mdc-snackbar__surface]:!text-[#ffe08a]',
-    ],
+    panelClass: WARNING_SNACKBAR_CLASS,
   });
 }
 
@@ -303,26 +310,22 @@ export async function downloadEditedResources(app: App, stripScripts = false): P
             ? 'Downloaded updated resources.dat without scripting resources.'
             : 'Downloaded updated resources.dat.',
         );
-        app.snackBar.open(stripScripts ? '✓ Downloaded resources.dat without scripts' : '✓ Downloaded resources.dat', 'OK', {
-          duration: 3000,
-          panelClass: [
-            '[&_.mdc-snackbar__surface]:!border',
-            '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
-            '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
-            '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
-          ],
-        });
+        app.snackBar.open(
+          stripScripts
+            ? '✓ Downloaded resources.dat without scripts'
+            : '✓ Downloaded resources.dat',
+          'OK',
+          {
+            duration: 3000,
+            panelClass: SUCCESS_SNACKBAR_CLASS,
+          },
+        );
       },
       (msg) => {
         app.editorError.set(msg);
         app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
           duration: 5000,
-          panelClass: [
-            '[&_.mdc-snackbar__surface]:!border',
-            '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
-            '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
-            '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
-          ],
+          panelClass: ERROR_SNACKBAR_CLASS,
         });
       },
     );
@@ -360,12 +363,7 @@ export async function saveEditedResourcesToGame(app: App, stripScripts = false):
         app.snackBar
           .open('✓ Saved to game – click Restart With Customisations to apply', 'Restart', {
             duration: 8000,
-            panelClass: [
-              '[&_.mdc-snackbar__surface]:!border',
-              '[&_.mdc-snackbar__surface]:!border-[#2e6b2e]',
-              '[&_.mdc-snackbar__surface]:!bg-[#1b3a1b]',
-              '[&_.mdc-snackbar__surface]:!text-[#a5d6a7]',
-            ],
+            panelClass: SUCCESS_SNACKBAR_CLASS,
           })
           .onAction()
           .subscribe(() => app.runtime.restartGameWithCustomResources());
@@ -374,12 +372,7 @@ export async function saveEditedResourcesToGame(app: App, stripScripts = false):
         app.editorError.set(msg);
         app.snackBar.open(`✗ ${msg}`, 'Dismiss', {
           duration: 5000,
-          panelClass: [
-            '[&_.mdc-snackbar__surface]:!border',
-            '[&_.mdc-snackbar__surface]:!border-[#7c2626]',
-            '[&_.mdc-snackbar__surface]:!bg-[#3a1b1b]',
-            '[&_.mdc-snackbar__surface]:!text-[#ef9a9a]',
-          ],
+          panelClass: ERROR_SNACKBAR_CLASS,
         });
       },
     );

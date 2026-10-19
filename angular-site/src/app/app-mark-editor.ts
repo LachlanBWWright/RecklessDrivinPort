@@ -1,4 +1,11 @@
-import { clampBarrierPoint, generateCentreDashMarkings, generateSideMarkings, removeMarkingsInYRange, sampleQuadraticBezier, type MarkingRoadSelection } from './road-marking-utils';
+import {
+  clampBarrierPoint,
+  generateCentreDashMarkings,
+  generateSideMarkings,
+  removeMarkingsInYRange,
+  sampleQuadraticBezier,
+  type MarkingRoadSelection,
+} from './road-marking-utils';
 import type { MarkSeg, RoadSeg } from './level-editor.service';
 import type { App } from './app';
 import { resultFromPromise } from './result-helpers';
@@ -56,7 +63,13 @@ export function generateSideRoadMarks(
 ): void {
   const level = app.selectedLevel();
   if (!level) return;
-  const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset, yFrequency });
+  const generated = generateSideMarkings(level.roadSegs, {
+    roadSelection,
+    yStart,
+    yEnd,
+    inset,
+    yFrequency,
+  });
   appendGeneratedMarks(app, generated, 'side road');
   clearMarkingPreviews(app);
 }
@@ -93,7 +106,13 @@ export function previewSideRoadMarks(
   const level = app.selectedLevel();
   if (!level) return;
   setMarkingRangePreview(app, yStart, yEnd);
-  const generated = generateSideMarkings(level.roadSegs, { roadSelection, yStart, yEnd, inset, yFrequency });
+  const generated = generateSideMarkings(level.roadSegs, {
+    roadSelection,
+    yStart,
+    yEnd,
+    inset,
+    yFrequency,
+  });
   app.markingPreview.set(generated);
 }
 
@@ -132,7 +151,8 @@ export function removeMarksByYRange(app: App, yStart: number, yEnd: number): voi
   clearMarkingPreviews(app);
   const currentMarks = app.marks();
   const selectedMarkIndex = app.selectedMarkIndex();
-  const selectedMark = selectedMarkIndex !== null ? currentMarks[selectedMarkIndex] ?? null : null;
+  const selectedMark =
+    selectedMarkIndex !== null ? (currentMarks[selectedMarkIndex] ?? null) : null;
   const nextMarks = removeMarkingsInYRange(currentMarks, { yStart, yEnd });
   const removedCount = currentMarks.length - nextMarks.length;
   if (removedCount === 0) {
@@ -287,7 +307,12 @@ export function joinAdjacentMarkNubs(app: App): void {
   app.scheduleMarkAutoSave();
 }
 
-export function onMarkFieldInput(app: App, markIdx: number, field: 'x1' | 'y1' | 'x2' | 'y2', value: number): void {
+export function onMarkFieldInput(
+  app: App,
+  markIdx: number,
+  field: 'x1' | 'y1' | 'x2' | 'y2',
+  value: number,
+): void {
   const val = Number(value);
   if (Number.isNaN(val)) return;
   app._pushUndo('marks');
@@ -307,7 +332,10 @@ export async function saveMarks(app: App): Promise<void> {
     'Save failed',
   ).match(
     (result) => {
-      app.applyLevelsResult(result.levels, { preserveCanvasView: true, refreshSelectedLevelState: false });
+      app.applyLevelsResult(result.levels, {
+        preserveCanvasView: true,
+        refreshSelectedLevelState: false,
+      });
       app.resourcesStatus.set(`Saved ${app.marks().length} mark segments for level ${id - 139}.`);
     },
     (msg) => {
@@ -331,15 +359,21 @@ export function handleCurveDrawClick(app: App, wx: number, wy: number): void {
     app._curveEndPoint = null;
     app.konva.setBarrierDrawPreview([wx, -wy]);
     app.konva.flush();
-    app.snackBar.open('Curve start set. Click the curve end point next.', undefined, { duration: 1500 });
+    app.snackBar.open('Curve start set. Click the curve end point next.', undefined, {
+      duration: 1500,
+    });
     return;
   }
   if (!app._curveEndPoint) {
     app._curveEndPoint = { wx, wy };
     updateCurvePreview(app, wx, wy);
-    app.snackBar.open('Curve end set. Move to adjust the bend, then click again to apply.', undefined, {
-      duration: 1800,
-    });
+    app.snackBar.open(
+      'Curve end set. Move to adjust the bend, then click again to apply.',
+      undefined,
+      {
+        duration: 1800,
+      },
+    );
     return;
   }
 

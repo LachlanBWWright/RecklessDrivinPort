@@ -1,5 +1,10 @@
-import { LUA_API_GROUPS, LUA_HOOK_COMPLETIONS, LUA_SELF_COMPLETIONS, LUA_CTX_COMPLETIONS } from './lua-script-api';
-import { completeLuaHostApi, completeLuaResourceReferences } from './lua-script-completions';
+import {
+  LUA_API_GROUPS,
+  LUA_HOOK_COMPLETIONS,
+  LUA_SELF_COMPLETIONS,
+  LUA_CTX_COMPLETIONS,
+} from './lua-script-api';
+import { completeLuaHostApi, completeLuaResourceReferences, completeLuaScript } from './lua-script-completions';
 
 describe('lua script completions', () => {
   it('keeps completion labels unique within each API group', () => {
@@ -20,7 +25,9 @@ describe('lua script completions', () => {
     const source = 'function onTick(self, ctx)\n  self:';
     const result = completeLuaHostApi(source, source.length);
     expect(result?.options.some((completion) => completion.label === 'setVelocity')).toBe(true);
-    expect(result?.options.some((completion) => completion.label === 'spawnObjectType')).toBe(false);
+    expect(result?.options.some((completion) => completion.label === 'spawnObjectType')).toBe(
+      false,
+    );
   });
 
   it('suggests ctx methods after ctx colon', () => {
@@ -31,17 +38,57 @@ describe('lua script completions', () => {
   });
 
   it('suggests constants after constant table dots', () => {
-    const result = completeLuaHostApi('self:setControl(Control.', 'self:setControl(Control.'.length);
+    const result = completeLuaHostApi(
+      'self:setControl(Control.',
+      'self:setControl(Control.'.length,
+    );
     expect(result?.options.some((completion) => completion.label === 'Control.Cop')).toBe(true);
     expect(result?.options.some((completion) => completion.label === 'Addon.Turbo')).toBe(false);
 
-    const trackResult = completeLuaHostApi('ctx:spawnOnTrack(typeId, Track.', 'ctx:spawnOnTrack(typeId, Track.'.length);
+    const trackResult = completeLuaHostApi(
+      'ctx:spawnOnTrack(typeId, Track.',
+      'ctx:spawnOnTrack(typeId, Track.'.length,
+    );
     expect(trackResult?.options.some((completion) => completion.label === 'Track.Up')).toBe(true);
-    expect(trackResult?.options.some((completion) => completion.label === 'RoadSide.Left')).toBe(false);
+    expect(trackResult?.options.some((completion) => completion.label === 'RoadSide.Left')).toBe(
+      false,
+    );
 
-    const sideResult = completeLuaHostApi('ctx:spawnTrackside(typeId, RoadSide.', 'ctx:spawnTrackside(typeId, RoadSide.'.length);
-    expect(sideResult?.options.some((completion) => completion.label === 'RoadSide.Right')).toBe(true);
+    const sideResult = completeLuaHostApi(
+      'ctx:spawnTrackside(typeId, RoadSide.',
+      'ctx:spawnTrackside(typeId, RoadSide.'.length,
+    );
+    expect(sideResult?.options.some((completion) => completion.label === 'RoadSide.Right')).toBe(
+      true,
+    );
     expect(sideResult?.options.some((completion) => completion.label === 'Track.Down')).toBe(false);
+  });
+
+  it('replaces a partially typed constant without duplicating its table', () => {
+    const source = 'self:setControl(Control.Co';
+    const result = completeLuaHostApi(source, source.length);
+    const cop = result?.options.find((completion) => completion.label === 'Control.Cop');
+    expect(cop).toBeDefined();
+    expect(source.slice(0, result?.from) + cop?.apply).toBe('self:setControl(Control.Cop');
+  });
+
+  it('completes a partially typed hook without inserting function twice', () => {
+    const source = 'function onTi';
+    const result = completeLuaHostApi(source, source.length);
+    const hook = result?.options.find((completion) => completion.label === 'onTick');
+    expect(hook).toBeDefined();
+    expect(source.slice(0, result?.from) + hook?.apply).toBe('function onTick(self, ctx, dt)\n  \nend');
+  });
+
+  it('suppresses API and workspace completions inside strings and comments', () => {
+    for (const source of ['-- ctx:', 'local text = "ctx:', '--[=[ ctx:', 'local text = [=[ ctx:']) {
+      expect(completeLuaScript({
+        source,
+        position: source.length,
+        objectTypes: [], sounds: [], spriteFrames: [],
+        workspaceSymbols: [{ label: 'helper', type: 'function', detail: 'helper()', documentation: 'Helper' }],
+      })).toBeNull();
+    }
   });
 
   it('suggests object type ids inside spawnObjectType', () => {
@@ -49,7 +96,13 @@ describe('lua script completions', () => {
     const result = completeLuaResourceReferences({
       source,
       position: source.length,
-      objectTypes: [{ id: 200, label: 'Frame #12 · 3 frames', description: 'Object typeId 200. Base frame 12.' }],
+      objectTypes: [
+        {
+          id: 200,
+          label: 'Frame #12 · 3 frames',
+          description: 'Object typeId 200. Base frame 12.',
+        },
+      ],
       sounds: [{ id: 128, label: '0.5s · 4000 bytes', description: 'Sound soundId 128.' }],
       spriteFrames: [{ id: 300, label: '16x16 · 8-bit', description: 'Sprite frameId 300.' }],
     });
@@ -62,6 +115,23 @@ describe('lua script completions', () => {
         apply: '200',
       },
     ]);
+  });
+
+  it('only suggests resource ids in the resource argument position', () => {
+    const source = 'ctx:spawnObjectType(typeId, ';
+    const result = completeLuaResourceReferences({
+      source,
+      position: source.length,
+      objectTypes: [{ id: 200, label: 'Frame #12 · 3 frames', description: 'Object typeId 200.' }],
+      sounds: [],
+      spriteFrames: [],
+    });
+    expect(result).toBeNull();
+  });
+
+  it('does not offer global hook completion in ordinary expressions', () => {
+    const source = 'local value = 1';
+    expect(completeLuaHostApi(source, source.length)).toBeNull();
   });
 
   it('suggests object type ids inside spawnRelative', () => {
@@ -78,7 +148,12 @@ describe('lua script completions', () => {
   });
 
   it('suggests object type ids inside deterministic spawn helpers', () => {
-    for (const source of ['ctx:spawnAt(', 'ctx:spawnNearPlayer(', 'ctx:spawnOnTrack(', 'ctx:spawnTrackside(']) {
+    for (const source of [
+      'ctx:spawnAt(',
+      'ctx:spawnNearPlayer(',
+      'ctx:spawnOnTrack(',
+      'ctx:spawnTrackside(',
+    ]) {
       const result = completeLuaResourceReferences({
         source,
         position: source.length,
@@ -89,7 +164,6 @@ describe('lua script completions', () => {
       expect(result?.options[0]?.apply).toBe('202');
     }
   });
-
 
   it('suggests sound ids inside playSound', () => {
     const source = 'ctx:playSound(';
@@ -183,12 +257,45 @@ describe('lua script completions', () => {
 
   it('covers all expected self API methods', () => {
     const expectedSelfMethods = [
-      'x', 'y', 'setPosition', 'velocityX', 'velocityY', 'setVelocity', 'addVelocity',
-      'direction', 'setDirection', 'frame', 'setFrame', 'setFrameDuration', 'damage', 'setDamage',
-      'typeId', 'maxDamage', 'scoreValue', 'mass', 'width', 'length', 'flags', 'flags2',
-      'control', 'layer', 'setLayer', 'isPlayer', 'exists', 'isOnScreen', 'distanceTo', 'angleTo',
-      'setInput', 'setControl', 'kill', 'remove', 'getState', 'setState', 'addChild', 'removeChild',
-      'childCount'
+      'x',
+      'y',
+      'setPosition',
+      'velocityX',
+      'velocityY',
+      'setVelocity',
+      'addVelocity',
+      'direction',
+      'setDirection',
+      'frame',
+      'setFrame',
+      'setFrameDuration',
+      'damage',
+      'setDamage',
+      'typeId',
+      'maxDamage',
+      'scoreValue',
+      'mass',
+      'width',
+      'length',
+      'flags',
+      'flags2',
+      'control',
+      'layer',
+      'setLayer',
+      'isPlayer',
+      'exists',
+      'isOnScreen',
+      'distanceTo',
+      'angleTo',
+      'setInput',
+      'setControl',
+      'kill',
+      'remove',
+      'getState',
+      'setState',
+      'addChild',
+      'removeChild',
+      'childCount',
     ];
     for (const name of expectedSelfMethods) {
       const completion = LUA_SELF_COMPLETIONS.find((c) => c.label === name);
@@ -199,14 +306,46 @@ describe('lua script completions', () => {
 
   it('covers all expected ctx API methods', () => {
     const expectedCtxMethods = [
-      'playerDistance', 'levelTime', 'levelNumber', 'levelResourceId', 'levelEndY',
-      'player', 'playerX', 'playerY', 'playerSpeed', 'playerDamage',
-      'teleportPlayer', 'teleportPlayerRelative', 'objectTypeExists', 'soundExists', 'frameExists',
-      'findNearestObject', 'countObjects', 'spawnObjectType', 'spawnAt', 'spawnNearPlayer',
-      'spawnOnTrack', 'spawnTrackside', 'spawnRelative', 'despawnChildren', 'playSound',
-      'addScore', 'fireWeapon', 'getScriptState', 'setScriptState', 'getLevelState', 'setLevelState',
-      'setTimer', 'getTimer', 'clearTimer', 'timerRemaining', 'after', 'every', 'cancelSchedule',
-      'setPlayerNearRadius'
+      'log',
+      'playerDistance',
+      'levelTime',
+      'levelNumber',
+      'levelResourceId',
+      'levelEndY',
+      'player',
+      'playerX',
+      'playerY',
+      'playerSpeed',
+      'playerDamage',
+      'teleportPlayer',
+      'teleportPlayerRelative',
+      'objectTypeExists',
+      'soundExists',
+      'frameExists',
+      'findNearestObject',
+      'countObjects',
+      'spawnObjectType',
+      'spawnAt',
+      'spawnNearPlayer',
+      'spawnOnTrack',
+      'spawnTrackside',
+      'spawnRelative',
+      'despawnChildren',
+      'playSound',
+      'addScore',
+      'fireWeapon',
+      'getScriptState',
+      'setScriptState',
+      'getLevelState',
+      'setLevelState',
+      'setTimer',
+      'getTimer',
+      'clearTimer',
+      'timerRemaining',
+      'after',
+      'every',
+      'cancelSchedule',
+      'setPlayerNearRadius',
     ];
     for (const name of expectedCtxMethods) {
       const completion = LUA_CTX_COMPLETIONS.find((c) => c.label === name);

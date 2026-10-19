@@ -147,7 +147,9 @@ export function applyUndoSnapshot(app: App, snapshot: EditorUndoSnapshot): void 
       app.editRoadInfo.set(snapshot.editRoadInfo);
       app.editRoadInfoData.set(snapshot.editRoadInfoData ? { ...snapshot.editRoadInfoData } : null);
       app.selectedRoadInfoId.set(snapshot.selectedRoadInfoId);
-      app.selectedRoadInfoData.set(snapshot.selectedRoadInfoData ? { ...snapshot.selectedRoadInfoData } : null);
+      app.selectedRoadInfoData.set(
+        snapshot.selectedRoadInfoData ? { ...snapshot.selectedRoadInfoData } : null,
+      );
       if (snapshot.editRoadInfoData) {
         app.roadInfoDataMap.set(snapshot.editRoadInfo, { ...snapshot.editRoadInfoData });
         app.refreshRoadInfoDerivedState();
@@ -165,7 +167,9 @@ export function applyUndoSnapshot(app: App, snapshot: EditorUndoSnapshot): void 
     case 'road': {
       const roadSegs = snapshot.roadSegs.map((seg) => ({ ...seg }));
       app.parsedLevels.update((levels) =>
-        levels.map((level) => (level.resourceId === snapshot.levelId ? { ...level, roadSegs } : level)),
+        levels.map((level) =>
+          level.resourceId === snapshot.levelId ? { ...level, roadSegs } : level,
+        ),
       );
       app._roadOffscreenKey = '';
       app.roadSegsVersion.update((v) => v + 1);

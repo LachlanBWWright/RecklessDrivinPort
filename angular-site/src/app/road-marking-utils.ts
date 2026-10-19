@@ -76,7 +76,10 @@ export function sampleQuadraticBezier(
 ): WorldPoint[] {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
-  const curveDist = Math.hypot(dx, dy) + Math.hypot(control.x - start.x, control.y - start.y) + Math.hypot(end.x - control.x, end.y - control.y);
+  const curveDist =
+    Math.hypot(dx, dy) +
+    Math.hypot(control.x - start.x, control.y - start.y) +
+    Math.hypot(end.x - control.x, end.y - control.y);
   const stepCount = Math.max(16, steps ?? Math.ceil(curveDist / 12));
   const points: WorldPoint[] = [];
   for (let i = 0; i <= stepCount; i++) {
@@ -140,7 +143,11 @@ function pointAtDistance(points: readonly LinePoint[], distance: number): LinePo
   return points[points.length - 1];
 }
 
-function dashedSegmentsFromGroup(points: readonly LinePoint[], dashLength: number, gapLength: number): MarkSeg[] {
+function dashedSegmentsFromGroup(
+  points: readonly LinePoint[],
+  dashLength: number,
+  gapLength: number,
+): MarkSeg[] {
   const safeDashLength = Math.max(1, dashLength);
   const safeGapLength = Math.max(1, gapLength);
   const cycle = safeDashLength + safeGapLength;
@@ -263,10 +270,7 @@ export function removeMarkingsInYRange(
 ): MarkSeg[] {
   const minY = Math.min(options.yStart, options.yEnd);
   const maxY = Math.max(options.yStart, options.yEnd);
-  return marks.filter((mark) => (
-    mark.y1 < minY
-    || mark.y1 > maxY
-    || mark.y2 < minY
-    || mark.y2 > maxY
-  ));
+  return marks.filter(
+    (mark) => mark.y1 < minY || mark.y1 > maxY || mark.y2 < minY || mark.y2 > maxY,
+  );
 }

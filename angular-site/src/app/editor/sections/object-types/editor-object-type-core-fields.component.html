@@ -1,0 +1,23 @@
+<app-editor-detail-card>
+  <div [formGroup]="form">
+  <div class="mb-3 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[var(--muted)]">
+    Core data
+  </div>
+  <div class="grid min-h-0 grid-cols-2 gap-3 max-[1200px]:grid-cols-1">
+    @for (field of fields; track field.name) {
+      <mat-form-field appearance="outline" [matTooltip]="tooltips[field.name]">
+        <mat-label>{{ field.label }}</mat-label>
+        <input
+          matInput
+          type="number"
+          [attr.inputmode]="field.inputMode"
+          [formControlName]="field.name"
+        />
+        @if (field.name === 'numFrames') {
+          <mat-hint>Raw <code>numFrames</code> encoding from the game</mat-hint>
+        }
+      </mat-form-field>
+    }
+  </div>
+</div>
+</app-editor-detail-card>

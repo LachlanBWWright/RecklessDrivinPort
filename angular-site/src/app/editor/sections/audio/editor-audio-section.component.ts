@@ -22,6 +22,17 @@ import { formatTime } from '../../../app-runtime';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorAudioSectionComponent implements OnChanges {
+  audioEntryClass(id: number): string {
+    return this.selectedAudioId === id
+      ? 'border-[color:rgba(66,165,245,0.6)] bg-[color:rgba(66,165,245,0.12)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]'
+      : 'border-transparent bg-[var(--surface2)] hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]';
+  }
+
+  audioEntryDetail(entry: { sizeBytes: number; durationMs?: number }): string {
+    return entry.durationMs === undefined
+      ? `${entry.sizeBytes.toLocaleString()} B`
+      : `${(entry.durationMs / 1000).toFixed(1)}s`;
+  }
   @Input() audioEntries: { id: number; sizeBytes: number; durationMs?: number }[] = [];
   @Input() selectedAudioId: number | null = null;
   @Input() selectedAudioBytes: Uint8Array | null = null;
@@ -47,6 +58,8 @@ export class EditorAudioSectionComponent implements OnChanges {
   readonly audioSeekControl = new FormControl<number | null>(null);
 
   constructor() {
+    this.audioEntryClass = this.audioEntryClass.bind(this);
+    this.audioEntryDetail = this.audioEntryDetail.bind(this);
     this.audioVolumeControl.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
       const next = Number(value);
       if (!Number.isNaN(next)) {

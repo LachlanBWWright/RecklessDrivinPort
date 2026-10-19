@@ -1,0 +1,16 @@
+@for (tool of tools; track tool) {
+  <button
+    mat-icon-button
+    class="!h-10 !w-10 !rounded-md !border !bg-[var(--surface2)] !p-2 transition"
+    [class.!border-[var(--accent2)]]="tool === this.tool"
+    [class.!bg-[color:rgba(66,165,245,0.12)]]="this.tool === tool"
+    [class.!text-[var(--accent2)]]="this.tool === tool"
+    [class.!border-[var(--border)]]="this.tool !== tool"
+    [class.!text-[var(--on-surface)]]="this.tool !== tool"
+    [class.active]="this.tool === tool"
+    (click)="toolChange.emit(tool)"
+    [matTooltip]="tool"
+  >
+    <mat-icon>{{ toolIcons[tool] }}</mat-icon>
+  </button>
+}

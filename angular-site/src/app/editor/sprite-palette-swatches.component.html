@@ -1,0 +1,13 @@
+<div class="flex max-h-[140px] flex-wrap gap-0.5 overflow-y-auto">
+  @for (color of colors; track $index) {
+    <div
+      class="h-[18px] w-[18px] cursor-pointer rounded-[2px] border border-[var(--border)]"
+      [style.background]="'rgb(' + color.r + ',' + color.g + ',' + color.b + ')'"
+      [matTooltip]="'rgb(' + color.r + ',' + color.g + ',' + color.b + ')'"
+      (click)="colorSelected.emit(color)"
+    ></div>
+  }
+  @if (colors.length === 0 && emptyLabel) {
+    <p class="m-0 text-[0.72rem] text-[var(--muted)]">{{ emptyLabel }}</p>
+  }
+</div>

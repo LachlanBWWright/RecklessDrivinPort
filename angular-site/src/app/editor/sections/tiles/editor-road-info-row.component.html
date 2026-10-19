@@ -1,0 +1,46 @@
+<div
+  class="flex w-full items-center gap-3 rounded-[10px] border border-transparent bg-[var(--surface2)] px-3 py-2.5 text-left transition duration-100 ease-out hover:-translate-y-px hover:border-white/10 hover:bg-[var(--surface3)]"
+  [ngClass]="
+    selectedRoadInfoId === option.id
+      ? 'border-[color:rgba(66,165,245,0.55)] bg-[color:rgba(66,165,245,0.16)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.1)]'
+      : ''
+  "
+>
+  <button
+    type="button"
+    class="flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-inherit"
+    (click)="selected.emit(option.id)"
+  >
+    @if (option.previewUrl) {
+      <img
+        class="h-7 w-[54px] shrink-0 rounded-md border border-white/15 object-cover"
+        [src]="option.previewUrl"
+        [alt]="'Road info ' + option.id"
+      />
+    } @else {
+      <span
+        class="h-7 w-[54px] shrink-0 rounded-md border border-white/15"
+        [style.background]="
+          option.water
+            ? 'linear-gradient(135deg,#0a7a1e,#354ab5)'
+            : 'linear-gradient(135deg,#555,#2c2c2c)'
+        "
+      ></span>
+    }
+    <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+      option.label
+    }}</span>
+  </button>
+  <span class="inline-flex items-center" [matTooltip]="getRoadDeleteTooltip(option.id)">
+    <button
+      type="button"
+      mat-icon-button
+      color="warn"
+      [disabled]="!canDeleteRoadInfo(option.id)"
+      (click)="$event.stopPropagation(); deleted.emit(option.id)"
+      [attr.aria-label]="'Delete road ' + option.id"
+    >
+      <mat-icon>delete</mat-icon>
+    </button>
+  </span>
+</div>

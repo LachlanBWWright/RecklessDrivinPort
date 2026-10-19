@@ -46,3 +46,11 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+*storybook.log
+storybook-static
+/storybook-screenshots/
+**/*.spec.ts-snapshots/
+/test-results/
+/playwright-report/
+documentation.json

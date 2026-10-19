@@ -1,0 +1,41 @@
+<div [formGroup]="formGroup">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+    <mat-select [formControlName]="field">
+      <mat-select-trigger>
+        @if (getTextureEntry(getValue()); as selectedTexture) {
+          <span class="inline-flex w-full min-w-0 items-center gap-2">
+            <app-editor-tile-thumbnail
+              [url]="getTileDataUrl(selectedTexture.texId)"
+              [alt]="'Texture ' + selectedTexture.texId"
+            />
+            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{
+              getTextureLabel(selectedTexture.texId)
+            }}</span>
+          </span>
+        } @else {
+          <span class="inline-flex w-full min-w-0 items-center gap-2">
+            <span
+              class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"
+            ></span>
+            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+              >#{{ getValue() }}</span
+            >
+          </span>
+        }
+      </mat-select-trigger>
+      @for (tile of tileEntries; track tile.texId) {
+        <mat-option [value]="tile.texId">
+          <span class="inline-flex min-w-0 items-center gap-2">
+            <app-editor-tile-thumbnail
+              [url]="getTileDataUrl(tile.texId)"
+              [alt]="'Texture ' + tile.texId"
+            />
+            <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+              >#{{ tile.texId }} · {{ tile.width }}×{{ tile.height }} px</span
+            >
+          </span>
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</div>

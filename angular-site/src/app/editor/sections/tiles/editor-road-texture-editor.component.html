@@ -1,0 +1,96 @@
+<h4 class="mb-3 text-[0.88rem] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">
+  Road {{ selectedRoadInfoData?.id }}
+</h4>
+<p class="text-sm leading-relaxed text-[var(--muted)]">
+  Texture references are stored with the shared road record. Physics fields remain on the Properties
+  tab.
+</p>
+
+<form [formGroup]="roadTextureForm">
+  <table
+    class="mb-4 w-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface2)] border-collapse [&_th]:border-b [&_th]:border-[var(--border)] [&_th]:bg-[var(--surface3)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-[0.75rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.05em] [&_th]:text-[var(--muted)] [&_td]:border-b [&_td]:border-[var(--border)] [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-[0.85rem] [&_td]:text-[var(--on-surface)] [&_tbody_tr:hover_td]:bg-[var(--surface3)]"
+  >
+    <tbody>
+      <tr>
+        <th colspan="2">Road Assets</th>
+      </tr>
+      <tr>
+        <td>backgroundTex</td>
+        <td>
+          <app-editor-texture-select
+            [formGroup]="roadTextureForm"
+            [field]="'backgroundTex'"
+            [tileEntries]="tileTileEntries"
+            [getTileDataUrl]="getTileDataUrl"
+          ></app-editor-texture-select>
+        </td>
+      </tr>
+      <tr>
+        <td>foregroundTex</td>
+        <td>
+          <app-editor-texture-select
+            [formGroup]="roadTextureForm"
+            [field]="'foregroundTex'"
+            [tileEntries]="tileTileEntries"
+            [getTileDataUrl]="getTileDataUrl"
+          ></app-editor-texture-select>
+        </td>
+      </tr>
+      <tr>
+        <td>roadLeftBorder</td>
+        <td>
+          <app-editor-texture-select
+            [formGroup]="roadTextureForm"
+            [field]="'roadLeftBorder'"
+            [tileEntries]="tileTileEntries"
+            [getTileDataUrl]="getTileDataUrl"
+          ></app-editor-texture-select>
+        </td>
+      </tr>
+      <tr>
+        <td>roadRightBorder</td>
+        <td>
+          <app-editor-texture-select
+            [formGroup]="roadTextureForm"
+            [field]="'roadRightBorder'"
+            [tileEntries]="tileTileEntries"
+            [getTileDataUrl]="getTileDataUrl"
+          ></app-editor-texture-select>
+        </td>
+      </tr>
+      <tr>
+        <td>marks</td>
+        <td>
+          <app-editor-texture-select
+            [formGroup]="roadTextureForm"
+            [field]="'marks'"
+            [tileEntries]="tileTileEntries"
+            [getTileDataUrl]="getTileDataUrl"
+          ></app-editor-texture-select>
+        </td>
+      </tr>
+      <tr>
+        <td>tracks</td>
+        <td>
+          <app-editor-texture-select
+            [formGroup]="roadTextureForm"
+            [field]="'tracks'"
+            [tileEntries]="tileTileEntries"
+            [getTileDataUrl]="getTileDataUrl"
+          ></app-editor-texture-select>
+        </td>
+      </tr>
+      <tr>
+        <td>skidSound</td>
+        <td>
+          <app-editor-road-skid-sound
+            [form]="roadTextureForm"
+            [audioEntries]="audioEntries"
+            [workerBusy]="workerBusy"
+            (play)="playRoadSkidSound.emit($event)"
+          />
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</form>

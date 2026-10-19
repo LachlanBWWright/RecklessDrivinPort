@@ -1108,6 +1108,25 @@ void test_RemainingHooksAndAPIs(void)
 	printf("  -> Passed!\n");
 }
 
+static void test_TracebackAndStackBalance(void)
+{
+    lua_State *L = CreateScriptState();
+    assert(L != NULL);
+    assert(luaL_loadbuffer(L, "local function fail() error('trace marker') end; fail()", strlen("local function fail() error('trace marker') end; fail()"), "Scrp #101") == LUA_OK);
+    assert(ScriptPCall(L, 0, 0) != LUA_OK);
+    assert(lua_gettop(L) == 1);
+    const char *message = lua_tostring(L, -1);
+    assert(strstr(message, "trace marker") != NULL);
+    assert(strstr(message, "stack traceback:") != NULL);
+    lua_pop(L, 1);
+    assert(luaL_loadstring(L, "return 12, 34") == LUA_OK);
+    assert(ScriptPCall(L, 0, 2) == LUA_OK);
+    assert(lua_gettop(L) == 2);
+    assert(lua_tointeger(L, -2) == 12);
+    assert(lua_tointeger(L, -1) == 34);
+    lua_close(L);
+}
+
 int main(int argc, char **argv)
 {
 	printf("===========================================\n");
@@ -1121,6 +1140,7 @@ int main(int argc, char **argv)
 	return 1;
 #endif
 
+    test_TracebackAndStackBalance();
 	test_ParserAndBindingLoad();
 	test_HookDispatch();
 	test_SelfAPI();

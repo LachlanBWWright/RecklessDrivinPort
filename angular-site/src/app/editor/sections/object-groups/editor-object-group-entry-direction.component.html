@@ -1,0 +1,18 @@
+<mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+  <mat-label>Direction</mat-label
+  ><input matInput type="number" inputmode="decimal" [formControl]="control" />
+  <span matSuffix class="inline-flex items-center">
+    @if (isAutoDir(control.value)) {
+      <span
+        class="inline-flex min-w-[34px] items-center justify-center rounded-full bg-[color:rgba(66,165,245,0.18)] px-1.5 py-0.5 text-[0.64rem] font-extrabold uppercase tracking-[0.08em] leading-none text-[var(--accent2)]"
+        >AUTO</span
+      >
+    } @else {
+      <mat-icon
+        class="!h-[18px] !w-[18px] !text-[18px]"
+        [style.transform]="getDirArrowRotation(control.value)"
+        >north</mat-icon
+      >
+    }
+  </span>
+</mat-form-field>

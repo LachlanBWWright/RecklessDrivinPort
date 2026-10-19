@@ -1,0 +1,230 @@
+<!-- Canvas toolbar -->
+<div
+  class="flex flex-col gap-1.5 border-b border-[var(--border)] bg-[var(--surface)] px-[14px] py-2 text-[var(--muted)]"
+>
+  <div class="flex flex-wrap items-center gap-0.5">
+    <!-- Undo / Redo -->
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.undo.emit()"
+      [disabled]="!host.canUndo"
+      matTooltip="Undo (Ctrl+Z)"
+    >
+      <mat-icon>undo</mat-icon>
+    </button>
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.redo.emit()"
+      [disabled]="!host.canRedo"
+      matTooltip="Redo (Ctrl+Y)"
+    >
+      <mat-icon>redo</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
+    <!-- Object actions -->
+    <app-editor-canvas-object-type-select
+      [selectedTypeId]="host.selectedAddObjectTypeId"
+      [availableTypeIds]="host.availableTypeIds"
+      [disabled]="host.workerBusy"
+      [getSpriteUrl]="host.getSpriteUrl"
+      (typeChange)="host.addObjectTypeChange.emit($event)"
+    />
+
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.duplicateObject.emit()"
+      [disabled]="host.selectedObjIndex === null"
+      matTooltip="Duplicate selected (Ctrl+D)"
+    >
+      <mat-icon>content_copy</mat-icon>
+    </button>
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.removeObject.emit()"
+      [disabled]="host.selectedObjIndex === null"
+      matTooltip="Remove selected (Del)"
+    >
+      <mat-icon>delete</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
+    <!-- View controls -->
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.frameAll.emit()"
+      matTooltip="Frame all objects"
+    >
+      <mat-icon>fit_screen</mat-icon>
+    </button>
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.centerSelected.emit()"
+      [disabled]="host.selectedObjIndex === null"
+      matTooltip="Center on selected"
+    >
+      <mat-icon>center_focus_strong</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
+    <!-- Marks toggle + mark management (visible when host.marks enabled) -->
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      [ngClass]="
+        host.showMarks ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''
+      "
+      (click)="host.toggleMarks.emit()"
+      matTooltip="Toggle checkpoint marks"
+    >
+      <mat-icon>edit_location</mat-icon>
+    </button>
+    @if (host.showMarks) {
+      <button
+        mat-icon-button
+        class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+        (click)="host.addMark.emit()"
+        [disabled]="host.workerBusy"
+        matTooltip="Add mark"
+      >
+        <mat-icon>add_location</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+        [ngClass]="
+          host.markCreateMode
+            ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]'
+            : ''
+        "
+        (click)="host.markCreateMode ? host.confirmMarkCreate.emit() : host.startMarkCreate.emit()"
+        [disabled]="host.workerBusy"
+        [matTooltip]="
+          host.markCreateMode
+            ? 'Confirm create (' + host.pendingMarkPointCount + ' pts)'
+            : 'Create mark by click'
+        "
+      >
+        <mat-icon>{{ host.markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+        (click)="host.removeMark.emit()"
+        [disabled]="host.selectedMarkIndex === null || host.workerBusy"
+        matTooltip="Remove selected mark"
+      >
+        <mat-icon>remove_circle_outline</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+        [ngClass]="
+          host.showMarkingPopup
+            ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]'
+            : ''
+        "
+        (click)="host.toggleMarkingPopup()"
+        [matTooltip]="host.showMarkingPopup ? 'Close marking generator' : 'Generate road markings'"
+      >
+        <mat-icon>auto_awesome</mat-icon>
+      </button>
+    }
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
+    <!-- Draw mode selector: 'none' = select/pan; other values enable barrier drawing -->
+    <mat-button-toggle-group
+      class="h-10 min-h-10 [&_.mat-button-toggle-button]:h-10 [&_.mat-button-toggle-label-content]:inline-flex [&_.mat-button-toggle-label-content]:h-10 [&_.mat-button-toggle-label-content]:items-center [&_.mat-button-toggle-label-content]:px-3 [&_.mat-button-toggle-label-content]:leading-10 [&_.mat-button-toggle]:h-10 [&_.mat-icon]:!h-[18px] [&_.mat-icon]:!w-[18px] [&_.mat-icon]:!text-[18px] [&_.mat-icon]:!leading-[18px]"
+      [value]="host.drawMode"
+      (change)="host.drawModeChange.emit($event.value)"
+      matTooltip="Select draw mode"
+    >
+      <mat-button-toggle value="none" matTooltip="Select / pan (no drawing)">
+        <mat-icon>pan_tool</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="freehand" matTooltip="Freehand barrier draw">
+        <mat-icon>gesture</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="straight" matTooltip="Straight-line barrier draw">
+        <mat-icon>show_chart</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle
+        value="curve"
+        matTooltip="Bezier-style barrier draw: click start, end, then bend"
+      >
+        <mat-icon>timeline</mat-icon>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+    @if (host.drawMode !== 'none') {
+      <mat-button-toggle-group
+        class="h-10 min-h-10 [&_.mat-button-toggle-button]:h-10 [&_.mat-button-toggle-label-content]:inline-flex [&_.mat-button-toggle-label-content]:h-10 [&_.mat-button-toggle-label-content]:items-center [&_.mat-button-toggle-label-content]:px-3 [&_.mat-button-toggle-label-content]:leading-10 [&_.mat-button-toggle]:h-10 [&_.mat-icon]:!h-[18px] [&_.mat-icon]:!w-[18px] [&_.mat-icon]:!text-[18px] [&_.mat-icon]:!leading-[18px]"
+        [value]="host.barrierDrawSide"
+        (change)="host.barrierDrawSideChange.emit($event.value)"
+        matTooltip="Select which barrier side to draw"
+      >
+        <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
+        <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
+        <mat-button-toggle
+          value="i"
+          matTooltip="Merge inner barriers: snap both v1 and v2 to the same drawn x"
+          >I</mat-button-toggle
+        >
+        <mat-button-toggle value="v2" matTooltip="Right inner barrier (v2)">Ri</mat-button-toggle>
+        <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
+      </mat-button-toggle-group>
+    }
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
+    <app-editor-canvas-road-controls
+      [canvasForm]="host.canvasForm"
+      [editRoadInfo]="host.editRoadInfo"
+      [roadInfoOptions]="host.roadInfoOptions"
+      [getRoadInfoOption]="host.getRoadInfoOption"
+      (timeLimitFocus)="host.onTimeLimitFocus()"
+      (timeLimitBlur)="host.onTimeLimitBlur()"
+      (timeLimitCommit)="host.commitTimeLimit()"
+    />
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
+    <!-- Zoom controls -->
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.zoomIn.emit()"
+      matTooltip="Zoom in (+)"
+    >
+      <mat-icon>zoom_in</mat-icon>
+    </button>
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.zoomOut.emit()"
+      matTooltip="Zoom out (-)"
+    >
+      <mat-icon>zoom_out</mat-icon>
+    </button>
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      (click)="host.resetView.emit()"
+      matTooltip="Reset view"
+    >
+      <mat-icon>home</mat-icon>
+    </button>
+    <mat-divider [vertical]="true" class="!mx-0.5 !h-5 !border-r-[var(--border)]"></mat-divider>
+    <!-- Info button -->
+    <button
+      mat-icon-button
+      class="!h-10 !w-10 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+      [ngClass]="
+        host.showInfoPopup
+          ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]'
+          : ''
+      "
+      (click)="host.showInfoPopup = !host.showInfoPopup"
+      matTooltip="Editor help &amp; info"
+    >
+      <mat-icon>info</mat-icon>
+    </button>
+  </div>
+</div>

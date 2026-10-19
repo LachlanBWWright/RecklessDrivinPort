@@ -1,0 +1,21 @@
+@if (selectedIconId !== null) {
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden py-1">
+    <h4 class="shrink-0 text-base font-bold text-[var(--on-surface)]">
+      {{ selectedIconLabel }}
+    </h4>
+    <app-editor-screen-details
+      [previewDataUrl]="iconPreviewDataUrl"
+      [type]="selectedIconType"
+      [workerBusy]="workerBusy"
+      (openImageEditor)="openImageEditor.emit()"
+      (exportPng)="exportPng.emit()"
+      (exportRaw)="exportRaw.emit()"
+      (pngUpload)="pngUpload.emit($event)"
+      (rawUpload)="rawUpload.emit($event)"
+    />
+  </div>
+} @else {
+  <div class="flex h-[200px] flex-col items-center justify-center text-[var(--muted)]">
+    <p class="text-[0.85rem] text-[var(--muted)]">Select an entry from the list.</p>
+  </div>
+}

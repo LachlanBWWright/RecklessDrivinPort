@@ -1,0 +1,80 @@
+<div
+  class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 py-4 pr-1 max-[1100px]:px-3 max-[1100px]:py-3"
+>
+  @if (selectedTileId !== null) {
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      @if (getTileDataUrl(selectedTileId); as url) {
+        <app-image-preview
+          [src]="url"
+          alt="tile preview"
+          [pixelated]="true"
+          loadingIcon="grid_view"
+        ></app-image-preview>
+      } @else {
+        <app-image-preview
+          [src]="null"
+          alt="tile preview"
+          [pixelated]="true"
+          loadingIcon="grid_view"
+        ></app-image-preview>
+      }
+      <mat-card class="w-full shrink-0 !border !border-[var(--border)] !bg-[var(--surface3)]">
+        <mat-card-content class="!px-3.5 !py-2.5">
+          <p
+            class="m-0 text-[0.82rem] leading-[1.7] text-[var(--on-surface)] [&_strong]:font-semibold [&_strong]:text-[var(--muted)]"
+          >
+            <strong>Tile</strong> #{{ selectedTileId }}<br />
+            <strong>Size</strong> {{ selectedTileDimensions }}<br />
+            <strong>Format</strong> RGB555 (16-bit)
+          </p>
+        </mat-card-content>
+      </mat-card>
+      <div class="flex shrink-0 flex-wrap gap-2">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="openTileEditor.emit(selectedTileId)"
+          [disabled]="workerBusy"
+          matTooltip="Open pixel editor for this tile"
+        >
+          <mat-icon>brush</mat-icon> Edit Pixels
+        </button>
+        <input
+          #tilePngInput
+          type="file"
+          accept="image/png,image/*"
+          style="display: none"
+          (change)="tilePngUpload.emit({ event: $event, texId: selectedTileId })"
+        />
+        <button
+          mat-stroked-button
+          (click)="tilePngInput.click()"
+          [disabled]="workerBusy"
+          matTooltip="Upload a PNG to replace this tile (scaled to match dimensions)"
+        >
+          <mat-icon>upload</mat-icon> Upload PNG
+        </button>
+        <button mat-stroked-button (click)="exportTilePng.emit(selectedTileId)">
+          <mat-icon>download</mat-icon> Export PNG
+        </button>
+      </div>
+    </div>
+  } @else if (selectedRoadInfoData) {
+    <app-editor-road-texture-editor
+      [selectedRoadInfoData]="selectedRoadInfoData"
+      [roadTextureForm]="roadTextureForm"
+      [tileTileEntries]="tileTileEntries"
+      [audioEntries]="audioEntries"
+      [workerBusy]="workerBusy"
+      [getTileDataUrl]="getTileDataUrl"
+      (playRoadSkidSound)="playRoadSkidSound.emit($event)"
+    ></app-editor-road-texture-editor>
+  } @else {
+    <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
+      <mat-icon class="!h-14 !w-14 !text-[56px] text-[var(--surface4)]">route</mat-icon>
+      <p class="max-w-[600px] leading-[1.6] text-[var(--muted)]">
+        Select a road record to edit its tile assignments.
+      </p>
+    </div>
+  }
+</div>

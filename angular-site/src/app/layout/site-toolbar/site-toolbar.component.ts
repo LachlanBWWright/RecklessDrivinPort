@@ -18,6 +18,9 @@ export type EditorSection =
 @Component({
   selector: 'app-site-toolbar',
   templateUrl: './site-toolbar.component.html',
+  host: {
+    class: 'site-toolbar block min-w-0',
+  },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -40,9 +43,15 @@ export class SiteToolbarComponent {
     options: ResourceMergeOptions;
   }>();
   @Output() downloadEditedResources = new EventEmitter<boolean>();
+  @Output() openLuaEditor = new EventEmitter<void>();
+  @Output() exportLuaProject = new EventEmitter<void>();
+  @Output() importLuaProject = new EventEmitter<Event>();
   @Output() clearEditorFile = new EventEmitter<void>();
   @Output() selectLevel = new EventEmitter<number>();
-  @Output() previewSelectedLevel = new EventEmitter<{ levelResourceId: number; stripScripts: boolean }>();
+  @Output() previewSelectedLevel = new EventEmitter<{
+    levelResourceId: number;
+    stripScripts: boolean;
+  }>();
 
   pendingMergeFile: File | null = null;
   mergeDialogOpen = false;
@@ -75,6 +84,14 @@ export class SiteToolbarComponent {
     { id: 'screens', label: 'Screens', icon: 'tv' },
     { id: 'strings', label: 'Strings', icon: 'text_fields' },
   ];
+
+  onMergeOptionsChange(options: ResourceMergeOptions): void {
+    Object.assign(this.mergeOptions, options);
+  }
+
+  onMergeLevelIdsChange(levelResourceIds: readonly number[]): void {
+    this.mergeOptions.levelResourceIds = [...levelResourceIds];
+  }
 
   readonly levelDisplayNum = levelDisplayNum;
 

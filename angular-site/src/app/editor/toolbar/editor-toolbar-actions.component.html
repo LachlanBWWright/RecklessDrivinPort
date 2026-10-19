@@ -1,0 +1,52 @@
+<div class="flex items-center gap-3">
+  <div class="flex flex-1 items-center gap-2">
+    <button mat-stroked-button (click)="loadDefaultResources.emit()" [disabled]="workerBusy">
+      <mat-icon>cloud_download</mat-icon> Load Default
+    </button>
+    <input
+      #fileInput
+      type="file"
+      accept=".dat"
+      (change)="resourceFileSelected.emit($event)"
+      [disabled]="workerBusy"
+      style="display: none"
+    />
+    <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="workerBusy">
+      <mat-icon>folder_open</mat-icon> Upload resources.dat
+    </button>
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="downloadEditedResources.emit()"
+      [disabled]="!hasEditorData || workerBusy"
+    >
+      <mat-icon>download</mat-icon> Download Edited
+    </button>
+    <button
+      mat-raised-button
+      color="accent"
+      (click)="saveEditedResourcesToGame.emit()"
+      [disabled]="!hasEditorData || workerBusy"
+      matTooltip="Save all edits (including sprites) to the game and prepare for restart"
+    >
+      <mat-icon>save</mat-icon> Save to Game
+    </button>
+
+    <app-editor-toolbar-level-buttons
+      [parsedLevels]="parsedLevels"
+      [selectedLevelId]="selectedLevelId"
+      (selectLevel)="selectLevel.emit($event)"
+    />
+  </div>
+  <div class="flex items-center gap-2.5 text-[0.82rem]">
+    @if (workerBusy) {
+      <mat-spinner diameter="18" class="inline-block"></mat-spinner>
+      <span class="text-[0.85rem] text-[var(--muted)]">Processing…</span>
+    }
+    @if (editorError) {
+      <span class="flex items-center gap-1 text-[var(--danger)]">
+        <mat-icon>warning</mat-icon> {{ editorError }}
+      </span>
+    }
+  </div>
+</div>

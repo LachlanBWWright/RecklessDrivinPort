@@ -1,0 +1,26 @@
+<div class="flex w-full items-start gap-2" [formGroup]="form">
+  <button
+    mat-icon-button
+    type="button"
+    (click)="play.emit(value)"
+    [disabled]="workerBusy || !getAudioEntry(value)"
+    matTooltip="Play selected skid sound"
+  >
+    <mat-icon>play_arrow</mat-icon>
+  </button>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mb-0 w-full min-w-0">
+    <mat-select formControlName="skidSound">
+      <mat-select-trigger>
+        <app-editor-sound-option [label]="getLabel(value)" />
+      </mat-select-trigger>
+      @for (audio of audioEntries; track audio.id) {
+        <mat-option [value]="audio.id">
+          <app-editor-sound-option [label]="getLabel(audio.id)" />
+        </mat-option>
+      }
+      @if (!getAudioEntry(value)) {
+        <mat-option [value]="value">#{{ value }} (custom)</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</div>

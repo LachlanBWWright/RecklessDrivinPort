@@ -1,0 +1,101 @@
+<div
+  class="flex min-h-0 w-[320px] min-w-[300px] shrink-0 flex-col gap-3 overflow-hidden border-l border-l-[var(--border)] bg-[var(--surface2)] p-4 max-[1024px]:max-h-[42vh] max-[1024px]:w-full max-[1024px]:min-w-0 max-[1024px]:flex-[0_0_auto] max-[1024px]:border-l-0 max-[1024px]:border-t max-[1024px]:border-t-[var(--border)] max-[1024px]:p-3"
+>
+  <div class="flex rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1">
+    <button
+      type="button"
+      class="flex-1 rounded-[10px] px-3 py-2 text-[0.8rem] font-semibold transition"
+      [ngClass]="
+        host.sidebarTab === 'objects'
+          ? 'bg-[color:rgba(66,165,245,0.16)] text-[var(--accent2)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]'
+          : 'text-[var(--muted)] hover:bg-white/[0.04]'
+      "
+      (click)="host.setSidebarTab('objects')"
+    >
+      Objects
+    </button>
+    <button
+      type="button"
+      class="flex-1 rounded-[10px] px-3 py-2 text-[0.8rem] font-semibold transition"
+      [ngClass]="
+        host.sidebarTab === 'groups'
+          ? 'bg-[color:rgba(66,165,245,0.16)] text-[var(--accent2)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]'
+          : 'text-[var(--muted)] hover:bg-white/[0.04]'
+      "
+      (click)="host.setSidebarTab('groups')"
+    >
+      Groups
+    </button>
+  </div>
+
+  @if (host.sidebarTab === 'objects') {
+    <div
+      class="[scrollbar-width:thin] [scrollbar-color:var(--surface4)_var(--bg)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[var(--bg)] [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[var(--surface4)] [&::-webkit-scrollbar-thumb:hover]:bg-[var(--muted)] flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1"
+    >
+      <app-object-inspector
+        [selectedIndex]="host.selectedObjIndex"
+        [editDirDeg]="host.editObjDirDeg"
+        [editTypeRes]="host.editObjTypeRes"
+        [availableTypeIds]="host.availableTypeIds"
+        [spriteUrl]="host.spriteUrl"
+        [getSpriteUrl]="host.getSpriteUrl"
+        [getFallbackColor]="host.getFallbackColor"
+        [typePalette]="host.typePalette"
+        [visibleTypeFilter]="host.visibleTypeFilter"
+        [workerBusy]="host.workerBusy"
+        [typeDimLabel]="host.typeDimLabel"
+        (dirDegInput)="host.dirDegInput.emit($event)"
+        (typeResChange)="host.typeResChange.emit($event)"
+        (typeVisibilityToggle)="host.typeVisibilityToggle.emit($event)"
+        (showAll)="host.showAll.emit()"
+        (hideAll)="host.hideAll.emit()"
+        (removeSelected)="host.removeSelected.emit()"
+        (deselect)="host.deselect.emit()"
+      ></app-object-inspector>
+
+      <app-object-list
+        [objects]="host.objects"
+        [filteredIndices]="host.filteredIndices"
+        [selectedIndex]="host.selectedObjIndex"
+        [searchTerm]="host.searchTerm"
+        [getSpriteUrl]="host.getSpriteUrl"
+        [getFallbackColor]="host.getFallbackColor"
+        (objectSelected)="host.objectSelected.emit($event)"
+        (searchTermChange)="host.searchTermChange.emit($event)"
+      ></app-object-list>
+    </div>
+  } @else {
+    <app-editor-objects-groups-panel
+      [groupsTabHelpTooltip]="host.groupsTabHelpTooltip"
+      [visibleObjectGroupSlots]="host.visibleObjectGroupSlots"
+      [selectedObjectGroupSlotIndex]="host.selectedObjectGroupSlotIndex"
+      [previewStartY]="host.previewStartY"
+      [levelEnd]="host.levelEnd"
+      [showGeneratedObjectGroupPreviews]="host.showGeneratedObjectGroupPreviews"
+      [enabledGeneratedObjectGroupPreviewCount]="host.enabledGeneratedObjectGroupPreviewCount"
+      [getObjectGroupLabel]="host.getObjectGroupLabel"
+      [canPreviewObjectGroupSlot]="host.canPreviewObjectGroupSlot"
+      [isGeneratedObjectGroupPreviewEnabled]="host.isGeneratedObjectGroupPreviewEnabled"
+      [getGeneratedObjectGroupPreviewCount]="host.getGeneratedObjectGroupPreviewCount"
+      [toggleGeneratedPreviewForSlot]="host.toggleGeneratedPreviewForSlot"
+      [getPreviewEntries]="host.getPreviewEntries"
+      [trackPreviewEntry]="host.trackPreviewEntry"
+      [getTypeLabel]="host.getTypeLabel"
+      [getRelativeOddsLabel]="host.getRelativeOddsLabel"
+      [getPreviewRotationDegrees]="host.getPreviewRotationDegrees"
+      [getPreviewSpriteRotationDegrees]="host.getPreviewSpriteRotationDegrees"
+      [getSpriteUrl]="host.getSpriteUrl"
+      [getPreviewOverflowCount]="host.getPreviewOverflowCount"
+      [getOffsetSummary]="host.getOffsetSummary"
+      [trackGroupEntry]="host.trackGroupEntry"
+      [trackVisibleObjectGroupSlot]="host.trackVisibleObjectGroupSlot"
+      (previewStartYChange)="host.onPreviewStartYInput($event)"
+      (showGeneratedPreviewsChange)="host.setShowGeneratedObjectGroupPreviews($event)"
+      (enableAllPreviews)="host.enableAllGeneratedPreviews()"
+      (disableAllPreviews)="host.disableAllGeneratedPreviews()"
+      (regenerateEnabledPreviews)="host.regenerateEnabledGeneratedPreviews()"
+      (selectSlot)="host.selectObjectGroupSlot($event)"
+      (regenerateSlot)="host.regeneratePreviewForSlot($event)"
+    />
+  }
+</div>

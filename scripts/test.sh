@@ -4,4 +4,4 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 ensure_angular_dependencies
-(cd "$ANGULAR_DIR" && pnpm test --watch=false "$@")
+(cd "$ANGULAR_DIR" && pnpm run check:lua-api && pnpm test --watch=false "$@")

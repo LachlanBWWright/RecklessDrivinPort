@@ -196,6 +196,7 @@ export interface ScriptValidationIssue {
   scriptId: number;
   hook: ScriptHookId | null;
   line: number | null;
+  column?: number | null;
   message: string;
 }
 

@@ -1,3 +1,4 @@
+import { ChangeDetectorRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { vi } from 'vitest';
@@ -48,9 +49,12 @@ describe('LuaScriptEditorDialogComponent', () => {
     issues: [],
   };
 
-  function createComponent(close: (result?: LuaScriptEditorDialogResult) => void): LuaScriptEditorDialogComponent {
+  function createComponent(
+    close: (result?: LuaScriptEditorDialogResult) => void,
+  ): LuaScriptEditorDialogComponent {
     TestBed.configureTestingModule({
       providers: [
+        { provide: ChangeDetectorRef, useValue: { markForCheck: vi.fn() } },
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: { close } },
       ],
@@ -69,7 +73,17 @@ describe('LuaScriptEditorDialogComponent', () => {
       scriptId: 128,
       name: 'Chaser',
       source: data.script.source,
+      workspace: component.projectSnapshot(),
     });
+  });
+
+  it('revalidates the latest source even before the debounced diagnostics arrive', () => {
+    const close = vi.fn();
+    const component = createComponent(close);
+    component.currentSource = 'function onTick(\n';
+    expect(component.canSave).toBe(true);
+    component.save();
+    expect(close).not.toHaveBeenCalled();
   });
 
   it('closes without a result on clean cancel', () => {

@@ -1,0 +1,19 @@
+<div class="fixed inset-0 z-[270] flex items-center justify-center bg-black/70 p-4">
+  <mat-card class="w-full max-w-[560px] border border-[var(--border)] bg-[var(--surface)]"
+    ><mat-card-header><mat-card-title>Download resources.dat</mat-card-title></mat-card-header
+    ><mat-card-content
+      ><p>
+        Download the current editor resources.dat. You can omit scripting resources for a file
+        readable by the original game.
+      </p>
+      <mat-checkbox [checked]="stripScripts" (change)="stripScriptsChange.emit($event.checked)"
+        >Strip scripting resources</mat-checkbox
+      ></mat-card-content
+    ><mat-card-actions align="end"
+      ><button mat-button (click)="close.emit()">Cancel</button
+      ><button mat-raised-button color="primary" (click)="confirm.emit()">
+        Download
+      </button></mat-card-actions
+    ></mat-card
+  >
+</div>

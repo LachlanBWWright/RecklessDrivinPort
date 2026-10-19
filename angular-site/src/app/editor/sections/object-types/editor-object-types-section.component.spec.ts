@@ -1,13 +1,23 @@
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { EditorObjectTypesSectionComponent } from './editor-object-types-section.component';
-import type { ObjectTypeDefinition, ScriptBinding, ScriptDefinition, ScriptValidationIssue } from '../../../level-editor.service';
+import type {
+  ObjectTypeDefinition,
+  ScriptBinding,
+  ScriptDefinition,
+  ScriptValidationIssue,
+} from '../../../level-editor.service';
 import { SCRIPT_FORMAT_VERSION } from '../../../script-format';
 
 describe('EditorObjectTypesSectionComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [{ provide: MatDialog, useValue: { open: () => ({ afterClosed: () => ({ subscribe: () => undefined }) }) } }],
+      providers: [
+        {
+          provide: MatDialog,
+          useValue: { open: () => ({ afterClosed: () => ({ subscribe: () => undefined }) }) },
+        },
+      ],
     });
   });
 
@@ -87,7 +97,9 @@ describe('EditorObjectTypesSectionComponent', () => {
         source: 'function onTick(self, ctx)\n  self:setInput(1, 0.65)\nend\n',
       } satisfies ScriptDefinition,
     ];
-    component.scriptBindings = [{ objectTypeId: 200, scriptId: 128, flags: 0 }] satisfies ScriptBinding[];
+    component.scriptBindings = [
+      { objectTypeId: 200, scriptId: 128, flags: 0 },
+    ] satisfies ScriptBinding[];
     component.scriptIssues = [
       {
         severity: 'warning',

@@ -5,6 +5,11 @@ import { resultFromPromise, resultFromThrowable } from './result-helpers';
 
 import type { App } from './app';
 
+function audioDurationMs(frameCount: number, sampleRate: number): number | null {
+  if (sampleRate <= 0) return null;
+  return (frameCount / sampleRate) * 1000;
+}
+
 const parseSndHeaderSafe = resultFromThrowable(parseSndHeader, 'Failed to parse sound header');
 const sndToWavSafe = resultFromThrowable(sndToWav, 'Failed to convert snd to wav');
 const tryPlaySndResourceSafe = resultFromThrowable(tryPlaySndResource, 'Failed to play sound');
@@ -51,10 +56,7 @@ async function loadAudioDurations(host: App, ids: number[]) {
       ({ bytes }) => {
         if (!bytes) return null;
         return parseSndHeaderSafe(new Uint8Array(bytes)).match(
-          (sndInfo) =>
-            !sndInfo || sndInfo.sampleRate <= 0
-              ? null
-              : (sndInfo.numFrames / sndInfo.sampleRate) * 1000,
+          (sndInfo) => (sndInfo ? audioDurationMs(sndInfo.numFrames, sndInfo.sampleRate) : null),
           () => null,
         );
       },

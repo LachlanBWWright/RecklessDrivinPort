@@ -1,11 +1,29 @@
+import { captureLuaRuntimeMessage } from './lua-runtime-log';
 import { err, ok, type Result } from 'neverthrow';
 import { App } from './app';
 import { AppStateResources } from './app-state-resources';
+
+function applyCustomResourceEntry(
+  app: App,
+  entry: { bytes: Uint8Array; name: string } | null,
+): void {
+  if (!entry) return;
+  app._pendingCustomResources = entry.bytes;
+  app.customResourcesName.set(entry.name);
+}
 import {
   TERMINATOR_RESOURCE_ASSET_PATH,
   TERMINATOR_RESOURCE_NAME,
   type CustomResourcesPresetId,
 } from './game/game-customisation-presets';
+import {
+  buildPendingEditorTestDriveLaunch,
+  clearPendingEditorTestDriveLaunch,
+  consumePendingEditorTestDriveLaunch,
+  consumePendingRestartOptions,
+  savePendingEditorTestDriveLaunch,
+  savePendingRestartOptions,
+} from './app-platform-options';
 
 interface EmscriptenModuleLike {
   canvas?: HTMLCanvasElement;
@@ -25,6 +43,8 @@ interface EmscriptenModuleLike {
   ) => void;
   _rd_start_editor_test_drive?: () => void;
   _rd_set_runtime_paused?: (paused: number) => void;
+  _rd_set_touch_key?: (element: number, pressed: number) => void;
+  _rd_set_touch_controls_active?: (active: number) => void;
 }
 
 interface EmscriptenSdlAudioLike {
@@ -36,7 +56,7 @@ interface EmscriptenSdlAudioLike {
   };
 }
 
-interface PendingEditorTestDriveLaunch {
+export interface PendingEditorTestDriveLaunch {
   enabled: boolean;
   autoStart: boolean;
   levelNumber: number;
@@ -48,13 +68,11 @@ interface PendingEditorTestDriveLaunch {
   disabledBonusRollMask: number;
 }
 
-interface PendingGameRestartOptions {
+export interface PendingGameRestartOptions {
   useCustomResources: boolean;
   launch: PendingEditorTestDriveLaunch | null;
 }
 
-const EDITOR_TEST_DRIVE_STORAGE_KEY = 'reckless-drivin-editor-test-drive';
-const RESTART_OPTIONS_STORAGE_KEY = 'reckless-drivin-restart-options';
 const GAME_FRAME_ID = 'game-frame';
 const GAME_FRAME_SRCDOC = `<!doctype html>
 <html lang="en">
@@ -85,91 +103,11 @@ const GAME_FRAME_SRCDOC = `<!doctype html>
 
 let pendingRestartOptions: PendingGameRestartOptions | null = null;
 
-function clampNonNegativeInteger(value: number, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback;
-  return Math.max(0, Math.round(value));
-}
-
-function clampLevelNumber(value: number, maxLevel: number): number {
-  if (!Number.isFinite(value)) return 1;
-  return Math.max(1, Math.min(maxLevel, Math.round(value)));
-}
-
 function validateLevelNumber(value: number, maxLevel: number): number | null {
   if (!Number.isFinite(value)) return null;
   const rounded = Math.round(value);
   if (rounded < 1 || rounded > maxLevel) return null;
   return rounded;
-}
-
-function buildPendingEditorTestDriveLaunch(
-  app: App,
-  autoStart: boolean,
-): PendingEditorTestDriveLaunch | null {
-  const maxLevel = Math.max(1, app.parsedLevels().length || 10);
-  const hasSettings =
-    app.editorTestDriveUseStartY() ||
-    app.editorTestDriveUseObjectGroupStartY() ||
-    app.editorTestDriveForcedAddOns() !== 0 ||
-    app.editorTestDriveDisabledBonusRollMask() !== 0;
-  if (!autoStart && !hasSettings) {
-    return null;
-  }
-  return {
-    enabled: autoStart || hasSettings,
-    autoStart,
-    levelNumber: clampLevelNumber(app.editorTestDriveLevelNumber(), maxLevel),
-    hasStartY: app.editorTestDriveUseStartY(),
-    startY: clampNonNegativeInteger(app.editorTestDriveStartY(), 500),
-    hasObjectGroupStartY: app.editorTestDriveUseObjectGroupStartY(),
-    objectGroupStartY: clampNonNegativeInteger(app.editorTestDriveObjectGroupStartY(), 500),
-    forcedAddOns: app.editorTestDriveForcedAddOns() >>> 0,
-    disabledBonusRollMask: app.editorTestDriveDisabledBonusRollMask() >>> 0,
-  };
-}
-
-function savePendingEditorTestDriveLaunch(launch: PendingEditorTestDriveLaunch): boolean {
-  try {
-    sessionStorage.setItem(EDITOR_TEST_DRIVE_STORAGE_KEY, JSON.stringify(launch));
-    return true;
-  } catch (error) {
-    console.warn('[Angular] Failed to persist pending editor test drive launch', error);
-    return false;
-  }
-}
-
-function clearPendingEditorTestDriveLaunch(): void {
-  try {
-    sessionStorage.removeItem(EDITOR_TEST_DRIVE_STORAGE_KEY);
-  } catch (error) {
-    console.warn('[Angular] Failed to clear pending editor test drive launch', error);
-  }
-}
-
-function consumePendingEditorTestDriveLaunch(): PendingEditorTestDriveLaunch | null {
-  try {
-    const raw = sessionStorage.getItem(EDITOR_TEST_DRIVE_STORAGE_KEY);
-    if (!raw) return null;
-    sessionStorage.removeItem(EDITOR_TEST_DRIVE_STORAGE_KEY);
-    const parsed = JSON.parse(raw) as Partial<PendingEditorTestDriveLaunch>;
-    if (typeof parsed.levelNumber !== 'number') {
-      return null;
-    }
-    return {
-      enabled: parsed.enabled !== false,
-      autoStart: parsed.autoStart === true,
-      levelNumber: parsed.levelNumber,
-      hasStartY: parsed.hasStartY === true,
-      startY: clampNonNegativeInteger(parsed.startY ?? 500, 500),
-      hasObjectGroupStartY: parsed.hasObjectGroupStartY === true,
-      objectGroupStartY: clampNonNegativeInteger(parsed.objectGroupStartY ?? 500, 500),
-      forcedAddOns: clampNonNegativeInteger(parsed.forcedAddOns ?? 0, 0),
-      disabledBonusRollMask: clampNonNegativeInteger(parsed.disabledBonusRollMask ?? 0, 0),
-    };
-  } catch (error) {
-    console.warn('[Angular] Failed to restore pending editor test drive launch', error);
-    return null;
-  }
 }
 
 function tryStartPendingEditorTestDrive(
@@ -217,51 +155,6 @@ function tryStartPendingEditorTestDrive(
     launch.forcedAddOns >>> 0,
     launch.disabledBonusRollMask >>> 0,
   );
-}
-
-function savePendingRestartOptions(options: PendingGameRestartOptions): boolean {
-  try {
-    sessionStorage.setItem(RESTART_OPTIONS_STORAGE_KEY, JSON.stringify(options));
-    return true;
-  } catch (error) {
-    console.warn('[Angular] Failed to persist restart options', error);
-    return false;
-  }
-}
-
-function consumePendingRestartOptions(): PendingGameRestartOptions | null {
-  try {
-    const raw = sessionStorage.getItem(RESTART_OPTIONS_STORAGE_KEY);
-    if (!raw) return null;
-    sessionStorage.removeItem(RESTART_OPTIONS_STORAGE_KEY);
-    const parsed = JSON.parse(raw) as Partial<PendingGameRestartOptions>;
-    return {
-      useCustomResources: parsed.useCustomResources !== false,
-      launch:
-        parsed.launch && typeof parsed.launch.levelNumber === 'number'
-          ? {
-              enabled: parsed.launch.enabled !== false,
-              autoStart: parsed.launch.autoStart === true,
-              levelNumber: parsed.launch.levelNumber,
-              hasStartY: parsed.launch.hasStartY === true,
-              startY: clampNonNegativeInteger(parsed.launch.startY ?? 500, 500),
-              hasObjectGroupStartY: parsed.launch.hasObjectGroupStartY === true,
-              objectGroupStartY: clampNonNegativeInteger(
-                parsed.launch.objectGroupStartY ?? 500,
-                500,
-              ),
-              forcedAddOns: clampNonNegativeInteger(parsed.launch.forcedAddOns ?? 0, 0),
-              disabledBonusRollMask: clampNonNegativeInteger(
-                parsed.launch.disabledBonusRollMask ?? 0,
-                0,
-              ),
-            }
-          : null,
-    };
-  } catch (error) {
-    console.warn('[Angular] Failed to restore restart options', error);
-    return null;
-  }
 }
 
 function getGameFrameElement(app: App): HTMLIFrameElement | null {
@@ -362,6 +255,21 @@ export function initPackWorker(app: App): void {
   }
 }
 
+/**
+ * Stop any queued background decode work before starting a fresh resource load.
+ * The worker processes messages serially, so retaining it can leave a new LOAD
+ * request behind an expensive full-pack decode.
+ */
+export function resetPackWorker(app: App): void {
+  app.packWorker?.terminate();
+  app.packWorker = null;
+  for (const callback of app.pendingCallbacks.values()) {
+    callback({ id: -1, ok: false, cmd: '', error: 'Pack worker reset' });
+  }
+  app.pendingCallbacks.clear();
+  initPackWorker(app);
+}
+
 export function dispatchWorker<T>(
   app: App,
   cmd: string,
@@ -374,7 +282,12 @@ export function dispatchWorker<T>(
       return;
     }
     const id = app.nextMsgId++;
+    const timeout = window.setTimeout(() => {
+      if (!app.pendingCallbacks.delete(id)) return;
+      reject(new Error(`Pack worker timed out while processing ${cmd}`));
+    }, 60_000);
     app.pendingCallbacks.set(id, (resp: WorkerResponse) => {
+      window.clearTimeout(timeout);
       if (resp.ok) resolve(resp.result as T);
       else reject(new Error(resp.error ?? 'Worker error'));
     });
@@ -411,8 +324,8 @@ export function setupEmscriptenModule(app: App): void {
   gameWindow.Module = {
     locateFile: (path: string) => assetUrl(app, path),
     canvas,
-    print: (t: string) => console.log('[WASM]', t),
-    printErr: (t: string) => console.warn('[WASM ERR]', t),
+    print: (t: string) => { captureLuaRuntimeMessage(t); console.log('[WASM]', t); },
+    printErr: (t: string) => { captureLuaRuntimeMessage(t); console.warn('[WASM ERR]', t); },
     setStatus: (t: string) => {
       if (t) {
         app.statusText.set(t);
@@ -452,12 +365,9 @@ export function setupEmscriptenModule(app: App): void {
           return;
         }
         AppStateResources._loadCustomResourcesDb()
-          .then((entry: { bytes: Uint8Array; name: string } | null) => {
-            if (entry) {
-              app._pendingCustomResources = entry.bytes;
-              app.customResourcesName.set(entry.name);
-            }
-          })
+          .then((entry: { bytes: Uint8Array; name: string } | null) =>
+            applyCustomResourceEntry(app, entry),
+          )
           .catch((err: unknown) => {
             console.warn('[Angular] Failed to read custom resources.dat from IndexedDB', err);
           })

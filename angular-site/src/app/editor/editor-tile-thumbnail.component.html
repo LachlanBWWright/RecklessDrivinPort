@@ -1,0 +1,12 @@
+@if (url) {
+  <img
+    [src]="url"
+    class="h-6 w-12 shrink-0 rounded border border-white/20 object-cover"
+    [style.imageRendering]="'pixelated'"
+    [alt]="alt"
+  />
+} @else {
+  <span
+    class="h-6 w-12 shrink-0 rounded border border-white/20 bg-[linear-gradient(135deg,#555,#2c2c2c)]"
+  ></span>
+}

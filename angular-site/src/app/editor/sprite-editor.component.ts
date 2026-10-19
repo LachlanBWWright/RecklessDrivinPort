@@ -31,6 +31,16 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   @ViewChild('editorCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('paletteCanvas') paletteCanvasRef!: ElementRef<HTMLCanvasElement>;
+  cursorStyle(): string {
+    return this.tool === 'eyedropper' ? 'crosshair' : this.tool === 'fill' ? 'cell' : 'default';
+  }
+
+  setCanvasRef(canvas: ElementRef<HTMLCanvasElement>): void {
+    this.canvasRef = canvas;
+  }
+  colorStyle(): string {
+    return `rgba(${this.color[0]},${this.color[1]},${this.color[2]},${this.color[3] / 255})`;
+  }
   @ViewChild('overlayEl') overlayElRef?: ElementRef<HTMLDivElement>;
 
   tool: SpriteEditorTool = 'pencil';
@@ -455,6 +465,11 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     if (!isNaN(r + g + b)) this.color = [r, g, b, 255];
+  }
+
+  setColorFromInput(event: Event): void {
+    const input = event.target;
+    if (input instanceof HTMLInputElement) this.setColorFromHex(input.value);
   }
 
   selectPaletteColor(c: { r: number; g: number; b: number; a: number }): void {

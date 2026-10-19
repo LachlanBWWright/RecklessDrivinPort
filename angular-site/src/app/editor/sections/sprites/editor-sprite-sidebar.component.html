@@ -1,0 +1,27 @@
+<app-editor-sidebar>
+  <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-1">
+    <div class="min-w-0 flex-1">
+      <div class="text-base font-bold text-[var(--text)]">
+        Sprite Viewer &amp; PPic Asset Editor
+      </div>
+      <div
+        class="mt-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]"
+      >
+        {{ frames.length }} frames
+      </div>
+    </div>
+    <button mat-icon-button color="primary" [disabled]="workerBusy" (click)="addFrame.emit()">
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+  <app-editor-sidebar-scroll class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pb-4">
+    @for (frame of frames; track frame.id) {
+      <app-editor-sprite-list-item
+        [frame]="frame"
+        [selected]="selectedId === frame.id"
+        [getSpriteDataUrl]="getSpriteDataUrl"
+        (selectedChange)="selectedChange.emit($event)"
+      />
+    }
+  </app-editor-sidebar-scroll>
+</app-editor-sidebar>

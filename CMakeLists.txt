@@ -242,7 +242,7 @@ if(EMSCRIPTEN)
         "-s INITIAL_MEMORY=67108864"
         "-s WASM=1"
         "-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap]"
-        "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive,_rd_set_runtime_paused]"
+        "-s EXPORTED_FUNCTIONS=[_main,_set_wasm_master_volume,_rd_set_editor_launch_options,_rd_start_editor_test_drive,_rd_set_runtime_paused,_rd_set_touch_key,_rd_set_touch_controls_active]"
         "-s ASYNCIFY=1"
         "-s ASYNCIFY_STACK_SIZE=1048576"
         "-s AUDIO_WORKLET=1"
@@ -363,6 +363,17 @@ if(PORT_SDL2 AND NOT EMSCRIPTEN AND NOT ANDROID)
         separate_arguments(SDL2_LDFLAGS_LIST UNIX_COMMAND "${SDL2_LDFLAGS}")
         target_link_libraries(${GAME_TARGET} ${SDL2_LDFLAGS_LIST})
     endif()
+endif()
+
+# Exercise the same geometry and hit targets used by the native overlay.
+if(BUILD_TESTING AND PORT_SDL2 AND NOT ANDROID AND NOT EMSCRIPTEN)
+    add_executable(touch_layout_tests tests/touch_layout_tests.c)
+    if(SDL2_FOUND)
+        target_link_libraries(touch_layout_tests ${SDL2_LIBRARIES})
+    elseif(SDL2_LDFLAGS_LIST)
+        target_link_libraries(touch_layout_tests ${SDL2_LDFLAGS_LIST})
+    endif()
+    add_test(NAME touch_layout COMMAND touch_layout_tests)
 endif()
 
 # On Linux, link pthreads and realtime clock

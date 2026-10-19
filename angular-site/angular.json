@@ -39,7 +39,8 @@
             ],
             "styles": [
               "src/styles.css"
-            ]
+            ],
+            "allowedCommonJsDependencies": ["luaparse"]
           },
           "configurations": {
             "production": {
@@ -54,7 +55,7 @@
                 {
                   "type": "initial",
                   "maximumWarning": "1.2MB",
-                  "maximumError": "2.1MB"
+                  "maximumError": "2.2MB"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -92,6 +93,22 @@
         },
         "test": {
           "builder": "@angular/build:unit-test"
+        },
+        "storybook": {
+          "builder": "@storybook/angular-vite:start-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "reckless-drivin:build",
+            "port": 6006
+          }
+        },
+        "build-storybook": {
+          "builder": "@storybook/angular-vite:build-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "reckless-drivin:build",
+            "outputDir": "storybook-static"
+          }
         }
       }
     }

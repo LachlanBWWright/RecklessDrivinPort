@@ -41,6 +41,36 @@ function lzrwHash(buf: Uint8Array, pos: number): number {
   return ((Math.imul(40543, inner) >> 4) & HASH_MASK) << DEPTH_BITS;
 }
 
+function findBestMatch(
+  combined: Uint8Array,
+  hashTable: Int32Array,
+  baseIndex: number,
+  currentPosition: number,
+  maxLength: number,
+): { index: number; length: number } {
+  let bestLength = 2;
+  let bestIndex = -1;
+  for (let depth = 0; depth < DEPTH; depth++) {
+    const index = baseIndex + depth;
+    const position = hashTable[index];
+    if (position <= 0 || position >= currentPosition) continue;
+    const distance = currentPosition - position;
+    const safeLength = Math.min(maxLength, distance >= 3 ? maxLength : distance);
+    let matchLength = 0;
+    while (
+      matchLength < safeLength &&
+      combined[position + matchLength] === combined[currentPosition + matchLength]
+    ) {
+      matchLength++;
+    }
+    if (matchLength >= 3 && matchLength > bestLength) {
+      bestLength = matchLength;
+      bestIndex = index;
+    }
+  }
+  return { index: bestIndex, length: bestLength };
+}
+
 /**
  * Decompress LZRW3-A compressed bytes.
  *
@@ -286,40 +316,17 @@ export function lzrw3aCompress(src: Uint8Array): Uint8Array {
       if (pSrc + 2 < srcLen) {
         const iBase = lzrwHash(combined, cPos);
 
-        // Search DEPTH slots for the best match.
-        let bestLen = 2; // minimum useful match = 3; start below threshold
-        let bestIdx = -1;
         const maxMatchLen = Math.min(18, srcLen - pSrc);
+        const bestMatch = findBestMatch(combined, hashTable, iBase, cPos, maxMatchLen);
 
-        for (let d = 0; d < DEPTH; d++) {
-          const idx = iBase + d;
-          const pos = hashTable[idx];
-          // Only use positions that are strictly before the current position.
-          // Also skip positions so close that they'd require an overlapping copy
-          // that the decompressor can't faithfully reproduce (match <= distance case).
-          if (pos > 0 && pos < cPos) {
-            const dist = cPos - pos;
-            // Limit match length to avoid overlap beyond what RLE can faithfully reproduce.
-            const safeMax = Math.min(maxMatchLen, dist >= 3 ? maxMatchLen : dist);
-            let mLen = 0;
-            while (mLen < safeMax && combined[pos + mLen] === combined[cPos + mLen]) {
-              mLen++;
-            }
-            if (mLen >= 3 && mLen > bestLen) {
-              bestLen = mLen;
-              bestIdx = idx;
-            }
-          }
-        }
-
-        if (bestIdx >= 0) {
+        if (bestMatch.index >= 0) {
           // Emit a copy item (control bit = 1).
-          ctrl |= (1 << item);
+          ctrl |= 1 << item;
           flushAndUpdateForCopy(cPos);
-          const I = bestIdx; // 12-bit hash table index
-          dst[pDst++] = ((I >> 4) & 0xF0) | (bestLen - 3);
-          dst[pDst++] = I & 0xFF;
-          pSrc += bestLen;
+          const I = bestMatch.index; // 12-bit hash table index
+          dst[pDst++] = ((I >> 4) & 0xf0) | (bestMatch.length - 3);
+          dst[pDst++] = I & 0xff;
+          pSrc += bestMatch.length;
           continue;
         }
       }
@@ -334,8 +341,8 @@ export function lzrw3aCompress(src: Uint8Array): Uint8Array {
     }
 
     // Write control word (little-endian).
-    dst[ctrlOff]     = ctrl & 0xFF;
-    dst[ctrlOff + 1] = (ctrl >> 8) & 0xFF;
+    dst[ctrlOff] = ctrl & 0xff;
+    dst[ctrlOff + 1] = (ctrl >> 8) & 0xff;
   }
 
   const compressed = dst.slice(0, pDst);

@@ -1,8 +1,15 @@
 import { resultFromThrowable } from './result-helpers';
 
-const canvasToDataUrl = resultFromThrowable((canvas: HTMLCanvasElement) => canvas.toDataURL(), 'Failed to encode canvas');
+const canvasToDataUrl = resultFromThrowable(
+  (canvas: HTMLCanvasElement) => canvas.toDataURL(),
+  'Failed to encode canvas',
+);
 
-export function getCanvasDataUrl(cache: Map<number, string>, canvases: Map<number, HTMLCanvasElement>, id: number) {
+export function getCanvasDataUrl(
+  cache: Map<number, string>,
+  canvases: Map<number, HTMLCanvasElement>,
+  id: number,
+) {
   const cached = cache.get(id);
   if (cached) return cached;
   const canvas = canvases.get(id) ?? null;
