@@ -10,15 +10,15 @@ android {
     namespace 'com.recklessdrivin'
     compileSdk 34
 
-    // NDK version pre-installed on GitHub Actions ubuntu-latest
-    ndkVersion '25.2.9519653'
+    // r28 builds 16 KB-aligned native libraries for newer Android devices.
+    ndkVersion '28.2.13676358'
 
     defaultConfig {
         applicationId 'com.recklessdrivin'
         minSdk 21
         targetSdk 34
-        versionCode 1
-        versionName '1.0'
+        versionCode providers.gradleProperty('versionCode').getOrElse('1').toInteger()
+        versionName providers.gradleProperty('versionName').getOrElse('1.0-dev')
 
         externalNativeBuild {
             cmake {
@@ -47,25 +47,50 @@ android {
         main {
             java.srcDirs = [
                 'src/main/java',
-                // SDL2 Java activity sources (copied in by CI before build)
+                // Java activity and native SDL must come from the same pinned source.
                 "${sdl2Dir}/android-project/app/src/main/java"
             ]
             manifest.srcFile 'src/main/AndroidManifest.xml'
             res.srcDirs     = ['src/main/res']
-            assets.srcDirs  = ['src/main/assets']
+            // Package the current pack directly; no stale copied asset can ship.
+            assets.srcDirs  = ['../../../port/resources']
+            assets.includes = ['resources.dat']
+        }
+    }
+
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
         }
     }
 
     buildTypes {
-        debug   { minifyEnabled false }
-        release { minifyEnabled false }
-    }
-
-    lint {
-        abortOnError false
+        debug {
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled false
+            if (System.getenv('ANDROID_KEYSTORE_PATH')) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 }
 
 dependencies {
     implementation 'androidx.core:core:1.12.0'
+}
+
+if (providers.gradleProperty('requireReleaseSigning').getOrElse('false').toBoolean()) {
+    ['ANDROID_KEYSTORE_PATH', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD'].each { name ->
+        if (!System.getenv(name)) {
+            throw new GradleException("Release signing requires ${name}")
+        }
+    }
 }

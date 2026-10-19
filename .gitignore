@@ -41,3 +41,11 @@ port/wasm/
 # gh-pages folder is built by CI
 gh-pages/
 gh-pages-local/
+
+# Android build outputs and private signing material
+port/android/app/build/
+port/android/app/.cxx/
+port/android/local.properties
+port/android/app/src/main/assets/resources.dat
+*.jks
+*.keystore

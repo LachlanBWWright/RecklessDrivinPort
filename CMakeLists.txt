@@ -365,6 +365,17 @@ if(PORT_SDL2 AND NOT EMSCRIPTEN AND NOT ANDROID)
     endif()
 endif()
 
+# Exercise the same geometry and hit targets used by the native overlay.
+if(BUILD_TESTING AND PORT_SDL2 AND NOT ANDROID AND NOT EMSCRIPTEN)
+    add_executable(touch_layout_tests tests/touch_layout_tests.c)
+    if(SDL2_FOUND)
+        target_link_libraries(touch_layout_tests ${SDL2_LIBRARIES})
+    elseif(SDL2_LDFLAGS_LIST)
+        target_link_libraries(touch_layout_tests ${SDL2_LDFLAGS_LIST})
+    endif()
+    add_test(NAME touch_layout COMMAND touch_layout_tests)
+endif()
+
 # On Linux, link pthreads and realtime clock
 if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN AND NOT ANDROID)
     target_link_libraries(${GAME_TARGET} rt)

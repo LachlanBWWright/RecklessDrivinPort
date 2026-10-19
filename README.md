@@ -65,6 +65,13 @@ pnpm start
 
 Open **http://localhost:4200/** and click **Start** to play.
 
+### Android builds and releases
+
+The **Android** GitHub Actions workflow produces an installable test APK on
+branch pushes and pull requests. Version tags prepare signed APK files
+and a draft GitHub release after signing secrets are configured.
+See [Android build and release instructions](documentation/android-release.md).
+
 ### Option C — Full production-like build (one command)
 
 ```bash

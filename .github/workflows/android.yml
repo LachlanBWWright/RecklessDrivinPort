@@ -1,0 +1,215 @@
+name: Android
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Prepare a draft release (select an existing vX.Y.Z tag as the ref)
+        type: boolean
+        default: false
+      version_code:
+        description: Android version code (blank uses this workflow's run number)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build and verify Android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      release: ${{ steps.metadata.outputs.release }}
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select version and build type
+        id: metadata
+        env:
+          PREPARE_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release) }}
+          REQUESTED_CODE: ${{ inputs.version_code }}
+        run: |
+          version="0.0.0-dev.${GITHUB_RUN_NUMBER}"
+          if [[ "$PREPARE_RELEASE" == true ]]; then
+            if [[ ! "$GITHUB_REF" =~ ^refs/tags/v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+              echo '::error::Releases require a vX.Y.Z tag (optional -prerelease suffix).'
+              exit 1
+            fi
+            version="${BASH_REMATCH[1]}"
+          fi
+          version_code="${REQUESTED_CODE:-$GITHUB_RUN_NUMBER}"
+          if [[ ! "$version_code" =~ ^[1-9][0-9]{0,9}$ ]] || (( version_code > 2100000000 )); then
+            echo '::error::Version code must be an integer between 1 and 2100000000.'
+            exit 1
+          fi
+          echo "release=$PREPARE_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "ANDROID_VERSION_NAME=$version" >> "$GITHUB_ENV"
+          echo "ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;35.0.0 ndk;28.2.13676358 cmake;3.22.1'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare release signing
+        if: steps.metadata.outputs.release == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing Android release signing secret: $name. See documentation/android-release.md."
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/android-release.jks" >> "$GITHUB_ENV"
+
+      - name: Build debug and release APKs
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ steps.metadata.outputs.release == 'true' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ steps.metadata.outputs.release == 'true' && secrets.ANDROID_KEY_ALIAS || '' }}
+          ANDROID_KEY_PASSWORD: ${{ steps.metadata.outputs.release == 'true' && secrets.ANDROID_KEY_PASSWORD || '' }}
+          REQUIRE_SIGNING: ${{ steps.metadata.outputs.release }}
+        run: |
+          ./scripts/build-android.sh \
+            :app:assembleDebug :app:assembleRelease \
+            "-PversionName=$ANDROID_VERSION_NAME" \
+            "-PversionCode=$ANDROID_VERSION_CODE" \
+            "-PrequireReleaseSigning=$REQUIRE_SIGNING"
+
+      - name: Verify packaged assets, ABIs, signatures, and native alignment
+        env:
+          REQUIRE_SIGNING: ${{ steps.metadata.outputs.release }}
+        run: |
+          ./scripts/verify-android.sh port/android/app/build/outputs/apk/debug/app-debug.apk
+          release_apk=port/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if [[ "$REQUIRE_SIGNING" == true ]]; then
+            release_apk=port/android/app/build/outputs/apk/release/app-release.apk
+          fi
+          ./scripts/verify-android.sh "$release_apk" "$REQUIRE_SIGNING"
+
+      - name: Upload installable test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: reckless-drivin-android-debug
+          path: port/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Package signed release
+        if: steps.metadata.outputs.release == 'true'
+        run: |
+          mkdir -p android-release
+          cp port/android/app/build/outputs/apk/release/app-release.apk \
+            "android-release/reckless-drivin-$ANDROID_VERSION_NAME.apk"
+          printf 'Commit: %s\nVersion: %s\nVersion code: %s\n' \
+            "$GITHUB_SHA" "$ANDROID_VERSION_NAME" "$ANDROID_VERSION_CODE" > android-release/BUILD.txt
+          (cd android-release && sha256sum ./*.apk > SHA256SUMS)
+
+      - name: Upload signed release artifacts
+        if: steps.metadata.outputs.release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reckless-drivin-android-release
+          path: android-release/
+          if-no-files-found: error
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/android-release.jks"
+
+  smoke-test:
+    name: Launch APK in landscape
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.release == 'true' && 'reckless-drivin-android-release' || 'reckless-drivin-android-debug' }}
+          path: apk
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and launch APK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: ./scripts/smoke-test-android.sh apk/*.apk android-smoke
+      - name: Upload emulator screenshot and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reckless-drivin-android-smoke
+          path: android-smoke/
+          if-no-files-found: warn
+
+  release:
+    name: Prepare GitHub draft release
+    needs: [build, smoke-test]
+    if: needs.build.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: reckless-drivin-android-release
+          path: android-release
+      - name: Preserve published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          draft_state="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq '.[] | select(.tag_name == env.GITHUB_REF_NAME) | .draft')"
+          if [[ "$draft_state" == false ]]; then
+            echo '::error::This release is already published. Use a new version tag.'
+            exit 1
+          fi
+      - name: Create or update draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build.outputs.version }}
+          name: Reckless Drivin' ${{ needs.build.outputs.version }}
+          draft: true
+          prerelease: ${{ contains(needs.build.outputs.version, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            android-release/*.apk
+            android-release/SHA256SUMS
+            android-release/BUILD.txt
