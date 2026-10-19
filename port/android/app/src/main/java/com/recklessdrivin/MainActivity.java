@@ -16,11 +16,22 @@ import java.io.*;
 public class MainActivity extends SDLActivity {
 
     private static final String RESOURCES_DAT = "resources.dat";
+    private boolean crashReportChecked;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        CrashReports.install(this);
         copyAssetIfNeeded(RESOURCES_DAT);
         super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    protected void onPostResume() {
+        super.onPostResume();
+        if (!crashReportChecked) {
+            crashReportChecked = true;
+            CrashReports.showPreviousCrash(this);
+        }
     }
 
     /** Tell SDL2 which native libraries to load (order matters). */

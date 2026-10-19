@@ -122,3 +122,12 @@ Tool versions: AGP 8.9.2, Gradle 8.11.1, JDK 17, NDK 28.2.13676358,
 CMake 3.22.1, and SDK Build Tools 35.0.0. Modern packaging and NDK alignment
 follow [Android's 16 KB guidance](https://developer.android.com/guide/practices/page-sizes).
 Signing follows [Android's app signing documentation](https://developer.android.com/studio/publish/app-signing).
+
+## Crash details
+
+On the next launch after a crash, Android displays a scrollable report with a
+**Copy details** button. Java exceptions are saved locally on all supported
+Android versions. Native crashes and unresponsive-app reports use Android 11+
+crash history; Android 12+ can also supply the native signal, fault address,
+and backtrace. Details depend on what Android retained. Reports stay on the
+device and are shown once after dismissal.
