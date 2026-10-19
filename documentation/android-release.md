@@ -49,7 +49,7 @@ use the same password, set both password secrets to that value. Do not commit
 the keystore or passwords. The workflow fails with a clear error if any release
 signing secret is missing; it never substitutes a debug key.
 
-## Prepare a release
+## Publish a release
 
 1. Commit and push the changes you want to ship. Uncommitted changes are not
    included in GitHub Actions builds.
@@ -63,10 +63,11 @@ signing secret is missing; it never substitutes a debug key.
 3. Wait for **Android** to finish. The tag determines the version name. The
    workflow run number supplies a monotonically increasing Android version
    code. Prerelease tags such as `v1.1.0-beta.1` are supported.
-4. Open **Releases**, review the generated **draft**, download and test the APK
-   on a device, and click **Publish release** when ready.
+4. After packaging and emulator gameplay checks pass, the workflow publishes
+   the release automatically. Open **Releases** to download the signed APK.
+   Use a prerelease tag such as `v1.1.0-beta.1` when you want a test release.
 
-The draft includes:
+The published release includes:
 
 - A signed APK for direct installation, with `resources.dat` embedded.
 - `SHA256SUMS` and `BUILD.txt` recording the commit, version, and version code.

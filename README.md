@@ -1,12 +1,16 @@
-# Reckless Drivin' — WebAssembly Port
+# Reckless Drivin' — Android and WebAssembly Port
 
-> A WebAssembly port of the classic Mac OS 9 racing game **Reckless Drivin'** by Jonas Echterhoff.
+> An SDL2 Android and WebAssembly port of the classic Mac OS 9 racing game **Reckless Drivin'** by Jonas Echterhoff.
+
+**Android APK:** [Download the latest release](https://github.com/LachlanBWWright/RecklessDrivinPort/releases/latest)
 
 **Play online:** [https://lachlanbwwright.github.io/RecklessDrivinPort/](https://lachlanbwwright.github.io/RecklessDrivinPort/)
 
 | Menu | Gameplay |
 |---|---|
-| ![Reckless Drivin menu](screenshots/menu-touch-controls.png) | ![Reckless Drivin gameplay](screenshots/gameplay-touch-controls.png) |
+| ![Android menu in fullscreen landscape](screenshots/android-menu.png) | ![Android gameplay with translucent touch controls](screenshots/android-gameplay.png) |
+
+Captured from the Android 14 emulator in the [Android CI workflow](https://github.com/LachlanBWWright/RecklessDrivinPort/actions/workflows/android.yml).
 
 ## Running locally (5 minutes)
 
@@ -69,7 +73,8 @@ Open **http://localhost:4200/** and click **Start** to play.
 
 The **Android** GitHub Actions workflow produces an installable test APK on
 branch pushes and pull requests. Version tags prepare signed APK files
-and a draft GitHub release after signing secrets are configured.
+and publish a GitHub release after signing secrets are configured and the
+emulator gameplay check passes.
 See [Android build and release instructions](documentation/android-release.md).
 
 ### Option C — Full production-like build (one command)
@@ -98,6 +103,7 @@ Useful flags: `--skip-wasm`, `--skip-angular`, `--port 3000`, `--no-cleanup`.
 
 ## Quick links
 
+- Current feature checklist and remaining work: [`angular-site/EDITOR_CHECKLIST.md`](angular-site/EDITOR_CHECKLIST.md)
 - Full developer notes: [`dev-readme.md`](dev-readme.md)
 - Level editor data format: [`documentation/level-editor-data-structures.md`](documentation/level-editor-data-structures.md)
 

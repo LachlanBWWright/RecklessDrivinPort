@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: Prepare a draft release (select an existing vX.Y.Z tag as the ref)
+        description: Publish a release (select an existing vX.Y.Z tag as the ref)
         type: boolean
         default: false
       version_code:
@@ -179,7 +179,7 @@ jobs:
           if-no-files-found: warn
 
   release:
-    name: Prepare GitHub draft release
+    name: Publish GitHub release
     needs: [build, smoke-test]
     if: needs.build.outputs.release == 'true'
     runs-on: ubuntu-24.04
@@ -200,12 +200,12 @@ jobs:
             echo '::error::This release is already published. Use a new version tag.'
             exit 1
           fi
-      - name: Create or update draft release
+      - name: Publish versioned release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.build.outputs.version }}
           name: Reckless Drivin' ${{ needs.build.outputs.version }}
-          draft: true
+          draft: false
           prerelease: ${{ contains(needs.build.outputs.version, '-') }}
           generate_release_notes: true
           fail_on_unmatched_files: true
