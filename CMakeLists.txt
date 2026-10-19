@@ -374,6 +374,19 @@ if(BUILD_TESTING AND PORT_SDL2 AND NOT ANDROID AND NOT EMSCRIPTEN)
         target_link_libraries(touch_layout_tests ${SDL2_LDFLAGS_LIST})
     endif()
     add_test(NAME touch_layout COMMAND touch_layout_tests)
+
+    # Start the real SDL game and exercise collision damage in high-color mode.
+    add_executable(collision_effects_tests tests/collision_effects_tests.c ${GAME_SOURCES})
+    target_compile_definitions(collision_effects_tests PRIVATE RD_NO_MAIN)
+    target_link_libraries(collision_effects_tests PRIVATE
+        mac_stubs game_resources lzrw ${SDL2_LIBRARIES} ${SDL2_LDFLAGS_LIST})
+    if(NOT MSVC)
+        target_link_libraries(collision_effects_tests PRIVATE m)
+    endif()
+    add_test(NAME collision_effects COMMAND collision_effects_tests)
+    set_tests_properties(collision_effects PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
+        TIMEOUT 30)
 endif()
 
 # On Linux, link pthreads and realtime clock

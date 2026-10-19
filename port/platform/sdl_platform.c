@@ -1752,7 +1752,7 @@ int SDL_Platform_RunModalTextEntry(short dialogID, char *text, size_t textCapaci
 /* SetScreenClut - set palette from color table resource */
 void SetScreenClut(int id)
 {
-    /* For hi-color mode, nothing to do; for 8-bit mode, load the color table */
+    /* Both indexed rendering and high-color particle effects use this palette. */
     CTabHandle ct = GetCTable(id);
     if (!ct || !*ct)
         return;
@@ -1767,6 +1767,21 @@ void SetScreenClut(int id)
         s_palette[i].a = 255;
     }
     s_palette_set = 1;
+    /* Collision sparks read this table directly in NewParticleFX. Build native
+     * RGB555 values here rather than leaving the original Mac Cl16 handle NULL
+     * or interpreting its big-endian resource bytes as native UInt16 values. */
+    if (!g16BitClut)
+        g16BitClut = NewHandleClear(256 * sizeof(UInt16));
+    if (!g16BitClut || !*g16BitClut)
+    {
+        fprintf(stderr, "Unable to allocate the particle color palette\n");
+        exit(1);
+    }
+    UInt16 *particle_colors = (UInt16 *)*g16BitClut;
+    for (i = 0; i < 256; i++)
+        particle_colors[i] = ((s_palette[i].r >> 3) << 10) |
+                             ((s_palette[i].g >> 3) << 5) |
+                             (s_palette[i].b >> 3);
     if (s_surface)
     {
         SDL_SetPaletteColors(s_surface->format->palette, s_palette, 0, 256);
@@ -3270,6 +3285,7 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
     return has_any;
 }
 
+#ifndef RD_NO_MAIN
 int main(int argc, char *argv[])
 {
     tEditorLaunchOptions editor_launch_options;
@@ -3331,6 +3347,7 @@ int main(int argc, char *argv[])
     Exit();
     return 0;
 }
+#endif /* RD_NO_MAIN */
 
 #endif /* __EMSCRIPTEN__ */
 
