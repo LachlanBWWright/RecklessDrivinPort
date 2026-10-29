@@ -145,6 +145,18 @@ Useful variants:
 
 The `build-wasm-local.sh` script auto-discovers Emscripten from those locations.
 
+## T3 Code shortcuts
+
+The repository's `t3.json` shares shortcuts for dependency setup, the editor,
+linting, unit/Lua API tests, browser tests, web builds, production preview,
+desktop builds/tests/packages, and Android APKs. Import the project scripts in
+T3 Code to use them. Dependency setup also runs when creating a new worktree.
+
+The editor opens its preview on port 4200; production preview uses port 8080.
+Build the desktop game before running its tests or packaging it. Web, desktop,
+and Android builds require the platform tools described in this document; the
+shortcuts do not install system toolchains. Shell helpers require Bash.
+
 ## Common commands
 
 ### Angular site
@@ -156,12 +168,72 @@ pnpm test -- --watch=false
 pnpm run build
 ```
 
-### Native desktop build
+### Native desktop builds
+
+The native SDL2 executables use the same game sources and pinned Lua runtime as
+WASM. The Angular editor is built separately. CMake downloads the Lua sources
+and verifies their checksum during configuration, so the first build needs
+network access.
+
+Linux (Ubuntu/Debian):
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
+sudo apt-get install cmake build-essential libsdl2-dev libgtk-3-dev
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
 cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./build/reckless_drivin
 ```
+
+macOS (with Homebrew):
+
+```bash
+brew install cmake sdl2
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+open build/reckless_drivin.app
+```
+
+Windows (PowerShell, Visual Studio C++ build tools and vcpkg installed):
+
+```powershell
+vcpkg install sdl2:x64-windows
+cmake -S . -B build -A x64 -DPORT_SDL2=ON `
+  "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+.\build\Release\reckless_drivin.exe
+```
+
+Set `VCPKG_ROOT` to your vcpkg checkout; GitHub's Windows runners use
+`VCPKG_INSTALLATION_ROOT` instead. Keep `resources.dat` beside the Linux or
+Windows executable; CMake copies it there when building. On macOS, it lives
+inside `reckless_drivin.app/Contents/Resources`. Launching from a different
+working directory is supported.
+
+To produce a redistributable archive, run CPack from the build directory:
+
+```bash
+cd build
+cpack -C Release
+```
+
+Linux and macOS produce `.tar.gz` archives; Windows produces `.zip`. The macOS
+install/package step bundles SDL2 and adjusts its library references. Windows
+includes SDL2 and the Microsoft runtime. Linux uses the system SDL2 and GTK3 runtimes
+(`libsdl2-2.0-0` and `libgtk-3-0` on Ubuntu/Debian). macOS bundles are ad-hoc signed, without Developer ID signing or notarization.
+
+The native Register button opens customisations using GTK3 on Linux, Cocoa on
+macOS, Win32 on Windows and Android system controls. Settings and imported packs
+persist in app storage; the original game remains a dropdown choice. Apply
+restarts the native runtime to avoid mixing cached resources between packs.
+WASM continues using the controls below its canvas.
+
+The Build workflow runs native tests and uploads complete packages for all three
+platforms. Use `-DSCRIPTING_TESTS=ON` to include the scripting-runtime tests in a
+local build.
 
 ## Where things are
 

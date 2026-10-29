@@ -9,6 +9,9 @@
 #include "gamesounds.h"
 #include "lzrwHandleInterface.h"
 #include "register.h"
+#if defined(PORT_SDL2) && !defined(__EMSCRIPTEN__)
+#include "platform/native_customisations.h"
+#endif
 #include <DrawSprocket.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -380,7 +383,14 @@ void HandleCommand(int cmd,int modifiers)
 	{
 		case kNoButton: return;
 		case kRegisterButton:
+#if defined(PORT_SDL2) && !defined(__EMSCRIPTEN__)
+			RDNativeShowCustomisations();
+			/* A native picker may recreate Android's SDL surface. Repaint the
+			 * complete menu when returning, rather than just its button region. */
+			DrawScreen(kNoButton,gMainScreenGW);
+#else
 			Register(true);
+#endif
 			return;
 		case kStartGameButton:
 			StartGame(modifiers&optionKey);

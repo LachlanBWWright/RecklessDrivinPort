@@ -314,7 +314,9 @@ export function redrawObjectCanvas(app: App): void {
   if (level && app.showTrackOverlay() && !barrierDrawLock) {
     const up = app.showTrackUp() ? app.editTrackUp() : [];
     const down = app.showTrackDown() ? app.editTrackDown() : [];
+    app.konva.setTrackDetailsVisible(app.trackDetailsVisible());
     app.konva.setTrackWaypoints(up, down, zoom, panX, panY);
+    app.konva.setSelectedTrackWaypoint(app.selectedTrackWaypoint());
   } else {
     app.konva.clearTrackWaypoints();
   }

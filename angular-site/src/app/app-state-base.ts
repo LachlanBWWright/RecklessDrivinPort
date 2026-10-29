@@ -198,6 +198,8 @@ export class AppStateBase {
   readonly isPanning = signal(false);
   // ---- Track waypoint drag ----
   /** When non-null, the user is dragging a track waypoint. */
+  trackDetailsVisible = signal(false);
+  selectedTrackWaypoint = signal<TrackWaypointRef | null>(null);
   dragTrackWaypoint = signal<TrackWaypointRef | null>(null);
   /** Hovered track waypoint (for cursor change and highlight). */
   hoverTrackWaypoint = signal<TrackWaypointRef | null>(null);

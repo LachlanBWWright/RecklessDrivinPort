@@ -1,3 +1,4 @@
+import { captureEditedTracks } from './app-track-saving';
 import type {
   MarkSeg,
   ObjectPos,
@@ -35,6 +36,7 @@ export type EditorUndoSnapshot =
       levelId: number | null;
       editTrackUp: { x: number; y: number; flags: number; velo: number }[];
       editTrackDown: { x: number; y: number; flags: number; velo: number }[];
+      selectedTrackWaypoint: TrackWaypointRef | null;
       dragTrackWaypoint: TrackWaypointRef | null;
       hoverTrackWaypoint: TrackWaypointRef | null;
       hoverTrackMidpoint: TrackMidpointRef | null;
@@ -88,6 +90,7 @@ export function captureUndoSnapshot(app: App, kind: EditorUndoKind): EditorUndoS
         levelId: app.selectedLevelId(),
         editTrackUp: app.editTrackUp().map((s) => ({ ...s })),
         editTrackDown: app.editTrackDown().map((s) => ({ ...s })),
+        selectedTrackWaypoint: app.selectedTrackWaypoint(),
         dragTrackWaypoint: app.dragTrackWaypoint(),
         hoverTrackWaypoint: app.hoverTrackWaypoint(),
         hoverTrackMidpoint: app.hoverTrackMidpoint(),
@@ -139,6 +142,8 @@ export function applyUndoSnapshot(app: App, snapshot: EditorUndoSnapshot): void 
     case 'tracks':
       app.editTrackUp.set(snapshot.editTrackUp.map((s) => ({ ...s })));
       app.editTrackDown.set(snapshot.editTrackDown.map((s) => ({ ...s })));
+      captureEditedTracks(app);
+      app.selectedTrackWaypoint.set(snapshot.selectedTrackWaypoint);
       app.dragTrackWaypoint.set(snapshot.dragTrackWaypoint);
       app.hoverTrackWaypoint.set(snapshot.hoverTrackWaypoint);
       app.hoverTrackMidpoint.set(snapshot.hoverTrackMidpoint);

@@ -1,3 +1,4 @@
+import type { LevelOperation } from '../../level-management';
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
 import type { ParsedLevel } from '../../level-editor.service';
 import { levelDisplayNum } from '../../app-helpers';
@@ -32,6 +33,7 @@ export class SiteToolbarComponent {
   @Input() parsedLevels: ParsedLevel[] = [];
   @Input() selectedLevelId: number | null = null;
   @Input() hasEditorData = false;
+  @Input() hasUndownloadedChanges = false;
   @Input() workerBusy = false;
   @Input() editorError = '';
   @Output() tabChange = new EventEmitter<SiteTab>();
@@ -52,6 +54,31 @@ export class SiteToolbarComponent {
     levelResourceId: number;
     stripScripts: boolean;
   }>();
+
+  @Output() manageLevels = new EventEmitter<LevelOperation>();
+  deleteLevelId: number | null = null;
+
+  requestLevelOperation(operation: LevelOperation): void {
+    this.deleteLevelId = null;
+    if (operation === 'delete') {
+      this.deleteLevelId = this.selectedLevelId;
+      return;
+    }
+    this.manageLevels.emit(operation);
+  }
+
+  selectManagedLevel(resourceId: number): void {
+    this.deleteLevelId = null;
+    this.selectLevel.emit(resourceId);
+  }
+
+  confirmDeleteLevel(): void {
+    const levelId = this.deleteLevelId;
+    this.deleteLevelId = null;
+    if (levelId !== this.selectedLevelId || this.workerBusy || this.parsedLevels.length <= 1)
+      return;
+    this.manageLevels.emit('delete');
+  }
 
   pendingMergeFile: File | null = null;
   mergeDialogOpen = false;

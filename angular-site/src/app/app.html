@@ -4,6 +4,7 @@
   [parsedLevels]="parsedLevels()"
   [selectedLevelId]="selectedLevelId()"
   [hasEditorData]="hasEditorData()"
+  [hasUndownloadedChanges]="hasUndownloadedChanges()"
   [workerBusy]="workerBusy()"
   [editorError]="editorError()"
   (tabChange)="runtime.setTab($event)"
@@ -17,6 +18,7 @@
   (importLuaProject)="importLuaProject($event)"
   (clearEditorFile)="runtime.clearEditorResources()"
   (selectLevel)="selectLevel($event)"
+  (manageLevels)="manageLevels($event)"
   (previewSelectedLevel)="launchSelectedLevelPreview($event.levelResourceId, $event.stripScripts)"
 ></app-site-toolbar>
 
@@ -157,6 +159,11 @@
 
         @if (editorSection() === 'objects') {
           <app-editor-objects-section
+            [editTrackUp]="editTrackUp()" [editTrackDown]="editTrackDown()"
+            [selectedTrackWaypoint]="selectedTrackWaypoint()"
+            (trackWaypointSelectionChange)="selectedTrackWaypoint.set($event)"
+            (waypointEdit)="applyWaypointEdit($event)"
+            (trackDetailsVisibleChange)="trackDetailsVisible.set($event)"
             [selectedLevel]="selectedLevel()"
             [levelNum]="selectedLevelNum()"
             [objects]="objects()"

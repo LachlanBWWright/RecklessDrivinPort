@@ -125,19 +125,18 @@ test.describe('Number input editing (InputValueDirective fix)', () => {
 
   test('friction field accepts a typed multi-digit value', async ({ page }) => {
     // Find the friction input by its label
-    const frictionInput = page.locator('input[type="number"]').first();
+    const frictionInput = page.locator('app-road-info-field').filter({ hasText: /^\s*friction\s*$/ }).locator('input');
     await frictionInput.click();
-    await frictionInput.selectText();
-    await frictionInput.type('0.75');
+    await frictionInput.press('ControlOrMeta+A');
+    await frictionInput.pressSequentially('0.75');
     // After typing, the field should contain the full value — not a partial reset
     const value = await frictionInput.inputValue();
     expect(value).toBe('0.75');
   });
 
   test('can type new value in a number field and commit by blurring', async ({ page }) => {
-    const frictionInput = page.locator('input[type="number"]').first();
+    const frictionInput = page.locator('app-road-info-field').filter({ hasText: /^\s*friction\s*$/ }).locator('input');
     await frictionInput.click();
-    await frictionInput.selectText();
     await frictionInput.fill('0.123');
     await frictionInput.blur();
     await expect(frictionInput).toHaveValue('0.123');

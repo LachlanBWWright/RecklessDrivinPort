@@ -26,6 +26,18 @@
     >
       Groups
     </button>
+    <button
+      type="button"
+      class="flex-1 rounded-[10px] px-3 py-2 text-[0.8rem] font-semibold transition"
+      [ngClass]="
+        host.sidebarTab === 'tracks'
+          ? 'bg-[color:rgba(66,165,245,0.16)] text-[var(--accent2)] shadow-[inset_0_0_0_1px_rgba(66,165,245,0.18)]'
+          : 'text-[var(--muted)] hover:bg-white/[0.04]'
+      "
+      (click)="host.setSidebarTab('tracks')"
+    >
+      Tracks
+    </button>
   </div>
 
   @if (host.sidebarTab === 'objects') {
@@ -63,6 +75,22 @@
         (objectSelected)="host.objectSelected.emit($event)"
         (searchTermChange)="host.searchTermChange.emit($event)"
       ></app-object-list>
+    </div>
+  } @else if (host.sidebarTab === 'tracks') {
+    <div class="min-h-0 flex-1 overflow-y-auto pr-1 pt-2">
+      @if (!host.showTrackOverlay) {
+        <button mat-button class="mb-3" (click)="host.toggleTracks.emit()">
+          Show tracks on canvas
+        </button>
+      }
+      <app-editor-waypoints
+        [trackUp]="host.editTrackUp"
+        [trackDown]="host.editTrackDown"
+        [selection]="host.selectedTrackWaypoint"
+        [busy]="host.workerBusy"
+        (selectionChange)="host.trackWaypointSelectionChange.emit($event)"
+        (waypointEdit)="host.waypointEdit.emit($event)"
+      />
     </div>
   } @else {
     <app-editor-objects-groups-panel

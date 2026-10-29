@@ -5,7 +5,8 @@ async function openProject(page: Page): Promise<void> {
   await page.goto('/');
   await page.getByRole('button', { name: /level editor/i }).click();
   await page.getByRole('button', { name: /load default/i }).click();
-  await page.getByRole('button', { name: 'Lua editor', exact: true }).click({ timeout: 30_000 });
+  await page.getByRole('button', { name: /Tools/ }).click({ timeout: 30_000 });
+  await page.getByRole('menuitem', { name: /Lua editor/i }).click();
   await expect(page.getByRole('heading', { name: 'Lua Project' })).toBeVisible({ timeout: 30_000 });
 }
 

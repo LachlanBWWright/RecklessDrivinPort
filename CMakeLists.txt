@@ -62,7 +62,9 @@ endif()
 # Resource file path
 # ============================================================
 set(RESOURCES_DAT "${CMAKE_SOURCE_DIR}/port/resources/resources.dat")
-add_compile_definitions(RESOURCES_DAT_PATH="${RESOURCES_DAT}")
+if(NOT EMSCRIPTEN AND NOT ANDROID)
+    add_compile_definitions(RESOURCES_DAT_PATH="resources.dat" SDL_MAIN_HANDLED)
+endif()
 
 # ============================================================
 # LZRW compression library
@@ -185,6 +187,11 @@ if(PORT_SDL2)
         include_directories(${SDL2_INCLUDE_DIRS})
     else()
         find_package(SDL2 QUIET)
+        if(TARGET SDL2::SDL2)
+            set(SDL2_LIBRARIES SDL2::SDL2)
+        elseif(TARGET SDL2::SDL2-static)
+            set(SDL2_LIBRARIES SDL2::SDL2-static)
+        endif()
 
         if(SDL2_FOUND)
             include_directories(${SDL2_INCLUDE_DIRS})
@@ -199,8 +206,7 @@ if(PORT_SDL2)
                     OUTPUT_VARIABLE SDL2_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
                 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SDL2_CFLAGS}")
             else()
-                message(WARNING "SDL2 not found; falling back to stub-only build (PORT_SDL2=OFF)")
-                set(PORT_SDL2 OFF)
+                message(FATAL_ERROR "SDL2 not found. Install SDL2 development files or set SDL2_DIR.")
             endif()
         endif()
     endif()
@@ -212,6 +218,25 @@ if(PORT_SDL2)
 
     # Add SDL2 platform implementation (replaces source/screen.c)
     list(APPEND GAME_SOURCES port/platform/sdl_platform.c)
+    if(NOT EMSCRIPTEN)
+        list(APPEND GAME_SOURCES port/platform/native_customisations.c)
+        if(ANDROID)
+            list(APPEND GAME_SOURCES port/platform/native_customisations_android.c)
+        elseif(WIN32)
+            list(APPEND GAME_SOURCES port/platform/native_customisations_windows.c)
+            set_source_files_properties(port/platform/native_customisations_windows.c
+                PROPERTIES COMPILE_DEFINITIONS MAC_COMPAT_H)
+        elseif(APPLE)
+            enable_language(OBJC)
+            list(APPEND GAME_SOURCES port/platform/native_customisations_macos.m)
+            set_source_files_properties(port/platform/native_customisations_macos.m
+                PROPERTIES COMPILE_OPTIONS "-fobjc-arc" COMPILE_DEFINITIONS MAC_COMPAT_H)
+        else()
+            find_package(PkgConfig REQUIRED)
+            pkg_check_modules(GTK3 REQUIRED IMPORTED_TARGET gtk+-3.0)
+            list(APPEND GAME_SOURCES port/platform/native_customisations_linux.c)
+        endif()
+    endif()
     message(STATUS "Building with SDL2 backend (PORT_SDL2=ON)")
 else()
     # Use original screen.c (Mac stubs only build)
@@ -285,7 +310,8 @@ else()
     set(GAME_TARGET reckless_drivin)
 endif()
 
-if(EMSCRIPTEN)
+if(NOT ANDROID)
+    add_compile_definitions(HAVE_LUA_SCRIPTING=1)
     # Build a pinned Lua release with the same -pthread/atomics flags as the
     # game. Fetching the source avoids relying on an installation-specific,
     # pre-populated SDK cache.
@@ -297,10 +323,7 @@ if(EMSCRIPTEN)
         URL https://www.lua.org/ftp/lua-5.5.0.tar.gz
         URL_HASH SHA512=3253d2cdc929da6438095a30d66ef16a1abdbb0ada8fee238705b3b38492f14be9553640fdca6b25661e01155ba5582032e0a2ef064e4c283e85efc0a128cabe
     )
-    FetchContent_GetProperties(lua_source)
-    if(NOT lua_source_POPULATED)
-        FetchContent_Populate(lua_source)
-    endif()
+    FetchContent_MakeAvailable(lua_source)
     set(LUA_RUNTIME_SRC_DIR "${lua_source_SOURCE_DIR}/src")
     set(LUA_RUNTIME_SOURCES
         lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c
@@ -312,6 +335,9 @@ if(EMSCRIPTEN)
     add_library(lua_runtime_static STATIC ${LUA_RUNTIME_SOURCES})
     target_include_directories(lua_runtime_static PUBLIC "${LUA_RUNTIME_SRC_DIR}")
     target_link_libraries(${GAME_TARGET} lua_runtime_static)
+    if(NOT MSVC)
+        target_link_libraries(lua_runtime_static PUBLIC m)
+    endif()
 endif()
 
 # ============================================================
@@ -356,6 +382,16 @@ endif()
 
 # Link SDL2 (non-Android, non-Emscripten desktop builds)
 if(PORT_SDL2 AND NOT EMSCRIPTEN AND NOT ANDROID)
+    if(WIN32)
+        set(NATIVE_DIALOG_LIBRARIES comdlg32 user32 gdi32)
+    elseif(APPLE)
+        set(NATIVE_DIALOG_LIBRARIES "-framework Cocoa")
+    else()
+        set(NATIVE_DIALOG_LIBRARIES PkgConfig::GTK3)
+    endif()
+    target_link_libraries(${GAME_TARGET} ${NATIVE_DIALOG_LIBRARIES})
+endif()
+if(PORT_SDL2 AND NOT EMSCRIPTEN AND NOT ANDROID)
     if(SDL2_FOUND)
         target_link_libraries(${GAME_TARGET} ${SDL2_LIBRARIES})
     elseif(SDL2_LDFLAGS)
@@ -375,11 +411,20 @@ if(BUILD_TESTING AND PORT_SDL2 AND NOT ANDROID AND NOT EMSCRIPTEN)
     endif()
     add_test(NAME touch_layout COMMAND touch_layout_tests)
 
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(native_customisations_tests
+            tests/native_customisations_tests.c
+            port/platform/native_customisations.c)
+        target_link_libraries(native_customisations_tests PRIVATE ${SDL2_LIBRARIES} ${SDL2_LDFLAGS_LIST})
+        add_test(NAME native_customisations COMMAND native_customisations_tests)
+        set_tests_properties(native_customisations PROPERTIES TIMEOUT 15)
+    endif()
+
     # Start the real SDL game and exercise collision damage in high-color mode.
     add_executable(collision_effects_tests tests/collision_effects_tests.c ${GAME_SOURCES})
     target_compile_definitions(collision_effects_tests PRIVATE RD_NO_MAIN)
     target_link_libraries(collision_effects_tests PRIVATE
-        mac_stubs game_resources lzrw ${SDL2_LIBRARIES} ${SDL2_LDFLAGS_LIST})
+        mac_stubs game_resources lzrw lua_runtime_static ${SDL2_LIBRARIES} ${SDL2_LDFLAGS_LIST} ${NATIVE_DIALOG_LIBRARIES})
     if(NOT MSVC)
         target_link_libraries(collision_effects_tests PRIVATE m)
     endif()
@@ -397,9 +442,54 @@ endif()
 # ============================================================
 # Installation
 # ============================================================
-if(NOT ANDROID)
-    install(TARGETS ${GAME_TARGET} DESTINATION bin)
-    install(FILES port/resources/resources.dat DESTINATION share/reckless_drivin)
+if(NOT ANDROID AND NOT EMSCRIPTEN)
+    if(APPLE)
+        set_target_properties(${GAME_TARGET} PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_BUNDLE_NAME "Reckless Drivin"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "org.recklessdrivin.game")
+        configure_file("${RESOURCES_DAT}" "${CMAKE_BINARY_DIR}/resources.dat" COPYONLY)
+        target_sources(${GAME_TARGET} PRIVATE "${RESOURCES_DAT}")
+        set_source_files_properties("${RESOURCES_DAT}" PROPERTIES
+            MACOSX_PACKAGE_LOCATION Resources)
+        install(TARGETS ${GAME_TARGET} BUNDLE DESTINATION .)
+        # Copy SDL's dylib/framework into the installed application and rewrite
+        # its install names, so the archive works without a Homebrew install.
+        configure_file(cmake/InstallMacBundle.cmake.in
+            "${CMAKE_BINARY_DIR}/InstallMacBundle.cmake" @ONLY)
+        install(SCRIPT "${CMAKE_BINARY_DIR}/InstallMacBundle.cmake")
+    else()
+        install(TARGETS ${GAME_TARGET} RUNTIME DESTINATION .)
+        install(FILES "${RESOURCES_DAT}" DESTINATION .)
+        add_custom_command(TARGET ${GAME_TARGET} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${RESOURCES_DAT}" "$<TARGET_FILE_DIR:${GAME_TARGET}>/resources.dat")
+        if(WIN32 AND TARGET SDL2::SDL2)
+            get_target_property(SDL2_TARGET_TYPE SDL2::SDL2 TYPE)
+            if(SDL2_TARGET_TYPE STREQUAL "SHARED_LIBRARY")
+                install(FILES "$<TARGET_FILE:SDL2::SDL2>" DESTINATION .)
+                add_custom_command(TARGET ${GAME_TARGET} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "$<TARGET_FILE:SDL2::SDL2>" "$<TARGET_FILE_DIR:${GAME_TARGET}>")
+            endif()
+        endif()
+    endif()
+    set(CPACK_PACKAGE_NAME "RecklessDrivin")
+    set(RECKLESS_DRIVIN_PACKAGE_VERSION "0.0.0" CACHE STRING "Desktop archive version")
+    set(CPACK_PACKAGE_VERSION "${RECKLESS_DRIVIN_PACKAGE_VERSION}")
+    if(MSVC)
+        set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION .)
+        include(InstallRequiredSystemLibraries)
+    endif()
+    install(FILES "${CMAKE_SOURCE_DIR}/port/licenses/SDL2.txt" DESTINATION licenses)
+    install(FILES "${lua_source_SOURCE_DIR}/doc/readme.html"
+        DESTINATION licenses RENAME Lua-readme.html)
+    if(WIN32)
+        set(CPACK_GENERATOR ZIP)
+    else()
+        set(CPACK_GENERATOR TGZ)
+    endif()
+    include(CPack)
 endif()
 
 # ============================================================
@@ -413,62 +503,16 @@ message(STATUS "Resources: ${RESOURCES_DAT}")
 # ============================================================
 option(SCRIPTING_TESTS "Build scripting unit tests" OFF)
 if(SCRIPTING_TESTS)
-    set(LUA_SRC_DIR "${CMAKE_SOURCE_DIR}/emsdk/upstream/emscripten/cache/ports/contrib.lua/lua-5.5.0/src")
-    if(NOT EXISTS "${LUA_SRC_DIR}/lua.h")
-        message(FATAL_ERROR "Lua source code not found at ${LUA_SRC_DIR}. Please run emscripten or ensure cache is populated.")
+    if(ANDROID)
+        message(FATAL_ERROR "SCRIPTING_TESTS requires a desktop or WASM build")
     endif()
-
-    set(LUA_SOURCES
-        ${LUA_SRC_DIR}/lapi.c
-        ${LUA_SRC_DIR}/lauxlib.c
-        ${LUA_SRC_DIR}/lbaselib.c
-        ${LUA_SRC_DIR}/lcode.c
-        ${LUA_SRC_DIR}/lcorolib.c
-        ${LUA_SRC_DIR}/lctype.c
-        ${LUA_SRC_DIR}/ldblib.c
-        ${LUA_SRC_DIR}/ldebug.c
-        ${LUA_SRC_DIR}/ldo.c
-        ${LUA_SRC_DIR}/ldump.c
-        ${LUA_SRC_DIR}/lfunc.c
-        ${LUA_SRC_DIR}/lgc.c
-        ${LUA_SRC_DIR}/linit.c
-        ${LUA_SRC_DIR}/liolib.c
-        ${LUA_SRC_DIR}/llex.c
-        ${LUA_SRC_DIR}/lmathlib.c
-        ${LUA_SRC_DIR}/lmem.c
-        ${LUA_SRC_DIR}/loadlib.c
-        ${LUA_SRC_DIR}/lobject.c
-        ${LUA_SRC_DIR}/lopcodes.c
-        ${LUA_SRC_DIR}/loslib.c
-        ${LUA_SRC_DIR}/lparser.c
-        ${LUA_SRC_DIR}/lstate.c
-        ${LUA_SRC_DIR}/lstring.c
-        ${LUA_SRC_DIR}/lstrlib.c
-        ${LUA_SRC_DIR}/ltable.c
-        ${LUA_SRC_DIR}/ltablib.c
-        ${LUA_SRC_DIR}/ltm.c
-        ${LUA_SRC_DIR}/lundump.c
-        ${LUA_SRC_DIR}/lutf8lib.c
-        ${LUA_SRC_DIR}/lvm.c
-        ${LUA_SRC_DIR}/lzio.c
-    )
-
-    add_library(lua_static STATIC ${LUA_SOURCES})
-    target_include_directories(lua_static PUBLIC ${LUA_SRC_DIR})
-
-    add_executable(script_runtime_tests
-        tests/script_runtime_tests.c
-    )
-
-    target_compile_definitions(script_runtime_tests PRIVATE
-        HAVE_LUA_SCRIPTING=1
-    )
-
-    target_include_directories(script_runtime_tests PRIVATE
-        ${LUA_SRC_DIR}
-        ${CMAKE_SOURCE_DIR}/headers
-        ${CMAKE_SOURCE_DIR}/port
-    )
-
-    target_link_libraries(script_runtime_tests lua_static m)
+    add_executable(script_runtime_tests tests/script_runtime_tests.c)
+    target_link_libraries(script_runtime_tests lua_runtime_static)
+    # Assertions are the test harness and some contain Lua API calls.
+    if(MSVC)
+        target_compile_options(script_runtime_tests PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(script_runtime_tests PRIVATE -UNDEBUG)
+    endif()
+    add_test(NAME script_runtime COMMAND script_runtime_tests)
 endif()

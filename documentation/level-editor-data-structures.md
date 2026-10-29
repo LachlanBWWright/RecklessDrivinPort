@@ -515,3 +515,63 @@ directory exactly (Angular static files + reckless_drivin.js/.wasm/.data + resou
 
 The server sets the correct `application/wasm` MIME type for `.wasm` files,
 which is required for browser WASM loading.
+
+---
+
+## 14. AI Waypoint Settings
+
+The **Objects & Tracks** sidebar includes a **Tracks** tab. Choose a track
+and waypoint, or click a visible waypoint on the canvas, to edit its target speed
+in metres per second and choose one of three traffic behaviors. Changes save automatically in the editor,
+participate in undo/redo, and are included in downloads and test-drive resources.
+Switching levels retains waypoint edits without a separate save action.
+
+- `kTargetOvertake` is `1`. The runtime enables overtaking only when the complete
+  flags value equals `1`.
+- `kTargetNoStop` is bit `2`. It disables the normal nearby-traffic braking logic.
+- The radio choices store exactly `1` (Overtake), `0` (No overtake), or `2` (No stop).
+  Overtake-capable object types shift their target 7 metres left and double their speed target.
+  No stop bypasses nearby-traffic braking, but does not bypass braking for turns.
+  Existing nonstandard flags remain untouched until a behavior is explicitly chosen.
+- While Tracks is open, each canvas waypoint shows its number, speed, and overtaking/no-stop
+  status icons. Labels keep a constant screen size as the view zooms.
+- **Apply to range** copies the selected speed and behavior to both endpoints and every waypoint
+  between them on the same track. The entire range is one undo/redo operation.
+
+Inserted waypoints interpolate neighbouring speeds and inherit the destination
+waypoint's flags. Extending a one-point route inherits that point's settings;
+starting an empty route defaults to 20 m/s.
+
+## 15. Level Management
+
+The menu beside the level selector provides **New level**, **Duplicate level**,
+**Move earlier**, **Move later**, and **Delete level**. New and duplicated levels are inserted after
+the selected level. A new level has a straight road, two waypoints per direction,
+a 120-second timer, and no placed objects, spawn groups, or markings; it reuses the
+selected level's road-info record.
+
+Level packs remain consecutive in resource IDs 140–149. The runtime has ten pack
+slots, so creation and duplication require a free slot, and deletion keeps at
+least one level. Deletion requires confirmation. Structural operations flush
+pending edits and reset undo history because slot IDs may change.
+
+Moving or copying a pack preserves its entries and re-encodes it using the
+destination slot's encryption rules. `ScLv` bindings follow their level; copies
+inherit the source binding, deleted levels lose their bindings, and the global
+binding at level resource ID `0` stays unchanged. Lua source containing literal
+level numbers or resource IDs is not rewritten.
+
+
+## 16. Toolbar and Download Status
+
+**Tools** groups resource merging and Lua editing/import/export. **Clear file** is
+separated at the bottom of that menu. The canvas toolbar groups navigation and
+selection under **View**, objects under **Place**, and drawing and marking tools
+under **Road**. Marking actions use their own menu; an active mark retains a
+visible confirmation action.
+
+The **Unsaved changes** indicator beside Download means the latest editor changes
+have not been included in a full resources.dat download. Automatic saves and
+previews keep the indicator active. A successful full download clears it for the
+exported state; failed downloads and exports with scripting resources stripped do
+not mark the complete file saved.

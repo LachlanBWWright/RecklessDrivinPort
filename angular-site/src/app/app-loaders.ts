@@ -14,6 +14,7 @@ import { DEFAULT_ROAD_THEME, ROAD_THEMES } from './object-canvas';
 import { renderSpritePixels } from './app-helpers';
 import { resultFromPromise, resultFromThrowable } from './result-helpers';
 import type { App } from './app';
+import { resetTrackSaving } from './app-track-saving';
 
 const encodeCanvasDataUrl = resultFromThrowable(
   (canvas: HTMLCanvasElement) => canvas.toDataURL(),
@@ -29,6 +30,7 @@ const dispatchWorkerResult = <T>(
 ) => resultFromPromise(app.runtime.dispatchWorker<T>(type, payload, transfer), fallback);
 
 export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName: string) {
+  resetTrackSaving(app);
   if (app.hasEditorData()) {
     app.runtime.resetPackWorker();
   }
@@ -65,6 +67,13 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
     },
   );
   if (!result) return;
+  app.strListDirty.set(false);
+  app.propertiesDirty.set(false);
+  app.propertiesSaveLevelId = null;
+  if (app.propertiesSaveTimer !== null) {
+    clearTimeout(app.propertiesSaveTimer);
+    app.propertiesSaveTimer = null;
+  }
   app.objectTypeDefinitionMap.clear();
   const objectTypes = result.objectTypesArr
     .map(([, def]) => def)
@@ -124,9 +133,9 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
 
   const curId = app.selectedLevelId();
   if (curId !== null && result.levels.some((l) => l.resourceId === curId)) {
-    app.selectLevel(curId);
+    app.selectLevel(curId, { captureTracks: false });
   } else if (result.levels.length > 0) {
-    app.selectLevel(result.levels[0].resourceId);
+    app.selectLevel(result.levels[0].resourceId, { captureTracks: false });
   } else {
     app.selectedLevelId.set(null);
     app.syncSelectedRoadInfoSelection();
@@ -135,6 +144,7 @@ export async function loadResourcesBytes(app: App, bytes: Uint8Array, sourceName
     void app.selectSprite(result.sprites[0].id);
   }
 
+  app.markDownloadBaseline();
   void decodeSpritePreviewsInBackground(app, result.objectTypesArr);
   void decodeRoadTexturesInBackground(app);
   void decodePackSpritesInBackground(app);

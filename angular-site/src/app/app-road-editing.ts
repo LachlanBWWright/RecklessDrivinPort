@@ -290,6 +290,7 @@ export function queuePackSync(app: App, syncPromises: Promise<unknown>[]): void 
       app.runtime.dispatchWorker('APPLY_SCRIPTS', {
         scripts: app.scriptDefinitions(),
         bindings: app.scriptBindings(),
+        levelBindings: app.levelScriptBindings(),
       }),
     );
   }

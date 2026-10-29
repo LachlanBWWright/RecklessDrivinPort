@@ -1,3 +1,4 @@
+import { resetTrackSaving } from './app-track-saving';
 import type { App } from './app';
 import { resultFromThrowable } from './result-helpers';
 
@@ -7,6 +8,7 @@ function disconnectKonvaResizeObserver(app: App): void {
 }
 
 export function destroyApp(app: App): void {
+  resetTrackSaving(app);
   const stopAudioResult = resultFromThrowable(
     (host: App) => host.media.stopAudio(),
     'Failed to stop audio',

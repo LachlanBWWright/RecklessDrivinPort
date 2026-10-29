@@ -1,3 +1,4 @@
+import { setTrackPoints } from './app-track-saving';
 import { effect } from '@angular/core';
 import { App } from './app';
 import type { EditorSection } from './layout/site-toolbar/site-toolbar.component';
@@ -60,6 +61,8 @@ export function setupAppLifecycle(app: App): void {
     app.showGrid();
     app.editTrackUp();
     app.editTrackDown();
+    app.selectedTrackWaypoint();
+    app.trackDetailsVisible();
     app.hoverTrackWaypoint();
     app.hoverTrackMidpoint();
     app.marks();
@@ -314,6 +317,10 @@ export function initializeKonvaOverlay(app: App): void {
     if (!app.showTrackOverlay()) return;
     app._handleTrackContextMenuAtWorld(wx, wy);
   };
+  app.konva.onWaypointSelect = (track, segIdx) => {
+    app.selectedTrackWaypoint.set({ track, segIdx });
+    app.selectedObjIndex.set(null);
+  };
   app.konva.onWaypointDragEnd = (e) => {
     app.selectedObjIndex.set(null);
     app._pushUndo('tracks');
@@ -321,13 +328,13 @@ export function initializeKonvaOverlay(app: App): void {
       const arr = [...app.editTrackUp()];
       if (e.segIdx < arr.length) {
         arr[e.segIdx] = { ...arr[e.segIdx], x: e.worldX, y: e.worldY };
-        app.editTrackUp.set(arr);
+        setTrackPoints(app, 'up', arr);
       }
     } else {
       const arr = [...app.editTrackDown()];
       if (e.segIdx < arr.length) {
         arr[e.segIdx] = { ...arr[e.segIdx], x: e.worldX, y: e.worldY };
-        app.editTrackDown.set(arr);
+        setTrackPoints(app, 'down', arr);
       }
     }
   };
@@ -336,14 +343,15 @@ export function initializeKonvaOverlay(app: App): void {
   };
   app.konva.onWaypointRightClick = (track, segIdx) => {
     app._pushUndo('tracks');
+    app.selectedTrackWaypoint.set(null);
     if (track === 'up') {
       const arr = [...app.editTrackUp()];
       arr.splice(segIdx, 1);
-      app.editTrackUp.set(arr);
+      setTrackPoints(app, 'up', arr);
     } else {
       const arr = [...app.editTrackDown()];
       arr.splice(segIdx, 1);
-      app.editTrackDown.set(arr);
+      setTrackPoints(app, 'down', arr);
     }
   };
   app.konva.onMarkEndpointDragEnd = (e) => {

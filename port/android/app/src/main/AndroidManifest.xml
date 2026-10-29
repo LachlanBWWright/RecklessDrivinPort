@@ -10,6 +10,14 @@
         android:hardwareAccelerated="true"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
 
+        <!-- A separate process restarts SDL with clean native globals after applying settings. -->
+        <activity
+            android:name=".RestartActivity"
+            android:exported="false"
+            android:process=":restart"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true" />
+
         <!--
             SDLActivity from SDL2 manages the full lifecycle, window, renderer,
             and bridges touch/keyboard events to our C code via SDL2.

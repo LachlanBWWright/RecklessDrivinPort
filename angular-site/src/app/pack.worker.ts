@@ -40,6 +40,7 @@
  *   MERGE_RESOURCES        payload: { bytes: ArrayBuffer, options: ResourceMergeOptions }
  */
 
+import { manageLevels, isLevelManagementRequest } from './level-management';
 import { ResourceDatService } from './resource-dat.service';
 import { LevelEditorService } from './level-editor.service';
 import {
@@ -228,6 +229,25 @@ self.addEventListener('message', (event: MessageEvent) => {
         const { texId } = payload as { texId: number };
         resources = levelEditorSvc.removeTile16Texture(resources, texId);
         self.postMessage({ id, ok: true, cmd, result: {} });
+        break;
+      }
+
+      case 'MANAGE_LEVELS': {
+        if (!isLevelManagementRequest(payload)) {
+          self.postMessage({ id, ok: false, cmd, error: 'Invalid level operation' });
+          break;
+        }
+        manageLevels(resources, payload).match(
+          (updated) => {
+            resources = updated.resources;
+            self.postMessage({ id, ok: true, cmd, result: {
+              levels: levelEditorSvc.extractParsedLevels(resources),
+              levelScriptBindings: extractScriptResources(resources).levelBindings,
+              selectedLevelId: updated.selectedLevelId,
+            } });
+          },
+          (error) => self.postMessage({ id, ok: false, cmd, error }),
+        );
         break;
       }
 

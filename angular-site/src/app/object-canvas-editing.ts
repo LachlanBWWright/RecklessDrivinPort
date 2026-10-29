@@ -1,8 +1,13 @@
+import { setTrackPoints } from './app-track-saving';
 import type { ParsedLevel } from './level-editor.service';
 import { getObjTypeDimensionLabel } from './app-helpers';
 import type { App } from './app';
 
-type TrackPoint = { x: number; y: number; flags: number; velo: number };
+import type { TrackSeg } from './level-editor.types';
+import type { TrackWaypointEdit } from './waypoint-editing';
+import { isValidWaypointEdit, waypointBetween } from './waypoint-editing';
+
+type TrackPoint = TrackSeg;
 
 function distanceToSegment(
   px: number,
@@ -24,8 +29,12 @@ export function insertBetweenClosestSegment(
   wx: number,
   wy: number,
 ): TrackPoint[] {
-  const newPoint = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 0 };
-  if (points.length < 2) return points.length === 0 ? [newPoint] : [...points, newPoint];
+  const newPoint = { x: Math.round(wx), y: Math.round(wy), flags: 0, velo: 20 };
+  if (points.length < 2) {
+    return points.length === 0
+      ? [newPoint]
+      : [...points, { ...points[0], x: newPoint.x, y: newPoint.y }];
+  }
 
   let bestIndex = 0;
   let bestDistance = Infinity;
@@ -40,11 +49,16 @@ export function insertBetweenClosestSegment(
   }
 
   const result = [...points];
-  result.splice(bestIndex + 1, 0, newPoint);
+  result.splice(
+    bestIndex + 1,
+    0,
+    waypointBetween(points[bestIndex], points[bestIndex + 1], wx, wy),
+  );
   return result;
 }
 
 export function selectObject(app: App, index: number, centerCanvas = false): void {
+  app.selectedTrackWaypoint.set(null);
   app.selectedObjIndex.set(index);
   if (app._barrierDrawing) {
     app._barrierDrawing = false;
@@ -151,17 +165,18 @@ export function insertWaypointAfter(app: App, track: 'up' | 'down', segmentIndex
   if (segmentIndex < 0 || segmentIndex >= source.length - 1) return;
   const current = source[segmentIndex];
   const next = source[segmentIndex + 1];
-  const inserted = {
-    x: Math.round((current.x + next.x) / 2),
-    y: Math.round((current.y + next.y) / 2),
-    flags: 0,
-    velo: 0,
-  };
+  const inserted = waypointBetween(
+    current,
+    next,
+    (current.x + next.x) / 2,
+    (current.y + next.y) / 2,
+  );
   const copy = [...source];
   copy.splice(segmentIndex + 1, 0, inserted);
   app._pushUndo('tracks');
-  if (track === 'up') app.editTrackUp.set(copy);
-  else app.editTrackDown.set(copy);
+  if (track === 'up') setTrackPoints(app, 'up', copy);
+  else setTrackPoints(app, 'down', copy);
+  app.selectedTrackWaypoint.set({ track, segIdx: segmentIndex + 1 });
   app.hoverTrackMidpoint.set(null);
   app._roadOffscreenKey = '';
   app.snackBar.open(`Inserted ${track} waypoint at midpoint.`, undefined, { duration: 1500 });
@@ -179,25 +194,9 @@ export async function saveLevelObjects(app: App): Promise<void> {
   );
 }
 
-export async function saveTrack(app: App): Promise<void> {
-  const id = app.selectedLevelId();
-  if (id === null) return;
-  await saveLevelEdit(
-    app,
-    'APPLY_TRACK',
-    {
-      resourceId: id,
-      trackUp: app.editTrackUp(),
-      trackDown: app.editTrackDown(),
-    },
-    `Saved track waypoints for level ${id - 139}.`,
-    'Track save failed',
-  );
-}
-
 async function saveLevelEdit(
   app: App,
-  operation: 'APPLY_OBJECTS' | 'APPLY_TRACK',
+  operation: 'APPLY_OBJECTS',
   payload: Record<string, unknown>,
   successMessage: string,
   failureMessage: string,
@@ -218,4 +217,28 @@ async function saveLevelEdit(
   } finally {
     app.workerBusy.set(false);
   }
+}
+
+export function applyWaypointEdit(app: App, edit: TrackWaypointEdit): void {
+  if (!isValidWaypointEdit(edit)) return;
+  const source = edit.track === 'up' ? app.editTrackUp() : app.editTrackDown();
+  const endIndex = edit.endIndex ?? edit.index;
+  if (endIndex >= source.length) return;
+  if (
+    !source.some(
+      (point, index) =>
+        index >= edit.index &&
+        index <= endIndex &&
+        (point.velo !== edit.velo || point.flags !== edit.flags),
+    )
+  )
+    return;
+  app._pushUndo('tracks');
+  const updated = source.map((point, index) =>
+    index >= edit.index && index <= endIndex
+      ? { ...point, velo: edit.velo, flags: edit.flags }
+      : point,
+  );
+  if (edit.track === 'up') setTrackPoints(app, 'up', updated);
+  else setTrackPoints(app, 'down', updated);
 }

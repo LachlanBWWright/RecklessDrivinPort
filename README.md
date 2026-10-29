@@ -1,8 +1,30 @@
-# Reckless Drivin' — Android and WebAssembly Port
+# Reckless Drivin' — Desktop, Android and WebAssembly Ports
 
-> An SDL2 Android and WebAssembly port of the classic Mac OS 9 racing game **Reckless Drivin'** by Jonas Echterhoff.
+> An SDL2 port of the classic Mac OS 9 racing game **Reckless Drivin'** by Jonas Echterhoff, for Linux, macOS, Windows, Android, and the web.
 
 **Android APK:** [Download the latest release](https://github.com/LachlanBWWright/RecklessDrivinPort/releases/latest)
+
+**Desktop builds:** [Build workflow artifacts](https://github.com/LachlanBWWright/RecklessDrivinPort/actions/workflows/build.yml)
+
+Linux, macOS, and Windows packages are built on pushes and pull requests, or by
+running the Build workflow manually. Download the artifact for your platform,
+then extract the archive inside it:
+
+- Linux: `reckless-drivin-linux.tar.gz`, containing the executable and game data.
+- macOS: `reckless-drivin-macos.tar.gz`, containing the application bundle and SDL2.
+- Windows: `reckless-drivin-windows.zip`, containing the executable, game data,
+  SDL2, and required Microsoft runtime files.
+
+Desktop builds run the same game code and Lua scripts as the browser version.
+The Angular level editor remains a web application. Linux requires the SDL2
+and GTK3 runtimes; macOS bundles are ad-hoc signed, without Developer ID signing or notarization. See the
+[desktop build instructions](dev-readme.md#native-desktop-builds) for local builds.
+
+On Linux, macOS, Windows and Android, the original **Register** button opens a
+native customisations dialog. Choose launch options and add custom `resources.dat`
+files to a saved dropdown library. Imported files are copied into app storage;
+applying settings restarts the game. The browser version keeps its existing
+customisation controls below the game.
 
 **Play online:** [https://lachlanbwwright.github.io/RecklessDrivinPort/](https://lachlanbwwright.github.io/RecklessDrivinPort/)
 

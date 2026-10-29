@@ -1,0 +1,66 @@
+{
+  "$schema": "https://t3.codes/schema/t3.json",
+  "scripts": [
+    {
+      "name": "Install dependencies",
+      "command": "bash scripts/setup.sh",
+      "icon": "configure",
+      "runOnWorktreeCreate": true,
+      "async": false
+    },
+    {
+      "name": "Start editor",
+      "command": "bash scripts/dev.sh --host 0.0.0.0",
+      "icon": "play",
+      "previewUrl": "http://localhost:4200",
+      "autoOpenPreview": true
+    },
+    {
+      "name": "Run unit and Lua API tests",
+      "command": "bash scripts/test.sh",
+      "icon": "test"
+    },
+    {
+      "name": "Lint editor",
+      "command": "bash scripts/lint.sh",
+      "icon": "lint"
+    },
+    {
+      "name": "Run browser tests",
+      "command": "bash scripts/test-e2e.sh",
+      "icon": "test"
+    },
+    {
+      "name": "Build web game and editor",
+      "command": "bash scripts/build-prod.sh",
+      "icon": "build"
+    },
+    {
+      "name": "Preview production build",
+      "command": "bash scripts/serve-prod.sh --port 8080",
+      "icon": "play",
+      "previewUrl": "http://localhost:8080",
+      "autoOpenPreview": true
+    },
+    {
+      "name": "Build desktop game",
+      "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON -DSCRIPTING_TESTS=ON && cmake --build build --config Release --parallel",
+      "icon": "build"
+    },
+    {
+      "name": "Run desktop tests",
+      "command": "ctest --test-dir build -C Release --output-on-failure",
+      "icon": "test"
+    },
+    {
+      "name": "Package desktop game",
+      "command": "cpack --config build/CPackConfig.cmake -C Release -B build/packages",
+      "icon": "build"
+    },
+    {
+      "name": "Build Android APKs",
+      "command": "bash scripts/build-android.sh",
+      "icon": "build"
+    }
+  ]
+}

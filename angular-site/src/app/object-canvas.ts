@@ -1,3 +1,4 @@
+import { setTrackPoints } from './app-track-saving';
 import type {
   ObjectGroupSpawnPreviewObject,
   TrackMidpointRef,
@@ -22,7 +23,6 @@ export {
   onObjTypeResChange,
   removeSelectedObject,
   saveLevelObjects,
-  saveTrack,
   selectObject,
   showAllObjectTypes,
   toggleTypeVisibility,
@@ -360,6 +360,7 @@ export function onCanvasMouseDown(app: App, event: MouseEvent): void {
     const trackHitR = Math.max(12, 10 / app.canvasZoom());
     for (let i = 0; i < trackUp.length; i++) {
       if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
+        app.selectedTrackWaypoint.set({ track: 'up', segIdx: i });
         app.dragTrackWaypoint.set({ track: 'up', segIdx: i });
         app.selectedObjIndex.set(null);
         getObjectCanvas()?.focus();
@@ -368,6 +369,7 @@ export function onCanvasMouseDown(app: App, event: MouseEvent): void {
     }
     for (let i = 0; i < trackDown.length; i++) {
       if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
+        app.selectedTrackWaypoint.set({ track: 'down', segIdx: i });
         app.dragTrackWaypoint.set({ track: 'down', segIdx: i });
         app.selectedObjIndex.set(null);
         getObjectCanvas()?.focus();
@@ -538,11 +540,11 @@ export function onCanvasMouseUp(app: App): void {
       if (twp.track === 'up') {
         const arr = [...app.editTrackUp()];
         arr[twp.segIdx] = { ...arr[twp.segIdx], x: pos.x, y: pos.y };
-        app.editTrackUp.set(arr);
+        setTrackPoints(app, 'up', arr);
       } else {
         const arr = [...app.editTrackDown()];
         arr[twp.segIdx] = { ...arr[twp.segIdx], x: pos.x, y: pos.y };
-        app.editTrackDown.set(arr);
+        setTrackPoints(app, 'down', arr);
       }
       app._pendingWaypointDragPos = null;
     }
@@ -584,7 +586,8 @@ export function onCanvasContextMenu(app: App, event: MouseEvent): void {
   for (let i = 0; i < trackUp.length; i++) {
     if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
       app._pushUndo('tracks');
-      app.editTrackUp.set(
+      app.selectedTrackWaypoint.set(null);
+      setTrackPoints(app, 'up',
         trackUp.filter(
           (_: { x: number; y: number; flags: number; velo: number }, j: number) => j !== i,
         ),
@@ -596,7 +599,8 @@ export function onCanvasContextMenu(app: App, event: MouseEvent): void {
   for (let i = 0; i < trackDown.length; i++) {
     if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
       app._pushUndo('tracks');
-      app.editTrackDown.set(
+      app.selectedTrackWaypoint.set(null);
+      setTrackPoints(app, 'down',
         trackDown.filter(
           (_: { x: number; y: number; flags: number; velo: number }, j: number) => j !== i,
         ),
@@ -637,9 +641,9 @@ export function onCanvasContextMenu(app: App, event: MouseEvent): void {
 
   app._pushUndo('tracks');
   if (nearestSegDistUp <= nearestSegDistDown || trackDown.length === 0) {
-    app.editTrackUp.set(insertBetweenClosestSegment(trackUp, wx, wy));
+    setTrackPoints(app, 'up', insertBetweenClosestSegment(trackUp, wx, wy));
   } else {
-    app.editTrackDown.set(insertBetweenClosestSegment(trackDown, wx, wy));
+    setTrackPoints(app, 'down', insertBetweenClosestSegment(trackDown, wx, wy));
   }
   app._roadOffscreenKey = '';
 }

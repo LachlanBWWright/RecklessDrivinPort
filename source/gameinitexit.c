@@ -19,6 +19,9 @@
 #include "gamesounds.h"
 #include "scripts.h"
 #include "byteswap_packs.h"
+#if defined(PORT_SDL2) && !defined(__EMSCRIPTEN__)
+#include "platform/native_customisations.h"
+#endif
 #include <string.h>
 #ifdef PORT_SDL2
 #include <SDL.h>
@@ -269,6 +272,10 @@ void GetLevelNumber()
 
 void StartGame(int lcheat)
 {
+#if defined(PORT_SDL2) && !defined(__EMSCRIPTEN__)
+	if(!gEditorLaunchOptions.enabled)
+		RDNativePrepareNewGame();
+#endif
 	int editorLaunchActive=gEditorLaunchOptions.enabled;
 	int editorLaunchAutoStart=gEditorLaunchOptions.autoStart;
 	tEditorLaunchOptions launchOptions=gEditorLaunchOptions;

@@ -17,6 +17,7 @@ public class MainActivity extends SDLActivity {
 
     private static final String RESOURCES_DAT = "resources.dat";
     private boolean crashReportChecked;
+    private CustomisationsDialog customisationsDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +33,34 @@ public class MainActivity extends SDLActivity {
             crashReportChecked = true;
             CrashReports.showPreviousCrash(this);
         }
+    }
+
+    /** Called by the SDL game thread; the dialog itself always runs on the UI thread. */
+    public String[] showCustomisations(int[] values, String resourcePath) {
+        customisationsDialog = new CustomisationsDialog(this);
+        return customisationsDialog.showAndWait(values, resourcePath);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (customisationsDialog != null) {
+            customisationsDialog.onActivityResult(requestCode, resultCode, data);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (customisationsDialog != null) customisationsDialog.cancel();
+        super.onDestroy();
+    }
+
+    public void restartGame() {
+        runOnUiThread(() -> {
+            android.content.Intent intent = new android.content.Intent(this, RestartActivity.class);
+            intent.putExtra("gamePid", android.os.Process.myPid());
+            startActivity(intent);
+        });
     }
 
     /** Tell SDL2 which native libraries to load (order matters). */

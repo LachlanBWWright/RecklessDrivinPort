@@ -1,0 +1,32 @@
+include(BundleUtilities)
+set(bundle "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/reckless_drivin.app")
+fixup_bundle("${bundle}" "" "@SDL2_LIBRARY_DIRS@")
+
+# install_name_tool invalidates existing signatures, including the ad-hoc
+# signatures required on Apple Silicon. Sign embedded code before the app.
+# This is local ad-hoc signing, without Developer ID or notarization.
+find_program(CODESIGN_EXECUTABLE codesign)
+if(NOT CODESIGN_EXECUTABLE)
+    message(FATAL_ERROR "codesign is required to package the macOS application")
+endif()
+function(sign_bundle_code path)
+    execute_process(COMMAND "${CODESIGN_EXECUTABLE}" --force --sign - "${path}"
+        RESULT_VARIABLE sign_result ERROR_VARIABLE sign_error)
+    if(NOT sign_result EQUAL 0)
+        message(FATAL_ERROR "Could not ad-hoc sign ${path}: ${sign_error}")
+    endif()
+endfunction()
+file(GLOB_RECURSE bundled_dylibs "${bundle}/Contents/*.dylib")
+foreach(library IN LISTS bundled_dylibs)
+    sign_bundle_code("${library}")
+endforeach()
+file(GLOB bundled_frameworks "${bundle}/Contents/Frameworks/*.framework")
+foreach(framework IN LISTS bundled_frameworks)
+    sign_bundle_code("${framework}")
+endforeach()
+sign_bundle_code("${bundle}")
+execute_process(COMMAND "${CODESIGN_EXECUTABLE}" --verify --deep --strict "${bundle}"
+    RESULT_VARIABLE verify_result ERROR_VARIABLE verify_error)
+if(NOT verify_result EQUAL 0)
+    message(FATAL_ERROR "Bundle signature verification failed: ${verify_error}")
+endif()

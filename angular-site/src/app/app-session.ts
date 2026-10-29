@@ -1,3 +1,4 @@
+import { flushTrackEdits, resetTrackSaving } from './app-track-saving';
 import { App } from './app';
 import { AppStateResources } from './app-state-resources';
 import { failEditor, loadResourcesBytes } from './app-loaders';
@@ -24,6 +25,9 @@ const WARNING_SNACKBAR_CLASS = [
 ];
 
 export function resetEditorData(app: App): void {
+  app.resetDownloadBaseline();
+  app.strListDirty.set(false);
+  resetTrackSaving(app);
   app.hasEditorData.set(false);
   app.editorError.set('');
   app.resourcesStatus.set('No resources.dat loaded. Use the buttons above to load one.');
@@ -89,6 +93,7 @@ export function resetEditorData(app: App): void {
   app.editTrackUp.set([]);
   app.editTrackDown.set([]);
   app.dragTrackWaypoint.set(null);
+  app.selectedTrackWaypoint.set(null);
   app.hoverTrackWaypoint.set(null);
   app.hoverTrackMidpoint.set(null);
   app.markingPreview.set([]);
@@ -148,6 +153,20 @@ export async function onResourceMergeSelected(
   app.workerBusy.set(true);
   app.resourcesStatus.set(`Merging ${file.name}…`);
 
+  const editsFlushed = await resultFromPromise(
+    flushPendingEdits(app),
+    'Failed to save pending edits before merging',
+  ).match(
+    () => true,
+    (error) => {
+      app.editorError.set(error);
+      app.resourcesStatus.set('Could not merge resources: pending edits could not be saved.');
+      app.workerBusy.set(false);
+      return false;
+    },
+  );
+  if (!editsFlushed) return;
+
   const fileBufferResult = await resultFromPromise(file.arrayBuffer(), 'Failed to read file');
   const fileBuffer = fileBufferResult.match(
     (buffer) => buffer,
@@ -179,6 +198,7 @@ export async function onResourceMergeSelected(
     },
   );
   if (!mergeCounts) return;
+  app.markResourceEdited();
 
   const serializedResult = await resultFromPromise(
     app.runtime.dispatchWorker<ArrayBuffer>('SERIALIZE'),
@@ -197,6 +217,9 @@ export async function onResourceMergeSelected(
   if (!serializedBuffer) return;
 
   await loadResourcesBytes(app, new Uint8Array(serializedBuffer), `${file.name} (merged)`);
+  // Loading the merged bytes establishes a new local baseline, but those bytes
+  // have not yet been downloaded by the user.
+  app.markResourceEdited();
   app.snackBar.open(
     `Merged resources: ${mergeCounts.overwritten} overwritten, ${mergeCounts.added} added.`,
     'OK',
@@ -232,7 +255,10 @@ function warnIfSelectedLevelHasObjectsBeyondFinish(app: App): void {
  * object groups, road info) to the pack worker so a subsequent SERIALIZE call
  * will include them.
  */
-async function flushPendingEdits(app: App): Promise<void> {
+export async function flushPendingEdits(app: App): Promise<void> {
+  const trackResult = await flushTrackEdits(app);
+  // Keep this legacy Promise boundary compatible with the export error handler.
+  if (trackResult.isErr()) return Promise.reject(new Error(trackResult.error));
   const syncPromises: Promise<unknown>[] = [];
   for (const level of app.parsedLevels()) {
     syncPromises.push(
@@ -246,13 +272,6 @@ async function flushPendingEdits(app: App): Promise<void> {
   if (selId !== null) {
     syncPromises.push(
       app.runtime.dispatchWorker<void>('APPLY_MARKS', { resourceId: selId, marks: app.marks() }),
-    );
-    syncPromises.push(
-      app.runtime.dispatchWorker<void>('APPLY_TRACK', {
-        resourceId: selId,
-        trackUp: app.editTrackUp(),
-        trackDown: app.editTrackDown(),
-      }),
     );
     syncPromises.push(
       app.runtime.dispatchWorker<void>('APPLY_OBJECTS', {
@@ -283,6 +302,7 @@ async function flushPendingEdits(app: App): Promise<void> {
 
 export async function downloadEditedResources(app: App, stripScripts = false): Promise<void> {
   if (!app.hasEditorData()) return;
+  const downloadSnapshot = app.captureDownloadSnapshot();
   app.workerBusy.set(true);
   app.resourcesStatus.set('Saving pending edits before download…');
 
@@ -305,6 +325,7 @@ export async function downloadEditedResources(app: App, stripScripts = false): P
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        if (!stripScripts) app.markDownloadBaseline(downloadSnapshot);
         app.resourcesStatus.set(
           stripScripts
             ? 'Downloaded updated resources.dat without scripting resources.'

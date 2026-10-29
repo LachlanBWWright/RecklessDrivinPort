@@ -1,3 +1,7 @@
+import { manageEditorLevels } from './app-level-management';
+import type { LevelOperation } from './level-management';
+import { applyWaypointEdit } from './object-canvas-editing';
+import type { TrackWaypointEdit } from './waypoint-editing';
 import {
   Component,
   inject,
@@ -119,7 +123,6 @@ const {
   resetView,
   insertWaypointAfter,
   saveLevelObjects,
-  saveTrack,
   selectObject,
   showAllObjectTypes,
   toggleTypeVisibility,
@@ -205,6 +208,10 @@ export type { EditorUndoKind, EditorUndoSnapshot } from './app-history';
   encapsulation: ViewEncapsulation.None,
 })
 export class App extends AppStateResources implements OnInit, AfterViewInit, OnDestroy {
+  manageLevels(operation: LevelOperation): Promise<void> {
+    return manageEditorLevels(this, operation);
+  }
+
   constructor() {
     super();
     actions.setupAppLifecycle(this);
@@ -594,7 +601,6 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     getObjectTypeDimensionLabel(this, typeRes);
   removeSelectedObject = (): void => removeSelectedObject(this);
   saveLevelObjects = (): Promise<void> => saveLevelObjects(this);
-  saveTrack = (): Promise<void> => saveTrack(this);
   worldToCanvas = (wx: number, wy: number): [number, number] => worldToCanvas(this, wx, wy);
   canvasToWorld = (cx: number, cy: number): [number, number] => canvasToWorld(this, cx, cy);
   onCanvasMouseDown = (event: MouseEvent): void => onCanvasMouseDown(this, event);
@@ -602,6 +608,8 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   onCanvasMouseUp = (): void => onCanvasMouseUp(this);
   onCanvasDoubleClick = (event: MouseEvent): void => onCanvasDoubleClick(this, event);
   onCanvasContextMenu = (event: MouseEvent): void => onCanvasContextMenu(this, event);
+  applyWaypointEdit = (edit: TrackWaypointEdit): void => applyWaypointEdit(this, edit);
+
   _insertWaypointAfter = (track: 'up' | 'down', segIdx: number): void =>
     insertWaypointAfter(this, track, segIdx);
   onCanvasKeyDown = (event: KeyboardEvent): void => onCanvasKeyDown(this, event);

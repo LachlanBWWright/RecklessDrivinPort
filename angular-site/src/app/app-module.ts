@@ -1,8 +1,10 @@
+import { A11yModule } from '@angular/cdk/a11y';
+import { EditorWaypointsComponent } from './editor/sections/objects/editor-waypoints.component';
 import { NgModule, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -160,6 +162,7 @@ export const MATERIAL_MODULES = [
   MatInputModule,
   MatFormFieldModule,
   MatSelectModule,
+  A11yModule,
   MatCardModule,
   MatToolbarModule,
   MatTabsModule,
@@ -228,6 +231,7 @@ export const APP_DECLARATIONS = [
   EditorObjectTypeFrameSelectComponent,
   EditorDetailCardComponent,
   EditorObjectsSectionComponent,
+  EditorWaypointsComponent,
   EditorObjectsCanvasPanelComponent,
   EditorObjectsGroupsPanelComponent,
   EditorObjectsSidebarComponent,
@@ -313,6 +317,7 @@ export const APP_DECLARATIONS = [
     BrowserModule,
     CommonModule,
     BrowserAnimationsModule,
+    FormsModule,
     ReactiveFormsModule,
     ...MATERIAL_MODULES,
   ],

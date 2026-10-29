@@ -1,3 +1,4 @@
+import { setTrackPoints } from './app-track-saving';
 import { dist2d, distToSegment2d, insertBetweenClosestSegment } from './object-canvas';
 
 import type { App } from './app';
@@ -25,17 +26,21 @@ export function handleTrackContextMenuAtWorld(app: App, wx: number, wy: number) 
 
   for (let i = 0; i < trackUp.length; i++) {
     if (dist2d(trackUp[i].x, trackUp[i].y, wx, wy) < trackHitR) {
+      app._pushUndo('tracks');
+      app.selectedTrackWaypoint.set(null);
       const arr = [...trackUp];
       arr.splice(i, 1);
-      app.editTrackUp.set(arr);
+      setTrackPoints(app, 'up', arr);
       return;
     }
   }
   for (let i = 0; i < trackDown.length; i++) {
     if (dist2d(trackDown[i].x, trackDown[i].y, wx, wy) < trackHitR) {
+      app._pushUndo('tracks');
+      app.selectedTrackWaypoint.set(null);
       const arr = [...trackDown];
       arr.splice(i, 1);
-      app.editTrackDown.set(arr);
+      setTrackPoints(app, 'down', arr);
       return;
     }
   }
@@ -71,9 +76,10 @@ export function handleTrackContextMenuAtWorld(app: App, wx: number, wy: number) 
   }
   if (trackDown.length === 1) nearestSegDistDown = dist2d(trackDown[0].x, trackDown[0].y, wx, wy);
 
+  app._pushUndo('tracks');
   if (nearestSegDistUp <= nearestSegDistDown || trackDown.length === 0) {
-    app.editTrackUp.set(insertBetweenClosestSegment(trackUp, wx, wy));
+    setTrackPoints(app, 'up', insertBetweenClosestSegment(trackUp, wx, wy));
   } else {
-    app.editTrackDown.set(insertBetweenClosestSegment(trackDown, wx, wy));
+    setTrackPoints(app, 'down', insertBetweenClosestSegment(trackDown, wx, wy));
   }
 }

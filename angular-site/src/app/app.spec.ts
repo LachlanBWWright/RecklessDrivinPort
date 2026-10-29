@@ -474,11 +474,67 @@ describe('App', () => {
       { x: 25, y: 50, dir: 0, typeRes: 128 },
       { x: 400, y: 640, dir: 0, typeRes: 140 },
     ]);
+    app.selectedTrackWaypoint.set({ track: 'up', segIdx: 0 });
     app.selectObject(1);
+    expect(app.selectedTrackWaypoint()).toBeNull();
 
     app.centerOnSelectedObject();
 
     expect(app.canvasPanX()).toBe(400);
     expect(app.canvasPanY()).toBe(640);
+  });
+  it('should undo and redo waypoint speed and flag edits without changing positions', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    const original = { x: 50, y: 100, velo: 20, flags: 8 };
+    app.editTrackDown.set([original]);
+    app.applyWaypointEdit({ track: 'down', index: 0, velo: 35, flags: 10 });
+    expect(app.editTrackDown()).toEqual([{ ...original, velo: 35, flags: 10 }]);
+    app.undo();
+    expect(app.editTrackDown()).toEqual([original]);
+    app.redo();
+    expect(app.editTrackDown()).toEqual([{ ...original, velo: 35, flags: 10 }]);
+    app.applyWaypointEdit({ track: 'down', index: 0, velo: Infinity, flags: 10 });
+    expect(app.editTrackDown()[0].velo).toBe(35);
+  });
+
+  it('applies an inclusive waypoint range as one undo step without changing the other track', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    const points = Array.from({ length: 4 }, (_, index) => ({
+      x: index,
+      y: index * 100,
+      velo: 20,
+      flags: 0,
+    }));
+    app.editTrackUp.set(points);
+    app.editTrackDown.set(points);
+    app.applyWaypointEdit({ track: 'up', index: 1, endIndex: 2, velo: 40, flags: 1 });
+    expect(app.editTrackUp()).toEqual([
+      points[0],
+      { ...points[1], velo: 40, flags: 1 },
+      { ...points[2], velo: 40, flags: 1 },
+      points[3],
+    ]);
+    expect(app.editTrackDown()).toBe(points);
+    app.undo();
+    expect(app.editTrackUp()).toEqual(points);
+    app.redo();
+    expect(app.editTrackUp()[2].flags).toBe(1);
+    app.applyWaypointEdit({ track: 'up', index: 1, endIndex: 4, velo: 90, flags: 2 });
+    expect(app.editTrackUp()[1].velo).toBe(40);
+  });
+
+  it('should interpolate midpoint waypoint speed and inherit destination flags', () => {
+    const app = TestBed.createComponent(App).componentInstance;
+    app.editTrackUp.set([
+      { x: 0, y: 0, velo: 10, flags: 1 },
+      { x: 100, y: 100, velo: 30, flags: 10 },
+    ]);
+    app._insertWaypointAfter('up', 0);
+    expect(app.editTrackUp()[1]).toEqual({ x: 50, y: 50, velo: 20, flags: 10 });
+    expect(app.selectedTrackWaypoint()).toEqual({ track: 'up', segIdx: 1 });
+    app.undo();
+    expect(app.editTrackUp()).toHaveLength(2);
+    app.redo();
+    expect(app.editTrackUp()[1].velo).toBe(20);
   });
 });

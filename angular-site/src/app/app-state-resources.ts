@@ -19,6 +19,12 @@ import {
 } from './resource-fields';
 import type { EditorUndoSnapshot } from './app-history';
 import { AppStateBase } from './app-state-base';
+import {
+  captureEditorChanges,
+  EditorChangeEncoder,
+  sameEditorChanges,
+  type EditorChangeSnapshot,
+} from './app-editor-changes';
 
 interface WorkerResponse {
   id: number;
@@ -30,6 +36,38 @@ interface WorkerResponse {
 
 /** Resource, persistence, and worker-backed state for the app. */
 export class AppStateResources extends AppStateBase {
+  private readonly changeEncoder = new EditorChangeEncoder();
+  private readonly resourceEditRevision = signal(0);
+  private readonly downloadBaseline = signal<EditorChangeSnapshot | null>(null);
+  private readonly currentEditorChanges = computed(() =>
+    captureEditorChanges(this, this.changeEncoder, this.resourceEditRevision()),
+  );
+  readonly hasUndownloadedChanges = computed(() => {
+    if (!this.hasEditorData()) return false;
+    const baseline = this.downloadBaseline();
+    return (
+      this.strListDirty() ||
+      (baseline !== null && !sameEditorChanges(this.currentEditorChanges(), baseline))
+    );
+  });
+
+  captureDownloadSnapshot(): EditorChangeSnapshot {
+    return this.currentEditorChanges();
+  }
+
+  markDownloadBaseline(snapshot = this.captureDownloadSnapshot()): void {
+    this.downloadBaseline.set(snapshot);
+  }
+
+  markResourceEdited(): void {
+    this.resourceEditRevision.update((revision) => revision + 1);
+  }
+
+  resetDownloadBaseline(): void {
+    this.downloadBaseline.set(null);
+    this.resourceEditRevision.set(0);
+  }
+
   // ---- Pack sprite viewer (decoded from Pack 129 & 137) ----
   /** Decoded game sprite frames: id → HTMLCanvasElement. */
   packSpriteCanvases = new Map<number, HTMLCanvasElement>();

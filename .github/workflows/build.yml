@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [ "**" ]
+  workflow_dispatch:
   pull_request:
     branches: [ main, master ]
 
@@ -30,10 +31,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y cmake gcc libsdl2-dev
+          sudo apt-get install -y cmake gcc libsdl2-dev libgtk-3-dev
 
       - name: Configure CMake (SDL2 backend, Release)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON -DSCRIPTING_TESTS=ON
 
       - name: Build
         run: cmake --build build --parallel
@@ -41,22 +42,29 @@ jobs:
       - name: Run native tests
         run: ctest --test-dir build --output-on-failure
 
-      - name: Check binary exists
+      - name: Verify installed Linux package
         run: |
-          test -f build/reckless_drivin && echo "Build succeeded: $(file build/reckless_drivin)"
+          cmake --install build --prefix stage
+          test -x stage/reckless_drivin
+          test -s stage/resources.dat
+
+      - name: Smoke-test all Linux levels
+        run: python3 scripts/smoke-desktop.py stage/reckless_drivin
+
+      - name: Package game and resources
+        run: cpack --config build/CPackConfig.cmake -C Release -G TGZ -B dist -D CPACK_PACKAGE_FILE_NAME=reckless-drivin-linux
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: reckless-drivin-linux
-          path: build/reckless_drivin
+          path: dist/reckless-drivin-linux.tar.gz
           if-no-files-found: error
 
   # ============================================================
   # macOS native build (SDL2 via Homebrew)
   # ============================================================
   build-macos:
-    if: false
     name: Build on macOS (SDL2)
     runs-on: macos-latest
     permissions:
@@ -70,26 +78,38 @@ jobs:
         run: brew install sdl2
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DPORT_SDL2=ON -DSCRIPTING_TESTS=ON -DCMAKE_PREFIX_PATH="$(brew --prefix sdl2)"
 
       - name: Build
         run: cmake --build build --parallel
 
-      - name: Check binary exists
-        run: test -f build/reckless_drivin && echo "Build succeeded"
+      - name: Run native tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Verify installed macOS app
+        run: |
+          cmake --install build --prefix stage
+          test -x stage/reckless_drivin.app/Contents/MacOS/reckless_drivin
+          test -s stage/reckless_drivin.app/Contents/Resources/resources.dat
+          if otool -L stage/reckless_drivin.app/Contents/MacOS/reckless_drivin | sed -n '2,$p' | grep -E '/opt/homebrew/|/usr/local/'; then
+            echo "::error::App still links to a build-host dependency"
+            exit 1
+          fi
+
+      - name: Package app and dependencies
+        run: cpack --config build/CPackConfig.cmake -C Release -G TGZ -B dist -D CPACK_PACKAGE_FILE_NAME=reckless-drivin-macos
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: reckless-drivin-macos
-          path: build/reckless_drivin
+          path: dist/reckless-drivin-macos.tar.gz
           if-no-files-found: error
 
   # ============================================================
   # Windows native build (SDL2 via vcpkg)
   # ============================================================
   build-windows:
-    if: false
     name: Build on Windows (SDL2)
     runs-on: windows-latest
     permissions:
@@ -102,27 +122,40 @@ jobs:
       - name: Install SDL2 via vcpkg
         run: |
           vcpkg install sdl2:x64-windows
-          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Configure CMake
         run: |
           cmake -B build `
             -DCMAKE_BUILD_TYPE=Release `
-            -DPORT_SDL2=ON `
+            -DPORT_SDL2=ON -DSCRIPTING_TESTS=ON `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows
 
       - name: Build
         run: cmake --build build --config Release --parallel
 
-      - name: Check binary exists
-        run: Test-Path build\Release\reckless_drivin.exe
+      - name: Run native tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Verify installed Windows package
+        run: |
+          cmake --install build --config Release --prefix stage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($file in @("reckless_drivin.exe", "resources.dat", "SDL2.dll")) {
+            if (-not (Test-Path -Path "stage/$file" -PathType Leaf)) {
+              throw "Installed package is missing $file"
+            }
+          }
+
+      - name: Package game and dependencies
+        run: cpack --config build/CPackConfig.cmake -C Release -G ZIP -B dist -D CPACK_PACKAGE_FILE_NAME=reckless-drivin-windows
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: reckless-drivin-windows
-          path: build/Release/reckless_drivin.exe
+          path: dist/reckless-drivin-windows.zip
           if-no-files-found: error
 
   # ============================================================
@@ -229,7 +262,7 @@ jobs:
     needs: build-wasm
     runs-on: ubuntu-latest
     # only run on the default branch so we don't publish preview builds
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

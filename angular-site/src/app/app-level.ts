@@ -1,3 +1,4 @@
+import { captureEditedTracks, preserveEditedTracks } from './app-track-saving';
 import type { LevelProperties, ParsedLevel, RoadInfoData } from './level-editor.service';
 import type { App } from './app';
 import {
@@ -21,7 +22,7 @@ export type RoadTextureField =
 
 declare module './app' {
   interface App {
-    selectLevel(id: number, options?: { preserveView?: boolean }): void;
+    selectLevel(id: number, options?: { preserveView?: boolean; captureTracks?: boolean }): void;
     resetViewToRoad(level: ParsedLevel): void;
     onPropsInput(field: keyof LevelProperties, event: Event): void;
     onRoadInfoChange(roadInfo: number): void;
@@ -57,8 +58,9 @@ function getInputValue(event: Event): string | null {
   return null;
 }
 
-export function selectLevel(app: App, id: number, options?: { preserveView?: boolean }): void {
+export function selectLevel(app: App, id: number, options?: { preserveView?: boolean; captureTracks?: boolean }): void {
   const preserveView = options?.preserveView ?? false;
+  if (options?.captureTracks !== false) captureEditedTracks(app);
   const currentLevelId = app.selectedLevelId();
   if (currentLevelId !== null && currentLevelId !== id && app.propertiesDirty()) {
     void saveLevelProperties(app);
@@ -89,6 +91,7 @@ export function selectLevel(app: App, id: number, options?: { preserveView?: boo
     level.trackDown.map((s) => ({ x: s.x, y: s.y, flags: s.flags, velo: s.velo })),
   );
   app.dragTrackWaypoint.set(null);
+  app.selectedTrackWaypoint.set(null);
   if (!preserveView) {
     resetViewToRoad(app, level);
   }
@@ -279,7 +282,7 @@ export function applyLevelsResult(
   const existingById = new Map(app.parsedLevels().map((l) => [l.resourceId, l]));
   const merged = levels.map((l) => {
     const cur = existingById.get(l.resourceId);
-    return cur ? { ...l, roadSegs: cur.roadSegs } : l;
+    return preserveEditedTracks(app, cur ? { ...l, roadSegs: cur.roadSegs } : l);
   });
   app.parsedLevels.set(merged);
   app._roadOffscreenKey = ''; // road segs may have changed; invalidate the road cache

@@ -1,3 +1,5 @@
+import type { TrackSeg } from '../../../level-editor.types';
+import type { TrackWaypointEdit } from '../../../waypoint-editing';
 import {
   Component,
   ChangeDetectionStrategy,
@@ -58,6 +60,12 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   @Input() editTime = 0;
   @Input() canUndo = false;
   @Input() canRedo = false;
+  @Input() editTrackUp: readonly TrackSeg[] = [];
+  @Input() editTrackDown: readonly TrackSeg[] = [];
+  @Input() selectedTrackWaypoint: TrackWaypointRef | null = null;
+  @Output() trackWaypointSelectionChange = new EventEmitter<TrackWaypointRef>();
+  @Output() trackDetailsVisibleChange = new EventEmitter<boolean>();
+  @Output() waypointEdit = new EventEmitter<TrackWaypointEdit>();
   @Input() trackUpCount = 0;
   @Input() trackDownCount = 0;
   @Input() roadSegCount = 0;
@@ -168,7 +176,7 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   @Output() deselect = new EventEmitter<void>();
   @Output() addObjectTypeChange = new EventEmitter<number>();
 
-  sidebarTab: 'objects' | 'groups' = 'objects';
+  sidebarTab: 'objects' | 'groups' | 'tracks' = 'objects';
   selectedObjectGroupSlotIndex: number | null = null;
   showGeneratedObjectGroupPreviews = true;
   previewStartY = DEFAULT_OBJECT_GROUP_PREVIEW_START_Y;
@@ -216,6 +224,14 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['selectedTrackWaypoint'] && this.selectedTrackWaypoint) {
+      this.setSidebarTab('tracks');
+    } else if (
+      (changes['selectedObjIndex'] || changes['selectedTrackWaypoint']) &&
+      this.selectedObjIndex !== null
+    ) {
+      this.setSidebarTab('objects');
+    }
     if (changes['levelEnd']) {
       this.previewStartY = this.normalizePreviewStartY(this.previewStartY);
     }
@@ -235,13 +251,24 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.trackDetailsVisibleChange.emit(false);
     this.objectGroupPreviewChange.emit(null);
     this.objectGroupSpawnPreviewChange.emit([]);
   }
 
-  setSidebarTab(tab: 'objects' | 'groups'): void {
+  setSidebarTab(tab: 'objects' | 'groups' | 'tracks'): void {
     if (this.sidebarTab === tab) return;
     this.sidebarTab = tab;
+    this.trackDetailsVisibleChange.emit(tab === 'tracks');
+    if (tab === 'tracks') {
+      if (this.selectedObjIndex !== null) this.deselect.emit();
+      if (!this.selectedTrackWaypoint) {
+        if (this.editTrackUp.length > 0)
+          this.trackWaypointSelectionChange.emit({ track: 'up', segIdx: 0 });
+        else if (this.editTrackDown.length > 0)
+          this.trackWaypointSelectionChange.emit({ track: 'down', segIdx: 0 });
+      }
+    }
     this.syncSelectedObjectGroupSlot();
     this.pushGeneratedObjectGroupPreview();
   }

@@ -2,6 +2,7 @@ import { captureLuaRuntimeMessage } from './lua-runtime-log';
 import { err, ok, type Result } from 'neverthrow';
 import { App } from './app';
 import { AppStateResources } from './app-state-resources';
+import { changesOpaqueResource } from './app-editor-changes';
 
 function applyCustomResourceEntry(
   app: App,
@@ -288,8 +289,10 @@ export function dispatchWorker<T>(
     }, 60_000);
     app.pendingCallbacks.set(id, (resp: WorkerResponse) => {
       window.clearTimeout(timeout);
-      if (resp.ok) resolve(resp.result as T);
-      else reject(new Error(resp.error ?? 'Worker error'));
+      if (resp.ok) {
+        if (changesOpaqueResource(cmd)) app.markResourceEdited();
+        resolve(resp.result as T);
+      } else reject(new Error(resp.error ?? 'Worker error'));
     });
     if (transferables?.length) {
       app.packWorker.postMessage({ id, cmd, payload }, transferables);

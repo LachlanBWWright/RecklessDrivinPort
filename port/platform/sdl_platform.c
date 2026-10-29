@@ -16,6 +16,9 @@
 #ifdef PORT_SDL2
 
 #include <SDL.h>
+#ifndef __EMSCRIPTEN__
+#include "native_customisations.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1250,6 +1253,9 @@ void SDL_Platform_SetPalette(int index, int count, UInt16 *rgbValues)
 
 void InitScreen(int unused)
 {
+#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+    SDL_SetMainReady();
+#endif
 #ifdef __ANDROID__
     /* SDLActivity also chooses orientation during native window creation. */
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft");
@@ -3288,6 +3294,9 @@ static int parse_editor_launch_options(int argc, char *argv[], tEditorLaunchOpti
 #ifndef RD_NO_MAIN
 int main(int argc, char *argv[])
 {
+#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+    SDL_SetMainReady();
+#endif
     tEditorLaunchOptions editor_launch_options;
     int auto_start_editor_launch = parse_editor_launch_options(argc, argv, &editor_launch_options);
 #ifdef __ANDROID__
@@ -3318,11 +3327,16 @@ int main(int argc, char *argv[])
         }
     }
 #endif /* __ANDROID__ */
+    RDNativeLoadCustomisations();
     Init();
     if (auto_start_editor_launch)
     {
         SetEditorLaunchOptions(&editor_launch_options);
         rd_start_editor_test_drive();
+    }
+    else
+    {
+        RDNativeApplyLaunchOptions();
     }
     {
         Uint32 frame_start;

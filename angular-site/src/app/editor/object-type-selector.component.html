@@ -1,7 +1,7 @@
 <mat-form-field appearance="outline" class="w-full text-[0.85rem]">
   <mat-label>Type ID</mat-label>
   <mat-select
-    formControlName="typeRes"
+    [formControl]="form.controls.typeRes"
     panelClass="max-w-[min(calc(100vw-32px),520px)] [&_.mat-mdc-option_.mdc-list-item__primary-text]:block [&_.mat-mdc-option_.mdc-list-item__primary-text]:w-full [&_.mat-mdc-option_.mdc-list-item__primary-text]:overflow-hidden [&_.mat-mdc-option]:!h-[30px] [&_.mat-mdc-option]:!min-h-[30px] [&_.mat-mdc-option]:items-center"
   >
     <mat-select-trigger>

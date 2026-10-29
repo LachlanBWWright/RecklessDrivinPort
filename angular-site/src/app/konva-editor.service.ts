@@ -1,9 +1,10 @@
+import type { TrackSeg } from './level-editor.types';
 /** Konva scene graph for the editor overlays and their synchronized transforms. */
 import { Injectable, OnDestroy } from '@angular/core';
 import Konva from 'konva';
-import type { ObjectPos } from './level-editor.service';
+import type { ObjectPos, TrackWaypointRef } from './level-editor.service';
 import { profiler } from './konva-editor.profiler';
-import { EMPTY_SET, setsEqual } from './konva-editor.types';
+import { EMPTY_SET, setsEqual, WAYPOINT_WORLD_R } from './konva-editor.types';
 import type {
   KonvaDragEndEvent,
   KonvaWaypointDragEndEvent,
@@ -66,6 +67,7 @@ export class KonvaEditorService implements OnDestroy {
     worldX: number,
     worldY: number,
   ) => void;
+  onWaypointSelect?: (track: 'up' | 'down', segIdx: number) => void;
   onWaypointDoubleClick?: (track: 'up' | 'down', segIdx: number) => void;
   onMarkEndpointDragEnd?: (e: KonvaMarkDragEndEvent) => void;
   onMarkClick?: (markIdx: number) => void;
@@ -133,8 +135,9 @@ export class KonvaEditorService implements OnDestroy {
   private _konvaObjNodes: KonvaWorldNode[] = [];
 
   // ── Track-layer cache ─────────────────────────────────────────────────────
-  private _lastTrackUp: readonly { x: number; y: number }[] | null = null;
-  private _lastTrackDown: readonly { x: number; y: number }[] | null = null;
+  private _selectedWaypointCircle: Konva.Circle | null = null;
+  private _lastTrackUp: readonly TrackSeg[] | null = null;
+  private _lastTrackDown: readonly TrackSeg[] | null = null;
 
   // ── Marks-layer cache ─────────────────────────────────────────────────────
   private _lastMarks: readonly { x1: number; y1: number; x2: number; y2: number }[] | null = null;
@@ -240,6 +243,7 @@ export class KonvaEditorService implements OnDestroy {
       this._lastSx = sx;
       this._lastSy = sy;
       this.updateWorldGroups(gx, gy, sx, sy);
+      this.scaleWaypointDetails();
       // keep background image transform in sync as well
       _applyBackgroundTransform(
         this.bgImageNode,
@@ -359,9 +363,47 @@ export class KonvaEditorService implements OnDestroy {
   // TRACK WAYPOINTS
   // ─────────────────────────────────────────────────────────────────────────
 
+  setSelectedTrackWaypoint(selection: TrackWaypointRef | null): void {
+    const node = selection
+      ? this.trackWorldGroup?.findOne(`#wp-${selection.track}-${selection.segIdx}`)
+      : null;
+    const circle = node instanceof Konva.Circle ? node : null;
+    if (circle === this._selectedWaypointCircle) return;
+    if (this._selectedWaypointCircle) {
+      this._selectedWaypointCircle.removeName('selected-waypoint');
+      this._selectedWaypointCircle.radius(WAYPOINT_WORLD_R);
+      this._selectedWaypointCircle.stroke('rgba(0,0,0,0.5)');
+    }
+    if (circle) {
+      circle.addName('selected-waypoint');
+      circle.radius(WAYPOINT_WORLD_R * 1.4);
+      circle.stroke('#fff');
+    }
+    this._selectedWaypointCircle = circle;
+    this._markLayerDirty(this.trackLayer);
+  }
+
+  private trackDetailsVisible = false;
+
+  setTrackDetailsVisible(visible: boolean): void {
+    if (this.trackDetailsVisible === visible) return;
+    this.trackDetailsVisible = visible;
+    if (visible) this.trackLayer?.moveToTop();
+    else this.trackLayer?.zIndex(2);
+    this._lastTrackUp = null;
+  }
+
+  private scaleWaypointDetails(): void {
+    const sx = this._zoom * (this._cssW / this._logicalW);
+    const sy = this._zoom * (this._cssH / this._logicalH);
+    this.trackWorldGroup
+      ?.find('.waypoint-details')
+      .forEach((node) => node.scale({ x: 1 / sx, y: 1 / sy }));
+  }
+
   setTrackWaypoints(
-    trackUp: { x: number; y: number }[],
-    trackDown: { x: number; y: number }[],
+    trackUp: TrackSeg[],
+    trackDown: TrackSeg[],
     zoom: number,
     panX: number,
     panY: number,
@@ -371,6 +413,7 @@ export class KonvaEditorService implements OnDestroy {
       t.end();
       return;
     }
+    if (this.trackDetailsVisible) this.trackLayer.moveToTop();
     this._zoom = zoom;
     this._panX = panX;
     this._panY = panY;
@@ -405,7 +448,10 @@ export class KonvaEditorService implements OnDestroy {
         this.onWaypointDragEnd?.({ track, segIdx, worldX: wx, worldY: wy }),
       (track, segIdx, wx, wy) => this.onWaypointRightClick?.(track, segIdx, wx, wy),
       (track, segIdx) => this.onWaypointDoubleClick?.(track, segIdx),
+      (track, segIdx) => this.onWaypointSelect?.(track, segIdx),
+      this.trackDetailsVisible,
     );
+    this.scaleWaypointDetails();
 
     this._applyGroupTransform();
     this._markLayerDirty(this.trackLayer);
@@ -413,6 +459,7 @@ export class KonvaEditorService implements OnDestroy {
   }
 
   clearTrackWaypoints(): void {
+    this._selectedWaypointCircle = null;
     this._lastTrackUp = null;
     this._lastTrackDown = null;
     this.trackWorldGroup?.destroyChildren();
@@ -432,10 +479,11 @@ export class KonvaEditorService implements OnDestroy {
     worldY: number,
   ): void {
     if (!this.trackWorldGroup || !this.trackLayer) return;
-    const node = this.trackWorldGroup.findOne(`#wp-${track}-${segIdx}`) as Konva.Circle | undefined;
-    if (node) {
+    const node = this.trackWorldGroup.findOne(`#wp-${track}-${segIdx}`);
+    if (node instanceof Konva.Circle) {
       node.x(worldX);
       node.y(-worldY);
+      this.trackWorldGroup.findOne(`#wp-label-${track}-${segIdx}`)?.position(node.position());
       // Invalidate the cache reference so the next setTrackWaypoints call fully rebuilds.
       if (track === 'up') this._lastTrackUp = null;
       else this._lastTrackDown = null;

@@ -16,5 +16,7 @@ export function applyPanMode(
 
 function updateGroupNodes(group: Konva.Group | null, isPan: boolean): void {
   if (!group) return;
-  for (const node of group.children) node.draggable(!isPan);
+  for (const node of group.children) {
+    if (node.listening()) node.draggable(!isPan);
+  }
 }

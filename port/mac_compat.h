@@ -11,6 +11,13 @@
 #ifndef MAC_COMPAT_H
 #define MAC_COMPAT_H
 
+/* MSVC does not define GCC's byte-order macros. Windows targets are LE. */
+#if defined(_WIN32) && !defined(__BYTE_ORDER__)
+#define __ORDER_LITTLE_ENDIAN__ 1234
+#define __ORDER_BIG_ENDIAN__ 4321
+#define __BYTE_ORDER__ __ORDER_LITTLE_ENDIAN__
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>

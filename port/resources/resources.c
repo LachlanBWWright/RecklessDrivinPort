@@ -18,6 +18,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#if defined(PORT_SDL2) && !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+#include <SDL.h>
+#endif
+#if defined(_WIN32) && defined(PORT_SDL2)
+#include <wchar.h>
+static FILE *open_resource_file(const char *path, const char *mode)
+{
+    wchar_t *widePath = (wchar_t *)SDL_iconv_string("UTF-16LE", "UTF-8", path, strlen(path) + 1);
+    wchar_t *wideMode = (wchar_t *)SDL_iconv_string("UTF-16LE", "UTF-8", mode, strlen(mode) + 1);
+    FILE *file = widePath && wideMode ? _wfopen(widePath, wideMode) : NULL;
+    SDL_free(widePath);
+    SDL_free(wideMode);
+    return file;
+}
+#define fopen open_resource_file
+#endif
 
 /* Path to resources.dat - can be overridden at compile time */
 #ifndef RESOURCES_DAT_PATH
@@ -56,7 +72,22 @@ int g_res_load = 1;
 void Pomme_InitResources(void)
 {
     if (gResourceFile) return;
-    gResourceFile = fopen(RESOURCES_DAT_PATH, "rb");
+#if defined(PORT_SDL2) && !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+    /* SDL_GetBasePath resolves both executable-adjacent data and macOS bundle
+     * Resources. Never depend on the launcher's working directory. */
+    char *base = SDL_GetBasePath();
+    if (base) {
+        size_t size = strlen(base) + sizeof("resources.dat");
+        char *path = malloc(size);
+        if (path) {
+            snprintf(path, size, "%sresources.dat", base);
+            gResourceFile = fopen(path, "rb");
+            free(path);
+        }
+        SDL_free(base);
+    }
+#endif
+    if (!gResourceFile) gResourceFile = fopen(RESOURCES_DAT_PATH, "rb");
     if (!gResourceFile) {
         /* Try relative path from executable location */
         fprintf(stderr, "Warning: could not open resources.dat at '%s'\n",
