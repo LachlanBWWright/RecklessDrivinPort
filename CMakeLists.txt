@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.16)
 project(RecklessDrivin C)
 
 include(CTest)
+if(BUILD_TESTING)
+    add_test(NAME mac_bundle_paths
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -P ${CMAKE_SOURCE_DIR}/tests/mac_bundle_paths.cmake)
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -333,6 +338,9 @@ if(NOT ANDROID)
     )
     list(TRANSFORM LUA_RUNTIME_SOURCES PREPEND "${LUA_RUNTIME_SRC_DIR}/")
     add_library(lua_runtime_static STATIC ${LUA_RUNTIME_SOURCES})
+    # Lua includes native platform headers (windows.h on Windows). It must not
+    # receive the forced classic Mac declarations used by the game sources.
+    target_compile_definitions(lua_runtime_static PRIVATE MAC_COMPAT_H)
     target_include_directories(lua_runtime_static PUBLIC "${LUA_RUNTIME_SRC_DIR}")
     target_link_libraries(${GAME_TARGET} lua_runtime_static)
     if(NOT MSVC)

@@ -1,5 +1,6 @@
 include(BundleUtilities)
 set(bundle "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/reckless_drivin.app")
+get_filename_component(bundle "${bundle}" ABSOLUTE)
 fixup_bundle("${bundle}" "" "@SDL2_LIBRARY_DIRS@")
 
 # install_name_tool invalidates existing signatures, including the ad-hoc
