@@ -29,6 +29,13 @@ export class EditorCanvasComponent implements OnChanges {
     if (this.hoverTrackWaypoint || this.spaceDown) return 'grab';
     return 'default';
   }
+  @Input() editingContext: 'objects' | 'groups' | 'tracks' = 'objects';
+  roadToolsOpen = false;
+
+  toggleRoadTools(): void {
+    this.roadToolsOpen = !this.roadToolsOpen;
+    if (!this.roadToolsOpen && this.drawMode !== 'none') this.drawModeChange.emit('none');
+  }
   @Input() objects: ObjectPos[] = [];
   @Input() selectedObjIndex: number | null = null;
   @Input() marks: MarkSeg[] = [];

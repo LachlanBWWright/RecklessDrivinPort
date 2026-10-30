@@ -1,4 +1,4 @@
-@if (mergeDialogOpen) {
+<ng-template #mergeTemplate>
   <app-site-toolbar-merge-dialog
     [pendingMergeFile]="pendingMergeFile"
     [mergeOptions]="mergeOptions"
@@ -7,8 +7,8 @@
     (close)="closeMerge.emit()"
     (confirm)="confirmMerge.emit()"
   />
-}
-@if (previewDialogOpen) {
+</ng-template>
+<ng-template #previewTemplate>
   <app-site-toolbar-preview-dialog
     [selectedLevelId]="selectedLevelId"
     [levelDisplayNum]="levelDisplayNum"
@@ -17,12 +17,32 @@
     (close)="closePreview.emit()"
     (confirm)="confirmPreview.emit()"
   />
-}
-@if (downloadDialogOpen) {
+</ng-template>
+<ng-template #downloadTemplate>
   <app-site-toolbar-download-dialog
     [stripScripts]="stripScriptsForDownload"
     (stripScriptsChange)="stripScriptsForDownloadChange.emit($event)"
     (close)="closeDownload.emit()"
     (confirm)="confirmDownload.emit()"
   />
-}
+</ng-template>
+
+<ng-template #deleteTemplate>
+  <h2 mat-dialog-title id="delete-dialog-title">
+    Delete level {{ deleteLevelId === null ? '' : levelDisplayNum(deleteLevelId) }}?
+  </h2>
+  <mat-dialog-content>
+    <p>The remaining levels will move up. This cannot be undone.</p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button data-delete-cancel (click)="closeDelete.emit()">Cancel</button>
+    <button
+      mat-flat-button
+      class="!bg-[var(--danger)] !text-white"
+      [disabled]="!canDeleteLevel"
+      (click)="confirmDelete.emit()"
+    >
+      Delete level
+    </button>
+  </mat-dialog-actions>
+</ng-template>

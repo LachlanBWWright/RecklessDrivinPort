@@ -259,6 +259,7 @@ export class EditorObjectsSectionComponent implements OnChanges, OnDestroy {
   setSidebarTab(tab: 'objects' | 'groups' | 'tracks'): void {
     if (this.sidebarTab === tab) return;
     this.sidebarTab = tab;
+    if (this.drawMode !== 'none') this.drawModeChange.emit('none');
     this.trackDetailsVisibleChange.emit(tab === 'tracks');
     if (tab === 'tracks') {
       if (this.selectedObjIndex !== null) this.deselect.emit();

@@ -15,7 +15,7 @@
       type="file"
       accept=".dat"
       (change)="resourceFileSelected.emit($event)"
-      [disabled]="workerBusy"
+      [disabled]="workerBusy || imageEditing"
       style="display: none"
     />
     <input
@@ -23,7 +23,7 @@
       type="file"
       accept=".zip,.lua-project.zip"
       (change)="importLuaProject.emit($event)"
-      [disabled]="workerBusy"
+      [disabled]="workerBusy || imageEditing"
       style="display: none"
     />
     @if (!hasEditorData) {
@@ -31,7 +31,7 @@
         mat-stroked-button
         class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
         (click)="loadDefaultResources.emit()"
-        [disabled]="workerBusy"
+        [disabled]="workerBusy || imageEditing"
       >
         <mat-icon>cloud_download</mat-icon> <span>Load Default</span>
       </button>
@@ -40,7 +40,7 @@
         type="button"
         class="!border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)] hover:!border-[var(--accent)] hover:!text-[var(--on-surface)] disabled:!border-[var(--border)] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
         (click)="fileInput.click()"
-        [disabled]="workerBusy"
+        [disabled]="workerBusy || imageEditing"
       >
         <mat-icon>folder_open</mat-icon> <span>Upload resources.dat</span>
       </button>
@@ -50,29 +50,41 @@
         type="button"
         class="!h-11 !min-h-11 !border-[var(--border)] !bg-[var(--surface2)] !text-[var(--on-surface)]"
         [matMenuTriggerFor]="toolsMenu"
-        [disabled]="workerBusy"
+        [disabled]="workerBusy || imageEditing"
       >
         <mat-icon>build</mat-icon><span>Tools</span
         ><mat-icon iconPositionEnd>arrow_drop_down</mat-icon>
       </button>
       <mat-menu #toolsMenu="matMenu">
-        <button mat-menu-item [disabled]="workerBusy" (click)="fileInput.click()">
+        <button mat-menu-item [disabled]="workerBusy || imageEditing" (click)="fileInput.click()">
           <mat-icon>merge_type</mat-icon><span>Merge resources.dat</span>
         </button>
         <mat-divider />
-        <button mat-menu-item [disabled]="workerBusy" (click)="openLuaEditor.emit()">
+        <button
+          mat-menu-item
+          [disabled]="workerBusy || imageEditing"
+          (click)="openLuaEditor.emit()"
+        >
           <mat-icon>code</mat-icon><span>Lua editor</span>
         </button>
-        <button mat-menu-item [disabled]="workerBusy" (click)="exportLuaProject.emit()">
+        <button
+          mat-menu-item
+          [disabled]="workerBusy || imageEditing"
+          (click)="exportLuaProject.emit()"
+        >
           <mat-icon>file_download</mat-icon><span>Export Lua project</span>
         </button>
-        <button mat-menu-item [disabled]="workerBusy" (click)="projectInput.click()">
+        <button
+          mat-menu-item
+          [disabled]="workerBusy || imageEditing"
+          (click)="projectInput.click()"
+        >
           <mat-icon>file_upload</mat-icon><span>Import Lua project</span>
         </button>
         <mat-divider />
         <button
           mat-menu-item
-          [disabled]="workerBusy"
+          [disabled]="workerBusy || imageEditing"
           (click)="clearEditorFile.emit()"
           class="!text-[var(--danger)]"
         >
@@ -83,7 +95,7 @@
         mat-stroked-button
         class="!h-11 !min-h-11 !border-[var(--accent2)] !text-[var(--accent2)] hover:!bg-[color:rgba(66,165,245,0.12)] disabled:!border-[var(--border)] disabled:!text-[var(--muted)]"
         (click)="previewSelectedLevel.emit()"
-        [disabled]="workerBusy || selectedLevelId === null"
+        [disabled]="workerBusy || imageEditing || selectedLevelId === null"
       >
         <mat-icon>play_arrow</mat-icon> <span>Preview</span>
       </button>
@@ -91,7 +103,7 @@
         mat-raised-button
         class="!h-11 !min-h-11 !bg-[var(--accent)] !text-white hover:!bg-[#d32f2f] disabled:!bg-[var(--surface3)] disabled:!text-[var(--muted)]"
         (click)="launchDownload.emit()"
-        [disabled]="workerBusy"
+        [disabled]="workerBusy || imageEditing"
       >
         <mat-icon>download</mat-icon> <span>Download</span>
       </button>
@@ -131,7 +143,7 @@
         <app-site-toolbar-level-selector
           [selectedLevelId]="selectedLevelId"
           [parsedLevels]="parsedLevels"
-          [workerBusy]="workerBusy"
+          [workerBusy]="workerBusy || imageEditing"
           (selectLevel)="selectLevel.emit($event)"
         />
         <button
@@ -139,7 +151,7 @@
           [matMenuTriggerFor]="levelMenu"
           aria-label="Manage levels"
           class="!text-[var(--muted)]"
-          [disabled]="workerBusy || selectedLevelIndex < 0"
+          [disabled]="workerBusy || imageEditing || selectedLevelIndex < 0"
         >
           <mat-icon>more_vert</mat-icon>
         </button>

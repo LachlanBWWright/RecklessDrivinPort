@@ -1,3 +1,4 @@
+import { leaveImageEditor } from './image-editor-session';
 import type { App } from './app';
 import {
   scheduleCanvasRedraw as scheduleCanvasRedrawHelper,
@@ -69,6 +70,7 @@ export function createRuntimeActions(app: App): {
   return {
     scheduleCanvasRedraw: () => scheduleCanvasRedrawHelper(app),
     setTab: (tab) => {
+      if (tab !== app.activeTab() && !leaveImageEditor(app)) return;
       app.activeTab.set(tab);
       syncGameLoopWithActiveTabHelper(app);
       if (tab === 'editor') {
@@ -76,6 +78,7 @@ export function createRuntimeActions(app: App): {
       }
     },
     setSection: (section) => {
+      if (section !== app.editorSection() && !leaveImageEditor(app)) return;
       app.editorSection.set(section);
     },
     toggleFullscreen: toggleFullscreenHelper,

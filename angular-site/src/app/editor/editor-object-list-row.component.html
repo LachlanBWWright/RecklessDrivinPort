@@ -1,5 +1,10 @@
-<div
-  class="flex cursor-pointer select-none items-center gap-2.5 border-b border-white/[0.04] border-l-[3px] px-2.5 py-1.5 pl-3 text-[0.82rem] transition"
+<button
+  #rowButton
+  type="button"
+  [attr.data-object-index]="index"
+  [attr.aria-pressed]="selected"
+  [attr.tabindex]="tabStop ? 0 : -1"
+  class="flex w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent2)] cursor-pointer select-none items-center gap-2.5 border-b border-white/[0.04] border-l-[3px] px-2.5 py-1.5 pl-3 text-[0.82rem] transition"
   [ngClass]="
     selected
       ? 'border-l-red-600 bg-red-600/20'
@@ -42,4 +47,4 @@
     [ngClass]="selected ? 'opacity-100 !text-[var(--accent)]' : 'opacity-25'"
     >chevron_right</mat-icon
   >
-</div>
+</button>

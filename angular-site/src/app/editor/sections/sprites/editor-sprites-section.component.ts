@@ -1,3 +1,4 @@
+import { type TemplateRef } from '@angular/core';
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
 import { getSpriteFormatLabel } from '../../../sprite-editor';
 
@@ -11,6 +12,9 @@ import { getSpriteFormatLabel } from '../../../sprite-editor';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorSpritesSectionComponent {
+  @Input() imageEditing = false;
+  @Input() imageEditorTemplate: TemplateRef<unknown> | null = null;
+
   @Input() packSpriteFrames: { id: number; bitDepth: 8 | 16; width: number; height: number }[] = [];
   @Input() selectedPackSpriteId: number | null = null;
   @Input() workerBusy = false;

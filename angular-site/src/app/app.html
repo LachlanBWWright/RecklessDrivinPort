@@ -6,6 +6,7 @@
   [hasEditorData]="hasEditorData()"
   [hasUndownloadedChanges]="hasUndownloadedChanges()"
   [workerBusy]="workerBusy()"
+  [imageEditing]="spriteEditorOpen()"
   [editorError]="editorError()"
   (tabChange)="runtime.setTab($event)"
   (editorSectionChange)="runtime.setSection($event)"
@@ -159,7 +160,8 @@
 
         @if (editorSection() === 'objects') {
           <app-editor-objects-section
-            [editTrackUp]="editTrackUp()" [editTrackDown]="editTrackDown()"
+            [editTrackUp]="editTrackUp()"
+            [editTrackDown]="editTrackDown()"
             [selectedTrackWaypoint]="selectedTrackWaypoint()"
             (trackWaypointSelectionChange)="selectedTrackWaypoint.set($event)"
             (waypointEdit)="applyWaypointEdit($event)"
@@ -268,6 +270,8 @@
 
         @if (editorSection() === 'sprites') {
           <app-editor-sprites-section
+            [imageEditing]="spriteEditorOpen()"
+            [imageEditorTemplate]="inlineImageEditor"
             [packSpriteFrames]="packSpriteFrames()"
             [selectedPackSpriteId]="selectedPackSpriteId()"
             [workerBusy]="workerBusy()"
@@ -282,6 +286,8 @@
 
         @if (editorSection() === 'tiles') {
           <app-editor-tiles-section
+            [imageEditing]="spriteEditorOpen()"
+            [imageEditorTemplate]="inlineImageEditor"
             [tileTileEntries]="tileTileEntries()"
             [roadTileGroups]="roadTileGroups()"
             [roadInfoOptions]="roadInfoOptions()"
@@ -332,6 +338,8 @@
 
         @if (editorSection() === 'screens') {
           <app-editor-screens-section
+            [imageEditing]="spriteEditorOpen()"
+            [imageEditorTemplate]="inlineImageEditor"
             [iconEntries]="iconEntries()"
             [selectedIconId]="selectedIconId()"
             [selectedIconType]="selectedIconType()"
@@ -365,9 +373,12 @@
   }
 </main>
 
-<app-sprite-editor
-  [frame]="spriteEditorFrame()"
-  [open]="spriteEditorOpen()"
-  (closed)="spriteEditorOpen.set(false)"
-  (saved)="onSpriteEditorSaved($event)"
-></app-sprite-editor>
+<ng-template #inlineImageEditor>
+  <app-sprite-editor
+    [frame]="spriteEditorFrame()"
+    [open]="spriteEditorOpen()"
+    (closed)="closeImageEditor()"
+    (dirtyChange)="spriteEditorDirty.set($event)"
+    (saved)="onSpriteEditorSaved($event)"
+  ></app-sprite-editor>
+</ng-template>

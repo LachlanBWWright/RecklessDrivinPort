@@ -7,6 +7,8 @@
         class="flex h-full min-h-0 flex-1 items-stretch gap-6 overflow-hidden max-[1100px]:flex-col"
       >
         <app-editor-screen-sidebar
+          [attr.inert]="imageEditing ? '' : null"
+          [class.opacity-60]="imageEditing"
           [entries]="iconEntries"
           [selectedId]="selectedIconId"
           [selectedType]="selectedIconType"
@@ -16,18 +18,27 @@
           (selectedChange)="selectIconEntry.emit($event)"
         />
 
-        <app-editor-screen-selection-panel
-          [selectedIconId]="selectedIconId"
-          [selectedIconLabel]="selectedIconLabel"
-          [selectedIconType]="selectedIconType"
-          [iconPreviewDataUrl]="iconPreviewDataUrl"
-          [workerBusy]="workerBusy"
-          (openImageEditor)="openIconImageEditor.emit()"
-          (exportPng)="exportIconPng.emit()"
-          (exportRaw)="exportIconRaw.emit()"
-          (pngUpload)="iconPngUpload.emit($event)"
-          (rawUpload)="iconRawUpload.emit($event)"
-        />
+        @if (imageEditing && imageEditorTemplate) {
+          <div
+            class="flex min-h-0 min-w-0 flex-1 flex-col p-3"
+            aria-label="Image editing workspace"
+          >
+            <ng-container [ngTemplateOutlet]="imageEditorTemplate" />
+          </div>
+        } @else {
+          <app-editor-screen-selection-panel
+            [selectedIconId]="selectedIconId"
+            [selectedIconLabel]="selectedIconLabel"
+            [selectedIconType]="selectedIconType"
+            [iconPreviewDataUrl]="iconPreviewDataUrl"
+            [workerBusy]="workerBusy"
+            (openImageEditor)="openIconImageEditor.emit()"
+            (exportPng)="exportIconPng.emit()"
+            (exportRaw)="exportIconRaw.emit()"
+            (pngUpload)="iconPngUpload.emit($event)"
+            (rawUpload)="iconRawUpload.emit($event)"
+          />
+        }
       </div>
     } @else {
       <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">

@@ -8,6 +8,7 @@ import {
   ElementRef,
   ViewChild,
   AfterViewInit,
+  HostListener,
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormControl } from '@angular/forms';
@@ -18,6 +19,7 @@ export type SpriteEditorTool = 'pencil' | 'fill' | 'eyedropper' | 'eraser';
 @Component({
   selector: 'app-sprite-editor',
   templateUrl: './sprite-editor.component.html',
+  host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -41,7 +43,24 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   colorStyle(): string {
     return `rgba(${this.color[0]},${this.color[1]},${this.color[2]},${this.color[3] / 255})`;
   }
-  @ViewChild('overlayEl') overlayElRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('workspaceEl') workspaceElRef?: ElementRef<HTMLElement>;
+  @Output() dirtyChange = new EventEmitter<boolean>();
+  dirty = false;
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.dirty) event.preventDefault();
+  }
+
+  private updateDirty(): void {
+    const frame = this.frame;
+    const dirty =
+      !!frame && !!this.pixels && this.pixels.some((value, index) => value !== frame.pixels[index]);
+    if (dirty !== this.dirty) {
+      this.dirty = dirty;
+      this.dirtyChange.emit(dirty);
+    }
+  }
 
   tool: SpriteEditorTool = 'pencil';
   readonly brushSize = new FormControl(1, { nonNullable: true });
@@ -114,8 +133,8 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     if (changes['frame'] || changes['open']) {
       if (this.open && this.frame) {
         this.loadFrame(this.frame);
-        // Focus the overlay for keyboard events
-        setTimeout(() => this.overlayElRef?.nativeElement?.focus(), 0);
+        // Focus the inline workspace for keyboard events
+        setTimeout(() => this.workspaceElRef?.nativeElement?.focus(), 0);
       }
     }
   }
@@ -123,8 +142,8 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   ngAfterViewInit(): void {
     if (this.open && this.frame) {
       this.loadFrame(this.frame);
-      // Ensure overlay gets focus for keyboard events (Escape to close)
-      setTimeout(() => this.overlayElRef?.nativeElement?.focus(), 0);
+      // Focus the inline workspace (Escape to cancel)
+      setTimeout(() => this.workspaceElRef?.nativeElement?.focus(), 0);
     }
   }
 
@@ -132,7 +151,9 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
     this.spriteW = frame.width;
     this.spriteH = frame.height;
     this.frameId = frame.frameId;
-    this.pixels = frame.pixels.slice() as Uint8ClampedArray;
+    this.pixels = new Uint8ClampedArray(frame.pixels);
+    this.dirty = false;
+    this.dirtyChange.emit(false);
     this.undoStack = [];
     this.redoStack = [];
     this.extractPalette();
@@ -270,6 +291,7 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
   }
 
   onMouseUp(): void {
+    if (this.mouseDown) this.updateDirty();
     this.mouseDown = false;
     this._lastPx = null;
     this._lastPy = null;
@@ -421,24 +443,26 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   private saveUndo(): void {
     if (!this.pixels) return;
-    this.undoStack.push(this.pixels.slice() as Uint8ClampedArray);
+    this.undoStack.push(new Uint8ClampedArray(this.pixels));
     if (this.undoStack.length > this.MAX_UNDO) this.undoStack.shift();
     this.redoStack = [];
   }
 
   undo(): void {
     if (this.undoStack.length === 0) return;
-    if (this.pixels) this.redoStack.push(this.pixels.slice() as Uint8ClampedArray);
+    if (this.pixels) this.redoStack.push(new Uint8ClampedArray(this.pixels));
     const prev = this.undoStack.pop();
     if (prev) this.pixels = prev;
+    this.updateDirty();
     this.queueDraw();
   }
 
   redo(): void {
     if (this.redoStack.length === 0) return;
-    if (this.pixels) this.undoStack.push(this.pixels.slice() as Uint8ClampedArray);
+    if (this.pixels) this.undoStack.push(new Uint8ClampedArray(this.pixels));
     const next = this.redoStack.pop();
     if (next) this.pixels = next;
+    this.updateDirty();
     this.queueDraw();
   }
 
@@ -493,7 +517,7 @@ export class SpriteEditorComponent implements OnChanges, AfterViewInit {
 
   save(): void {
     if (!this.pixels) return;
-    this.saved.emit({ frameId: this.frameId, pixels: this.pixels.slice() as Uint8ClampedArray });
+    this.saved.emit({ frameId: this.frameId, pixels: new Uint8ClampedArray(this.pixels) });
   }
 
   close(): void {

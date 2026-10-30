@@ -49,7 +49,11 @@ import type {
 import { exportLuaProject, importLuaProject } from './lua-project';
 import { SCRIPT_FORMAT_VERSION } from './script-format';
 import { MatDialog } from '@angular/material/dialog';
-import type { LuaScriptEditorDialogData, LuaScriptEditorDialogResult, LuaScriptEditorChange } from './editor/lua-script-editor-dialog.component';
+import type {
+  LuaScriptEditorDialogData,
+  LuaScriptEditorDialogResult,
+  LuaScriptEditorChange,
+} from './editor/lua-script-editor-dialog.component';
 import type { LuaProjectInput } from './lua-project';
 import { validateLuaWorkspace } from './lua-workspace';
 
@@ -224,10 +228,22 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     const levelBindings = this.levelScriptBindings() ?? [];
     const encoder = new TextEncoder();
     const sourceBytes = scripts.map((script) => encoder.encode(script.source).byteLength);
-    if (scripts.length > 256 || scripts.some((script, index) => script.id < 0 || script.id > 32767 ||
-      encoder.encode(script.name).byteLength > 4096 || (sourceBytes[index] ?? 0) > 2 * 1024 * 1024) ||
-      sourceBytes.reduce((total, size) => total + size, 0) > 15 * 1024 * 1024) {
-      this.snackBar.open('Lua project exceeds a supported script count, ID, name, or size limit.', 'OK', { duration: 6000 });
+    if (
+      scripts.length > 256 ||
+      scripts.some(
+        (script, index) =>
+          script.id < 0 ||
+          script.id > 32767 ||
+          encoder.encode(script.name).byteLength > 4096 ||
+          (sourceBytes[index] ?? 0) > 2 * 1024 * 1024,
+      ) ||
+      sourceBytes.reduce((total, size) => total + size, 0) > 15 * 1024 * 1024
+    ) {
+      this.snackBar.open(
+        'Lua project exceeds a supported script count, ID, name, or size limit.',
+        'OK',
+        { duration: 6000 },
+      );
       return;
     }
     const bytes = exportLuaProject({
@@ -240,7 +256,9 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
       resourceSourceName: this.resourcesStatus(),
     });
     if (bytes.byteLength > 16 * 1024 * 1024) {
-      this.snackBar.open('Exported Lua project exceeds the 16 MiB project limit.', 'OK', { duration: 6000 });
+      this.snackBar.open('Exported Lua project exceeds the 16 MiB project limit.', 'OK', {
+        duration: 6000,
+      });
       return;
     }
     const downloadBuffer = new ArrayBuffer(bytes.byteLength);
@@ -259,42 +277,97 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
     if (input) input.value = '';
     if (!file) return;
     if (file.size > 16 * 1024 * 1024) {
-      this.snackBar.open('Lua project ZIP exceeds the 16 MiB import limit.', 'OK', { duration: 5000 });
+      this.snackBar.open('Lua project ZIP exceeds the 16 MiB import limit.', 'OK', {
+        duration: 5000,
+      });
       return;
     }
-    void file.arrayBuffer().then((buffer) => {
-      const result = importLuaProject(new Uint8Array(buffer), { allowInvalidLua: true });
-      result.match(
-        (project) => this.openLuaEditor(project),
-        (error) => this.snackBar.open(error, 'OK', { duration: 5000 }),
+    void file
+      .arrayBuffer()
+      .then((buffer) => {
+        const result = importLuaProject(new Uint8Array(buffer), { allowInvalidLua: true });
+        result.match(
+          (project) => this.openLuaEditor(project),
+          (error) => this.snackBar.open(error, 'OK', { duration: 5000 }),
+        );
+      })
+      .catch(() =>
+        this.snackBar.open('Could not read the selected Lua project file.', 'OK', {
+          duration: 5000,
+        }),
       );
-    }).catch(() => this.snackBar.open('Could not read the selected Lua project file.', 'OK', { duration: 5000 }));
   };
   private readonly luaDialog = inject(MatDialog);
-  readonly luaLevelResourceIds = computed(() => this.parsedLevels().map((level) => level.resourceId));
+  readonly luaLevelResourceIds = computed(() =>
+    this.parsedLevels().map((level) => level.resourceId),
+  );
 
   async openLuaEditor(initialProject?: LuaProjectInput): Promise<void> {
-    const { LuaScriptEditorDialogComponent } = await import('./editor/lua-script-editor-dialog.component');
+    const { LuaScriptEditorDialogComponent } =
+      await import('./editor/lua-script-editor-dialog.component');
     const scripts = this.scriptDefinitions() ?? [];
-    const script = scripts[0] ?? { id: 1, version: SCRIPT_FORMAT_VERSION, name: 'New script', source: 'function onLevelTick(ctx, dt)\n  \nend\n' };
-    const dialog = this.luaDialog.open<InstanceType<typeof LuaScriptEditorDialogComponent>, LuaScriptEditorDialogData, LuaScriptEditorDialogResult>(LuaScriptEditorDialogComponent, {
-      width: 'min(1680px, calc(100vw - 16px))', height: 'min(980px, calc(100vh - 16px))', maxWidth: '100vw', maxHeight: '100vh', disableClose: true,
-      data: { script, scripts, scriptBindings: this.scriptBindings() ?? [], levelScriptBindings: this.levelScriptBindings() ?? [],
-        levelResourceIds: this.luaLevelResourceIds(), objectTypeId: 0, objectTypes: this.objectTypeDefinitions(),
-        spriteFrames: this.packSpriteFrames(), audioEntries: this.audioEntries(), issues: this.scriptValidationIssues() ?? [],
-        resourceSourceName: this.resourcesStatus(), selectedLevelResourceId: this.selectedLevelId(), initialProject },
+    const script = scripts[0] ?? {
+      id: 1,
+      version: SCRIPT_FORMAT_VERSION,
+      name: 'New script',
+      source: 'function onLevelTick(ctx, dt)\n  \nend\n',
+    };
+    const dialog = this.luaDialog.open<
+      InstanceType<typeof LuaScriptEditorDialogComponent>,
+      LuaScriptEditorDialogData,
+      LuaScriptEditorDialogResult
+    >(LuaScriptEditorDialogComponent, {
+      width: 'min(1680px, calc(100vw - 16px))',
+      height: 'min(980px, calc(100vh - 16px))',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      disableClose: true,
+      data: {
+        script,
+        scripts,
+        scriptBindings: this.scriptBindings() ?? [],
+        levelScriptBindings: this.levelScriptBindings() ?? [],
+        levelResourceIds: this.luaLevelResourceIds(),
+        objectTypeId: 0,
+        objectTypes: this.objectTypeDefinitions(),
+        spriteFrames: this.packSpriteFrames(),
+        audioEntries: this.audioEntries(),
+        issues: this.scriptValidationIssues() ?? [],
+        resourceSourceName: this.resourcesStatus(),
+        selectedLevelResourceId: this.selectedLevelId(),
+        initialProject,
+      },
     });
-    dialog.afterClosed().subscribe((result) => { if (result) this.applyLuaEditorResult(result); });
+    dialog.afterClosed().subscribe((result) => {
+      if (result) this.applyLuaEditorResult(result);
+    });
   }
 
   applyLuaEditorResult(result: LuaScriptEditorChange): void {
     if (result.workspace) {
-      const workspace = { ...result.workspace, objectTypeIds: this.objectTypeDefinitions().map((type) => type.typeRes), soundIds: this.audioEntries().map((sound) => sound.id) };
+      const workspace = {
+        ...result.workspace,
+        objectTypeIds: this.objectTypeDefinitions().map((type) => type.typeRes),
+        soundIds: this.audioEntries().map((sound) => sound.id),
+      };
       const error = validateLuaWorkspace(workspace).find((issue) => issue.severity === 'error');
-      if (error) { this.snackBar.open(`Lua changes could not be applied: ${error.message}`, 'OK', { duration: 6000 }); return; }
-      actions.replaceLuaProjectScripts(this, [...workspace.scripts], [...workspace.scriptBindings], [...workspace.levelScriptBindings]);
+      if (error) {
+        this.snackBar.open(`Lua changes could not be applied: ${error.message}`, 'OK', {
+          duration: 6000,
+        });
+        return;
+      }
+      actions.replaceLuaProjectScripts(
+        this,
+        [...workspace.scripts],
+        [...workspace.scriptBindings],
+        [...workspace.levelScriptBindings],
+      );
     } else updateScript(this, result.scriptId, result.name, result.source);
-    if (result.testDriveLevelId !== undefined && this.parsedLevels().some((level) => level.resourceId === result.testDriveLevelId)) {
+    if (
+      result.testDriveLevelId !== undefined &&
+      this.parsedLevels().some((level) => level.resourceId === result.testDriveLevelId)
+    ) {
       void runSelectedLevelPreview(this, result.testDriveLevelId, false);
     }
   }
@@ -765,7 +838,15 @@ export class App extends AppStateResources implements OnInit, AfterViewInit, OnD
   onSpritePngUpload = (event: Event, frameId: number): Promise<void> =>
     onSpritePngUpload(this, event, frameId);
   addSpriteFrame = (): Promise<void> => addSpriteFrame(this);
+  closeImageEditor(): void {
+    this.spriteEditorOpen.set(false);
+    this.spriteEditorDirty.set(false);
+    this._editingTileId = null;
+    this._editingIconResource = null;
+  }
+
   onSpriteEditorSaved(event: { frameId: number; pixels: Uint8ClampedArray }): Promise<void> {
+    this.spriteEditorDirty.set(false);
     if (this._editingIconResource) {
       return this.media.onIconImageEditorSaved(event);
     }

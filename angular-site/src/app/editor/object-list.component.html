@@ -26,12 +26,17 @@
   </mat-form-field>
   <div
     class="[scrollbar-width:thin] [scrollbar-color:var(--surface4)_var(--bg)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[var(--bg)] [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[var(--surface4)] [&::-webkit-scrollbar-thumb:hover]:bg-[var(--muted)] min-h-0 flex-1 overflow-y-auto py-1"
+    (keydown)="onListKeydown($event)"
   >
     @for (idx of filteredIndices; track idx) {
       <app-editor-object-list-row
         [object]="objects[idx]"
         [index]="idx"
         [selected]="selectedIndex === idx"
+        [tabStop]="
+          selectedIndex === idx ||
+          (!filteredIndices.includes(selectedIndex ?? -1) && idx === filteredIndices[0])
+        "
         [getSpriteUrl]="getSpriteUrl"
         [getFallbackColor]="getFallbackColor"
         (selectedChange)="objectSelected.emit(idx)"

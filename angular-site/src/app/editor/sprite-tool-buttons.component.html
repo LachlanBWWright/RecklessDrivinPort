@@ -10,6 +10,8 @@
     [class.active]="this.tool === tool"
     (click)="toolChange.emit(tool)"
     [matTooltip]="tool"
+    [attr.aria-label]="tool"
+    [attr.aria-pressed]="this.tool === tool"
   >
     <mat-icon>{{ toolIcons[tool] }}</mat-icon>
   </button>

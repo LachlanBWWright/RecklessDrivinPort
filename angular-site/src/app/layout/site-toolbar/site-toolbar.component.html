@@ -4,6 +4,7 @@
   @if (activeTab === 'editor') {
     <app-site-toolbar-editor-actions
       [workerBusy]="workerBusy"
+      [imageEditing]="imageEditing"
       [hasEditorData]="hasEditorData"
       [hasUndownloadedChanges]="hasUndownloadedChanges"
       [editorError]="editorError"
@@ -68,6 +69,10 @@
 </mat-toolbar>
 
 <app-site-toolbar-dialogs
+  [deleteLevelId]="deleteLevelId === selectedLevelId ? deleteLevelId : null"
+  [canDeleteLevel]="!workerBusy && parsedLevels.length > 1"
+  (closeDelete)="deleteLevelId = null"
+  (confirmDelete)="confirmDeleteLevel()"
   [mergeDialogOpen]="mergeDialogOpen"
   [previewDialogOpen]="previewDialogOpen"
   [downloadDialogOpen]="downloadDialogOpen"
@@ -88,44 +93,3 @@
   (closeDownload)="closeDownloadDialog()"
   (confirmDownload)="confirmDownloadDialog()"
 />
-
-@if (deleteLevelId !== null && deleteLevelId === selectedLevelId) {
-  <div
-    class="fixed inset-0 z-[270] flex items-center justify-center bg-black/70 p-4"
-    (click)="deleteLevelId = null"
-  >
-    <mat-card
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="delete-level-title"
-      aria-describedby="delete-level-description"
-      cdkTrapFocus
-      [cdkTrapFocusAutoCapture]="true"
-      (keydown.escape)="deleteLevelId = null"
-      (click)="$event.stopPropagation()"
-      class="w-full max-w-[380px] border border-[var(--border)] bg-[var(--surface)]"
-    >
-      <mat-card-header
-        ><mat-card-title id="delete-level-title"
-          >Delete level {{ levelDisplayNum(deleteLevelId) }}?</mat-card-title
-        ></mat-card-header
-      >
-      <mat-card-content
-        ><p id="delete-level-description" class="!mt-4 text-[var(--muted)]">
-          The remaining levels will move up. This cannot be undone.
-        </p></mat-card-content
-      >
-      <mat-card-actions align="end">
-        <button mat-button cdkFocusInitial (click)="deleteLevelId = null">Cancel</button>
-        <button
-          mat-flat-button
-          class="!bg-[var(--danger)] !text-white"
-          [disabled]="workerBusy || parsedLevels.length <= 1"
-          (click)="confirmDeleteLevel()"
-        >
-          Delete level
-        </button>
-      </mat-card-actions>
-    </mat-card>
-  </div>
-}

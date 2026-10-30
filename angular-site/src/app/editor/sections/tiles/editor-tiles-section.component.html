@@ -4,6 +4,8 @@
   <mat-card-content class="!flex !min-h-0 !flex-1 !flex-col !p-0">
     <div class="flex h-full min-h-0 flex-1 gap-4 overflow-hidden max-[1100px]:flex-col">
       <app-editor-tiles-sidebar
+        [attr.inert]="imageEditing ? '' : null"
+        [class.opacity-60]="imageEditing"
         [roadInfoOptions]="roadInfoOptions"
         [selectedRoadInfoId]="selectedRoadInfoId"
         [tileTileEntries]="tileTileEntries"
@@ -23,20 +25,26 @@
         (deletedTile)="deleteTileImage.emit($event)"
       />
 
-      <app-editor-tiles-detail-panel
-        [selectedTileId]="selectedTileId"
-        [selectedRoadInfoData]="selectedRoadInfoData"
-        [selectedTileDimensions]="selectedTileDimensions"
-        [tileTileEntries]="tileTileEntries"
-        [audioEntries]="audioEntries"
-        [workerBusy]="workerBusy"
-        [getTileDataUrl]="getTileDataUrl"
-        [roadTextureForm]="roadTextureForm"
-        (openTileEditor)="openTileEditor.emit($event)"
-        (tilePngUpload)="tilePngUpload.emit($event)"
-        (exportTilePng)="exportTilePng.emit($event)"
-        (playRoadSkidSound)="playRoadSkidSound.emit($event)"
-      />
+      @if (imageEditing && imageEditorTemplate) {
+        <div class="flex min-h-0 min-w-0 flex-1 flex-col p-3" aria-label="Image editing workspace">
+          <ng-container [ngTemplateOutlet]="imageEditorTemplate" />
+        </div>
+      } @else {
+        <app-editor-tiles-detail-panel
+          [selectedTileId]="selectedTileId"
+          [selectedRoadInfoData]="selectedRoadInfoData"
+          [selectedTileDimensions]="selectedTileDimensions"
+          [tileTileEntries]="tileTileEntries"
+          [audioEntries]="audioEntries"
+          [workerBusy]="workerBusy"
+          [getTileDataUrl]="getTileDataUrl"
+          [roadTextureForm]="roadTextureForm"
+          (openTileEditor)="openTileEditor.emit($event)"
+          (tilePngUpload)="tilePngUpload.emit($event)"
+          (exportTilePng)="exportTilePng.emit($event)"
+          (playRoadSkidSound)="playRoadSkidSound.emit($event)"
+        />
+      }
     </div>
   </mat-card-content>
 </mat-card>

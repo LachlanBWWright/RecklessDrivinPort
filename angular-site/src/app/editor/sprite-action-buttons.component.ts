@@ -8,8 +8,9 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Output } from '@angul
       class="justify-start gap-1"
       (click)="save.emit()"
     >
-      <mat-icon>save</mat-icon> Save to file</button
+      <mat-icon>check</mat-icon> Apply changes</button
     ><button mat-stroked-button (click)="cancel.emit()">Cancel</button>`,
+  host: { class: 'flex shrink-0 items-center gap-2' },
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

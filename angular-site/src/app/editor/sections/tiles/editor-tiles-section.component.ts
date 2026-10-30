@@ -1,3 +1,4 @@
+import { type TemplateRef } from '@angular/core';
 import {
   Component,
   ChangeDetectionStrategy,
@@ -35,6 +36,9 @@ type TextureField =
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorTilesSectionComponent implements OnChanges {
+  @Input() imageEditing = false;
+  @Input() imageEditorTemplate: TemplateRef<unknown> | null = null;
+
   @Input() tileTileEntries: TextureTileEntry[] = [];
   @Input() roadTileGroups: RoadTileGroup[] = [];
   @Input() roadInfoOptions: RoadInfoOption[] = [];

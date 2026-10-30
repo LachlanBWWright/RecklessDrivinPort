@@ -15,25 +15,27 @@
     >
       <mat-icon>pan_tool</mat-icon>
     </button>
-    <button
-      mat-icon-button
-      class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
-      (click)="host.frameAll.emit()"
-      matTooltip="Frame all objects"
-      aria-label="Frame all objects"
-    >
-      <mat-icon>fit_screen</mat-icon>
-    </button>
-    <button
-      mat-icon-button
-      class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
-      (click)="host.centerSelected.emit()"
-      [disabled]="host.selectedObjIndex === null"
-      matTooltip="Center on selected"
-      aria-label="Center on selected"
-    >
-      <mat-icon>center_focus_strong</mat-icon>
-    </button>
+    @if (host.editingContext === 'objects') {
+      <button
+        mat-icon-button
+        class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+        (click)="host.frameAll.emit()"
+        matTooltip="Frame all objects"
+        aria-label="Frame all objects"
+      >
+        <mat-icon>fit_screen</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+        (click)="host.centerSelected.emit()"
+        [disabled]="host.selectedObjIndex === null"
+        matTooltip="Center on selected"
+        aria-label="Center on selected"
+      >
+        <mat-icon>center_focus_strong</mat-icon>
+      </button>
+    }
     <button
       mat-icon-button
       class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
@@ -83,154 +85,188 @@
       <mat-icon>redo</mat-icon>
     </button>
   </div>
-  <mat-divider [vertical]="true" class="!mx-1 !h-6 !border-r-[var(--border)] max-[640px]:!hidden" />
-  <div role="group" aria-label="Object placement" class="flex min-w-0 items-center gap-0.5">
-    <span class="mr-1 text-[11px] text-[var(--muted)]">Place</span>
-    <app-editor-canvas-object-type-select
-      [selectedTypeId]="host.selectedAddObjectTypeId"
-      [availableTypeIds]="host.availableTypeIds"
-      [disabled]="host.workerBusy"
-      [getSpriteUrl]="host.getSpriteUrl"
-      (typeChange)="host.addObjectTypeChange.emit($event)"
+  @if (host.editingContext === 'objects') {
+    <mat-divider
+      [vertical]="true"
+      class="!mx-1 !h-6 !border-r-[var(--border)] max-[640px]:!hidden"
     />
-    <button
-      mat-icon-button
-      class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
-      (click)="host.duplicateObject.emit()"
-      [disabled]="host.selectedObjIndex === null"
-      matTooltip="Duplicate selected (Ctrl+D)"
-      aria-label="Duplicate selected (Ctrl+D)"
-    >
-      <mat-icon>content_copy</mat-icon>
-    </button>
-    <button
-      mat-icon-button
-      class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
-      (click)="host.removeObject.emit()"
-      [disabled]="host.selectedObjIndex === null"
-      matTooltip="Remove selected (Del)"
-      aria-label="Remove selected (Del)"
-    >
-      <mat-icon>delete</mat-icon>
-    </button>
-  </div>
-  <mat-divider [vertical]="true" class="!mx-1 !h-6 !border-r-[var(--border)] max-[640px]:!hidden" />
-  <div
-    role="group"
-    aria-label="Road and marking tools"
-    class="flex min-w-0 flex-wrap items-center gap-0.5"
-  >
-    <span class="mr-1 text-[11px] text-[var(--muted)]">Road</span>
-    <mat-button-toggle-group
-      class="h-9 min-h-9 [&_.mat-button-toggle-button]:h-9 [&_.mat-button-toggle-label-content]:inline-flex [&_.mat-button-toggle-label-content]:h-9 [&_.mat-button-toggle-label-content]:items-center [&_.mat-button-toggle-label-content]:px-2 [&_.mat-button-toggle-label-content]:leading-9 [&_.mat-button-toggle]:h-9 [&_.mat-icon]:!h-[18px] [&_.mat-icon]:!w-[18px] [&_.mat-icon]:!text-[18px] [&_.mat-icon]:!leading-[18px]"
-      [value]="host.drawMode"
-      (change)="host.drawModeChange.emit($event.value)"
-      aria-label="Barrier drawing tools"
-    >
-      <mat-button-toggle value="freehand" matTooltip="Freehand barrier draw">
-        <mat-icon>gesture</mat-icon>
-      </mat-button-toggle>
-      <mat-button-toggle value="straight" matTooltip="Straight-line barrier draw">
-        <mat-icon>show_chart</mat-icon>
-      </mat-button-toggle>
-      <mat-button-toggle
-        value="curve"
-        matTooltip="Bezier-style barrier draw: click start, end, then bend"
+    <div role="group" aria-label="Object placement" class="flex min-w-0 items-center gap-0.5">
+      <span class="mr-1 text-[11px] text-[var(--muted)]">Place</span>
+      <app-editor-canvas-object-type-select
+        [selectedTypeId]="host.selectedAddObjectTypeId"
+        [availableTypeIds]="host.availableTypeIds"
+        [disabled]="host.workerBusy"
+        [getSpriteUrl]="host.getSpriteUrl"
+        (typeChange)="host.addObjectTypeChange.emit($event)"
+      />
+      <button
+        mat-icon-button
+        class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+        (click)="host.duplicateObject.emit()"
+        [disabled]="host.selectedObjIndex === null"
+        matTooltip="Duplicate selected (Ctrl+D)"
+        aria-label="Duplicate selected (Ctrl+D)"
       >
-        <mat-icon>timeline</mat-icon>
-      </mat-button-toggle>
-    </mat-button-toggle-group>
-    @if (host.drawMode !== 'none') {
-      <mat-button-toggle-group
-        class="h-9 min-h-9 [&_.mat-button-toggle-button]:h-9 [&_.mat-button-toggle-label-content]:inline-flex [&_.mat-button-toggle-label-content]:h-9 [&_.mat-button-toggle-label-content]:items-center [&_.mat-button-toggle-label-content]:px-2 [&_.mat-button-toggle-label-content]:leading-9 [&_.mat-button-toggle]:h-9 [&_.mat-icon]:!h-[18px] [&_.mat-icon]:!w-[18px] [&_.mat-icon]:!text-[18px] [&_.mat-icon]:!leading-[18px]"
-        [value]="host.barrierDrawSide"
-        (change)="host.barrierDrawSideChange.emit($event.value)"
-        matTooltip="Select which barrier side to draw"
+        <mat-icon>content_copy</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"
+        (click)="host.removeObject.emit()"
+        [disabled]="host.selectedObjIndex === null"
+        matTooltip="Remove selected (Del)"
+        aria-label="Remove selected (Del)"
       >
-        <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
-        <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
-        <mat-button-toggle
-          value="i"
-          matTooltip="Merge inner barriers: snap both v1 and v2 to the same drawn x"
-          >I</mat-button-toggle
-        >
-        <mat-button-toggle value="v2" matTooltip="Right inner barrier (v2)">Ri</mat-button-toggle>
-        <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
-      </mat-button-toggle-group>
-    }
-
-    <button
-      mat-icon-button
-      class="!h-9 !w-9 !p-0 !text-[var(--muted)]"
-      [matMenuTriggerFor]="marksMenu"
-      aria-label="Marking tools"
-      matTooltip="Marking tools"
-      [ngClass]="
-        host.showMarks ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]' : ''
-      "
-    >
-      <mat-icon>edit_location</mat-icon>
-    </button>
-    @if (host.markCreateMode) {
+        <mat-icon>delete</mat-icon>
+      </button>
+    </div>
+    <mat-divider
+      [vertical]="true"
+      class="!mx-1 !h-6 !border-r-[var(--border)] max-[640px]:!hidden"
+    />
+  } @else if (host.editingContext === 'tracks') {
+    <div role="group" aria-label="Track tools" class="flex items-center gap-2">
+      <span class="text-xs">Tracks</span>
       <button
         mat-button
-        class="!h-9 !min-w-0 !px-2 !text-[var(--accent)]"
-        (click)="host.confirmMarkCreate.emit()"
-        [disabled]="host.workerBusy"
-        matTooltip="Finish drawing this mark"
-        aria-label="Confirm drawn mark"
+        [attr.aria-pressed]="host.showTrackOverlay"
+        (click)="host.toggleTracks.emit()"
       >
-        <mat-icon>check</mat-icon><span>Confirm ({{ host.pendingMarkPointCount }})</span>
+        <mat-icon>{{ host.showTrackOverlay ? 'visibility_off' : 'visibility' }}</mat-icon>
+        {{ host.showTrackOverlay ? 'Hide tracks' : 'Show tracks' }}
       </button>
-    }
-    <mat-menu #marksMenu="matMenu">
-      <button mat-menu-item (click)="host.toggleMarks.emit()">
-        <mat-icon>{{ host.showMarks ? 'visibility_off' : 'visibility' }}</mat-icon
-        ><span>{{ host.showMarks ? 'Hide checkpoint marks' : 'Show checkpoint marks' }}</span>
+    </div>
+  } @else {
+    <span class="px-2 text-xs">Groups · Select a spawn range in the sidebar</span>
+  }
+  <button
+    mat-button
+    [attr.aria-expanded]="host.roadToolsOpen || host.markCreateMode"
+    (click)="host.toggleRoadTools()"
+  >
+    <mat-icon>edit_road</mat-icon>Road tools
+    <mat-icon iconPositionEnd>{{ host.roadToolsOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+  </button>
+  @if (host.roadToolsOpen || host.markCreateMode) {
+    <div
+      role="group"
+      aria-label="Road and marking tools"
+      class="flex min-w-0 flex-wrap items-center gap-0.5"
+    >
+      <span class="mr-1 text-[11px] text-[var(--muted)]">Road</span>
+      <mat-button-toggle-group
+        class="h-9 min-h-9 [&_.mat-button-toggle-button]:h-9 [&_.mat-button-toggle-label-content]:inline-flex [&_.mat-button-toggle-label-content]:h-9 [&_.mat-button-toggle-label-content]:items-center [&_.mat-button-toggle-label-content]:px-2 [&_.mat-button-toggle-label-content]:leading-9 [&_.mat-button-toggle]:h-9 [&_.mat-icon]:!h-[18px] [&_.mat-icon]:!w-[18px] [&_.mat-icon]:!text-[18px] [&_.mat-icon]:!leading-[18px]"
+        [value]="host.drawMode"
+        (change)="host.drawModeChange.emit($event.value)"
+        aria-label="Barrier drawing tools"
+      >
+        <mat-button-toggle value="freehand" matTooltip="Freehand barrier draw">
+          <mat-icon>gesture</mat-icon>
+        </mat-button-toggle>
+        <mat-button-toggle value="straight" matTooltip="Straight-line barrier draw">
+          <mat-icon>show_chart</mat-icon>
+        </mat-button-toggle>
+        <mat-button-toggle
+          value="curve"
+          matTooltip="Bezier-style barrier draw: click start, end, then bend"
+        >
+          <mat-icon>timeline</mat-icon>
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+      @if (host.drawMode !== 'none') {
+        <mat-button-toggle-group
+          class="h-9 min-h-9 [&_.mat-button-toggle-button]:h-9 [&_.mat-button-toggle-label-content]:inline-flex [&_.mat-button-toggle-label-content]:h-9 [&_.mat-button-toggle-label-content]:items-center [&_.mat-button-toggle-label-content]:px-2 [&_.mat-button-toggle-label-content]:leading-9 [&_.mat-button-toggle]:h-9 [&_.mat-icon]:!h-[18px] [&_.mat-icon]:!w-[18px] [&_.mat-icon]:!text-[18px] [&_.mat-icon]:!leading-[18px]"
+          [value]="host.barrierDrawSide"
+          (change)="host.barrierDrawSideChange.emit($event.value)"
+          matTooltip="Select which barrier side to draw"
+        >
+          <mat-button-toggle value="v0" matTooltip="Left outer barrier (v0)">L</mat-button-toggle>
+          <mat-button-toggle value="v1" matTooltip="Left inner barrier (v1)">Li</mat-button-toggle>
+          <mat-button-toggle
+            value="i"
+            matTooltip="Merge inner barriers: snap both v1 and v2 to the same drawn x"
+            >I</mat-button-toggle
+          >
+          <mat-button-toggle value="v2" matTooltip="Right inner barrier (v2)">Ri</mat-button-toggle>
+          <mat-button-toggle value="v3" matTooltip="Right outer barrier (v3)">R</mat-button-toggle>
+        </mat-button-toggle-group>
+      }
+
+      <button
+        mat-icon-button
+        class="!h-9 !w-9 !p-0 !text-[var(--muted)]"
+        [matMenuTriggerFor]="marksMenu"
+        aria-label="Marking tools"
+        matTooltip="Marking tools"
+        [ngClass]="
+          host.showMarks
+            ? '!bg-[color:rgba(229,57,53,0.14)] [&_mat-icon]:!text-[var(--accent)]'
+            : ''
+        "
+      >
+        <mat-icon>edit_location</mat-icon>
       </button>
-      @if (host.showMarks) {
-        <button mat-menu-item (click)="host.addMark.emit()" [disabled]="host.workerBusy">
-          <mat-icon>add_location</mat-icon><span>Add mark</span>
-        </button>
+      @if (host.markCreateMode) {
         <button
-          mat-menu-item
-          (click)="
-            host.markCreateMode ? host.confirmMarkCreate.emit() : host.startMarkCreate.emit()
-          "
+          mat-button
+          class="!h-9 !min-w-0 !px-2 !text-[var(--accent)]"
+          (click)="host.confirmMarkCreate.emit()"
           [disabled]="host.workerBusy"
+          matTooltip="Finish drawing this mark"
+          aria-label="Confirm drawn mark"
         >
-          <mat-icon>{{ host.markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon
-          ><span>{{
-            host.markCreateMode
-              ? 'Confirm mark (' + host.pendingMarkPointCount + ' points)'
-              : 'Draw mark by clicking'
-          }}</span>
-        </button>
-        <button
-          mat-menu-item
-          (click)="host.removeMark.emit()"
-          [disabled]="host.selectedMarkIndex === null || host.workerBusy"
-        >
-          <mat-icon>remove_circle_outline</mat-icon><span>Remove selected mark</span>
-        </button>
-        <button mat-menu-item (click)="host.toggleMarkingPopup()">
-          <mat-icon>auto_awesome</mat-icon
-          ><span>{{
-            host.showMarkingPopup ? 'Close marking generator' : 'Generate road markings'
-          }}</span>
+          <mat-icon>check</mat-icon><span>Confirm ({{ host.pendingMarkPointCount }})</span>
         </button>
       }
-    </mat-menu>
-    <app-editor-canvas-road-controls
-      [canvasForm]="host.canvasForm"
-      [editRoadInfo]="host.editRoadInfo"
-      [roadInfoOptions]="host.roadInfoOptions"
-      [getRoadInfoOption]="host.getRoadInfoOption"
-      (timeLimitFocus)="host.onTimeLimitFocus()"
-      (timeLimitBlur)="host.onTimeLimitBlur()"
-      (timeLimitCommit)="host.commitTimeLimit()"
-    />
-  </div>
+      <mat-menu #marksMenu="matMenu">
+        <button mat-menu-item (click)="host.toggleMarks.emit()">
+          <mat-icon>{{ host.showMarks ? 'visibility_off' : 'visibility' }}</mat-icon
+          ><span>{{ host.showMarks ? 'Hide checkpoint marks' : 'Show checkpoint marks' }}</span>
+        </button>
+        @if (host.showMarks) {
+          <button mat-menu-item (click)="host.addMark.emit()" [disabled]="host.workerBusy">
+            <mat-icon>add_location</mat-icon><span>Add mark</span>
+          </button>
+          <button
+            mat-menu-item
+            (click)="
+              host.markCreateMode ? host.confirmMarkCreate.emit() : host.startMarkCreate.emit()
+            "
+            [disabled]="host.workerBusy"
+          >
+            <mat-icon>{{ host.markCreateMode ? 'check_circle' : 'timeline' }}</mat-icon
+            ><span>{{
+              host.markCreateMode
+                ? 'Confirm mark (' + host.pendingMarkPointCount + ' points)'
+                : 'Draw mark by clicking'
+            }}</span>
+          </button>
+          <button
+            mat-menu-item
+            (click)="host.removeMark.emit()"
+            [disabled]="host.selectedMarkIndex === null || host.workerBusy"
+          >
+            <mat-icon>remove_circle_outline</mat-icon><span>Remove selected mark</span>
+          </button>
+          <button mat-menu-item (click)="host.toggleMarkingPopup()">
+            <mat-icon>auto_awesome</mat-icon
+            ><span>{{
+              host.showMarkingPopup ? 'Close marking generator' : 'Generate road markings'
+            }}</span>
+          </button>
+        }
+      </mat-menu>
+      <app-editor-canvas-road-controls
+        [canvasForm]="host.canvasForm"
+        [editRoadInfo]="host.editRoadInfo"
+        [roadInfoOptions]="host.roadInfoOptions"
+        [getRoadInfoOption]="host.getRoadInfoOption"
+        (timeLimitFocus)="host.onTimeLimitFocus()"
+        (timeLimitBlur)="host.onTimeLimitBlur()"
+        (timeLimitCommit)="host.commitTimeLimit()"
+      />
+    </div>
+  }
   <button
     mat-icon-button
     class="!h-9 !w-9 !p-0 !text-[var(--muted)] hover:[&_mat-icon]:!text-[var(--accent2)]"

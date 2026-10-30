@@ -1,7 +1,12 @@
 <span class="inline-flex gap-1"
-  ><button mat-icon-button (click)="undo.emit()" matTooltip="Undo (Ctrl+Z)">
+  ><button
+    mat-icon-button
+    (click)="undo.emit()"
+    matTooltip="Undo (Ctrl+Z)"
+    aria-label="Undo pixel edit"
+  >
     <mat-icon>undo</mat-icon></button
-  ><button mat-icon-button (click)="redo.emit()" matTooltip="Redo">
+  ><button mat-icon-button (click)="redo.emit()" matTooltip="Redo" aria-label="Redo pixel edit">
     <mat-icon>redo</mat-icon>
   </button></span
 >

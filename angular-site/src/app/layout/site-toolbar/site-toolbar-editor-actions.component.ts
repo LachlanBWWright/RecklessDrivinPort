@@ -34,6 +34,7 @@ export class SiteToolbarEditorActionsComponent {
       });
   }
 
+  @Input() imageEditing = false;
   @Input() workerBusy = false;
   @Input() hasEditorData = false;
   @Input() hasUndownloadedChanges = false;

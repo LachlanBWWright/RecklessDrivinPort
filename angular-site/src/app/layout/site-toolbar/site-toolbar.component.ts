@@ -34,6 +34,7 @@ export class SiteToolbarComponent {
   @Input() selectedLevelId: number | null = null;
   @Input() hasEditorData = false;
   @Input() hasUndownloadedChanges = false;
+  @Input() imageEditing = false;
   @Input() workerBusy = false;
   @Input() editorError = '';
   @Output() tabChange = new EventEmitter<SiteTab>();

@@ -1,3 +1,4 @@
+import { type TemplateRef } from '@angular/core';
 import {
   Component,
   ChangeDetectionStrategy,
@@ -18,6 +19,9 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorScreensSectionComponent implements OnChanges {
+  @Input() imageEditing = false;
+  @Input() imageEditorTemplate: TemplateRef<unknown> | null = null;
+
   @Input() iconEntries: { type: string; id: number; label: string }[] = [];
   @Input() selectedIconId: number | null = null;
   @Input() selectedIconType = 'ICN#';

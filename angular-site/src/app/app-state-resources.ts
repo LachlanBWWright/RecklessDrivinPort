@@ -90,13 +90,14 @@ export class AppStateResources extends AppStateBase {
     return this.packSpriteFrames().find((f) => f.id === id) ?? null;
   });
 
-  /** Whether the sprite pixel editor popup is open. */
+  /** Whether the sprite inline pixel editor is open. */
   spriteEditorOpen = signal(false);
-  /** The decoded frame currently being edited in the popup. */
+  spriteEditorDirty = signal(false);
+  /** The decoded frame currently being edited in the inline editor. */
   spriteEditorFrame = signal<DecodedSpriteFrame | null>(null);
   /** True when the sprite editor is being used to edit a tile (not a sprite). */
   _editingTileId: number | null = null;
-  /** Active screen/icon resource currently being edited in the sprite editor popup. */
+  /** Active screen/icon resource currently being edited in the inline image editor. */
   _editingIconResource: { type: string; id: number } | null = null;
 
   // ---- Raw resource browser ----

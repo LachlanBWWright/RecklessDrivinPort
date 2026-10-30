@@ -1,112 +1,96 @@
 @if (open && frame) {
-  <div
-    #overlayEl
-    class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-    (click)="close()"
-    (keydown.escape)="close()"
+  <section
+    #workspaceEl
+    role="region"
+    aria-label="Image pixel editor"
     tabindex="-1"
-    aria-modal="true"
-    role="dialog"
-    aria-label="Sprite pixel editor"
+    (keydown.escape)="close(); $event.stopPropagation()"
+    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--on-surface)]"
   >
-    <div
-      class="flex max-h-[94vh] w-[min(96vw,960px)] min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--on-surface)] shadow-[0_12px_48px_rgba(0,0,0,0.8)]"
-      (click)="$event.stopPropagation()"
+    <!-- Header -->
+    <mat-toolbar
+      class="!h-auto !min-h-12 shrink-0 flex-wrap gap-2 !py-1 border-b border-[var(--border)] !bg-[var(--bg)] !px-3"
+      color="primary"
     >
-      <!-- Header -->
-      <mat-toolbar
-        class="!h-12 !min-h-12 shrink-0 gap-2 border-b border-[var(--border)] !bg-[var(--bg)] !px-3"
-        color="primary"
+      <mat-icon class="text-[var(--accent)]">brush</mat-icon>
+      <span class="min-w-0 flex-1 text-[0.88rem] font-semibold text-[var(--on-surface)]"
+        >Edit image #{{ frame.frameId }} ({{ frame.width }}×{{ frame.height }} px ·
+        {{ frame.bitDepth }}-bit)</span
       >
-        <mat-icon class="text-[var(--accent)]">brush</mat-icon>
-        <span class="flex-1 text-[0.88rem] font-semibold text-[var(--on-surface)]"
-          >Sprite Editor – Frame #{{ frame.frameId }} ({{ frame.width }}×{{ frame.height }} px ·
-          {{ frame.bitDepth }}-bit)</span
-        >
-        <button
-          mat-icon-button
-          class="ml-auto"
-          (click)="close()"
-          aria-label="Close editor"
-          matTooltip="Close"
-        >
-          <mat-icon>close</mat-icon>
-        </button>
-      </mat-toolbar>
+      <app-sprite-action-buttons (save)="save()" (cancel)="close()" />
+    </mat-toolbar>
 
-      <!-- Body -->
-      <div class="flex min-h-0 flex-1 overflow-hidden max-sm:flex-col">
-        <!-- Left: canvas -->
-        <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:border-r sm:border-[var(--border)]">
-          <div class="[scrollbar-width:thin] flex-1 overflow-auto bg-[var(--bg)] p-2">
-            <canvas
-              #editorCanvas
-              class="block border border-[var(--border)] [image-rendering:pixelated]"
-              (mousedown)="onMouseDown($event)"
-              (mousemove)="onMouseMove($event)"
-              (mouseup)="onMouseUp()"
-              (mouseleave)="onMouseUp()"
-              (contextmenu)="$event.preventDefault()"
-              [style.cursor]="cursorStyle()"
-            ></canvas>
-          </div>
-          <div
-            class="flex shrink-0 items-center gap-2 border-t border-[var(--border)] px-2.5 py-1.5 text-[0.72rem] text-[var(--muted)]"
-          >
-            <span>{{ zoom }}× — {{ frame.width }}×{{ frame.height }} px</span>
-            <app-sprite-zoom-controls (zoomOut)="zoomOut()" (zoomIn)="zoomIn()" />
-          </div>
+    <p class="m-0 shrink-0 px-3 py-2 text-xs text-[var(--muted)]" role="status">
+      {{ dirty ? 'Unapplied changes' : 'Editing a working copy' }} · Apply changes or cancel to
+      return to the preview.
+    </p>
+    <!-- Body -->
+    <div class="flex min-h-0 flex-1 overflow-hidden max-sm:flex-col">
+      <!-- Left: canvas -->
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:border-r sm:border-[var(--border)]">
+        <div class="[scrollbar-width:thin] flex-1 overflow-auto bg-[var(--bg)] p-2">
+          <canvas
+            #editorCanvas
+            class="block border border-[var(--border)] [image-rendering:pixelated]"
+            (mousedown)="onMouseDown($event)"
+            (mousemove)="onMouseMove($event)"
+            (mouseup)="onMouseUp()"
+            (mouseleave)="onMouseUp()"
+            (contextmenu)="$event.preventDefault()"
+            [style.cursor]="cursorStyle()"
+          ></canvas>
         </div>
-
-        <!-- Right: tools + palette -->
         <div
-          class="[scrollbar-width:thin] [scrollbar-color:var(--surface4)_var(--bg)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[var(--bg)] [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[var(--surface4)] [&::-webkit-scrollbar-thumb:hover]:bg-[var(--muted)] flex w-60 shrink-0 flex-col gap-1.5 overflow-y-auto bg-[var(--surface)] p-3 max-sm:max-h-[40vh] max-sm:w-full max-sm:border-t max-sm:border-[var(--border)] sm:border-l sm:border-transparent"
+          class="flex shrink-0 items-center gap-2 border-t border-[var(--border)] px-2.5 py-1.5 text-[0.72rem] text-[var(--muted)]"
         >
-          <!-- Tools -->
-          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">Tool</div>
-          <div class="flex flex-wrap gap-1">
-            <!-- prettier-ignore -->
-            <app-sprite-tool-buttons [tools]="tools" [tool]="tool" [toolIcons]="toolIcons" (toolChange)="tool = $event" />
-            <app-sprite-history-buttons (undo)="undo()" (redo)="redo()" />
-          </div>
-
-          <!-- Brush size -->
-          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">
-            Brush size
-          </div>
-          <app-sprite-brush-controls
-            [brushSize]="brushSize"
-            [colorStyle]="colorStyle()"
-            [colorHex]="colorHex"
-            (colorInput)="setColorFromInput($event)"
-          />
-
-          <!-- Current colour -->
-
-          <!-- Palette from sprite -->
-          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">
-            Sprite palette
-          </div>
-          <app-sprite-palette-swatches
-            [colors]="palette"
-            emptyLabel="No colours extracted."
-            (colorSelected)="selectPaletteColor($event)"
-          />
-
-          <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">
-            Preset colours
-          </div>
-          <app-sprite-palette-swatches
-            [colors]="presetPalette"
-            (colorSelected)="selectPaletteColor($event)"
-          />
-
-          <!-- Actions -->
-          <div class="mt-auto flex flex-col gap-2 pt-3">
-            <app-sprite-action-buttons (save)="save()" (cancel)="close()" />
-          </div>
+          <span>{{ zoom }}× — {{ frame.width }}×{{ frame.height }} px</span>
+          <app-sprite-zoom-controls (zoomOut)="zoomOut()" (zoomIn)="zoomIn()" />
         </div>
       </div>
+
+      <!-- Right: tools + palette -->
+      <div
+        class="[scrollbar-width:thin] [scrollbar-color:var(--surface4)_var(--bg)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[var(--bg)] [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[var(--surface4)] [&::-webkit-scrollbar-thumb:hover]:bg-[var(--muted)] flex w-60 shrink-0 flex-col gap-1.5 overflow-y-auto bg-[var(--surface)] p-3 max-sm:max-h-[40vh] max-sm:w-full max-sm:border-t max-sm:border-[var(--border)] sm:border-l sm:border-transparent"
+      >
+        <!-- Tools -->
+        <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">Tool</div>
+        <div class="flex flex-wrap gap-1">
+          <!-- prettier-ignore -->
+          <app-sprite-tool-buttons [tools]="tools" [tool]="tool" [toolIcons]="toolIcons" (toolChange)="tool = $event" />
+          <app-sprite-history-buttons (undo)="undo()" (redo)="redo()" />
+        </div>
+
+        <!-- Brush size -->
+        <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">
+          Brush size
+        </div>
+        <app-sprite-brush-controls
+          [brushSize]="brushSize"
+          [colorStyle]="colorStyle()"
+          [colorHex]="colorHex"
+          (colorInput)="setColorFromInput($event)"
+        />
+
+        <!-- Current colour -->
+
+        <!-- Palette from sprite -->
+        <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">
+          Sprite palette
+        </div>
+        <app-sprite-palette-swatches
+          [colors]="palette"
+          emptyLabel="No colours extracted."
+          (colorSelected)="selectPaletteColor($event)"
+        />
+
+        <div class="mt-1 text-[0.7rem] uppercase tracking-[0.06em] text-[var(--muted)]">
+          Preset colours
+        </div>
+        <app-sprite-palette-swatches
+          [colors]="presetPalette"
+          (colorSelected)="selectPaletteColor($event)"
+        />
+      </div>
     </div>
-  </div>
+  </section>
 }
